@@ -1,0 +1,24 @@
+<Document start_line="5">
+  <head1 start_line="7">
+    NAME
+  </head1>
+  <Para start_line="9">
+    &#1050;&#1086;&#1075;&#1076;&#1072; &#1095;&#1080;&#1090;&#1072;&#1083;&#1072;
+    &#1090;&#1099; &#1084;&#1091;&#1095;&#1080;&#1090;&#1077;&#1083;&#1100;&#1085;&#1099;&#1077;
+    &#1089;&#1090;&#1088;&#1086;&#1082;&#1080; -- Fet&#39;s
+    &#34;When you were reading&#34;
+  </Para>
+  <head1 start_line="11">
+    TEXT
+  </head1>
+  <Para start_line="15">
+    (This is a test Pod pocument in KOI8-R.)
+  </Para>
+  <Para start_line="17">
+    15 &#65414;&#65413;&#65431;&#65426;&#65409;&#65420;&#65425;
+    1887
+  </Para>
+  <Para start_line="19">
+    [end]
+  </Para>
+</Document>
