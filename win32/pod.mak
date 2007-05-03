@@ -103,6 +103,8 @@ POD = \
 	perlpragma.pod	\
 	perlre.pod	\
 	perlreapi.pod	\
+	perlrebackslash.pod	\
+	perlrecharclass.pod	\
 	perlref.pod	\
 	perlreftut.pod	\
 	perlreguts.pod	\
@@ -116,7 +118,7 @@ POD = \
 	perlsyn.pod	\
 	perlthrtut.pod	\
 	perltie.pod	\
-	perltoc.pod	\
+	kurilatoc.pod	\
 	perltodo.pod	\
 	perltooc.pod	\
 	perltoot.pod	\
@@ -219,6 +221,8 @@ MAN = \
 	perlpragma.man	\
 	perlre.man	\
 	perlreapi.man	\
+	perlrebackslash.man	\
+	perlrecharclass.man	\
 	perlref.man	\
 	perlreftut.man	\
 	perlreguts.man	\
@@ -232,7 +236,7 @@ MAN = \
 	perlsyn.man	\
 	perlthrtut.man	\
 	perltie.man	\
-	perltoc.man	\
+	kurilatoc.man	\
 	perltodo.man	\
 	perltooc.man	\
 	perltoot.man	\
@@ -335,6 +339,8 @@ HTML = \
 	perlpragma.html	\
 	perlre.html	\
 	perlreapi.html	\
+	perlrebackslash.html	\
+	perlrecharclass.html	\
 	perlref.html	\
 	perlreftut.html	\
 	perlreguts.html	\
@@ -360,7 +366,7 @@ HTML = \
 	perlvar.html	\
 	perlxs.html	\
 	perlxstut.html	
-# not perltoc.html
+# not kurilatoc.html
 
 TEX = \
 	perl.tex	\
@@ -451,6 +457,8 @@ TEX = \
 	perlpragma.tex	\
 	perlre.tex	\
 	perlreapi.tex	\
+	perlrebackslash.tex	\
+	perlrecharclass.tex	\
 	perlref.tex	\
 	perlreftut.tex	\
 	perlreguts.tex	\
@@ -464,7 +472,7 @@ TEX = \
 	perlsyn.tex	\
 	perlthrtut.tex	\
 	perltie.tex	\
-	perltoc.tex	\
+	kurilatoc.tex	\
 	perltodo.tex	\
 	perltooc.tex	\
 	perltoot.tex	\
@@ -485,7 +493,7 @@ html:	pod2html $(HTML)
 tex:	pod2latex $(TEX)
 
 toc:
-	$(PERL) -I../lib buildtoc >perltoc.pod
+	$(PERL) -I../lib buildtoc >kurilatoc.pod
 
 .SUFFIXES: .pm .pod
 

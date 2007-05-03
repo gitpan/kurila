@@ -233,11 +233,11 @@ An unescaped C<$> or C<@> interpolates the corresponding variable,
 while escaping will cause the literal string C<\$> to be matched.
 You'll need to write something like C<m/\Quser\E\@\Qhost/>.
 
-=head3 Character classes
+=head3 Character Classes and other Special Escapes
 
 In addition, Perl defines the following:
 X<\w> X<\W> X<\s> X<\S> X<\d> X<\D> X<\X> X<\p> X<\P> X<\C>
-X<\g> X<\k> X<\N> X<\K> X<\v> X<\V>
+X<\g> X<\k> X<\N> X<\K>
 X<word> X<whitespace> X<character class> X<backreference>
 
     \w	     Match a "word" character (alphanumeric plus "_")
@@ -265,8 +265,7 @@ X<word> X<whitespace> X<character class> X<backreference>
     \x12     Hexadecimal escape sequence
     \x{1234} Long hexadecimal escape sequence
     \K       Keep the stuff left of the \K, don't include it in $&
-    \v       Shortcut for (*PRUNE)
-    \V       Shortcut for (*SKIP)
+    \R       Linebreak (matches like \v inside of a charclass)
 
 A C<\w> matches a single alphanumeric character (an alphabetic
 character, or a decimal digit) or C<_>, not a whole word.  Use C<\w+>
@@ -277,11 +276,20 @@ locale.  See L<perllocale>.  You may use C<\w>, C<\W>, C<\s>, C<\S>,
 C<\d>, and C<\D> within character classes, but they aren't usable
 as either end of a range. If any of them precedes or follows a "-",
 the "-" is understood literally. If Unicode is in effect, C<\s> matches
-also "\x{85}", "\x{2028}, and "\x{2029}". See L<perlunicode> for more
+also "\x{85}", "\x{2028}", and "\x{2029}". See L<perlunicode> for more
 details about C<\pP>, C<\PP>, C<\X> and the possibility of defining
 your own C<\p> and C<\P> properties, and L<perluniintro> about Unicode
 in general.
 X<\w> X<\W> X<word>
+
+C<\R> will atomically match a linebreak, including the network line-ending
+"\x0D\x0A".  Specifically, X<\R> is exactly equivelent to
+
+  (?>\x0D\x0A?|[\x0A-\x0C\x85\x{2028}\x{2029}])
+
+B<Note:> C<\R> has no special meaning inside of a character class;
+use C<\v> instead (vertical whitespace).
+X<\R>
 
 The POSIX character class syntax
 X<character class>
@@ -793,7 +801,7 @@ not include it in C<$&>. This effectively provides variable length
 look-behind. The use of C<\K> inside of another look-around assertion
 is allowed, but the behaviour is currently not well defined.
 
-For various reasons C<\K> may be signifigantly more efficient than the
+For various reasons C<\K> may be significantly more efficient than the
 equivalent C<< (?<=...) >> construct, and it is especially useful in
 situations where you want to efficiently remove something following
 something else in a string. For instance
@@ -820,7 +828,7 @@ X<< (?<NAME>) >> X<(?'NAME')> X<named capture> X<capture>
 
 A named capture buffer. Identical in every respect to normal capturing
 parentheses C<()> but for the additional fact that C<%+> may be used after
-a succesful match to refer to a named buffer. See C<perlvar> for more
+a successful match to refer to a named buffer. See C<perlvar> for more
 details on the C<%+> hash.
 
 If multiple distinct capture buffers have the same name then the
@@ -1442,7 +1450,7 @@ name of the most recently executed C<(*MARK:NAME)> that was involved
 in the match.
 
 This can be used to determine which branch of a pattern was matched
-without using a seperate capture buffer for each branch, which in turn
+without using a separate capture buffer for each branch, which in turn
 can result in a performance improvement, as perl cannot optimize
 C</(?:(x)|(y)|(z))/> as efficiently as something like
 C</(?:x(*MARK:x)|y(*MARK:y)|z(*MARK:z))/>.

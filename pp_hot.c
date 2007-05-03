@@ -127,15 +127,6 @@ PP(pp_sassign)
 	SV * const temp = left;
 	left = right; right = temp;
     }
-    else if (PL_op->op_private & OPpASSIGN_STATE) {
-	if (SvPADSTALE(right))
-	    SvPADSTALE_off(right);
-	else {
-	    (void)POPs;
-	    PUSHs(right);
-	    RETURN; /* ignore assignment */
-	}
-    }
     if (PL_tainting && PL_tainted && !SvTAINTED(left))
 	TAINT_NOT;
     if (PL_op->op_private & OPpASSIGN_CV_TO_GV) {
@@ -188,11 +179,6 @@ PP(pp_sassign)
 						 SvRV(cv)));
 	    SvREFCNT_dec(cv);
 	    LEAVE;
-	}
-
-	if (strEQ(GvNAME(right),"isa")) {
-	    GvCVGEN(right) = 0;
-	    ++PL_sub_generation;
 	}
     }
     SvSetMagicSV(right, left);
@@ -418,12 +404,13 @@ PP(pp_defined)
 		--SP;
             RETURNOP(cLOGOP->op_other);
         }
-    } else if (op_type == OP_DEFINED) {
+    }
+    else {
+	/* OP_DEFINED */
         sv = POPs;
         if (!sv || !SvANY(sv))
             RETPUSHNO;
-    } else
-        DIE(aTHX_ "panic:  Invalid op (%s) in pp_defined()", OP_NAME(PL_op));
+    }
 
     defined = FALSE;
     switch (SvTYPE(sv)) {
@@ -950,13 +937,6 @@ PP(pp_aassign)
     int duplicates = 0;
     SV **firsthashrelem = NULL;	/* "= 0" keeps gcc 2.95 quiet  */
 
-    if (PL_op->op_private & OPpASSIGN_STATE) {
-	if (SvPADSTALE(*firstlelem))
-	    SvPADSTALE_off(*firstlelem);
-	else
-	    RETURN; /* ignore assignment */
-    }
-
     PL_delaymagic = DM_DELAY;		/* catch simultaneous items */
     gimme = GIMME_V;
 
@@ -1157,7 +1137,7 @@ PP(pp_qr)
     dVAR; dSP;
     register PMOP * const pm = cPMOP;
     REGEXP * rx = PM_GETRE(pm);
-    SV * const pkg = CALLREG_QRPKG(rx);
+    SV * const pkg = CALLREG_PACKAGE(rx);
     SV * const rv = sv_newmortal();
     SV * const sv = newSVrv(rv, SvPV_nolen(pkg));
     if (rx->extflags & RXf_TAINTED)
@@ -3000,7 +2980,8 @@ S_method_common(pTHX_ SV* meth, U32* hashp)
 	if (he) {
 	    gv = (GV*)HeVAL(he);
 	    if (isGV(gv) && GvCV(gv) &&
-		(!GvCVGEN(gv) || GvCVGEN(gv) == PL_sub_generation))
+		(!GvCVGEN(gv) || GvCVGEN(gv)
+                  == (PL_sub_generation + HvMROMETA(stash)->cache_gen)))
 		return (SV*)GvCV(gv);
 	}
     }

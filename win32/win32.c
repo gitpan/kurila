@@ -1218,7 +1218,7 @@ kill_process_tree_toolhelp(DWORD pid, int sig)
     int killed = 0;
 
     process_handle = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
-    if (process_handle == INVALID_HANDLE_VALUE)
+    if (process_handle == NULL)
         return 0;
 
     killed += terminate_process(pid, process_handle, sig);
@@ -1253,7 +1253,7 @@ kill_process_tree_sysinfo(SYSTEM_PROCESSES *process_info, DWORD pid, int sig)
     int killed = 0;
 
     process_handle = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
-    if (process_handle == INVALID_HANDLE_VALUE)
+    if (process_handle == NULL)
         return 0;
 
     killed += terminate_process(pid, process_handle, sig);
@@ -1308,7 +1308,8 @@ my_kill(int pid, int sig)
         return killpg(pid, -sig);
 
     process_handle = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
-    if (process_handle != INVALID_HANDLE_VALUE) {
+    /* OpenProcess() returns NULL on error, *not* INVALID_HANDLE_VALUE */
+    if (process_handle != NULL) {
         retval = terminate_process(pid, process_handle, sig);
         CloseHandle(process_handle);
     }
@@ -4909,6 +4910,16 @@ Perl_sys_intern_init(pTHX)
 	/* Force C runtime signal stuff to set its console handler */
 	signal(SIGINT,win32_csighandler);
 	signal(SIGBREAK,win32_csighandler);
+
+        /* We spawn asynchronous processes with the CREATE_NEW_PROCESS_GROUP
+         * flag.  This has the side-effect of disabling Ctrl-C events in all
+         * processes in this group.  At least on Windows NT and later we
+         * can re-enable Ctrl-C handling by calling SetConsoleCtrlHandler()
+         * with a NULL handler.  This is not valid on Windows 9X.
+         */
+        if (IsWinNT())
+            SetConsoleCtrlHandler(NULL,FALSE);
+
 	/* Push our handler on top */
 	SetConsoleCtrlHandler(win32_ctrlhandler,TRUE);
     }

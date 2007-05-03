@@ -310,7 +310,7 @@ S_regcppop(pTHX_ const regexp *rex)
  - pregexec - match a regexp against a string
  */
 I32
-Perl_pregexec(pTHX_ register regexp *prog, char *stringarg, register char *strend,
+Perl_pregexec(pTHX_ REGEXP * const prog, char* stringarg, register char *strend,
 	 char *strbeg, I32 minend, SV *screamer, U32 nosave)
 /* strend: pointer to null at end of string */
 /* strbeg: real beginning of string */
@@ -374,7 +374,7 @@ Perl_pregexec(pTHX_ register regexp *prog, char *stringarg, register char *stren
    deleted from the finite automaton. */
 
 char *
-Perl_re_intuit_start(pTHX_ regexp *prog, SV *sv, char *strpos,
+Perl_re_intuit_start(pTHX_ REGEXP * const prog, SV *sv, char *strpos,
 		     char *strend, U32 flags, re_scream_pos_data *data)
 {
     dVAR;
@@ -1069,6 +1069,15 @@ REXEC_FBC_SCAN(                                       \
 if ((!reginfo || regtry(reginfo, &s))) \
     goto got_it
 
+#define REXEC_FBC_CSCAN(CoNdUtF8,CoNd)                         \
+    if (do_utf8) {                                             \
+	REXEC_FBC_UTF8_CLASS_SCAN(CoNdUtF8);                   \
+    }                                                          \
+    else {                                                     \
+	REXEC_FBC_CLASS_SCAN(CoNd);                            \
+    }                                                          \
+    break
+    
 #define REXEC_FBC_CSCAN_PRELOAD(UtFpReLoAd,CoNdUtF8,CoNd)      \
     if (do_utf8) {                                             \
 	UtFpReLoAd;                                            \
@@ -1278,6 +1287,12 @@ S_find_byclass(pTHX_ regexp * prog, const regnode *c, char *s,
 	    if ((!prog->minlen && !tmp) && (!reginfo || regtry(reginfo, &s)))
 		goto got_it;
 	    break;
+	case LNBREAK:
+	    Perl_croak(aTHX_ "foobar");
+	    REXEC_FBC_CSCAN(
+		is_LNBREAK_utf8(s),
+		is_LNBREAK_latin1(s)
+	    );
 	case AHOCORASICKC:
 	case AHOCORASICK: 
 	    {
@@ -1524,7 +1539,7 @@ S_swap_match_buff (pTHX_ regexp *prog) {
  - regexec_flags - match a regexp against a string
  */
 I32
-Perl_regexec_flags(pTHX_ register regexp *prog, char *stringarg, register char *strend,
+Perl_regexec_flags(pTHX_ REGEXP * const prog, char *stringarg, register char *strend,
 	      char *strbeg, I32 minend, SV *sv, void *data, U32 flags)
 /* strend: pointer to null at end of string */
 /* strbeg: real beginning of string */
@@ -3322,13 +3337,11 @@ S_regmatch(pTHX_ regmatch_info *reginfo, regnode *prog)
 			re = reg_temp_copy((regexp *)mg->mg_obj); /*XXX:dmq*/
 		    }
 		    else {
-			STRLEN len;
-			const char * const t = SvPV_const(ret, len);
 			U32 pm_flags = 0;
 			const I32 osize = PL_regsize;
 
 			if (DO_UTF8(ret)) pm_flags |= RXf_PMf_UTF8;
-			re = CALLREGCOMP((char*)t, (char*)t + len, pm_flags);
+			re = CALLREGCOMP(ret, pm_flags);
 			if (!(SvFLAGS(ret)
 			      & (SVs_TEMP | SVs_PADTMP | SVf_READONLY
 				| SVs_GMG)))
@@ -4630,6 +4643,13 @@ NULL
             sayNO;
             /* NOTREACHED */
 #undef ST
+        case LNBREAK:
+            if ((n=is_LNBREAK(locinput,do_utf8))) {
+                locinput += n;
+                nextchr = UCHARAT(locinput);
+            } else
+                sayNO;
+            break;
 
 	default:
 	    PerlIO_printf(Perl_error_log, "%"UVxf" %d\n",
@@ -4898,6 +4918,26 @@ S_regrepeat(pTHX_ const regexp *prog, const regnode *p, I32 max, int depth)
 	while (scan < loceol && REGINCLASS(prog, p, (U8*)scan))
 	    scan++;
 	break;
+    case LNBREAK:
+        if (do_utf8) {
+	    loceol = PL_regeol;
+	    while (hardcount < max && scan < loceol && (c=is_LNBREAK_utf8(scan))) {
+		scan += c;
+		hardcount++;
+	    }
+	} else {
+	    /*
+	      LNBREAK can match two latin chars, which is ok,
+	      because we have a null terminated string, but we
+	      have to use hardcount in this situation
+	    */
+	    while (scan < loceol && (c=is_LNBREAK_latin1(scan)))  {
+		scan+=c;
+		hardcount++;
+	    }
+	}	
+	break;
+
     default:		/* Called on something of 0 width. */
 	break;		/* So match right here or not at all. */
     }

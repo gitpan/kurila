@@ -571,6 +571,7 @@ MICROCORE_SRC	=		\
 		..\dump.c	\
 		..\globals.c	\
 		..\gv.c		\
+		..\mro.c	\
 		..\hv.c		\
 		..\mg.c		\
 		..\op.c		\
@@ -656,7 +657,7 @@ CORE_NOCFG_H	=		\
 		.\include\sys\socket.h	\
 		.\win32.h
 
-DYNAMIC_EXT	= Socket IO Fcntl Opcode SDBM_File POSIX attrs Thread B re \
+DYNAMIC_EXT	= Socket IO Fcntl Opcode SDBM_File POSIX attrs B re \
 		Data/Dumper Devel/Peek ByteLoader Devel/DProf File/Glob \
 		Sys/Hostname
 
@@ -790,6 +791,7 @@ $(DLLDIR)\doop.obj \
 $(DLLDIR)\dump.obj \
 $(DLLDIR)\globals.obj \
 $(DLLDIR)\gv.obj \
+$(DLLDIR)\mro.obj \
 $(DLLDIR)\hv.obj \
 $(DLLDIR)\locale.obj \
 $(DLLDIR)\mathoms.obj \

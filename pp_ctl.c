@@ -125,7 +125,7 @@ PP(pp_regcomp)
     }
     else {
 	STRLEN len;
-	const char *t = SvPV_const(tmpstr, len);
+	const char *t = SvOK(tmpstr) ? SvPV_const(tmpstr, len) : "";
 	re = PM_GETRE(pm);
 
 	/* Check against the last compiled regexp. */
@@ -148,9 +148,9 @@ PP(pp_regcomp)
 		PL_reginterp_cnt = I32_MAX; /* Mark as safe.  */
 
 	    if (eng) 
-	        PM_SETRE(pm, CALLREGCOMP_ENG(eng,(char *)t, (char *)t + len, pm_flags));
+	        PM_SETRE(pm, CALLREGCOMP_ENG(eng, tmpstr, pm_flags));
             else
-                PM_SETRE(pm, CALLREGCOMP((char *)t, (char *)t + len, pm_flags));
+                PM_SETRE(pm, CALLREGCOMP(tmpstr, pm_flags));
 
 	    PL_reginterp_cnt = 0;	/* XXXX Be extra paranoid - needed
 					   inside tie/overload accessors.  */
@@ -2374,7 +2374,7 @@ S_doeval(pTHX_ int gimme, OP** startop, CV* outside, U32 seq)
     SAVESPTR(PL_unitcheckav);
     PL_unitcheckav = newAV();
     SAVEFREESV(PL_unitcheckav);
-    SAVEI32(PL_error_count);
+    SAVEI8(PL_error_count);
 
 #ifdef PERL_MAD
     SAVEBOOL(PL_madskills);
@@ -2742,7 +2742,7 @@ PP(pp_require)
 			|| (*name == ':' && name[1] != ':' && strchr(name+2, ':'))
 #endif
 		  ) {
-		    const char *dir = SvPVx_nolen_const(dirsv);
+		    const char *dir = SvPV_nolen_const(dirsv);
 #ifdef MACOS_TRADITIONAL
 		    char buf1[256];
 		    char buf2[256];
@@ -2967,7 +2967,7 @@ PP(pp_entereval)
     /* prepare to compile string */
 
     if (PERLDB_LINE && PL_curstash != PL_debstash)
-	save_lines(CopFILEAV(&PL_compiling), PL_linestr);
+	save_lines(CopFILEAV(&PL_compiling), PL_parser->linestr);
     PUTBACK;
     ret = doeval(gimme, NULL, runcv, seq);
     if (PERLDB_INTER && was != (I32)PL_sub_generation /* Some subs defined here. */

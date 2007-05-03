@@ -48,6 +48,8 @@
 #define PL_pending_ident        (PL_parser->pending_ident)
 #define PL_preambled		(PL_parser->preambled)
 #define PL_sublex_info		(PL_parser->sublex_info)
+#define PL_linestr		(PL_parser->linestr)
+
 
 #ifdef PERL_MAD
 #  define PL_endwhite		(PL_parser->endwhite)
@@ -635,7 +637,7 @@ Perl_lex_start(pTHX_ SV *line)
 
     /* initialise lexer state */
 
-    SAVEI32(PL_lex_state);
+    SAVEI8(PL_lex_state);
 #ifdef PERL_MAD
     if (PL_lex_state == LEX_KNOWNEXT) {
 	I32 toke = parser->old_parser->lasttoke;
@@ -666,9 +668,8 @@ Perl_lex_start(pTHX_ SV *line)
     SAVEPPTR(PL_last_lop);
     SAVEPPTR(PL_last_uni);
     SAVEPPTR(PL_linestart);
-    SAVESPTR(PL_linestr);
     SAVEDESTRUCTOR_X(restore_rsfp, PL_rsfp);
-    SAVEINT(PL_expect);
+    SAVEI8(PL_expect);
 
     PL_copline = NOLINE;
     PL_lex_state = LEX_NORMAL;
@@ -685,22 +686,20 @@ Perl_lex_start(pTHX_ SV *line)
     } else {
 	len = 0;
     }
+
     if (!len) {
-	PL_linestr = newSVpvs("\n;");
+	parser->linestr = newSVpvs("\n;");
     } else if (SvREADONLY(line) || s[len-1] != ';') {
-	PL_linestr = newSVsv(line);
+	parser->linestr = newSVsv(line);
 	if (s[len-1] != ';')
-	    sv_catpvs(PL_linestr, "\n;");
+	    sv_catpvs(parser->linestr, "\n;");
     } else {
 	SvTEMP_off(line);
 	SvREFCNT_inc_simple_void_NN(line);
-	PL_linestr = line;
+	parser->linestr = line;
     }
-    /* PL_linestr needs to survive until end of scope, not just the next
-       FREETMPS. See changes 17505 and 17546 which fixed the symptoms only.  */
-    SAVEFREESV(PL_linestr);
-    PL_oldoldbufptr = PL_oldbufptr = PL_bufptr = PL_linestart = SvPVX(PL_linestr);
-    PL_bufend = PL_bufptr + SvCUR(PL_linestr);
+    PL_oldoldbufptr = PL_oldbufptr = PL_bufptr = PL_linestart = SvPVX(parser->linestr);
+    PL_bufend = PL_bufptr + SvCUR(parser->linestr);
     PL_last_lop = PL_last_uni = NULL;
     PL_rsfp = 0;
 }
@@ -711,6 +710,8 @@ Perl_lex_start(pTHX_ SV *line)
 void
 Perl_parser_free(pTHX_  const yy_parser *parser)
 {
+    SvREFCNT_dec(parser->linestr);
+
     Safefree(parser->stack);
     Safefree(parser->lex_brackstack);
     Safefree(parser->lex_casestack);
@@ -1590,7 +1591,7 @@ S_sublex_start(pTHX)
     }
 
     PL_sublex_info.super_state = PL_lex_state;
-    PL_sublex_info.sub_inwhat = op_type;
+    PL_sublex_info.sub_inwhat = (U16)op_type;
     PL_sublex_info.sub_op = PL_lex_op;
     PL_lex_state = LEX_INTERPPUSH;
 
@@ -1619,13 +1620,13 @@ S_sublex_push(pTHX)
     ENTER;
 
     PL_lex_state = PL_sublex_info.super_state;
-    SAVEI32(PL_lex_dojoin);
+    SAVEBOOL(PL_lex_dojoin);
     SAVEI32(PL_lex_brackets);
     SAVEI32(PL_lex_casemods);
     SAVEI32(PL_lex_starts);
-    SAVEI32(PL_lex_state);
+    SAVEI8(PL_lex_state);
     SAVEVPTR(PL_lex_inpat);
-    SAVEI32(PL_lex_inwhat);
+    SAVEI16(PL_lex_inwhat);
     SAVECOPLINE(PL_curcop);
     SAVEPPTR(PL_bufptr);
     SAVEPPTR(PL_bufend);
@@ -4916,8 +4917,7 @@ Perl_yylex(pTHX)
 	    }
 	    else if (gv && !gvp
 		     && -tmp==KEY_lock	/* XXX generalizable kludge */
-		     && GvCVu(gv)
-		     && !hv_fetchs(GvHVn(PL_incgv), "Thread.pm", FALSE))
+		     && GvCVu(gv))
 	    {
 		tmp = 0;		/* any sub overrides "weak" keyword */
 	    }
@@ -5859,7 +5859,7 @@ Perl_yylex(pTHX)
 	case KEY_our:
 	case KEY_my:
 	case KEY_state:
-	    PL_in_my = tmp;
+	    PL_in_my = (U16)tmp;
 	    s = SKIPSPACE1(s);
 	    if (isIDFIRST_lazy_if(s,UTF)) {
 #ifdef PERL_MAD

@@ -1,6 +1,6 @@
 /*    thdrvar.h
  *
- *    Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006
+ *    Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007
  *    by Larry Wall and others
  *
  *    You may distribute under the terms of either the GNU General Public
@@ -52,6 +52,7 @@ PERLVAR(Ttmps_stack,	SV **)		/* mortals we've made */
 PERLVARI(Ttmps_ix,	I32,	-1)
 PERLVARI(Ttmps_floor,	I32,	-1)
 PERLVAR(Ttmps_max,	I32)
+PERLVAR(Tmodcount,	I32)		/* how much mod()ification in assignment? */
 
 PERLVAR(Tmarkstack,	I32 *)		/* stack_sp locations we're remembering */
 PERLVAR(Tmarkstack_ptr,	I32 *)
@@ -85,7 +86,6 @@ PERLVAR(Ttimesbuf,	struct tms)
 #endif
 
 /* Fields used by magic variables such as $@, $/ and so on */
-PERLVAR(Ttainted,	bool)		/* using variables controlled by $< */
 PERLVAR(Tcurpm,		PMOP *)		/* what to do \ interps in REs from */
 
 /*
@@ -116,11 +116,6 @@ PERLVAR(Tcurstash,	HV *)		/* symbol table for current package */
 
 PERLVAR(Trestartop,	OP *)		/* propagating an error from croak? */
 PERLVARI(Tcurcop,	COP * VOL,	&PL_compiling)
-PERLVAR(Tin_eval,	VOL U8)	/* trap "fatal" errors? */
-PERLVAR(Tdelaymagic,	U16)		/* ($<,$>) = ... */
-PERLVARI(Tdirty,	bool, FALSE)	/* in the middle of tearing things down? */
-PERLVAR(Tlocalizing,	int)		/* are we processing a local() list? */
-
 PERLVAR(Tcurstack,	AV *)		/* THE STACK */
 PERLVAR(Tcurstackinfo,	PERL_SI *)	/* current stack + context */
 PERLVAR(Tmainstack,	AV *)		/* the stack when nothing funny is happening */
@@ -134,10 +129,8 @@ PERLVAR(Tav_fetch_sv,	SV *)		/* unused as of change #19268 */
 PERLVAR(Thv_fetch_sv,	SV *)		/* unused as of change #19268 */
 PERLVAR(Thv_fetch_ent_mh, HE*)		/* owned by hv_fetch_ent() */
 
-PERLVAR(Tmodcount,	I32)		/* how much mod()ification in assignment? */
 
 PERLVAR(Tlastgotoprobe,	OP*)		/* from pp_ctl.c */
-PERLVARI(Tdumpindent,	I32, 4)		/* # of blanks per dump indentation level */
 
 /* sort stuff */
 PERLVAR(Tsortcop,	OP *)		/* user defined sort routine */
@@ -153,18 +146,17 @@ PERLVAR(Tefloatsize,	STRLEN)
 
 PERLVAR(Tscreamfirst,	I32 *)
 PERLVAR(Tscreamnext,	I32 *)
-PERLVARI(Tmaxscream,	I32,	-1)
 PERLVAR(Tlastscream,	SV *)
 
 PERLVAR(Treg_state,	struct re_save_state)
 PERLVAR(Tregdummy,	regnode)	/* from regcomp.c */
-PERLVAR(Tcolorset,	int)		/* from regcomp.c */
 PERLVARA(Tcolors,6,	char *)		/* from regcomp.c */
 
 PERLVARI(Tpeepp,	peep_t, MEMBER_TO_FPTR(Perl_peep))
 					/* Pointer to peephole optimizer */
 
-PERLVARI(Treginterp_cnt,int,	    0)	/* Whether "Regexp" was interpolated. */
+PERLVARI(Tmaxscream,	I32,	-1)
+PERLVARI(Treginterp_cnt,I32,	    0)	/* Whether "Regexp" was interpolated. */
 PERLVARI(Twatchaddr,	char **,    0)
 PERLVAR(Twatchok,	char *)
 
@@ -176,3 +168,18 @@ PERLVAR(Twatchok,	char *)
 
 PERLVARI(Tregmatch_slab,	regmatch_slab *, NULL)
 PERLVAR(Tregmatch_state,	regmatch_state *)
+
+PERLVARI(Tdumpindent,	U16, 4)		/* # of blanks per dump indentation level */
+
+/* Put anything new that is pointer aligned here. */
+
+PERLVAR(Tdelaymagic,	U16)		/* ($<,$>) = ... */
+PERLVAR(Tlocalizing,	U8)		/* are we processing a local() list? */
+PERLVAR(Tcolorset,	bool)		/* from regcomp.c */
+PERLVARI(Tdirty,	bool, FALSE)	/* in the middle of tearing things down? */
+PERLVAR(Tin_eval,	VOL U8)	/* trap "fatal" errors? */
+PERLVAR(Ttainted,	bool)		/* using variables controlled by $< */
+
+/* For historical reasons this file is followed by intrpvar.h in the interpeter
+   struct. As this file currently ends with 7 bytes of variables, intrpvar.h
+   starts with one single U8, to avoid structure padding space wastage.  */

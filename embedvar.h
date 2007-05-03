@@ -224,6 +224,7 @@
 #define PL_incgv		(vTHX->Iincgv)
 #define PL_initav		(vTHX->Iinitav)
 #define PL_inplace		(vTHX->Iinplace)
+#define PL_isarev		(vTHX->Iisarev)
 #define PL_known_layers		(vTHX->Iknown_layers)
 #define PL_last_lop		(vTHX->Ilast_lop)
 #define PL_last_lop_op		(vTHX->Ilast_lop_op)
@@ -239,7 +240,6 @@
 #define PL_lex_state		(vTHX->Ilex_state)
 #define PL_lineary		(vTHX->Ilineary)
 #define PL_linestart		(vTHX->Ilinestart)
-#define PL_linestr		(vTHX->Ilinestr)
 #define PL_localpatches		(vTHX->Ilocalpatches)
 #define PL_lockhook		(vTHX->Ilockhook)
 #define PL_madskills		(vTHX->Imadskills)
@@ -270,7 +270,6 @@
 #define PL_nice_chunk		(vTHX->Inice_chunk)
 #define PL_nice_chunk_size	(vTHX->Inice_chunk_size)
 #define PL_nomemok		(vTHX->Inomemok)
-#define PL_numeric_compat1	(vTHX->Inumeric_compat1)
 #define PL_numeric_local	(vTHX->Inumeric_local)
 #define PL_numeric_name		(vTHX->Inumeric_name)
 #define PL_numeric_radix_sv	(vTHX->Inumeric_radix_sv)
@@ -376,9 +375,7 @@
 #define PL_utf8_xdigit		(vTHX->Iutf8_xdigit)
 #define PL_utf8cache		(vTHX->Iutf8cache)
 #define PL_utf8locale		(vTHX->Iutf8locale)
-#define PL_uudmap		(vTHX->Iuudmap)
 #define PL_warnhook		(vTHX->Iwarnhook)
-#define PL_widesyscalls		(vTHX->Iwidesyscalls)
 #define PL_xmlfp		(vTHX->Ixmlfp)
 
 #else	/* !MULTIPLICITY */
@@ -492,6 +489,7 @@
 #define PL_Iincgv		PL_incgv
 #define PL_Iinitav		PL_initav
 #define PL_Iinplace		PL_inplace
+#define PL_Iisarev		PL_isarev
 #define PL_Iknown_layers	PL_known_layers
 #define PL_Ilast_lop		PL_last_lop
 #define PL_Ilast_lop_op		PL_last_lop_op
@@ -507,7 +505,6 @@
 #define PL_Ilex_state		PL_lex_state
 #define PL_Ilineary		PL_lineary
 #define PL_Ilinestart		PL_linestart
-#define PL_Ilinestr		PL_linestr
 #define PL_Ilocalpatches	PL_localpatches
 #define PL_Ilockhook		PL_lockhook
 #define PL_Imadskills		PL_madskills
@@ -538,7 +535,6 @@
 #define PL_Inice_chunk		PL_nice_chunk
 #define PL_Inice_chunk_size	PL_nice_chunk_size
 #define PL_Inomemok		PL_nomemok
-#define PL_Inumeric_compat1	PL_numeric_compat1
 #define PL_Inumeric_local	PL_numeric_local
 #define PL_Inumeric_name	PL_numeric_name
 #define PL_Inumeric_radix_sv	PL_numeric_radix_sv
@@ -644,9 +640,7 @@
 #define PL_Iutf8_xdigit		PL_utf8_xdigit
 #define PL_Iutf8cache		PL_utf8cache
 #define PL_Iutf8locale		PL_utf8locale
-#define PL_Iuudmap		PL_uudmap
 #define PL_Iwarnhook		PL_warnhook
-#define PL_Iwidesyscalls	PL_widesyscalls
 #define PL_Ixmlfp		PL_xmlfp
 
 #define PL_TSv			PL_Sv

@@ -1496,8 +1496,18 @@ Perl_magic_setisa(pTHX_ SV *sv, MAGIC *mg)
 {
     dVAR;
     PERL_UNUSED_ARG(sv);
-    PERL_UNUSED_ARG(mg);
-    PL_sub_generation++;
+
+    /* The first case occurs via setisa,
+       the second via setisa_elem, which
+       calls this same magic */
+    mro_isa_changed_in(
+        GvSTASH(
+            SvTYPE(mg->mg_obj) == SVt_PVGV
+                ? (GV*)mg->mg_obj
+                : (GV*)SvMAGIC(mg->mg_obj)->mg_obj
+        )
+    );
+
     return 0;
 }
 
@@ -1507,7 +1517,6 @@ Perl_magic_setamagic(pTHX_ SV *sv, MAGIC *mg)
     dVAR;
     PERL_UNUSED_ARG(sv);
     PERL_UNUSED_ARG(mg);
-    /* HV_badAMAGIC_on(Sv_STASH(sv)); */
     PL_amagic_generation++;
 
     return 0;
@@ -1624,19 +1633,21 @@ U32
 Perl_magic_sizepack(pTHX_ SV *sv, MAGIC *mg)
 {
     dVAR; dSP;
-    U32 retval = 0;
+    I32 retval = 0;
 
     ENTER;
     SAVETMPS;
     PUSHSTACKi(PERLSI_MAGIC);
     if (magic_methcall(sv, mg, "FETCHSIZE", G_SCALAR, 2, NULL)) {
 	sv = *PL_stack_sp--;
-	retval = (U32) SvIV(sv)-1;
+	retval = SvIV(sv)-1;
+	if (retval < -1)
+	    Perl_croak(aTHX_ "FETCHSIZE returned a negative value");
     }
     POPSTACK;
     FREETMPS;
     LEAVE;
-    return retval;
+    return (U32) retval;
 }
 
 int
@@ -1881,6 +1892,8 @@ Perl_magic_setglob(pTHX_ SV *sv, MAGIC *mg)
 {
     GV* gv;
     PERL_UNUSED_ARG(mg);
+
+    Perl_croak(aTHX_ "Perl_magic_setglob is dead code?");
 
     if (!SvOK(sv))
 	return 0;

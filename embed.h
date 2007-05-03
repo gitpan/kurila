@@ -703,7 +703,7 @@
 #if defined(PERL_CORE) || defined(PERL_EXT)
 #define reg_named_buff_get	Perl_reg_named_buff_get
 #define reg_numbered_buff_get	Perl_reg_numbered_buff_get
-#define reg_qr_pkg		Perl_reg_qr_pkg
+#define reg_qr_package		Perl_reg_qr_package
 #endif
 #if defined(PERL_CORE) || defined(PERL_EXT)
 #define regprop			Perl_regprop
@@ -1234,7 +1234,6 @@
 #define incpush			S_incpush
 #define init_interp		S_init_interp
 #define init_ids		S_init_ids
-#define init_lexer		S_init_lexer
 #define init_main_stash		S_init_main_stash
 #define init_perllib		S_init_perllib
 #define init_postdump_symbols	S_init_postdump_symbols
@@ -1570,6 +1569,7 @@
 #define sv_copypv		Perl_sv_copypv
 #define my_atof2		Perl_my_atof2
 #define my_socketpair		Perl_my_socketpair
+#define my_dirfd		Perl_my_dirfd
 #ifdef PERL_OLD_COPY_ON_WRITE
 #if defined(PERL_CORE) || defined(PERL_EXT)
 #define sv_setsv_cow		Perl_sv_setsv_cow
@@ -1871,6 +1871,24 @@
 #endif
 #endif
 #if !defined(HAS_SIGNBIT)
+#endif
+#ifdef PERL_CORE
+#define mro_meta_init		Perl_mro_meta_init
+#endif
+#if defined(USE_ITHREADS)
+#ifdef PERL_CORE
+#define mro_meta_dup		Perl_mro_meta_dup
+#endif
+#endif
+#define mro_get_linear_isa	Perl_mro_get_linear_isa
+#define mro_get_linear_isa_c3	Perl_mro_get_linear_isa_c3
+#define mro_get_linear_isa_dfs	Perl_mro_get_linear_isa_dfs
+#ifdef PERL_CORE
+#define mro_isa_changed_in	Perl_mro_isa_changed_in
+#endif
+#define mro_method_changed_in	Perl_mro_method_changed_in
+#ifdef PERL_CORE
+#define boot_core_mro		Perl_boot_core_mro
 #endif
 #define ck_anoncode		Perl_ck_anoncode
 #define ck_bitop		Perl_ck_bitop
@@ -2928,8 +2946,8 @@
 #if defined(USE_ITHREADS)
 #define regdupe_internal(a,b)	Perl_regdupe_internal(aTHX_ a,b)
 #endif
-#define pregcomp(a,b,c)		Perl_pregcomp(aTHX_ a,b,c)
-#define re_compile(a,b,c)	Perl_re_compile(aTHX_ a,b,c)
+#define pregcomp(a,b)		Perl_pregcomp(aTHX_ a,b)
+#define re_compile(a,b)		Perl_re_compile(aTHX_ a,b)
 #define re_intuit_start(a,b,c,d,e,f)	Perl_re_intuit_start(aTHX_ a,b,c,d,e,f)
 #define re_intuit_string(a)	Perl_re_intuit_string(aTHX_ a)
 #define regexec_flags(a,b,c,d,e,f,g,h)	Perl_regexec_flags(aTHX_ a,b,c,d,e,f,g,h)
@@ -2937,7 +2955,7 @@
 #if defined(PERL_CORE) || defined(PERL_EXT)
 #define reg_named_buff_get(a,b,c)	Perl_reg_named_buff_get(aTHX_ a,b,c)
 #define reg_numbered_buff_get(a,b,c)	Perl_reg_numbered_buff_get(aTHX_ a,b,c)
-#define reg_qr_pkg(a)		Perl_reg_qr_pkg(aTHX_ a)
+#define reg_qr_package(a)	Perl_reg_qr_package(aTHX_ a)
 #endif
 #if defined(PERL_CORE) || defined(PERL_EXT)
 #define regprop(a,b,c)		Perl_regprop(aTHX_ a,b,c)
@@ -3462,12 +3480,11 @@
 #endif
 #if defined(PERL_IN_PERL_C) || defined(PERL_DECL_PROT)
 #ifdef PERL_CORE
-#define find_beginning()	S_find_beginning(aTHX)
+#define find_beginning(a)	S_find_beginning(aTHX_ a)
 #define forbid_setid(a,b)	S_forbid_setid(aTHX_ a,b)
 #define incpush(a,b,c,d,e)	S_incpush(aTHX_ a,b,c,d,e)
 #define init_interp()		S_init_interp(aTHX)
 #define init_ids()		S_init_ids(aTHX)
-#define init_lexer()		S_init_lexer(aTHX)
 #define init_main_stash()	S_init_main_stash(aTHX)
 #define init_perllib()		S_init_perllib(aTHX)
 #define init_postdump_symbols(a,b,c)	S_init_postdump_symbols(aTHX_ a,b,c)
@@ -3476,7 +3493,7 @@
 #define nuke_stacks()		S_nuke_stacks(aTHX)
 #define open_script(a,b,c,d)	S_open_script(aTHX_ a,b,c,d)
 #define usage(a)		S_usage(aTHX_ a)
-#define validate_suid(a,b,c,d)	S_validate_suid(aTHX_ a,b,c,d)
+#define validate_suid(a,b,c,d,e)	S_validate_suid(aTHX_ a,b,c,d,e)
 #endif
 #  if defined(IAMSUID)
 #ifdef PERL_CORE
@@ -3808,6 +3825,7 @@
 #define sv_copypv(a,b)		Perl_sv_copypv(aTHX_ a,b)
 #define my_atof2(a,b)		Perl_my_atof2(aTHX_ a,b)
 #define my_socketpair		Perl_my_socketpair
+#define my_dirfd(a)		Perl_my_dirfd(aTHX_ a)
 #ifdef PERL_OLD_COPY_ON_WRITE
 #if defined(PERL_CORE) || defined(PERL_EXT)
 #define sv_setsv_cow(a,b)	Perl_sv_setsv_cow(aTHX_ a,b)
@@ -4115,6 +4133,24 @@
 #if !defined(HAS_SIGNBIT)
 #endif
 #if defined(PERL_CORE) || defined(PERL_EXT)
+#endif
+#ifdef PERL_CORE
+#define mro_meta_init(a)	Perl_mro_meta_init(aTHX_ a)
+#endif
+#if defined(USE_ITHREADS)
+#ifdef PERL_CORE
+#define mro_meta_dup(a,b)	Perl_mro_meta_dup(aTHX_ a,b)
+#endif
+#endif
+#define mro_get_linear_isa(a)	Perl_mro_get_linear_isa(aTHX_ a)
+#define mro_get_linear_isa_c3(a,b)	Perl_mro_get_linear_isa_c3(aTHX_ a,b)
+#define mro_get_linear_isa_dfs(a,b)	Perl_mro_get_linear_isa_dfs(aTHX_ a,b)
+#ifdef PERL_CORE
+#define mro_isa_changed_in(a)	Perl_mro_isa_changed_in(aTHX_ a)
+#endif
+#define mro_method_changed_in(a)	Perl_mro_method_changed_in(aTHX_ a)
+#ifdef PERL_CORE
+#define boot_core_mro()		Perl_boot_core_mro(aTHX)
 #endif
 #define ck_anoncode(a)		Perl_ck_anoncode(aTHX_ a)
 #define ck_bitop(a)		Perl_ck_bitop(aTHX_ a)

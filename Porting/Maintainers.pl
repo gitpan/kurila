@@ -31,6 +31,7 @@ package Maintainers;
 	'jand'		=> 'Jan Dubois <jand@activestate.com>',
 	'jdhedden'	=> 'Jerry D. Hedden <jdhedden@cpan.org>',
 	'jhi'		=> 'Jarkko Hietaniemi <jhi@cpan.org>',
+	'jpeacock'	=> 'John Peacock <jpeacock@rowman.com>',
 	'jstowe'	=> 'Jonathan Stowe <jstowe@cpan.org>',
 	'jv'		=> 'Johan Vromans <jv@cpan.org>',
 	'kane'		=> 'Jos Boumans <kane@cpan.org>',
@@ -512,11 +513,13 @@ package Maintainers;
 		'CPAN'		=> 1,
 		},
 
+	# NB. tests are located in t/Module_Pluggable to avoid directory
+	# depth issues on VMS
 	'Module::Pluggable' =>
 		{
 		'MAINTAINER'	=> 'simonw',
 		'FILES'		=> q[lib/Module/Pluggable lib/Module/Pluggable.pm
-				     lib/Devel/InnerPackage.pm],
+				     lib/Devel/InnerPackage.pm t/Module_Pluggable],
 		'CPAN'		=> 1,
 		},
 
@@ -678,6 +681,13 @@ package Maintainers;
 		{
 		'MAINTAINER'	=> 'rgarcia',
 		'FILES'		=> q[lib/Switch.pm lib/Switch],
+		'CPAN'		=> 1,
+		},
+
+	'Sys::Syslog' =>
+		{
+		'MAINTAINER'	=> 'saper',
+		'FILES'		=> q[ext/Sys/Syslog],
 		'CPAN'		=> 1,
 		},
 
@@ -867,6 +877,20 @@ package Maintainers;
 		'MAINTAINER'	=> 'laun',
 		'FILES'		=> q[x2p/s2p.PL],
 		'CPAN'		=> 0,
+		},
+
+	'version' =>
+		{
+		'MAINTAINER'	=> 'jpeacock',
+		'FILES'		=> q[lib/version.pm lib/version.pod lib/version.t],
+		'CPAN'		=> 1,
+		},
+
+	'Perl6::Form' =>
+		{
+		'MAINTAINER'	=> 'dconway',
+		'FILES'		=> q[ext/Perl6-Form],
+		'CPAN'		=> 1,
 		},
 
 	);

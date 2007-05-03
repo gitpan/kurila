@@ -670,7 +670,7 @@ Ap	|void	|push_scope
 Amb	|OP*	|ref		|NULLOK OP* o|I32 type
 p	|OP*	|refkids	|NULLOK OP* o|I32 type
 Ap	|void	|regdump	|NN const regexp* r
-Ap	|I32	|pregexec	|NN regexp* prog|NN char* stringarg \
+Ap	|I32	|pregexec	|NN REGEXP * const prog|NN char* stringarg \
 				|NN char* strend|NN char* strbeg|I32 minend \
 				|NN SV* screamer|U32 nosave
 Ap	|void	|pregfree	|NULLOK struct regexp* r
@@ -678,22 +678,22 @@ EXp	|struct regexp*	|reg_temp_copy	|NN struct regexp* r
 Ap	|void	|regfree_internal|NULLOK struct regexp* r
 Ap	|char *	|reg_stringify  |NN MAGIC *mg|NULLOK STRLEN *lp|NULLOK U32 *flags|NULLOK I32 *haseval
 #if defined(USE_ITHREADS)
-Ap	|void*	|regdupe_internal|NN const regexp* r|NN CLONE_PARAMS* param
+Ap	|void*	|regdupe_internal|NN REGEXP * const r|NN CLONE_PARAMS* param
 #endif
-Ap	|regexp*|pregcomp	|NN char* exp|NN char* xend|U32 pm_flags
-Ap	|regexp*|re_compile	|NN char* exp|NN char* xend|U32 pm_flags
-Ap	|char*	|re_intuit_start|NN regexp* prog|NULLOK SV* sv|NN char* strpos \
-				|NN char* strend|U32 flags \
+Ap	|REGEXP*|pregcomp	|NN const SV * const pattern|const U32 flags
+Ap	|REGEXP*|re_compile	|NN const SV * const pattern|const U32 flags
+Ap	|char*	|re_intuit_start|NN REGEXP * const rx|NULLOK SV* sv|NN char* strpos \
+				|NN char* strend|const U32 flags \
 				|NULLOK struct re_scream_pos_data_s *data
-Ap	|SV*	|re_intuit_string|NN regexp* prog
-Ap	|I32	|regexec_flags	|NN regexp* prog|NN char* stringarg \
+Ap	|SV*	|re_intuit_string|NN REGEXP * const rx
+Ap	|I32	|regexec_flags	|NN REGEXP * const rx|NN char* stringarg \
 				|NN char* strend|NN char* strbeg|I32 minend \
 				|NN SV* screamer|NULLOK void* data|U32 flags
 ApR	|regnode*|regnext	|NN regnode* p
 
-EXp	|SV*|reg_named_buff_get	|NN const REGEXP * const rx|NN SV* namesv|U32 flags
-EXp	|SV*|reg_numbered_buff_get|NN const REGEXP * const rx|I32 paren|NULLOK SV* usesv
-EXp	|SV*|reg_qr_pkg|NN const REGEXP * const rx
+EXp	|SV*|reg_named_buff_get	|NN REGEXP * const rx|NN SV * const namesv|const U32 flags
+EXp	|void|reg_numbered_buff_get|NN REGEXP * const rx|const I32 paren|NULLOK SV * const usesv
+EXp	|SV*|reg_qr_package|NN REGEXP * const rx
 
 Ep	|void	|regprop	|NULLOK const regexp *prog|NN SV* sv|NN const regnode* o
 Ap	|void	|repeatcpy	|NN char* to|NN const char* from|I32 len|I32 count
@@ -1234,12 +1234,11 @@ s	|void	|Slab_to_rw	|NN void *op
 #endif
 
 #if defined(PERL_IN_PERL_C) || defined(PERL_DECL_PROT)
-s	|void	|find_beginning
+s	|void	|find_beginning	|NN SV* linestr_sv
 s	|void	|forbid_setid	|const char flag|const int suidscript
 s	|void	|incpush	|NULLOK const char *dir|bool addsubdirs|bool addoldvers|bool usesep|bool canrelocate
 s	|void	|init_interp
 s	|void	|init_ids
-s	|void	|init_lexer
 s	|void	|init_main_stash
 s	|void	|init_perllib
 s	|void	|init_postdump_symbols|int argc|NN char **argv|NULLOK char **env
@@ -1251,7 +1250,7 @@ s	|int	|open_script	|NN const char *scriptname|bool dosearch \
 s	|void	|usage		|NN const char *name
 s	|void	|validate_suid	|NN const char *validarg \
 				|NN const char *scriptname|int fdscript \
-				|int suidscript
+				|int suidscript|NN SV* linestr_sv
 #  if defined(IAMSUID)
 s	|int	|fd_on_nosuid_fs|int fd
 #  endif
@@ -1571,6 +1570,7 @@ Apd	|char*	|sv_pvn_force_flags|NN SV* sv|NULLOK STRLEN* lp|I32 flags
 Apd	|void	|sv_copypv	|NN SV* dsv|NN SV* ssv
 Ap	|char*	|my_atof2	|NN const char *s|NN NV* value
 Apn	|int	|my_socketpair	|int family|int type|int protocol|int fd[2]
+Ap	|int	|my_dirfd	|NULLOK DIR* dir
 #ifdef PERL_OLD_COPY_ON_WRITE
 pMXE	|SV*	|sv_setsv_cow	|NN SV* dsv|NN SV* ssv
 #endif
@@ -1842,6 +1842,17 @@ AMdnoP	|int	|Perl_signbit	|NV f
 
 XEMop	|void	|emulate_cop_io	|NN const COP *const c|NN SV *const sv
 XEMop	|regexp *|get_re_arg|NULLOK SV *sv|U32 flags|NULLOK MAGIC **mgp
+
+p	|struct mro_meta*	|mro_meta_init	|NN HV* stash
+#if defined(USE_ITHREADS)
+p	|struct mro_meta*	|mro_meta_dup	|NN struct mro_meta* smeta|NN CLONE_PARAMS* param
+#endif
+Apd	|AV*	|mro_get_linear_isa|NN HV* stash
+Apd	|AV*	|mro_get_linear_isa_c3|NN HV* stash|I32 level
+Apd	|AV*	|mro_get_linear_isa_dfs|NN HV* stash|I32 level
+pd	|void   |mro_isa_changed_in|NN HV* stash
+Apd	|void	|mro_method_changed_in	|NN HV* stash
+p	|void   |boot_core_mro
 
 END_EXTERN_C
 /*

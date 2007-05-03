@@ -1946,22 +1946,6 @@ S_unpack_rec(pTHX_ tempsym_t* symptr, const char *s, const char *strbeg, const c
 	    break;
 #endif
 	case 'u':
-	    /* MKS:
-	     * Initialise the decode mapping.  By using a table driven
-             * algorithm, the code will be character-set independent
-             * (and just as fast as doing character arithmetic)
-             */
-            if (PL_uudmap[(U8)'M'] == 0) {
-		size_t i;
-
-		for (i = 0; i < sizeof(PL_uuemap); ++i)
-                    PL_uudmap[(U8)PL_uuemap[i]] = i;
-                /*
-                 * Because ' ' and '`' map to the same value,
-                 * we need to decode them both the same.
-                 */
-                PL_uudmap[(U8)' '] = 0;
-            }
 	    {
                 const STRLEN l = (STRLEN) (strend - s) * 3 / 4;
 		sv = sv_2mortal(newSV(l));
@@ -1969,9 +1953,8 @@ S_unpack_rec(pTHX_ tempsym_t* symptr, const char *s, const char *strbeg, const c
 	    }
 		while (s < strend && *s > ' ' && ISUUCHAR(*s)) {
 		    I32 a, b, c, d;
-		    char hunk[4];
+		    char hunk[3];
 
-		    hunk[3] = '\0';
 		    len = PL_uudmap[*(U8*)s++] & 077;
 		    while (len > 0) {
 			if (s < strend && ISUUCHAR(*s))

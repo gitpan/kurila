@@ -1294,3 +1294,10 @@ X(\w+)(?=\s)|X(\w+)	Xab	y	[$1-$2]	[-ab]
 (?(DEFINE)(?<A>(?&B)+)(?<B>a))(?&A)	a	y	$&	a
 (?(DEFINE)(?<A>(?&B)+)(?<B>a))(?&A)	aa	y	$&	aa
 \x{100}?(??{""})xxx	xxx	y	$&	xxx
+
+foo(\R)bar	foo\r\nbar	y	$1	\r\n
+foo(\R)bar	foo\nbar	y	$1	\n
+foo(\R)bar	foo\rbar	y	$1	\r
+
+foo(\R+)bar	foo\r\n\x{85}\r\n\nbar	y	$1	\r\n\x{85}\r\n\n
+

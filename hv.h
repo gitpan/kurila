@@ -38,12 +38,32 @@ struct shared_he {
 
 /* Subject to change.
    Don't access this directly.
+   Use the funcs in mro.c
 */
+
+typedef enum {
+    MRO_DFS, /* 0 */
+    MRO_C3   /* 1 */
+} mro_alg;
+
+struct mro_meta {
+    AV      *mro_linear_dfs; /* cached dfs @ISA linearization */
+    AV      *mro_linear_c3;  /* cached c3 @ISA linearization */
+    HV      *mro_nextmethod; /* next::method caching */
+    U32     cache_gen;       /* Bumping this invalidates our method cache */
+    mro_alg mro_which;       /* which mro alg is in use? */
+};
+
+/* Subject to change.
+   Don't access this directly.
+*/
+
 struct xpvhv_aux {
     HEK		*xhv_name;	/* name, if a symbol table */
     AV		*xhv_backreferences; /* back references for weak references */
     HE		*xhv_eiter;	/* current entry of iterator */
     I32		xhv_riter;	/* current root of iterator */
+    struct mro_meta *xhv_mro_meta;
 };
 
 /* hash structure: */
@@ -240,6 +260,9 @@ C<SV*>.
 #define HvRITER_get(hv)	(SvOOK(hv) ? HvAUX(hv)->xhv_riter : -1)
 #define HvEITER_get(hv)	(SvOOK(hv) ? HvAUX(hv)->xhv_eiter : 0)
 #define HvNAME(hv)	HvNAME_get(hv)
+#define HvMROMETA(hv)	(SvOOK(hv) \
+			? (HvAUX(hv)->xhv_mro_meta ? HvAUX(hv)->xhv_mro_meta : mro_meta_init(hv)) \
+			: NULL)
 /* FIXME - all of these should use a UTF8 aware API, which should also involve
    getting the length. */
 /* This macro may go away without notice.  */
@@ -442,6 +465,15 @@ struct refcounted_he {
 #  define HINTS_REFCNT_INIT		NOOP
 #  define HINTS_REFCNT_TERM		NOOP
 #endif
+
+/* Hash actions
+ * Passed in PERL_MAGIC_uvar calls
+ */
+#define HV_DELETE          -1
+#define HV_FETCH_ISSTORE   0x01
+#define HV_FETCH_ISEXISTS  0x02
+#define HV_FETCH_LVALUE    0x04
+#define HV_FETCH_JUST_SV   0x08
 
 /*
  * Local variables:

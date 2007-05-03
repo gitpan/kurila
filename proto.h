@@ -1838,7 +1838,7 @@ PERL_CALLCONV OP*	Perl_refkids(pTHX_ OP* o, I32 type);
 PERL_CALLCONV void	Perl_regdump(pTHX_ const regexp* r)
 			__attribute__nonnull__(pTHX_1);
 
-PERL_CALLCONV I32	Perl_pregexec(pTHX_ regexp* prog, char* stringarg, char* strend, char* strbeg, I32 minend, SV* screamer, U32 nosave)
+PERL_CALLCONV I32	Perl_pregexec(pTHX_ REGEXP * const prog, char* stringarg, char* strend, char* strbeg, I32 minend, SV* screamer, U32 nosave)
 			__attribute__nonnull__(pTHX_1)
 			__attribute__nonnull__(pTHX_2)
 			__attribute__nonnull__(pTHX_3)
@@ -1854,28 +1854,26 @@ PERL_CALLCONV char *	Perl_reg_stringify(pTHX_ MAGIC *mg, STRLEN *lp, U32 *flags,
 			__attribute__nonnull__(pTHX_1);
 
 #if defined(USE_ITHREADS)
-PERL_CALLCONV void*	Perl_regdupe_internal(pTHX_ const regexp* r, CLONE_PARAMS* param)
+PERL_CALLCONV void*	Perl_regdupe_internal(pTHX_ REGEXP * const r, CLONE_PARAMS* param)
 			__attribute__nonnull__(pTHX_1)
 			__attribute__nonnull__(pTHX_2);
 
 #endif
-PERL_CALLCONV regexp*	Perl_pregcomp(pTHX_ char* exp, char* xend, U32 pm_flags)
-			__attribute__nonnull__(pTHX_1)
-			__attribute__nonnull__(pTHX_2);
+PERL_CALLCONV REGEXP*	Perl_pregcomp(pTHX_ const SV * const pattern, const U32 flags)
+			__attribute__nonnull__(pTHX_1);
 
-PERL_CALLCONV regexp*	Perl_re_compile(pTHX_ char* exp, char* xend, U32 pm_flags)
-			__attribute__nonnull__(pTHX_1)
-			__attribute__nonnull__(pTHX_2);
+PERL_CALLCONV REGEXP*	Perl_re_compile(pTHX_ const SV * const pattern, const U32 flags)
+			__attribute__nonnull__(pTHX_1);
 
-PERL_CALLCONV char*	Perl_re_intuit_start(pTHX_ regexp* prog, SV* sv, char* strpos, char* strend, U32 flags, struct re_scream_pos_data_s *data)
+PERL_CALLCONV char*	Perl_re_intuit_start(pTHX_ REGEXP * const rx, SV* sv, char* strpos, char* strend, const U32 flags, struct re_scream_pos_data_s *data)
 			__attribute__nonnull__(pTHX_1)
 			__attribute__nonnull__(pTHX_3)
 			__attribute__nonnull__(pTHX_4);
 
-PERL_CALLCONV SV*	Perl_re_intuit_string(pTHX_ regexp* prog)
+PERL_CALLCONV SV*	Perl_re_intuit_string(pTHX_ REGEXP * const rx)
 			__attribute__nonnull__(pTHX_1);
 
-PERL_CALLCONV I32	Perl_regexec_flags(pTHX_ regexp* prog, char* stringarg, char* strend, char* strbeg, I32 minend, SV* screamer, void* data, U32 flags)
+PERL_CALLCONV I32	Perl_regexec_flags(pTHX_ REGEXP * const rx, char* stringarg, char* strend, char* strbeg, I32 minend, SV* screamer, void* data, U32 flags)
 			__attribute__nonnull__(pTHX_1)
 			__attribute__nonnull__(pTHX_2)
 			__attribute__nonnull__(pTHX_3)
@@ -1887,14 +1885,14 @@ PERL_CALLCONV regnode*	Perl_regnext(pTHX_ regnode* p)
 			__attribute__nonnull__(pTHX_1);
 
 
-PERL_CALLCONV SV*	Perl_reg_named_buff_get(pTHX_ const REGEXP * const rx, SV* namesv, U32 flags)
+PERL_CALLCONV SV*	Perl_reg_named_buff_get(pTHX_ REGEXP * const rx, SV * const namesv, const U32 flags)
 			__attribute__nonnull__(pTHX_1)
 			__attribute__nonnull__(pTHX_2);
 
-PERL_CALLCONV SV*	Perl_reg_numbered_buff_get(pTHX_ const REGEXP * const rx, I32 paren, SV* usesv)
+PERL_CALLCONV void	Perl_reg_numbered_buff_get(pTHX_ REGEXP * const rx, const I32 paren, SV * const usesv)
 			__attribute__nonnull__(pTHX_1);
 
-PERL_CALLCONV SV*	Perl_reg_qr_pkg(pTHX_ const REGEXP * const rx)
+PERL_CALLCONV SV*	Perl_reg_qr_package(pTHX_ REGEXP * const rx)
 			__attribute__nonnull__(pTHX_1);
 
 
@@ -3333,12 +3331,13 @@ STATIC void	S_Slab_to_rw(pTHX_ void *op)
 #endif
 
 #if defined(PERL_IN_PERL_C) || defined(PERL_DECL_PROT)
-STATIC void	S_find_beginning(pTHX);
+STATIC void	S_find_beginning(pTHX_ SV* linestr_sv)
+			__attribute__nonnull__(pTHX_1);
+
 STATIC void	S_forbid_setid(pTHX_ const char flag, const int suidscript);
 STATIC void	S_incpush(pTHX_ const char *dir, bool addsubdirs, bool addoldvers, bool usesep, bool canrelocate);
 STATIC void	S_init_interp(pTHX);
 STATIC void	S_init_ids(pTHX);
-STATIC void	S_init_lexer(pTHX);
 STATIC void	S_init_main_stash(pTHX);
 STATIC void	S_init_perllib(pTHX);
 STATIC void	S_init_postdump_symbols(pTHX_ int argc, char **argv, char **env)
@@ -3357,9 +3356,10 @@ STATIC int	S_open_script(pTHX_ const char *scriptname, bool dosearch, SV *sv, in
 STATIC void	S_usage(pTHX_ const char *name)
 			__attribute__nonnull__(pTHX_1);
 
-STATIC void	S_validate_suid(pTHX_ const char *validarg, const char *scriptname, int fdscript, int suidscript)
+STATIC void	S_validate_suid(pTHX_ const char *validarg, const char *scriptname, int fdscript, int suidscript, SV* linestr_sv)
 			__attribute__nonnull__(pTHX_1)
-			__attribute__nonnull__(pTHX_2);
+			__attribute__nonnull__(pTHX_2)
+			__attribute__nonnull__(pTHX_5);
 
 #  if defined(IAMSUID)
 STATIC int	S_fd_on_nosuid_fs(pTHX_ int fd);
@@ -4154,6 +4154,7 @@ PERL_CALLCONV char*	Perl_my_atof2(pTHX_ const char *s, NV* value)
 			__attribute__nonnull__(pTHX_2);
 
 PERL_CALLCONV int	Perl_my_socketpair(int family, int type, int protocol, int fd[2]);
+PERL_CALLCONV int	Perl_my_dirfd(pTHX_ DIR* dir);
 #ifdef PERL_OLD_COPY_ON_WRITE
 PERL_CALLCONV SV*	Perl_sv_setsv_cow(pTHX_ SV* dsv, SV* ssv)
 			__attribute__nonnull__(pTHX_1)
@@ -4601,6 +4602,32 @@ PERL_CALLCONV void	Perl_emulate_cop_io(pTHX_ const COP *const c, SV *const sv)
 			__attribute__nonnull__(pTHX_2);
 
 PERL_CALLCONV regexp *	Perl_get_re_arg(pTHX_ SV *sv, U32 flags, MAGIC **mgp);
+
+PERL_CALLCONV struct mro_meta*	Perl_mro_meta_init(pTHX_ HV* stash)
+			__attribute__nonnull__(pTHX_1);
+
+#if defined(USE_ITHREADS)
+PERL_CALLCONV struct mro_meta*	Perl_mro_meta_dup(pTHX_ struct mro_meta* smeta, CLONE_PARAMS* param)
+			__attribute__nonnull__(pTHX_1)
+			__attribute__nonnull__(pTHX_2);
+
+#endif
+PERL_CALLCONV AV*	Perl_mro_get_linear_isa(pTHX_ HV* stash)
+			__attribute__nonnull__(pTHX_1);
+
+PERL_CALLCONV AV*	Perl_mro_get_linear_isa_c3(pTHX_ HV* stash, I32 level)
+			__attribute__nonnull__(pTHX_1);
+
+PERL_CALLCONV AV*	Perl_mro_get_linear_isa_dfs(pTHX_ HV* stash, I32 level)
+			__attribute__nonnull__(pTHX_1);
+
+PERL_CALLCONV void	Perl_mro_isa_changed_in(pTHX_ HV* stash)
+			__attribute__nonnull__(pTHX_1);
+
+PERL_CALLCONV void	Perl_mro_method_changed_in(pTHX_ HV* stash)
+			__attribute__nonnull__(pTHX_1);
+
+PERL_CALLCONV void	Perl_boot_core_mro(pTHX);
 
 END_EXTERN_C
 /*

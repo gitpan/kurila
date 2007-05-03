@@ -528,18 +528,18 @@ Bourne shell script functions that can make your life easier:
     function edit {
 	if [ -L $1 ]; then
 	    mv $1 $1.orig
-		cp $1.orig $1
-		vi $1
+	    cp $1.orig $1
+	    vi $1
 	else
-	    /bin/vi $1
-		fi
+	    vi $1
+	fi
     }
 
     function unedit {
 	if [ -L $1.orig ]; then
 	    rm $1
-		mv $1.orig $1
-		fi
+	    mv $1.orig $1
+	fi
     }
 
 Replace "vi" with your favorite flavor of editor.
@@ -549,15 +549,15 @@ files which have been edited in your symlink tree:
 
     mkpatchorig() {
 	local diffopts
-	    for f in `find . -name '*.orig' | sed s,^\./,,`
-		do
-		    case `echo $f | sed 's,.orig$,,;s,.*\.,,'` in
-			c)   diffopts=-p ;;
+	for f in `find . -name '*.orig' | sed s,^\./,,`
+	do
+	    case `echo $f | sed 's,.orig$,,;s,.*\.,,'` in
+		c)   diffopts=-p ;;
 		pod) diffopts='-F^=' ;;
 		*)   diffopts= ;;
-		esac
-		    diff -du $diffopts $f `echo $f | sed 's,.orig$,,'`
-		    done
+	    esac
+	    diff -du $diffopts $f `echo $f | sed 's,.orig$,,'`
+	done
     }
 
 This function produces patches which include enough context to make
@@ -602,8 +602,10 @@ the 5.8 pumpking decides which of those patches is to be backported to the
 maint branch.  Only patches that survive the heat of the development
 branch get applied to maintenance versions.
 
-Your patch should also update the documentation and test suite.  See
-L<Writing a test>.
+Your patch should update the documentation and test suite.  See
+L<Writing a test>.  If you have added or removed files in the distribution,
+edit the MANIFEST file accordingly, sort the MANIFEST file using
+C<make manisort>, and include those changes as part of your patch.
 
 Patching documentation also follows the same order: if accepted, a patch
 is first applied to B<development>, and if relevant then it's backported

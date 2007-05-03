@@ -542,6 +542,7 @@ GLOBEXE		= ..\perlglob.exe
 CONFIGPM	= ..\lib\Config.pm ..\lib\Config_heavy.pl
 MINIMOD		= ..\lib\ExtUtils\Miniperl.pm
 X2P		= ..\x2p\a2p.exe
+GENUUDMAP	= ..\generate_uudmap.exe
 !IF "$(BUILD_STATIC)" == "define"
 PERLSTATIC	= static
 !ELSE
@@ -647,6 +648,7 @@ MICROCORE_SRC	=		\
 		..\dump.c	\
 		..\globals.c	\
 		..\gv.c		\
+		..\mro.c	\
 		..\hv.c		\
 		..\locale.c	\
 		..\mathoms.c    \
@@ -751,6 +753,8 @@ CORE_NOCFG_H	=		\
 
 CORE_H		= $(CORE_NOCFG_H) .\config.h
 
+UUDMAP_H	= ..\uudmap.h
+
 MICROCORE_OBJ	= $(MICROCORE_SRC:.c=.obj)
 CORE_OBJ	= $(MICROCORE_OBJ) $(EXTRACORE_SRC:.c=.obj)
 WIN32_OBJ	= $(WIN32_SRC:.c=.obj)
@@ -761,6 +765,7 @@ MINIWIN32_OBJ	= $(WIN32_OBJ:.\=.\mini\)
 MINI_OBJ	= $(MINICORE_OBJ) $(MINIWIN32_OBJ)
 DLL_OBJ		= $(DLL_SRC:.c=.obj)
 X2P_OBJ		= $(X2P_SRC:.c=.obj)
+GENUUDMAP_OBJ	= $(GENUUDMAP:.exe=.obj)
 
 PERLDLL_OBJ	= $(CORE_OBJ)
 PERLEXE_OBJ	= perlmain$(o)
@@ -818,8 +823,17 @@ all : .\config.h $(GLOBEXE) $(MINIMOD) $(CONFIGPM) $(UNIDATAFILES) $(PERLEXE) \
 	cd ..
 	regcomp.pl
 	cd win32
+	
+..\regcharclass.h : ..\Porting\regcharclass.pl
+	cd ..
+	Porting\regcharclass.pl
+	cd win32
 
 regnodes : ..\regnodes.h
+
+..\regcomp$(o) : ..\regnodes.h ..\regcharclass.h	
+
+..\regexec$(o) : ..\regnodes.h ..\regcharclass.h
 
 reonly : regnodes .\config.h $(GLOBEXE) $(MINIMOD) $(CONFIGPM) $(UNIDATAFILES) \
 	$(PERLEXE) $(X2P) Extensions_reonly
@@ -953,6 +967,17 @@ $(X2P) : $(MINIPERL) $(X2P_OBJ)
 	$(MINIPERL) ..\x2p\s2p.PL
 	$(LINK32) -subsystem:console -out:$@ @<<
 		$(LINK_FLAGS) $(LIBFILES) $(X2P_OBJ)
+<<
+	$(EMBED_EXE_MANI)
+
+$(MINIDIR)\globals$(o) : $(UUDMAP_H)
+
+$(UUDMAP_H) : $(GENUUDMAP)
+	$(GENUUDMAP) >$(UUDMAP_H)
+
+$(GENUUDMAP) : $(GENUUDMAP_OBJ)
+	$(LINK32) -subsystem:console -out:$@ @<<
+		$(LINK_FLAGS) $(LIBFILES) $(GENUUDMAP_OBJ)
 <<
 	$(EMBED_EXE_MANI)
 
@@ -1121,7 +1146,6 @@ distclean: realclean
 	-del /f $(LIBDIR)\PerlIO\scalar.pm
 	-del /f $(LIBDIR)\PerlIO\via.pm
 	-del /f $(LIBDIR)\Sys\Hostname.pm
-	-del /f $(LIBDIR)\Thread\Signal.pm $(LIBDIR)\Thread\Specific.pm
 	-del /f $(LIBDIR)\threads\shared.pm
 	-del /f $(LIBDIR)\Time\HiRes.pm
 	-del /f $(LIBDIR)\Unicode\Normalize.pm
@@ -1273,6 +1297,7 @@ _clean :
 	-@$(DEL) $(PERLSTATICLIB)
 	-@$(DEL) $(PERLDLL)
 	-@$(DEL) $(CORE_OBJ)
+	-@$(DEL) $(GENUUDMAP) $(GENUUDMAP_OBJ) $(UUDMAP_H)
 	-if exist $(MINIDIR) rmdir /s /q $(MINIDIR)
 	-if exist $(UNIDATADIR1) rmdir /s /q $(UNIDATADIR1)
 	-if exist $(UNIDATADIR2) rmdir /s /q $(UNIDATADIR2)

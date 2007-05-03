@@ -196,10 +196,10 @@
 
 #define CALLRUNOPS  CALL_FPTR(PL_runops)
 
-#define CALLREGCOMP(exp, xend, pm) Perl_pregcomp(aTHX_ (exp),(xend),(pm))
+#define CALLREGCOMP(sv, flags) Perl_pregcomp(aTHX_ (sv),(flags))
 
-#define CALLREGCOMP_ENG(prog, exp, xend, pm) \
-    CALL_FPTR(((prog)->comp))(aTHX_ exp, xend, pm)
+#define CALLREGCOMP_ENG(prog, sv, flags) \
+    CALL_FPTR(((prog)->comp))(aTHX_ sv, flags)
 #define CALLREGEXEC(prog,stringarg,strend,strbeg,minend,screamer,data,flags) \
     CALL_FPTR((prog)->engine->exec)(aTHX_ (prog),(stringarg),(strend), \
         (strbeg),(minend),(screamer),(data),(flags))
@@ -225,8 +225,8 @@
 #define CALLREG_NAMEDBUF(rx,name,flags) \
     CALL_FPTR((rx)->engine->named_buff_get)(aTHX_ (rx),(name),(flags))
 
-#define CALLREG_QRPKG(rx) \
-    CALL_FPTR((rx)->engine->qr_pkg)(aTHX_ (rx))
+#define CALLREG_PACKAGE(rx) \
+    CALL_FPTR((rx)->engine->qr_package)(aTHX_ (rx))
 
 #if defined(USE_ITHREADS)         
 #define CALLREGDUPE(prog,param) \
@@ -3277,8 +3277,8 @@ struct nexttoken {
 
 typedef struct _sublex_info SUBLEXINFO;
 struct _sublex_info {
-    I32 super_state;	/* lexer state to save */
-    I32 sub_inwhat;	/* "lex_inwhat" to use */
+    U8 super_state;	/* lexer state to save */
+    U16 sub_inwhat;	/* "lex_inwhat" to use */
     OP *sub_op;		/* "lex_op" to use */
     char *super_bufptr;	/* PL_bufptr that was */
     char *super_bufend;	/* PL_bufend that was */
@@ -4058,11 +4058,14 @@ EXTCONST char PL_memory_wrap[]
 EXTCONST char PL_uuemap[65]
   INIT("`!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_");
 
-
 #ifdef DOINIT
+EXTCONST char PL_uudmap[256] =
+#include "uudmap.h"
+;
 EXTCONST char* const PL_sig_name[] = { SIG_NAME };
 EXTCONST int         PL_sig_num[]  = { SIG_NUM };
 #else
+EXTCONST char PL_uudmap[256];
 EXTCONST char* const PL_sig_name[];
 EXTCONST int         PL_sig_num[];
 #endif
@@ -4499,8 +4502,6 @@ struct interpreter {
     char broiled;
 };
 #endif /* MULTIPLICITY */
-
-typedef void *Thread;
 
 /* Done with PERLVAR macros for now ... */
 #undef PERLVAR

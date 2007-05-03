@@ -213,11 +213,6 @@ S_hv_notallowed(pTHX_ int flags, const char *key, I32 klen,
 /* (klen == HEf_SVKEY) is special for MAGICAL hv entries, meaning key slot
  * contains an SV* */
 
-#define HV_FETCH_ISSTORE   0x01
-#define HV_FETCH_ISEXISTS  0x02
-#define HV_FETCH_LVALUE    0x04
-#define HV_FETCH_JUST_SV   0x08
-
 /*
 =for apidoc hv_store
 
@@ -909,7 +904,7 @@ S_hv_delete_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
 
     if (keysv) {
 	if (SvSMAGICAL(hv) && SvGMAGICAL(hv))
-	    keysv = hv_magic_uvar_xkey(hv, keysv, -1);
+	    keysv = hv_magic_uvar_xkey(hv, keysv, HV_DELETE);
 	if (k_flags & HVhek_FREEKEY)
 	    Safefree(key);
 	key = SvPV_const(keysv, klen);
@@ -1452,7 +1447,7 @@ Perl_hv_free_ent(pTHX_ HV *hv, register HE *entry)
 	return;
     val = HeVAL(entry);
     if (val && isGV(val) && GvCVu(val) && HvNAME_get(hv))
-	PL_sub_generation++;	/* may be deletion of method from stash */
+        mro_method_changed_in(hv);	/* deletion of method from stash */
     SvREFCNT_dec(val);
     if (HeKLEN(entry) == HEf_SVKEY) {
 	SvREFCNT_dec(HeKEY_sv(entry));
@@ -1534,6 +1529,8 @@ Perl_hv_clear(pTHX_ HV *hv)
     HvREHASH_off(hv);
     reset:
     if (SvOOK(hv)) {
+        if(HvNAME_get(hv))
+            mro_isa_changed_in(hv);
 	HvEITER_set(hv, NULL);
     }
 }
@@ -1647,6 +1644,7 @@ S_hfreeentries(pTHX_ HV *hv)
 
 	if (SvOOK(hv)) {
 	    HE *entry;
+            struct mro_meta *meta;
 	    struct xpvhv_aux *iter = HvAUX(hv);
 	    /* If there are weak references to this HV, we need to avoid
 	       freeing them up here.  In particular we need to keep the AV
@@ -1677,6 +1675,14 @@ S_hfreeentries(pTHX_ HV *hv)
 	    }
 	    iter->xhv_riter = -1; 	/* HvRITER(hv) = -1 */
 	    iter->xhv_eiter = NULL;	/* HvEITER(hv) = NULL */
+
+            if((meta = iter->xhv_mro_meta)) {
+                if(meta->mro_linear_dfs) SvREFCNT_dec(meta->mro_linear_dfs);
+                if(meta->mro_linear_c3)  SvREFCNT_dec(meta->mro_linear_c3);
+                if(meta->mro_nextmethod) SvREFCNT_dec(meta->mro_nextmethod);
+                Safefree(meta);
+                iter->xhv_mro_meta = NULL;
+            }
 
 	    /* There are now no allocated pointers in the aux structure.  */
 
@@ -1761,8 +1767,12 @@ Perl_hv_undef(pTHX_ HV *hv)
 	return;
     DEBUG_A(Perl_hv_assert(aTHX_ hv));
     xhv = (XPVHV*)SvANY(hv);
+
+    if ((name = HvNAME_get(hv)) && !PL_dirty)
+        mro_isa_changed_in(hv);
+
     hfreeentries(hv);
-    if ((name = HvNAME_get(hv))) {
+    if (name) {
         if(PL_stashcache)
 	    hv_delete(PL_stashcache, name, HvNAMELEN_get(hv), G_DISCARD);
 	hv_name_set(hv, NULL, 0, 0);
@@ -1799,6 +1809,7 @@ S_hv_auxinit(HV *hv) {
     iter->xhv_eiter = NULL;	/* HvEITER(hv) = NULL */
     iter->xhv_name = 0;
     iter->xhv_backreferences = 0;
+    iter->xhv_mro_meta = NULL;
     return iter;
 }
 

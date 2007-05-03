@@ -55,13 +55,14 @@ See L<perlfunc/stat> about the S_I* constants.
 
 =cut
 
+use strict;
 our($VERSION, @ISA, @EXPORT, @EXPORT_OK, %EXPORT_TAGS, $AUTOLOAD);
 
 require Exporter;
 use XSLoader ();
 @ISA = qw(Exporter);
 BEGIN {
-  $VERSION = "1.05";
+  $VERSION = "1.06";
 }
 
 # Items to export into callers namespace by default
@@ -179,7 +180,7 @@ BEGIN {
 	SEEK_CUR
 	SEEK_END
 	SEEK_SET
-	S_IFSOCK S_IFBLK S_IFCHR S_IFIFO S_IFWHT
+	S_IFSOCK S_IFBLK S_IFCHR S_IFIFO S_IFWHT S_ENFMT
 	S_IREAD S_IWRITE S_IEXEC
 	S_IRGRP S_IWGRP S_IXGRP S_IRWXG
 	S_IROTH S_IWOTH S_IXOTH S_IRWXO
@@ -187,7 +188,7 @@ BEGIN {
 	S_ISUID S_ISGID S_ISVTX S_ISTXT
 	_S_IFMT S_IFREG S_IFDIR S_IFLNK
 	&S_ISREG &S_ISDIR &S_ISLNK &S_ISSOCK &S_ISBLK &S_ISCHR &S_ISFIFO
-	&S_ISWHT &S_IFMT &S_IMODE
+	&S_ISWHT &S_ISENFMT &S_IFMT &S_IMODE
 );
 # Named groups of exports
 %EXPORT_TAGS = (
@@ -214,17 +215,18 @@ BEGIN {
   XSLoader::load 'Fcntl', $VERSION;
 }
 
-sub S_IFMT  { @_ ? ( $_[0] & _S_IFMT ) : _S_IFMT  }
+sub S_IFMT  { @_ ? ( $_[0] & _S_IFMT() ) : _S_IFMT()  }
 sub S_IMODE { $_[0] & 07777 }
 
-sub S_ISREG    { ( $_[0] & _S_IFMT ) == S_IFREG   }
-sub S_ISDIR    { ( $_[0] & _S_IFMT ) == S_IFDIR   }
-sub S_ISLNK    { ( $_[0] & _S_IFMT ) == S_IFLNK   }
-sub S_ISSOCK   { ( $_[0] & _S_IFMT ) == S_IFSOCK  }
-sub S_ISBLK    { ( $_[0] & _S_IFMT ) == S_IFBLK   }
-sub S_ISCHR    { ( $_[0] & _S_IFMT ) == S_IFCHR   }
-sub S_ISFIFO   { ( $_[0] & _S_IFMT ) == S_IFIFO   }
-sub S_ISWHT    { ( $_[0] & _S_IFMT ) == S_IFWHT   }
+sub S_ISREG    { ( $_[0] & _S_IFMT() ) == S_IFREG()   }
+sub S_ISDIR    { ( $_[0] & _S_IFMT() ) == S_IFDIR()   }
+sub S_ISLNK    { ( $_[0] & _S_IFMT() ) == S_IFLNK()   }
+sub S_ISSOCK   { ( $_[0] & _S_IFMT() ) == S_IFSOCK()  }
+sub S_ISBLK    { ( $_[0] & _S_IFMT() ) == S_IFBLK()   }
+sub S_ISCHR    { ( $_[0] & _S_IFMT() ) == S_IFCHR()   }
+sub S_ISFIFO   { ( $_[0] & _S_IFMT() ) == S_IFIFO()   }
+sub S_ISWHT    { ( $_[0] & _S_IFMT() ) == S_IFWHT()   }
+sub S_ISENFMT  { ( $_[0] & _S_IFMT() ) == S_IFENFMT() }
 
 sub AUTOLOAD {
     (my $constname = $AUTOLOAD) =~ s/.*:://;
@@ -234,6 +236,7 @@ sub AUTOLOAD {
         my (undef,$file,$line) = caller;
         die "$error at $file line $line.\n";
     }
+    no strict 'refs';
     *$AUTOLOAD = sub { $val };
     goto &$AUTOLOAD;
 }
