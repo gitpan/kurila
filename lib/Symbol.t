@@ -5,7 +5,7 @@ BEGIN {
     @INC = '../lib';
 }
 
-use Test::More tests => 19;
+use Test::More tests => 24;
 
 BEGIN { $_ = 'foo'; }  # because Symbol used to clobber $_
 
@@ -44,14 +44,14 @@ is( $FOO, 'Eymascalar', 'leaves scalar alone' );
     local $^W=1;		# 5.005 compat.
     my $warn;
     local $SIG{__WARN__} = sub { $warn .= "@_" };
-    readline FOO;
+    readline *FOO;
     like( $warn, qr/unopened filehandle/, 'warns like an unopened filehandle' );
 }
 
 # Test qualify()
 package foo;
 
-use Symbol qw(qualify);  # must import into this package too
+use Symbol qw(qualify qualify_to_ref);  # must import into this package too
 
 ::ok( qualify("x") eq "foo::x",		'qualify() with a simple identifier' );
 ::ok( qualify("x", "FOO") eq "FOO::x",	'qualify() with a package' );
@@ -65,6 +65,22 @@ use Symbol qw(qualify);  # must import into this package too
     'qualify() with an identifier starting with a _' );
 ::ok( qualify("^FOO") eq "main::\cFOO",
     'qualify() with an identifier starting with a ^' );
+
+# Test qualify_to_ref()
+{
+    no strict 'refs';
+    ::ok( \*{qualify_to_ref("x")} eq \*foo::x, 'qualify_to_ref() with a simple identifier' );
+}
+
+# test fetch_glob()
+
+::ok( (ref Symbol::fetch_glob("x")) eq "GLOB", "fetch_glob returns a ref to a glob" );
+::ok( Symbol::fetch_glob("x") eq \*foo::x, "fetch_glob with unqualified name" );
+::ok( Symbol::fetch_glob("foo::x") eq \*foo::x, "fetch_glob with qualified name" );
+
+::ok( (ref Symbol::stash("foo")) eq "HASH", "stash returns a ref to a hash" );
+
+# test stash()
 
 # tests for delete_package
 package main;

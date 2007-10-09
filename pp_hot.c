@@ -811,8 +811,7 @@ PP(pp_rv2av)
 		    if (SvROK(sv))
 			goto wasref;
 		}
-		gv = Perl_softref2xv(aTHX_ sv, is_pp_rv2av ? an_array : a_hash,
-				     type, &sp);
+		gv = Perl_softref2xv(aTHX_ sv, is_pp_rv2av ? an_array : a_hash);
 		if (!gv)
 		    RETURN;
 	    }
@@ -1129,6 +1128,15 @@ PP(pp_aassign)
 	while (relem <= SP)
 	    *relem++ = (lelem <= lastlelem) ? *lelem++ : &PL_sv_undef;
     }
+
+    /* This is done at the bottom and in this order because
+       mro_isa_changed_in() can throw exceptions */
+    if(PL_delayedisa) {
+        HV* stash = PL_delayedisa;
+        PL_delayedisa = NULL;
+        mro_isa_changed_in(stash);
+    }
+
     RETURN;
 }
 
@@ -1233,9 +1241,12 @@ PP(pp_match)
 	    }
 	}
     }
-    /* remove comment to get faster /g but possibly unsafe $1 vars after a
-       match. Test for the unsafe vars will fail as well*/
-    if (( /* !global &&  */ rx->nparens) 
+    /* XXX: comment out !global get safe $1 vars after a
+       match, BUT be aware that this leads to dramatic slowdowns on
+       /g matches against large strings.  So far a solution to this problem
+       appears to be quite tricky.
+       Test for the unsafe vars are TODO for now. */
+    if ((  !global &&  rx->nparens) 
 	    || SvTEMP(TARG) || PL_sawampersand ||
 	    (rx->extflags & (RXf_EVAL_SEEN|RXf_PMf_KEEPCOPY)))
 	r_flags |= REXEC_COPY_STR;
@@ -1385,13 +1396,7 @@ yup:					/* Confirmed by INTUIT */
 	/* FIXME - should rx->subbeg be const char *?  */
 	rx->subbeg = (char *) truebase;
 	rx->offs[0].start = s - truebase;
-	if (IN_CODEPOINTS) {
-	    char * const t = (char*)utf8_hop((U8*)s, rx->minlenret);
-	    rx->offs[0].end = t - truebase;
-	}
-	else {
-	    rx->offs[0].end = s - truebase + rx->minlenret;
-	}
+	rx->offs[0].end = s - truebase + rx->minlenret;
 	rx->sublen = strend - truebase;
 	goto gotcha;
     }
@@ -2157,7 +2162,7 @@ PP(pp_subst)
 	    SPAGAIN;
 	    PUSHs(sv_2mortal(newSViv((I32)iters)));
 	}
-	(void)SvPOK_only_UTF8(TARG);
+	(void)SvPOK_only(TARG);
 	TAINT_IF(rxtainted);
 	if (SvSMAGICAL(TARG)) {
 	    PUTBACK;
@@ -2580,10 +2585,7 @@ PP(pp_entersub)
             }
 	    if (!sym)
 		DIE(aTHX_ PL_no_usym, "a subroutine");
-	    if (PL_op->op_private & HINT_STRICT_REFS)
-		DIE(aTHX_ PL_no_symref, sym, "a subroutine");
-	    cv = get_cvn_flags(sym, len, GV_ADD);
-	    break;
+	    DIE(aTHX_ PL_no_symref, sym, "a subroutine");
 	}
   got_rv:
 	{
@@ -2641,9 +2643,6 @@ try_autoload:
 
     gimme = GIMME_V;
     if ((PL_op->op_private & OPpENTERSUB_DB) && GvCV(PL_DBsub) && !CvNODEBUG(cv)) {
-        if (CvASSERTION(cv) && PL_DBassertion)
-	    sv_setiv(PL_DBassertion, 1);
-	
 	 Perl_get_db_sub(aTHX_ &sv, cv);
 	 if (CvISXSUB(cv))
 	     PL_curcopdb = PL_curcop;
@@ -2794,8 +2793,6 @@ PP(pp_aelem)
 	Perl_warner(aTHX_ packWARN(WARN_MISC),
 		    "Use of reference \"%"SVf"\" as array index",
 		    SVfARG(elemsv));
-    if (elem > 0)
-	elem -= CopARYBASE_get(PL_curcop);
     if (SvTYPE(av) != SVt_PVAV)
 	RETPUSHUNDEF;
     svp = av_fetch(av, elem, lval && !defer);

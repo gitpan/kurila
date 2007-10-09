@@ -1,8 +1,8 @@
 package Term::UI::History;
 
 use strict;
-use base 'Exporter';
 use base 'Log::Message::Simple';
+use base 'Exporter';
 
 =pod
 
@@ -56,7 +56,7 @@ BEGIN {
     for my $func ( @EXPORT ) {
         no strict 'refs';
         
-        *$func = sub {  my $msg     = shift;
+        *{Symbol::fetch_glob($func)} = sub {  my $msg     = shift;
                         $log->store(
                                 message => $msg,
                                 tag     => uc $func,

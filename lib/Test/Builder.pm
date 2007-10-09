@@ -983,6 +983,7 @@ DIAGNOSTIC
 
 # I'm not ready to publish this.  It doesn't deal with array return
 # values from the code or context.
+
 =begin private
 
 =item B<_try>
@@ -1145,7 +1146,7 @@ foreach my $attribute (qw(No_Header No_Ending No_Diag)) {
     };
 
     no strict 'refs';
-    *{__PACKAGE__.'::'.$method} = $code;
+    *{Symbol::fetch_glob(__PACKAGE__.'::'.$method)} = $code;
 }
 
 
@@ -1574,7 +1575,7 @@ sub todo {
     return 0 unless $pack;
 
     no strict 'refs';
-    return defined ${$pack.'::TODO'} ? ${$pack.'::TODO'}
+    return defined ${*{Symbol::fetch_glob($pack.'::TODO')}} ? ${*{Symbol::fetch_glob($pack.'::TODO')}}
                                      : 0;
 }
 

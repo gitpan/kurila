@@ -9,7 +9,7 @@ sub import {
     my $who = _who();
 
     {   no strict 'refs';
-        *{"${who}::load"} = *load;
+        *{Symbol::fetch_glob("${who}::load")} = *load;
     }
 }
 

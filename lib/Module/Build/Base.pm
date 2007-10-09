@@ -447,10 +447,7 @@ sub find_perl_interpreter {
   my $exe = $c->get('exe_ext');
   foreach my $thisperl ( @potential_perls ) {
 
-    if ($proto->os_type eq 'VMS') {
-      # VMS might have a file version at the end
-      $thisperl .= $exe unless $thisperl =~ m/$exe(;\d+)?$/i;
-    } elsif (defined $exe) {
+    if (defined $exe and $proto->os_type ne 'VMS') {
       $thisperl .= $exe unless $thisperl =~ m/$exe$/i;
     }
 
@@ -467,7 +464,7 @@ sub find_perl_interpreter {
 }
 
 sub _is_interactive {
-  return -t STDIN && (-t STDOUT || !(-f STDOUT || -c STDOUT)) ;   # Pipe?
+  return -t *STDIN && (-t *STDOUT || !(-f *STDOUT || -c *STDOUT)) ;   # Pipe?
 }
 
 # NOTE this is a blocking operation if(-t STDIN)
@@ -683,8 +680,9 @@ sub ACTION_config_data {
       unless ($class->can($property)) {
         no strict 'refs';
 	if ( $type eq 'HASH' ) {
-          *{"$class\::$property"} = sub {
+          *{Symbol::fetch_glob("$class\::$property")} = sub {
 	    my $self = shift;
+            $self = ${*{Symbol::fetch_glob("$self\::properties")}} ||= {} if not ref $self;
 	    my $x = $self->{properties};
 	    return $x->{$property} unless @_;
 
@@ -706,8 +704,9 @@ sub ACTION_config_data {
 	  };
 
         } else {
-          *{"$class\::$property"} = sub {
+          *{Symbol::fetch_glob("$class\::$property")} = sub {
 	    my $self = shift;
+            $self = ${*{Symbol::fetch_glob("$self\::properties")}} ||= {} if not ref $self;
 	    $self->{properties}{$property} = shift if @_;
 	    return $self->{properties}{$property};
 	  }
@@ -857,7 +856,7 @@ sub mb_parents {
               # Canonize the :: -> main::, ::foo -> main::foo thing.
               # Should I ever canonize the Foo'Bar = Foo::Bar thing?
               $seen{$c}++ ? () : $c;
-          } @{"$current\::ISA"};
+          } @{*{Symbol::fetch_glob("$current\::ISA")}};
 
         # I.e., if this class has any parents (at least, ones I've never seen
         # before), push them, in order, onto the stack of classes I need to
@@ -1211,7 +1210,7 @@ sub check_installed_status {
   if ($modname eq 'perl') {
     $status{have} = $self->perl_version;
   
-  } elsif (eval { no strict; $status{have} = ${"${modname}::VERSION"} }) {
+  } elsif (eval { no strict; $status{have} = ${*{Symbol::fetch_glob("${modname}::VERSION")}} }) {
     # Don't try to load if it's already loaded
     
   } else {
@@ -1633,6 +1632,10 @@ sub read_args {
   }
   $args{ARGV} = \@argv;
 
+  for ('extra_compiler_flags', 'extra_linker_flags') {
+    $args{$_} = [ $self->split_like_shell($args{$_}) ] if exists $args{$_};
+  }
+
   # Hashify these parameters
   for ($self->hash_properties, 'config') {
     next unless exists $args{$_};
@@ -1677,6 +1680,8 @@ sub read_args {
 }
 
 
+# (bash shell won't expand tildes mid-word: "--foo=~/thing")
+# TODO: handle ~user/foo
 sub _detildefy {
     my $arg = shift;
 
@@ -1838,7 +1843,7 @@ sub super_classes {
   $seen  ||= {};
   
   no strict 'refs';
-  my @super = grep {not $seen->{$_}++} $class, @{ $class . '::ISA' };
+  my @super = grep {not $seen->{$_}++} $class, @{*{Symbol::fetch_glob( $class . '::ISA')} };
   return @super, map {$self->super_classes($_,$seen)} @super;
 }
 
@@ -1849,7 +1854,7 @@ sub known_actions {
   no strict 'refs';
   
   foreach my $class ($self->super_classes) {
-    foreach ( keys %{ $class . '::' } ) {
+    foreach ( keys %{*{Symbol::fetch_glob( $class . '::')} } ) {
       $actions{$1}++ if /^ACTION_(\w+)/;
     }
   }
@@ -1865,6 +1870,7 @@ sub get_action_docs {
   my ($files_found, @docs) = (0);
   foreach my $class ($self->super_classes) {
     (my $file = $class) =~ s{::}{/}g;
+    # NOTE: silently skipping relative paths if any chdir() happened
     $file = $INC{$file . '.pm'} or next;
     my $fh = IO::File->new("< $file") or next;
     $files_found++;
@@ -1877,20 +1883,41 @@ sub get_action_docs {
       last if /^=head1 ACTIONS\s/;
     }
 
-    # Look for our action
-    my ($found, $inlist) = (0, 0);
+    # Look for our action and determine the style
+    my $style;
     while (<$fh>) {
-      if (/^=item\s+\Q$action\E\b/)  {
-        $found = 1;
-      } elsif (/^=(item|back)/) {
-        last if $found > 1 and not $inlist;
+      last if /^=head1 /;
+
+      # only item and head2 are allowed (3&4 are not in 5.005)
+      if(/^=(item|head2)\s+\Q$action\E\b/) {
+        $style = $1;
+        push @docs, $_;
+        last;
       }
-      next unless $found;
-      push @docs, $_;
-      ++$inlist if /^=over/;
-      --$inlist if /^=back/;
-      ++$found  if /^\w/; # Found descriptive text
     }
+    $style or next; # not here
+
+    # and the content
+    if($style eq 'item') {
+      my ($found, $inlist) = (0, 0);
+      while (<$fh>) {
+        if (/^=(item|back)/) {
+          last unless $inlist;
+        }
+        push @docs, $_;
+        ++$inlist if /^=over/;
+        --$inlist if /^=back/;
+      }
+    }
+    else { # head2 style
+      # stop at anything equal or greater than the found level
+      while (<$fh>) {
+        last if(/^=(?:head[12]|cut)/);
+        push @docs, $_;
+      }
+    }
+    # TODO maybe disallow overriding just pod for an action
+    # TODO and possibly: @docs and last;
   }
 
   unless ($files_found) {
@@ -2264,7 +2291,7 @@ sub process_script_files {
   
   foreach my $file (keys %$files) {
     my $result = $self->copy_if_modified($file, $script_dir, 'flatten') or next;
-    $self->fix_shebang_line($result) unless $self->os_type eq 'VMS';
+    $self->fix_shebang_line($result) unless $self->is_vmsish;
     $self->make_executable($result);
   }
 }
@@ -2351,7 +2378,7 @@ sub _find_file_by_type {
 
 sub localize_file_path {
   my ($self, $path) = @_;
-  $path =~ s/\.\z// if $self->os_type eq 'VMS';
+  $path =~ s/\.\z// if $self->is_vmsish;
   return File::Spec->catfile( split m{/}, $path );
 }
 
@@ -2384,7 +2411,7 @@ sub fix_shebang_line { # Adapted from fixin() in ExtUtils::MM_Unix 1.35
     $shb .= qq{
 eval 'exec $interpreter $arg -S \$0 \${1+"\$\@"}'
     if 0; # not running under some shell
-} unless $self->os_type eq 'Windows'; # this won't work on win32, so don't
+} unless $self->is_windowsish; # this won't work on win32, so don't
     
     my $FIXOUT = IO::File->new(">$file.new")
       or die "Can't create new $file: $!\n";
@@ -2435,6 +2462,18 @@ sub ACTION_testpodcoverage {
   eval q{use Test::Pod::Coverage 1.00; 1}
     or die "The 'testpodcoverage' action requires ",
            "Test::Pod::Coverage version 1.00";
+
+  # TODO this needs test coverage!
+
+  # XXX work-around a bug in Test::Pod::Coverage previous to v1.09
+  # Make sure we test the module in blib/
+  local @INC = @INC;
+  my $p = $self->{properties};
+  unshift(@INC,
+    # XXX any reason to include arch?
+    File::Spec->catdir($p->{base_dir}, $self->blib, 'lib'),
+    #File::Spec->catdir($p->{base_dir}, $self->blib, 'arch')
+  );
 
   all_pod_coverage_ok();
 }
@@ -3014,9 +3053,9 @@ EOF
       # when it actually only takes an input filehandle
 
       my $old_parse_file;
-      $old_parse_file = \&{"Pod::Simple::parse_file"}
+      $old_parse_file = \&{Symbol::fetch_glob("Pod::Simple::parse_file")}
 	and
-      local *{"Pod::Simple::parse_file"} = sub {
+      local *{Symbol::fetch_glob("Pod::Simple::parse_file")} = sub {
 	my $self = shift;
 	$self->output_fh($_[1]) if $_[1];
 	$self->$old_parse_file($_[0]);

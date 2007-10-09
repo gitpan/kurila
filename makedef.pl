@@ -6,7 +6,7 @@
 # and by AIX for creating libperl.a when -Dusershrplib is in effect,
 # and by MacOS Classic.
 #
-# reads global.sym, pp.sym, perlvars.h, intrpvar.h, thrdvar.h, config.h
+# reads global.sym, pp.sym, perlvars.h, intrpvar.h, config.h
 # On OS/2 reads miniperl.map and the previous version of perl5.def as well
 
 BEGIN { unshift @INC, "lib" }
@@ -72,7 +72,6 @@ my $exportperlmalloc = $PLATFORM eq 'os2';
 
 my $config_sh   = "config.sh";
 my $config_h    = "config.h";
-my $thrdvar_h   = "thrdvar.h";
 my $intrpvar_h  = "intrpvar.h";
 my $perlvars_h  = "perlvars.h";
 my $global_sym  = "global.sym";
@@ -86,13 +85,13 @@ if ($PLATFORM eq 'aix') {
 }
 elsif ($PLATFORM =~ /^win(?:32|ce)$/ || $PLATFORM eq 'netware') {
     $CCTYPE = "MSVC" unless defined $CCTYPE;
-    foreach ($thrdvar_h, $intrpvar_h, $perlvars_h, $global_sym,
+    foreach ($intrpvar_h, $perlvars_h, $global_sym,
 	     $pp_sym, $globvar_sym, $perlio_sym) {
 	s!^!..\\!;
     }
 }
 elsif ($PLATFORM eq 'MacOS') {
-    foreach ($thrdvar_h, $intrpvar_h, $perlvars_h, $global_sym,
+    foreach ($intrpvar_h, $perlvars_h, $global_sym,
 	     $pp_sym, $globvar_sym, $perlio_sym) {
 	s!^!::!;
     }
@@ -162,7 +161,11 @@ print STDERR "Defines: (" . join(' ', sort keys %define) . ")\n";
 if ($PLATFORM =~ /^win(?:32|ce)$/) {
     (my $dll = ($define{PERL_DLL} || "perl59")) =~ s/\.dll$//i;
     print "LIBRARY $dll\n";
-    print "DESCRIPTION 'Perl interpreter'\n";
+    # The DESCRIPTION module definition file statement is not supported
+    # by VC7 onwards.
+    if ($CCTYPE !~ /^MSVC7/ && $CCTYPE !~ /^MSVC8/) {
+	print "DESCRIPTION 'Perl interpreter'\n";
+    }
     print "EXPORTS\n";
     if ($define{PERL_IMPLICIT_SYS}) {
 	output_symbol("perl_get_host_info");
@@ -1158,7 +1161,7 @@ for my $syms (@syms) {
 # variables
 
 if ($define{'MULTIPLICITY'}) {
-    for my $f ($perlvars_h, $intrpvar_h, $thrdvar_h) {
+    for my $f ($perlvars_h, $intrpvar_h) {
 	my $glob = readvar($f, sub { "Perl_" . $_[1] . $_[2] . "_ptr" });
 	emit_symbols $glob;
     }
@@ -1175,10 +1178,6 @@ else {
     }
     unless ($define{'MULTIPLICITY'}) {
 	my $glob = readvar($intrpvar_h);
-	emit_symbols $glob;
-    }
-    unless ($define{'MULTIPLICITY'}) {
-	my $glob = readvar($thrdvar_h);
 	emit_symbols $glob;
     }
 }
@@ -1539,6 +1538,8 @@ foreach my $symbol (@stat_mods)
     {
 	try_symbol($symbol);
     }
+
+try_symbol("init_Win32CORE") if $static_ext =~ /\bWin32CORE\b/;
 
 # Now all symbols should be defined because
 # next we are going to output them.

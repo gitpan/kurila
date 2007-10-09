@@ -2,7 +2,7 @@
 
 require './test.pl';
 
-plan (125);
+plan (117);
 
 my (@ary, @foo, @bar, $tmp, $r, $foo, %foo, $F1, $F2, $Etc, %bar, $cnt);
 #
@@ -17,23 +17,6 @@ is($tmp, 5);
 is($#ary, 3);
 is(join('',@ary), '1234');
 
-$[ = 1;
-@ary = (1,2,3,4,5);
-is(join('',@ary), '12345');
-
-$tmp = $ary[$#ary]; --$#ary;
-is($tmp, 5);
-# Must do == here beacuse $[ isn't 0
-ok($#ary == 4);
-is(join('',@ary), '1234');
-
-is($ary[5], undef);
-
-$#ary += 1;	# see if element 5 gone for good
-ok($#ary == 5);
-ok(!defined $ary[5]);
-
-$[ = 0;
 @foo = ();
 $r = join(',', $#foo, @foo);
 is($r, "-1");
@@ -247,23 +230,6 @@ sub foo { "a" }
 my @foo=(foo())[0,0];
 is ($foo[1], "a");
 
-# $[ should have the same effect regardless of whether the aelem
-#    op is optimized to aelemfast.
-
-
-
-our @tary;
-
-sub tary {
-  local $[ = 10;
-  my $five = 5;
-  is ($tary[5], $tary[$five]);
-}
-
-@tary = (0..50);
-tary();
-
-
 # bugid #15439 - clearing an array calls destructors which may try
 # to modify the array - caused 'Attempt to free unreferenced scalar'
 
@@ -387,14 +353,14 @@ sub test_arylen {
     # Bug #37350
     no strict 'refs';
     my @array = (1..4);
-    $#{@array} = 7;
+    $#{*{Symbol::fetch_glob(scalar @array)}} = 7;
     is ($#{4}, 7);
 
     my $x;
     $#{$x} = 3;
     is(scalar @$x, 4);
 
-    push @{@array}, 23;
+    push @{*{Symbol::fetch_glob(scalar @array)}}, 23;
     is ($4[8], 23);
 }
 {
@@ -402,14 +368,14 @@ sub test_arylen {
     no strict 'refs';
     use vars '@array';
     @array = (1..4);
-    $#{@array} = 7;
+    $#{*{Symbol::fetch_glob(scalar @array)}} = 7;
     is ($#{4}, 7);
 
     my $x;
     $#{$x} = 3;
     is(scalar @$x, 4);
 
-    push @{@array}, 23;
+    push @{*{Symbol::fetch_glob(scalar @array)}}, 23;
     is ($4[8], 23);
 }
 

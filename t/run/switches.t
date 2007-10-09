@@ -120,7 +120,7 @@ is( $r, 'fooxbarx', '-l with octal number' );
 
 $r = runperl(
     switches	=> [ '-s' ],
-    prog	=> 'for (qw/abc def ghi/) {print defined $$_ ? $$_ : q(-)}',
+    prog	=> 'for (qw/abc def ghi/) {print defined ${*{Symbol::fetch_glob($_)}} ? ${*{Symbol::fetch_glob($_)}} : q(-)}',
     args	=> [ '--', '-abc=2', '-def', ],
 );
 is( $r, '21-', '-s switch parsing' );
@@ -237,7 +237,7 @@ SWTESTPM
 
     my $v = sprintf "%vd", $^V;
     like( runperl( switches => ['-v'] ),
-	  qr/This is perl, v$v (?:DEVEL\d+ )?built for \Q$Config{archname}\E.+Copyright.+Larry Wall.+Artistic License.+GNU General Public License/s,
+	  qr/This is kurila, v$v (?:DEVEL\w+ )?built for \Q$Config{archname}\E.+Copyright.+Gerard Goossen.+Artistic License.+GNU General Public License/s,
           '-v looks okay' );
 
 }

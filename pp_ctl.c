@@ -243,7 +243,7 @@ PP(pp_substcont)
 	    TAINT_IF(cx->sb_rxtainted & 1);
 	    PUSHs(sv_2mortal(newSViv(saviters - 1)));
 
-	    (void)SvPOK_only_UTF8(targ);
+	    (void)SvPOK_only(targ);
 	    TAINT_IF(cx->sb_rxtainted);
 	    SvSETMAGIC(targ);
 	    SvTAINT(targ);
@@ -925,7 +925,8 @@ Perl_qerror(pTHX_ SV *err)
 	sv_catsv(PL_errors, err);
     else
 	Perl_warn(aTHX_ "%"SVf, SVfARG(err));
-    ++PL_error_count;
+    if (PL_parser)
+	++PL_parser->error_count;
 }
 
 OP *
@@ -2211,7 +2212,7 @@ Perl_sv_compile_2op(pTHX_ SV *sv, OP** startop, const char *code, PAD** padp)
     STRLEN len;
 
     ENTER;
-    lex_start(sv);
+    lex_start(sv, NULL, FALSE);
     SAVETMPS;
     /* switch to eval mode */
 
@@ -2374,7 +2375,6 @@ S_doeval(pTHX_ int gimme, OP** startop, CV* outside, U32 seq)
     SAVESPTR(PL_unitcheckav);
     PL_unitcheckav = newAV();
     SAVEFREESV(PL_unitcheckav);
-    SAVEI8(PL_error_count);
 
 #ifdef PERL_MAD
     SAVEBOOL(PL_madskills);
@@ -2384,14 +2384,12 @@ S_doeval(pTHX_ int gimme, OP** startop, CV* outside, U32 seq)
     /* try to compile it */
 
     PL_eval_root = NULL;
-    PL_error_count = 0;
     PL_curcop = &PL_compiling;
-    CopARYBASE_set(PL_curcop, 0);
     if (saveop && (saveop->op_type != OP_REQUIRE) && (saveop->op_flags & OPf_SPECIAL))
 	PL_in_eval |= EVAL_KEEPERR;
     else
 	sv_setpvn(ERRSV,"",0);
-    if (yyparse() || PL_error_count || !PL_eval_root) {
+    if (yyparse() || PL_parser->error_count || !PL_eval_root) {
 	SV **newsp;			/* Used by POPBLOCK. */
 	PERL_CONTEXT *cx = &cxstack[cxstack_ix];
 	I32 optype = 0;			/* Might be reset by POPEVAL. */
@@ -2475,7 +2473,7 @@ S_doeval(pTHX_ int gimme, OP** startop, CV* outside, U32 seq)
     CvDEPTH(PL_compcv) = 1;
     SP = PL_stack_base + POPMARK;		/* pop original mark */
     PL_op = saveop;			/* The caller may need it. */
-    PL_lex_state = LEX_NOTPARSING;	/* $^S needs this. */
+    PL_parser->lex_state = LEX_NOTPARSING;	/* $^S needs this. */
 
     RETURNOP(PL_eval_start);
 }
@@ -2843,11 +2841,8 @@ PP(pp_require)
 
     ENTER;
     SAVETMPS;
-    lex_start(NULL);
-    SAVEGENERICSV(PL_rsfp_filters);
-    PL_rsfp_filters = NULL;
+    lex_start(NULL, tryrsfp, TRUE);
 
-    PL_rsfp = tryrsfp;
     SAVEHINTS();
     PL_hints = DEFAULT_HINTS;
     SAVECOMPILEWARNINGS();
@@ -2912,7 +2907,7 @@ PP(pp_entereval)
     TAINT_PROPER("eval");
 
     ENTER;
-    lex_start(sv);
+    lex_start(sv, NULL, FALSE);
     SAVETMPS;
 
     /* switch to eval mode */
@@ -3716,33 +3711,6 @@ PP(pp_break)
 	return cx->blk_givwhen.leave_op;
 }
 
-STATIC bool
-S_num_overflow(NV value, I32 fldsize, I32 frcsize)
-{
-    /* Can value be printed in fldsize chars, using %*.*f ? */
-    NV pwr = 1;
-    NV eps = 0.5;
-    bool res = FALSE;
-    int intsize = fldsize - (value < 0 ? 1 : 0);
-
-    if (frcsize & 256)
-        intsize--;
-    frcsize &= 255;
-    intsize -= frcsize;
-
-    while (intsize--) pwr *= 10.0;
-    while (frcsize--) eps /= 10.0;
-
-    if( value >= 0 ){
-        if (value + eps >= pwr)
-	    res = TRUE;
-    } else {
-        if (value - eps <= -pwr)
-	    res = TRUE;
-    }
-    return res;
-}
-
 static I32
 S_run_user_filter(pTHX_ int idx, SV *buf_sv, int maxlen)
 {
@@ -3764,7 +3732,7 @@ S_run_user_filter(pTHX_ int idx, SV *buf_sv, int maxlen)
 
     /* I was having segfault trouble under Linux 2.2.5 after a
        parse error occured.  (Had to hack around it with a test
-       for PL_error_count == 0.)  Solaris doesn't segfault --
+       for PL_parser->error_count == 0.)  Solaris doesn't segfault --
        not sure where the trouble is yet.  XXX */
 
     if (NULL) { /* IoFMT_GV(datasv)) { */

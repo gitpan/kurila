@@ -76,8 +76,8 @@ sub AUTOLOAD {
     my ($error, $val) = constant($constname);
     Carp::croak $error if $error;
     no strict 'refs';
-    *{$AUTOLOAD} = sub { $val };
-    goto &{$AUTOLOAD};
+    *{Symbol::fetch_glob($AUTOLOAD)} = sub { $val };
+    goto &{*{Symbol::fetch_glob($AUTOLOAD)}};
 }
 
 XSLoader::load 'GDBM_File', $VERSION;

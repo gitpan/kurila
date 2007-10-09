@@ -265,7 +265,7 @@ use vars qw(@isa @args $module @dirs $file $dl_debug $dlsrc @dl_library_path
 
 sub bootstrap_inherit {
     my $module = $_[0];
-    local *isa = *{"$module\::ISA"};
+    local *isa = *{Symbol::fetch_glob("$module\::ISA")};
     local @isa = (@isa, 'DynaLoader');
     # Cannot goto due to delocalization.  Will report errors on a wrong line?
     bootstrap(@_);
@@ -498,7 +498,7 @@ sub dl_findfile {
         my(@names, $name);    # what filenames to look for
         if (m:-l: ) {          # convert -lname to appropriate library name
             s/-l//;
-            push(@names,"lib$_.<<=to_string($Config::Config{'so'})>>");
+            push(@names,"lib$_.<<=$dl_so>>");
             push(@names,"lib$_.a");
         } else {                # Umm, a bare name. Try various alternatives:
             # these should be ordered with the most likely first

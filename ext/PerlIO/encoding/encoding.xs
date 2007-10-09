@@ -148,6 +148,8 @@ PerlIOEncode_pushed(pTHX_ PerlIO * f, const char *mode, SV * arg, PerlIO_funcs *
     }
 
     e->chk = newSVsv(get_sv("PerlIO::encoding::fallback", 0));
+    if ( ! SvIV(e->chk) )
+        Perl_die(aTHX_ "PerlIO::encoding::fallback has not been set");
     e->inEncodeCall = 0;
 
     FREETMPS;
@@ -341,7 +343,7 @@ PerlIOEncode_fill(pTHX_ PerlIO * f)
 	PUTBACK;
 	/* Now get translated string (forced to UTF-8) and use as buffer */
 	if (SvPOK(uni)) {
-	    s = SvPVutf8(uni, len);
+	    s = SvPV(uni, len);
 #ifdef PARANOID_ENCODE_CHECKS
 	    if (len && !is_utf8_string((U8*)s,len)) {
 		Perl_warn(aTHX_ "panic: decode did not return UTF-8 '%.*s'",(int) len,s);
@@ -436,11 +438,11 @@ PerlIOEncode_flush(pTHX_ PerlIO * f)
 	    if (PerlIO_flush(PerlIONext(f)) != 0) {
 		code = -1;
 	    }
-	    if (SvCUR(e->bufsv)) {
-		/* Did not all translate */
-		e->base.ptr = e->base.buf+SvCUR(e->bufsv);
-		return code;
-	    }
+            if (SvCUR(e->bufsv)) {
+                /* Did not all translate */
+                e->base.ptr = e->base.buf+SvCUR(e->bufsv);
+                return code;
+            }
 	}
 	else if ((PerlIOBase(f)->flags & PERLIO_F_RDBUF)) {
 	    /* read case */

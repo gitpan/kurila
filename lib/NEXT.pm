@@ -10,7 +10,7 @@ sub NEXT::ELSEWHERE::ancestors
 	while (my $next = shift @inlist) {
 		push @outlist, $next;
 		no strict 'refs';
-		unshift @inlist, @{"$outlist[-1]::ISA"};
+		unshift @inlist, @{*{Symbol::fetch_glob("$outlist[-1]::ISA")}};
 	}
 	return @outlist;
 }
@@ -22,7 +22,7 @@ sub NEXT::ELSEWHERE::ordered_ancestors
 	while (my $next = shift @inlist) {
 		push @outlist, $next;
 		no strict 'refs';
-		push @inlist, @{"$outlist[-1]::ISA"};
+		push @inlist, @{*{Symbol::fetch_glob("$outlist[-1]::ISA")}};
 	}
 	return sort { $a->isa($b) ? -1
 	            : $b->isa($a) ? +1
@@ -55,12 +55,12 @@ sub AUTOLOAD
 		}
 		no strict 'refs';
 		@{$NEXT::NEXT{$self,$wanted_method}} = 
-			map { *{"${_}::$caller_method"}{CODE}||() } @forebears
+			map { *{Symbol::fetch_glob("${_}::$caller_method")}{CODE}||() } @forebears
 				unless $wanted_method eq 'AUTOLOAD';
 		@{$NEXT::NEXT{$self,$wanted_method}} = 
-			map { (*{"${_}::AUTOLOAD"}{CODE}) ? "${_}::AUTOLOAD" : ()} @forebears
+			map { (*{Symbol::fetch_glob("${_}::AUTOLOAD")}{CODE}) ? "${_}::AUTOLOAD" : ()} @forebears
 				unless @{$NEXT::NEXT{$self,$wanted_method}||[]};
-		$NEXT::SEEN->{$self,*{$caller}{CODE}}++;
+		$NEXT::SEEN->{$self,*{Symbol::fetch_glob($caller)}{CODE}}++;
 	}
 	my $call_method = shift @{$NEXT::NEXT{$self,$wanted_method}};
 	while ($wanted_class =~ /^NEXT\b.*\b(UNSEEN|DISTINCT)\b/
@@ -76,10 +76,10 @@ sub AUTOLOAD
 	};
 	return $self->$call_method(@_[1..$#_]) if ref $call_method eq 'CODE';
 	no strict 'refs';
-	($wanted_method=${$caller_class."::AUTOLOAD"}) =~ s/.*:://
+	($wanted_method=${*{Symbol::fetch_glob($caller_class."::AUTOLOAD")}}) =~ s/.*:://
 		if $wanted_method eq 'AUTOLOAD';
-	$$call_method = $caller_class."::NEXT::".$wanted_method;
-	return $call_method->(@_);
+	${*{Symbol::fetch_glob($call_method)}} = $caller_class."::NEXT::".$wanted_method;
+	return *{Symbol::fetch_glob($call_method)}->(@_);
 }
 
 no strict 'vars';

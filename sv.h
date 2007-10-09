@@ -63,13 +63,6 @@ typedef enum {
 	SVt_LAST	/* keep last in enum. used to size arrays */
 } svtype;
 
-#ifndef PERL_CORE
-/* Although Fast Boyer Moore tables are now being stored in PVGVs, for most
-   purposes eternal code wanting to consider PVBM probably needs to think of
-   PVMG instead.  */
-#  define SVt_PVBM	SVt_PVMG
-#endif
-
 /* There is collusion here with sv_clear - sv_clear exits early for SVt_NULL
    and SVt_IV, so never reaches the clause at the end that uses
    sv_type_details->body_size to determine whether to call safefree(). Hence
@@ -300,7 +293,6 @@ perform the upgrade if necessary.  See C<svtype>.
 #define SVs_PADSTALE	0x00010000  /* lexical has gone out of scope */
 #define SVpad_STATE	0x00010000  /* pad name is a "state" var */
 #define SVs_PADTMP	0x00020000  /* in use as tmp */
-#define SVpad_TYPED	0x00020000  /* pad name is a Typed Lexical */
 #define SVs_PADMY	0x00040000  /* in use a "my" variable */
 #define SVpad_OUR	0x00040000  /* pad name is "our" instead of "my" */
 #define SVs_TEMP	0x00080000  /* string is stealable? */
@@ -343,18 +335,21 @@ perform the upgrade if necessary.  See C<svtype>.
 #define PRIVSHIFT 4	/* (SVp_?OK >> PRIVSHIFT) == SVf_?OK */
 
 #define SVf_AMAGIC	0x10000000  /* has magical overloaded methods */
-#define SVf_OBSOLETE    0x20000000  /* was: SVf_UTF8. SvPV is UTF-8 encoded */
+/* Ensure this value does not clash with the GV_ADD* flags in gv.h: */
+#define SVf_NOTUSED    0x20000000  /* was: SVf_UTF8. SvPV is UTF-8 encoded */
 					   
-/* Ensure this value does not clash with the GV_ADD* flags in gv.h */
 
 /* Some private flags. */
+
+/* PVAV could probably use 0x2000000 without conflict. I assume that PVFM can
+   be UTF-8 encoded, and PVCVs could well have UTF-8 prototypes. PVIOs haven't
+   been restructured, so sometimes get used as string buffers.  */
 
 /* PVHV */
 #define SVphv_SHAREKEYS 0x20000000  /* PVHV keys live on shared string table */
 /* PVNV, PVMG, presumably only inside pads */
 #define SVpad_NAME	0x40000000  /* This SV is a name in the PAD, so
-				       SVpad_TYPED, SVpad_OUR and SVpad_STATE
-				       apply */
+				       SVpad_OUR and SVpad_STATE apply */
 /* PVAV */
 #define SVpav_REAL	0x40000000  /* free old entries */
 /* PVHV */
@@ -371,7 +366,7 @@ perform the upgrade if necessary.  See C<svtype>.
 /* PVAV */
 #define SVpav_REIFY 	0x80000000  /* can become real */
 /* PVHV */
-#define SVphv_HASKFLAGS	0x80000000  /* keys have flag byte after hash */
+#define SVphv_NOTUSED	0x80000000  /* unused */
 /* PVGV when SVpbm_VALID is true */
 #define SVpbm_TAIL	0x80000000
 /* RV upwards. However, SVf_ROK and SVp_IOK are exclusive  */
@@ -878,29 +873,6 @@ Set the actual length of the string which is in the SV.  See C<SvIV_set>.
 #define SvNOK_only(sv)		(SvOK_off(sv), \
 				    SvFLAGS(sv) |= (SVf_NOK|SVp_NOK))
 
-/*
-=for apidoc Am|U32|SvUTF8|SV* sv
-Deleted.
-Returns a U32 value indicating whether the SV contains UTF-8 encoded data.
-Call this after SvPV() in case any call to string overloading updates the
-internal flag.
-
-=for apidoc Am|void|SvUTF8_on|SV *sv
-Deleted.
-Turn on the UTF-8 status of an SV (the data is not changed, just the flag).
-Do not use frivolously.
-
-=for apidoc Am|void|SvUTF8_off|SV *sv
-Deleted.
-Unsets the UTF-8 status of an SV.
-
-=for apidoc Am|void|SvPOK_only_UTF8|SV* sv
-Tells an SV that it is a string and disables all other OK bits,
-and leaves the UTF-8 status as it was.
-
-=cut
- */
-
 /* Ensure the return value of this macro does not clash with the GV_ADD* flags
 in gv.h: */
 #define SvPOK(sv)		(SvFLAGS(sv) & SVf_POK)
@@ -910,10 +882,6 @@ in gv.h: */
 #define SvPOK_only(sv)		(assert_not_ROK(sv) assert_not_glob(sv)	\
 				 SvFLAGS(sv) &= ~(SVf_OK|		\
 						  SVf_IVisUV),	\
-				    SvFLAGS(sv) |= (SVf_POK|SVp_POK))
-#define SvPOK_only_UTF8(sv)	(assert_not_ROK(sv) assert_not_glob(sv)	\
-				 SvFLAGS(sv) &= ~(SVf_OK|		\
-						  SVf_IVisUV),		\
 				    SvFLAGS(sv) |= (SVf_POK|SVp_POK))
 
 #define SvVOK(sv)		(SvMAGICAL(sv)				\
@@ -1070,9 +1038,6 @@ the scalar's value cannot change unless written to.
 #define SvREPADTMP_off(sv)	(SvFLAGS(sv) &= ~SVf_FAKE)
 #endif
 
-#define SvPAD_TYPED(sv) \
-	((SvFLAGS(sv) & (SVpad_NAME|SVpad_TYPED)) == (SVpad_NAME|SVpad_TYPED))
-
 #define SvPAD_OUR(sv)	\
 	((SvFLAGS(sv) & (SVpad_NAME|SVpad_OUR)) == (SVpad_NAME|SVpad_OUR))
 
@@ -1080,11 +1045,6 @@ the scalar's value cannot change unless written to.
 	((SvFLAGS(sv) & (SVpad_NAME|SVpad_STATE)) == (SVpad_NAME|SVpad_STATE))
 
 #if defined (DEBUGGING) && defined(__GNUC__) && !defined(PERL_GCC_BRACE_GROUPS_FORBIDDEN)
-#  define SvPAD_TYPED_on(sv)	({					\
-	    SV *const whap = (SV *) (sv);				\
-	    assert(SvTYPE(whap) == SVt_PVMG);				\
-	    (SvFLAGS(whap) |= SVpad_NAME|SVpad_TYPED);			\
-	})
 #define SvPAD_OUR_on(sv)	({					\
 	    SV *const whap = (SV *) (sv);				\
 	    assert(SvTYPE(whap) == SVt_PVMG);				\
@@ -1096,7 +1056,6 @@ the scalar's value cannot change unless written to.
 	    (SvFLAGS(whap) |= SVpad_NAME|SVpad_STATE);			\
 	})
 #else
-#  define SvPAD_TYPED_on(sv)	(SvFLAGS(sv) |= SVpad_NAME|SVpad_TYPED)
 #  define SvPAD_OUR_on(sv)	(SvFLAGS(sv) |= SVpad_NAME|SVpad_OUR)
 #  define SvPAD_STATE_on(sv)	(SvFLAGS(sv) |= SVpad_NAME|SVpad_STATE)
 #endif
@@ -1322,34 +1281,34 @@ the scalar's value cannot change unless written to.
 #if defined (DEBUGGING) && defined(__GNUC__) && !defined(PERL_GCC_BRACE_GROUPS_FORBIDDEN)
 #  define BmFLAGS(sv)							\
 	(*({ SV *const uggh = (SV *) (sv);				\
-		assert(SvTYPE(uggh) == SVt_PVGV);			\
+		assert(SvTYPE(uggh) == SVt_PVMG);			\
 		assert(SvVALID(uggh));					\
-	    &(((XPVGV*) SvANY(uggh))->xnv_u.xbm_s.xbm_flags);		\
+	    &(((XPVMG*) SvANY(uggh))->xnv_u.xbm_s.xbm_flags);		\
 	 }))
 #  define BmRARE(sv)							\
 	(*({ SV *const uggh = (SV *) (sv);				\
-		assert(SvTYPE(uggh) == SVt_PVGV);			\
+		assert(SvTYPE(uggh) == SVt_PVMG);			\
 		assert(SvVALID(uggh));					\
-	    &(((XPVGV*) SvANY(uggh))->xnv_u.xbm_s.xbm_rare);		\
+	    &(((XPVMG*) SvANY(uggh))->xnv_u.xbm_s.xbm_rare);		\
 	 }))
 #  define BmUSEFUL(sv)							\
 	(*({ SV *const uggh = (SV *) (sv);				\
-	    assert(SvTYPE(uggh) == SVt_PVGV);				\
+	    assert(SvTYPE(uggh) == SVt_PVMG);				\
 	    assert(SvVALID(uggh));					\
 	    assert(!SvIOK(uggh));					\
-	    &(((XPVGV*) SvANY(uggh))->xiv_u.xivu_i32);			\
+	    &(((XPVMG*) SvANY(uggh))->xiv_u.xivu_i32);			\
 	 }))
 #  define BmPREVIOUS(sv)						\
 	(*({ SV *const uggh = (SV *) (sv);				\
-		assert(SvTYPE(uggh) == SVt_PVGV);			\
+		assert(SvTYPE(uggh) == SVt_PVMG);			\
 		assert(SvVALID(uggh));					\
-	    &(((XPVGV*) SvANY(uggh))->xnv_u.xbm_s.xbm_previous);	\
+	    &(((XPVMG*) SvANY(uggh))->xnv_u.xbm_s.xbm_previous);	\
 	 }))
 #else
-#  define BmFLAGS(sv)		((XPVGV*) SvANY(sv))->xnv_u.xbm_s.xbm_flags
-#  define BmRARE(sv)		((XPVGV*) SvANY(sv))->xnv_u.xbm_s.xbm_rare
-#  define BmUSEFUL(sv)		((XPVGV*) SvANY(sv))->xiv_u.xivu_i32
-#  define BmPREVIOUS(sv)	((XPVGV*) SvANY(sv))->xnv_u.xbm_s.xbm_previous
+#  define BmFLAGS(sv)		((XPVMG*) SvANY(sv))->xnv_u.xbm_s.xbm_flags
+#  define BmRARE(sv)		((XPVMG*) SvANY(sv))->xnv_u.xbm_s.xbm_rare
+#  define BmUSEFUL(sv)		((XPVMG*) SvANY(sv))->xiv_u.xivu_i32
+#  define BmPREVIOUS(sv)	((XPVMG*) SvANY(sv))->xnv_u.xbm_s.xbm_previous
 
 #endif
 
@@ -1482,44 +1441,6 @@ otherwise use the more efficient C<SvUV>.
 Returns a boolean indicating whether Perl would evaluate the SV as true or
 false, defined or undefined.  Does not handle 'get' magic.
 
-=for apidoc Am|char*|SvPVutf8_force|SV* sv|STRLEN len
-Like C<SvPV_force>, but converts sv to utf8 first if necessary.
-
-=for apidoc Am|char*|SvPVutf8|SV* sv|STRLEN len
-Like C<SvPV>, but converts sv to utf8 first if necessary.
-
-=for apidoc Am|char*|SvPVutf8_nolen|SV* sv
-Like C<SvPV_nolen>, but converts sv to utf8 first if necessary.
-
-=for apidoc Am|char*|SvPVbyte_force|SV* sv|STRLEN len
-Like C<SvPV_force>, but converts sv to byte representation first if necessary.
-
-=for apidoc Am|char*|SvPVbyte|SV* sv|STRLEN len
-Like C<SvPV>, but converts sv to byte representation first if necessary.
-
-=for apidoc Am|char*|SvPVbyte_nolen|SV* sv
-Like C<SvPV_nolen>, but converts sv to byte representation first if necessary.
-
-=for apidoc Am|char*|SvPVutf8x_force|SV* sv|STRLEN len
-Like C<SvPV_force>, but converts sv to utf8 first if necessary.
-Guarantees to evaluate sv only once; use the more efficient C<SvPVutf8_force>
-otherwise.
-
-=for apidoc Am|char*|SvPVutf8x|SV* sv|STRLEN len
-Like C<SvPV>, but converts sv to utf8 first if necessary.
-Guarantees to evaluate sv only once; use the more efficient C<SvPVutf8>
-otherwise.
-
-=for apidoc Am|char*|SvPVbytex_force|SV* sv|STRLEN len
-Like C<SvPV_force>, but converts sv to byte representation first if necessary.
-Guarantees to evaluate sv only once; use the more efficient C<SvPVbyte_force>
-otherwise.
-
-=for apidoc Am|char*|SvPVbytex|SV* sv|STRLEN len
-Like C<SvPV>, but converts sv to byte representation first if necessary.
-Guarantees to evaluate sv only once; use the more efficient C<SvPVbyte>
-otherwise.
-
 =for apidoc Am|bool|SvIsCOW|SV* sv
 Returns a boolean indicating whether the SV is Copy-On-Write. (either shared
 hash key scalars, or full Copy On Write scalars if 5.9.0 is configured for
@@ -1603,43 +1524,12 @@ Like C<sv_catsv> but doesn't process magic.
 
 /* ----*/
 
-#define SvPVutf8(sv, lp) \
-    ((SvFLAGS(sv) & (SVf_POK)) == (SVf_POK) \
-     ? ((lp = SvCUR(sv)), SvPVX(sv)) : sv_2pvutf8(sv, &lp))
-
-#define SvPVutf8_force(sv, lp) \
-    ((SvFLAGS(sv) & (SVf_POK|SVf_THINKFIRST)) == (SVf_POK) \
-     ? ((lp = SvCUR(sv)), SvPVX(sv)) : sv_pvutf8n_force(sv, &lp))
-
-
-#define SvPVutf8_nolen(sv) \
-    ((SvFLAGS(sv) & (SVf_POK)) == (SVf_POK)\
-     ? SvPVX(sv) : sv_2pvutf8(sv, 0))
-
-/* ----*/
-
-#define SvPVbyte(sv, lp) \
-    ((SvFLAGS(sv) & SVf_POK) == (SVf_POK) \
-     ? ((lp = SvCUR(sv)), SvPVX(sv)) : sv_2pvbyte(sv, &lp))
-
-#define SvPVbyte_force(sv, lp) \
-    ((SvFLAGS(sv) & (SVf_POK|SVf_THINKFIRST)) == (SVf_POK) \
-     ? ((lp = SvCUR(sv)), SvPVX(sv)) : sv_pvbyten_force(sv, &lp))
-
-#define SvPVbyte_nolen(sv) \
-    ((SvFLAGS(sv) & SVf_POK) == (SVf_POK)\
-     ? SvPVX(sv) : sv_2pvbyte(sv, 0))
-
-
-    
 /* define FOOx(): idempotent versions of FOO(). If possible, use a local
  * var to evaluate the arg once; failing that, use a global if possible;
  * failing that, call a function to do the work
  */
 
 #define SvPVx_force(sv, lp) sv_pvn_force(sv, &lp)
-#define SvPVutf8x_force(sv, lp) sv_pvutf8n_force(sv, &lp)
-#define SvPVbytex_force(sv, lp) sv_pvbyten_force(sv, &lp)
 
 #if defined(__GNUC__) && !defined(PERL_GCC_BRACE_GROUPS_FORBIDDEN)
 
@@ -1650,9 +1540,6 @@ Like C<sv_catsv> but doesn't process magic.
 #  define SvPVx_const(sv, lp) ({SV *_sv = (sv); SvPV_const(_sv, lp); })
 #  define SvPVx_nolen(sv) ({SV *_sv = (sv); SvPV_nolen(_sv); })
 #  define SvPVx_nolen_const(sv) ({SV *_sv = (sv); SvPV_nolen_const(_sv); })
-#  define SvPVutf8x(sv, lp) ({SV *_sv = (sv); SvPVutf8(_sv, lp); })
-#  define SvPVbytex(sv, lp) ({SV *_sv = (sv); SvPVbyte(_sv, lp); })
-#  define SvPVbytex_nolen(sv) ({SV *_sv = (sv); SvPVbyte_nolen(_sv); })
 #  define SvTRUE(sv) (						\
     !sv								\
     ? 0								\
@@ -1683,9 +1570,6 @@ Like C<sv_catsv> but doesn't process magic.
 #  define SvPVx_const(sv, lp) ((PL_Sv = (sv)), SvPV_const(PL_Sv, lp))
 #  define SvPVx_nolen(sv) ((PL_Sv = (sv)), SvPV_nolen(PL_Sv))
 #  define SvPVx_nolen_const(sv) ((PL_Sv = (sv)), SvPV_nolen_const(PL_Sv))
-#  define SvPVutf8x(sv, lp) ((PL_Sv = (sv)), SvPVutf8(PL_Sv, lp))
-#  define SvPVbytex(sv, lp) ((PL_Sv = (sv)), SvPVbyte(PL_Sv, lp))
-#  define SvPVbytex_nolen(sv) ((PL_Sv = (sv)), SvPVbyte_nolen(PL_Sv))
 #  define SvTRUE(sv) (						\
     !sv								\
     ? 0								\
@@ -1723,13 +1607,15 @@ Like C<sv_catsv> but doesn't process magic.
 #define SV_SMAGIC		128
 #define SV_HAS_TRAILING_NUL	256
 #define SV_COW_SHARED_HASH_KEYS	512
+/* This one is only enabled for PERL_OLD_COPY_ON_WRITE */
+#define SV_COW_OTHER_PVS	1024
 
 /* The core is safe for this COW optimisation. XS code on CPAN may not be.
    So only default to doing the COW setup if we're in the core.
  */
 #ifdef PERL_CORE
 #  ifndef SV_DO_COW_SVSETSV
-#    define SV_DO_COW_SVSETSV	SV_COW_SHARED_HASH_KEYS
+#    define SV_DO_COW_SVSETSV	SV_COW_SHARED_HASH_KEYS|SV_COW_OTHER_PVS
 #  endif
 #endif
 
@@ -1772,8 +1658,6 @@ Like C<sv_catsv> but doesn't process magic.
 /* all these 'functions' are now just macros */
 
 #define sv_pv(sv) SvPV_nolen(sv)
-#define sv_pvutf8(sv) SvPVutf8_nolen(sv)
-#define sv_pvbyte(sv) SvPVbyte_nolen(sv)
 
 #define sv_pvn_force_nomg(sv, lp) sv_pvn_force_flags(sv, lp, 0)
 #define sv_catpvn_nomg(dsv, sstr, slen) sv_catpvn_flags(dsv, sstr, slen, 0)
@@ -1788,8 +1672,6 @@ Like C<sv_catsv> but doesn't process magic.
 	sv_catpvn_flags(sv, sstr, slen, SV_GMAGIC|SV_SMAGIC);
 #define sv_2pv(sv, lp) sv_2pv_flags(sv, lp, SV_GMAGIC)
 #define sv_2pv_nolen(sv) sv_2pv(sv, 0)
-#define sv_2pvbyte_nolen(sv) sv_2pvbyte(sv, 0)
-#define sv_2pvutf8_nolen(sv) sv_2pvutf8(sv, 0)
 #define sv_2pv_nomg(sv, lp) sv_2pv_flags(sv, lp, 0)
 #define sv_pvn_force(sv, lp) sv_pvn_force_flags(sv, lp, SV_GMAGIC)
 #define sv_2iv(sv) sv_2iv_flags(sv, SV_GMAGIC)

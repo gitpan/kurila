@@ -1,5 +1,5 @@
 /*
- $Id: Encode.xs,v 2.11 2007/04/06 12:53:41 dankogai Exp $
+ $Id: Encode.xs,v 2.14 2007/05/29 18:15:32 dankogai Exp dankogai $
  */
 
 #define PERL_NO_GET_CONTEXT
@@ -26,16 +26,11 @@
                          }
 /**/
 
-UNIMPLEMENTED(_encoded_utf8_to_bytes, I32)
-UNIMPLEMENTED(_encoded_bytes_to_utf8, I32)
-
 #define UTF8_ALLOW_STRICT 0
 #define UTF8_ALLOW_NONSTRICT (UTF8_ALLOW_ANY &                    \
                               ~(UTF8_ALLOW_CONTINUATION |         \
                                 UTF8_ALLOW_NON_CONTINUATION |     \
                                 UTF8_ALLOW_LONG))
-
-static SV* fallback_cb = (SV*)NULL ;
 
 void
 Encode_XSEncoding(pTHX_ encode_t * enc)
@@ -66,11 +61,11 @@ call_failure(SV * routine, U8 * done, U8 * dest, U8 * orig)
 #define ERR_DECODE_NOMAP "%s \"\\x%02" UVXf "\" does not map to Unicode"
 
 static SV *
-do_fallback_cb(pTHX_ UV ch)
+do_fallback_cb(pTHX_ UV ch, SV *fallback_cb)
 {
     dSP;
     int argc;
-    SV* retval;
+    SV *temp, *retval;
     ENTER;
     SAVETMPS;
     PUSHMARK(sp);
@@ -79,18 +74,22 @@ do_fallback_cb(pTHX_ UV ch)
     argc = call_sv(fallback_cb, G_SCALAR);
     SPAGAIN;
     if (argc != 1){
-    croak("fallback sub must return scalar!");
+	croak("fallback sub must return scalar!");
     }
-    retval = newSVsv(POPs);
+    temp = newSVsv(POPs);
     PUTBACK;
     FREETMPS;
     LEAVE;
+    retval = newSVpv("",0);
+    sv_catsv(retval, temp);
+    SvREFCNT_dec(temp);
     return retval;
 }
 
 static SV *
 encode_method(pTHX_ const encode_t * enc, const encpage_t * dir, SV * src,
-          int check, STRLEN * offset, SV * term, int * retcode)
+	      int check, STRLEN * offset, SV * term, int * retcode, 
+	      SV *fallback_cb)
 {
     STRLEN slen;
     U8 *s = (U8 *) SvPV(src, slen);
@@ -118,9 +117,9 @@ encode_method(pTHX_ const encode_t * enc, const encpage_t * dir, SV * src,
     }
 
     if (slen == 0){
-    SvCUR_set(dst, 0);
-    SvPOK_only(dst);
-    goto ENCODE_END;
+        SvCUR_set(dst, 0);
+        SvPOK_only(dst);
+        goto ENCODE_END;
     }
 
     while( (code = do_encode(dir, s, &slen, d, dlen, &dlen, !check,
@@ -192,8 +191,9 @@ encode_method(pTHX_ const encode_t * enc, const encpage_t * dir, SV * src,
         }
         if (check & (ENCODE_PERLQQ|ENCODE_HTMLCREF|ENCODE_XMLCREF)){
             SV* subchar = 
-            (fallback_cb != (SV*)NULL) ? do_fallback_cb(aTHX_ ch) :
-            newSVpvf(check & ENCODE_PERLQQ ? "\\x{%04"UVxf"}" :
+            (fallback_cb != &PL_sv_undef)
+		? do_fallback_cb(aTHX_ ch, fallback_cb)
+		: newSVpvf(check & ENCODE_PERLQQ ? "\\x{%04"UVxf"}" :
                  check & ENCODE_HTMLCREF ? "&#%" UVuf ";" :
                  "&#x%" UVxf ";", (UV)ch);
             sdone += slen + clen;
@@ -226,9 +226,9 @@ encode_method(pTHX_ const encode_t * enc, const encpage_t * dir, SV * src,
         if (check &
             (ENCODE_PERLQQ|ENCODE_HTMLCREF|ENCODE_XMLCREF)){
             SV* subchar = 
-            (fallback_cb != (SV*)NULL) ? 
-            do_fallback_cb(aTHX_ (UV)s[slen]) :
-            newSVpvf("\\x[%02" UVXf"]", (UV)s[slen]);
+            (fallback_cb != &PL_sv_undef)
+		? do_fallback_cb(aTHX_ (UV)s[slen], fallback_cb) 
+		: newSVpvf("\\x[%02" UVXf"]", (UV)s[slen]);
             sdone += slen + 1;
             ddone += dlen + SvCUR(subchar);
             sv_catsv(dst, subchar);
@@ -255,11 +255,11 @@ encode_method(pTHX_ const encode_t * enc, const encpage_t * dir, SV * src,
     }
  ENCODE_SET_SRC:
     if (check && !(check & ENCODE_LEAVE_SRC)){
-    sdone = SvCUR(src) - (slen+sdone);
-    if (sdone) {
-        sv_setpvn(src, (char*)s+slen, sdone);
-    }
-    SvCUR_set(src, sdone);
+        sdone = SvCUR(src) - (slen+sdone);
+        if (sdone) {
+            sv_setpvn(src, (char*)s+slen, sdone);
+        }
+        SvCUR_set(src, sdone);
     }
     /* warn("check = 0x%X, code = 0x%d\n", check, code); */
 
@@ -507,20 +507,28 @@ CODE:
 }
 
 void
-Method_cat_decode(obj, dst, src, off, term, check = 0)
+Method_cat_decode(obj, dst, src, off, term, check_sv = &PL_sv_no)
 SV *	obj
 SV *	dst
 SV *	src
 SV *	off
 SV *	term
-int	check
+SV *    check_sv
 CODE:
 {
+    int check;
+    SV *fallback_cb = &PL_sv_undef;
     encode_t *enc = INT2PTR(encode_t *, SvIV(SvRV(obj)));
     STRLEN offset = (STRLEN)SvIV(off);
     int code = 0;
+    if (SvROK(check_sv)){
+	fallback_cb = check_sv;
+	check = ENCODE_PERLQQ|ENCODE_LEAVE_SRC; /* same as FB_PERLQQ */
+    }else{
+	check = SvIV(check_sv);
+    }
     sv_catsv(dst, encode_method(aTHX_ enc, enc->t_utf8, src, check,
-                &offset, term, &code));
+                &offset, term, &code, fallback_cb));
     SvIV_set(off, (IV)offset);
     if (code == ENCODE_FOUND_TERM) {
     ST(0) = &PL_sv_yes;
@@ -538,24 +546,18 @@ SV *	check_sv
 CODE:
 {
     int check;
+    SV *fallback_cb = &PL_sv_undef;
     encode_t *enc = INT2PTR(encode_t *, SvIV(SvRV(obj)));
     if (SvROK(check_sv)){
-    if (fallback_cb == (SV*)NULL){
-            fallback_cb = newSVsv(check_sv); /* First time */
-        }else{
-            SvSetSV(fallback_cb, check_sv); /* Been here before */
-    }
-    check = ENCODE_PERLQQ|ENCODE_LEAVE_SRC; /* same as FB_PERLQQ */
+	fallback_cb = check_sv;
+	check = ENCODE_PERLQQ|ENCODE_LEAVE_SRC; /* same as FB_PERLQQ */
     }else{
-    fallback_cb = (SV*)NULL;
-    check = SvIV(check_sv);
+	check = SvIV(check_sv);
     }
     ST(0) = encode_method(aTHX_ enc, enc->t_utf8, src, check,
-              NULL, Nullsv, NULL);
+              NULL, Nullsv, NULL, fallback_cb);
     XSRETURN(1);
 }
-
-
 
 void
 Method_encode(obj,src,check_sv = &PL_sv_no)
@@ -565,20 +567,16 @@ SV *	check_sv
 CODE:
 {
     int check;
+    SV *fallback_cb = &PL_sv_undef;
     encode_t *enc = INT2PTR(encode_t *, SvIV(SvRV(obj)));
     if (SvROK(check_sv)){
-    if (fallback_cb == (SV*)NULL){
-            fallback_cb = newSVsv(check_sv); /* First time */
-        }else{
-            SvSetSV(fallback_cb, check_sv); /* Been here before */
-    }
-    check = ENCODE_PERLQQ|ENCODE_LEAVE_SRC; /* same as FB_PERLQQ */
+	fallback_cb = check_sv;
+	check = ENCODE_PERLQQ|ENCODE_LEAVE_SRC; /* same as FB_PERLQQ */
     }else{
-    fallback_cb = (SV*)NULL;
-    check = SvIV(check_sv);
+	check = SvIV(check_sv);
     }
     ST(0) = encode_method(aTHX_ enc, enc->f_utf8, src, check,
-              NULL, Nullsv, NULL);
+              NULL, Nullsv, NULL, fallback_cb);
     XSRETURN(1);
 }
 
@@ -610,102 +608,38 @@ CODE:
     XSRETURN(1);
 }
 
+void
+Method_mime_name(obj)
+SV *	obj
+CODE:
+{
+    encode_t *enc = INT2PTR(encode_t *, SvIV(SvRV(obj)));
+    SV *retval;
+    eval_pv("require Encode::MIME::Name", 0);
+
+    if (SvTRUE(get_sv("@", 0))) {
+	ST(0) = &PL_sv_undef;
+    }else{
+	ENTER;
+	SAVETMPS;
+	PUSHMARK(sp);
+	XPUSHs(sv_2mortal(newSVpvn(enc->name[0], strlen(enc->name[0]))));
+	PUTBACK;
+	call_pv("Encode::MIME::Name::get_mime_name", G_SCALAR);
+	SPAGAIN;
+	retval = newSVsv(POPs);
+	PUTBACK;
+	FREETMPS;
+	LEAVE;
+	/* enc->name[0] */
+	ST(0) = retval;
+    }
+    XSRETURN(1);
+}
+
 MODULE = Encode         PACKAGE = Encode
 
 PROTOTYPES: ENABLE
-
-I32
-_bytes_to_utf8(sv, ...)
-SV *    sv
-CODE:
-{
-    SV * encoding = items == 2 ? ST(1) : Nullsv;
-
-    if (encoding)
-    RETVAL = _encoded_bytes_to_utf8(sv, SvPV_nolen(encoding));
-    else {
-    STRLEN len;
-    U8*    s = (U8*)SvPV(sv, len);
-    U8*    converted;
-
-    converted = bytes_to_utf8(s, &len); /* This allocs */
-    sv_setpvn(sv, (char *)converted, len);
-    Safefree(converted);                /* ... so free it */
-    RETVAL = len;
-    }
-}
-OUTPUT:
-    RETVAL
-
-I32
-_utf8_to_bytes(sv, ...)
-SV *    sv
-CODE:
-{
-    SV * to    = items > 1 ? ST(1) : Nullsv;
-    SV * check = items > 2 ? ST(2) : Nullsv;
-
-    if (to) {
-    RETVAL = _encoded_utf8_to_bytes(sv, SvPV_nolen(to));
-    } else {
-    STRLEN len;
-    U8 *s = (U8*)SvPV(sv, len);
-
-    RETVAL = 0;
-    if (SvTRUE(check)) {
-        /* Must do things the slow way */
-        U8 *dest;
-            /* We need a copy to pass to check() */
-        U8 *src  = s;
-        U8 *send = s + len;
-        U8 *d0;
-
-        New(83, dest, len, U8); /* I think */
-        d0 = dest;
-
-        while (s < send) {
-                if (*s < 0x80){
-            *dest++ = *s++;
-                } else {
-            STRLEN ulen;
-            UV uv = *s++;
-
-            /* Have to do it all ourselves because of error routine,
-               aargh. */
-            if (!(uv & 0x40)){ goto failure; }
-            if      (!(uv & 0x20)) { ulen = 2;  uv &= 0x1f; }
-            else if (!(uv & 0x10)) { ulen = 3;  uv &= 0x0f; }
-            else if (!(uv & 0x08)) { ulen = 4;  uv &= 0x07; }
-            else if (!(uv & 0x04)) { ulen = 5;  uv &= 0x03; }
-            else if (!(uv & 0x02)) { ulen = 6;  uv &= 0x01; }
-            else if (!(uv & 0x01)) { ulen = 7;  uv = 0; }
-            else                   { ulen = 13; uv = 0; }
-        
-            /* Note change to utf8.c variable naming, for variety */
-            while (ulen--) {
-            if ((*s & 0xc0) != 0x80){
-                goto failure;
-            } else {
-                uv = (uv << 6) | (*s++ & 0x3f);
-            }
-          }
-          if (uv > 256) {
-          failure:
-              call_failure(check, s, dest, src);
-              /* Now what happens? */
-          }
-          *dest++ = (U8)uv;
-        }
-        }
-        RETVAL = dest - d0;
-        sv_usepvn(sv, (char *)dest, RETVAL);
-    } else {
-        RETVAL = (utf8_to_bytes(s, &len) ? len : 0);
-    }
-    }
-}
-OUTPUT:
-    RETVAL
 
 bool
 is_utf8(sv, check = 0)

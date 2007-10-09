@@ -9,12 +9,31 @@ package mro;
 use strict;
 use warnings;
 
-# mro.pm versions < 1.00 reserved for possible CPAN mro dist
-#  (for partial back-compat to 5.[68].x)
+# mro.pm versions < 1.00 reserved for MRO::Compat
+#  for partial back-compat to 5.[68].x
 our $VERSION = '1.00';
 
 sub import {
     mro::set_mro(scalar(caller), $_[1]) if $_[1];
+}
+
+package # hide me from PAUSE
+    next;
+
+sub can { mro::_nextcan($_[0], 0) }
+
+sub method {
+    my $method = mro::_nextcan($_[0], 1);
+    goto &$method;
+}
+
+package # hide me from PAUSE
+    maybe::next;
+
+sub method {
+    my $method = mro::_nextcan($_[0], 0);
+    goto &$method if defined $method;
+    return;
 }
 
 1;
@@ -27,8 +46,10 @@ mro - Method Resolution Order
 
 =head1 SYNOPSIS
 
-  use mro 'dfs'; # enable DFS MRO for this class (Perl default)
-  use mro 'c3'; # enable C3 MRO for this class
+  use mro; # enables next::method and friends globally
+
+  use mro 'c3'; # enable C3 MRO for this class (Perl Kurila default)
+  use mro 'dfs'; # enable DFS MRO for this class
 
 =head1 DESCRIPTION
 
@@ -39,15 +60,18 @@ with method resolution order and method caching in general.
 
 It's possible to change the MRO of a given class either by using C<use
 mro> as shown in the synopsis, or by using the L</mro::set_mro> function
-below.  The functions do not require loading the C<mro> module, as they
-are actually provided by the core perl interpreter.  The C<use mro> syntax
-is just syntactic sugar for setting the current package's MRO.
+below.  The functions in the mro namespace do not require loading the
+C<mro> module, as they are actually provided by the core perl interpreter.
+
+The special methods C<next::method>, C<next::can>, and
+C<maybe::next::method> are not available until this C<mro> module
+has been loaded via C<use> or C<require>.
 
 =head1 The C3 MRO
 
-In addition to the traditional Perl default MRO (depth first
-search, called C<DFS> here), Perl now offers the C3 MRO as
-well.  Perl's support for C3 is based on the work done in
+C3 is the defualt MRO of Perl Kurila, in contrast to Perl 5 which has
+depth first search (C<DFS>) as default MRO.
+Perl's support for C3 is based on the work done in
 Stevan Little's module L<Class::C3>, and most of the C3-related
 documentation here is ripped directly from there.
 
@@ -89,6 +113,13 @@ Returns an arrayref which is the linearized MRO of the given class.
 Uses whichever MRO is currently in effect for that class by default,
 or the given MRO (either C<c3> or C<dfs> if specified as C<$type>).
 
+The linearized MRO of a class is an ordered array of all of the
+classes one would search when resolving a method on that class,
+starting with the class itself.
+
+If the requested class doesn't yet exist, this function will still
+succeed, and return C<[ $classname ]>
+
 Note that C<UNIVERSAL> (and any members of C<UNIVERSAL>'s MRO) are not
 part of the MRO of a class, even though all classes implicitly inherit
 methods from C<UNIVERSAL> and its parents.
@@ -105,7 +136,7 @@ Returns the MRO of the given class (either C<c3> or C<dfs>).
 =head2 mro::get_isarev($classname)
 
 Gets the C<mro_isarev> for this class, returned as an
-array of class names.  These are every class that "isa"
+arrayref of class names.  These are every class that "isa"
 the given class name, even if the isa relationship is
 indirect.  This is used internally by the MRO code to
 keep track of method/MRO cache invalidations.
@@ -149,7 +180,41 @@ caching in all packages.
 =head2 mro::method_changed_in($classname)
 
 Invalidates the method cache of any classes dependent on the
-given class.
+given class.  This is not normally necessary.  The only
+known case where pure perl code can confuse the method
+cache is when you manually install a new constant
+subroutine by using a readonly scalar value, like the
+internals of L<constant> do.  If you find another case,
+please report it so we can either fix it or document
+the exception here.
+
+=head2 mro::get_pkg_gen($classname)
+
+Returns an integer which is incremented every time a
+real local method in the package C<$classname> changes,
+or the local C<@ISA> of C<$classname> is modified.
+
+This is intended for authors of modules which do lots
+of class introspection, as it allows them to very quickly
+check if anything important about the local properties
+of a given class have changed since the last time they
+looked.  It does not increment on method/C<@ISA>
+changes in superclasses.
+
+It's still up to you to seek out the actual changes,
+and there might not actually be any.  Perhaps all
+of the changes since you last checked cancelled each
+other out and left the package in the state it was in
+before.
+
+This integer normally starts off at a value of C<1>
+when a package stash is instantiated.  Calling it
+on packages whose stashes do not exist at all will
+return C<0>.  If a package stash is completely
+deleted (not a normal occurence, but it can happen
+if someone does something like C<undef %PkgName::>),
+the number will be reset to either C<0> or C<1>,
+depending on how completely package was wiped out.
 
 =head2 next::method
 
@@ -245,6 +310,39 @@ In simple cases, it is equivalent to:
 
 But there are some cases where only this solution
 works (like C<goto &maybe::next::method>);
+
+=head1 PERFORMANCE CONSIDERATIONS
+
+Specifying the mro type of a class before setting C<@ISA> will
+be faster than the other way around.  Also, making all of your
+C<@ISA> manipulations in a single assignment statement will be
+faster that doing them one by one via C<push> (which is what
+C<use base> does currently).
+
+Examples:
+
+  # The slowest way
+  package Foo;
+  use base qw/A B C/;
+  use mro 'c3';
+
+  # The fastest way
+  # (not exactly equivalent to above,
+  #   as base.pm can do other magic)
+  use mro 'c3';
+  use A ();
+  use B ();
+  use C ();
+  our @ISA = qw/A B C/;
+
+Generally speaking, every time C<@ISA> is modified, the MRO
+of that class will be recalculated, because of the way array
+magic works.  Pushing multiple items onto C<@ISA> in one push
+statement still counts as multiple modifications.  However,
+assigning a list to C<@ISA> only counts as a single
+modification.  Thus if you really need to do C<push> as
+opposed to assignment, C<@ISA = (@ISA, qw/A B C/);>
+will still be faster than C<push(@ISA, qw/A B C/);>
 
 =head1 SEE ALSO
 

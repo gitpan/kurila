@@ -104,7 +104,7 @@ sub AUTOLOAD {
                 }
             }
         };
-        goto &$AUTOLOAD;
+        goto &{Symbol::fetch_glob($AUTOLOAD)};
     } else {
         require Carp;
         Carp::croak ("undefined subroutine &$AUTOLOAD called");

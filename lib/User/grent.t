@@ -18,9 +18,10 @@ BEGIN {
 }
 
 use strict;
-our @grent;
+our ($gid, @grent);
 BEGIN {
-    @grent = getgrgid 0; # This is the function getgrgid.
+    $gid = $^O ne 'cygwin' ? 0 : 18;
+    @grent = getgrgid $gid; # This is the function getgrgid.
     unless (@grent) { plan skip_all => "no gid 0"; }
 }
 
@@ -31,7 +32,7 @@ BEGIN {
 
 can_ok(__PACKAGE__, 'getgrgid');
 
-my $grent = getgrgid 0;
+my $grent = getgrgid $gid;
 
 is( $grent->name, $grent[0],    'name matches core getgrgid' );
 

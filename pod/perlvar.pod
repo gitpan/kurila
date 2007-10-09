@@ -755,8 +755,7 @@ X<$^ENCODING>
 The I<object reference> to the Encode object that is used to convert
 the source code to Unicode.  Thanks to this variable your perl script
 does not have to be written in UTF-8.  Default is I<undef>.  The direct
-manipulation of this variable is highly discouraged.  See L<encoding>
-for more details.
+manipulation of this variable is highly discouraged.
 
 =item $OS_ERROR
 
@@ -917,7 +916,9 @@ the same as the first number.
 
 However, a value assigned to C<$(> must be a single number used to
 set the real gid.  So the value given by C<$(> should I<not> be assigned
-back to C<$(> without being forced numeric, such as by adding zero.
+back to C<$(> without being forced numeric, such as by adding zero. Note
+that this is different to the effective gid (C<$)>) which does take a
+list.
 
 You can change both the real gid and the effective gid at the same
 time by using POSIX::setgid().  Changes to $( require a check to $!
@@ -993,25 +994,6 @@ thread may modify its copy of the C<$0> and the change becomes visible
 to ps(1) (assuming the operating system plays along).  Note that
 the view of C<$0> the other threads have will not change since they
 have their own copies of it.
-
-=item $[
-X<$[>
-
-The index of the first element in an array, and of the first character
-in a substring.  Default is 0, but you could theoretically set it
-to 1 to make Perl behave more like B<awk> (or Fortran) when
-subscripting and when evaluating the index() and substr() functions.
-(Mnemonic: [ begins subscripts.)
-
-As of release 5 of Perl, assignment to C<$[> is treated as a compiler
-directive, and cannot influence the behavior of any other file.
-(That's why you can only assign compile-time constants to it.)
-Its use is highly discouraged.
-
-Note that, unlike other compile-time directives (such as L<strict>),
-assignment to C<$[> can be seen from outer lexical scopes in the same file.
-However, you can use local() on it to strictly bind its value to a
-lexical block.
 
 =item $]
 X<$]>

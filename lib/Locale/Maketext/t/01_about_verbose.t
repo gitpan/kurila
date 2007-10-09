@@ -40,11 +40,11 @@ use Locale::Maketext;
 
     #print "Peeking at $this => ${$this . '::VERSION'}\n";
     
-    if(defined ${$this . '::VERSION'} ) {
-      $v{$this} = ${$this . '::VERSION'}
+    if(defined ${*{Symbol::fetch_glob($this . '::VERSION')}} ) {
+      $v{$this} = ${*{Symbol::fetch_glob($this . '::VERSION')}}
     } elsif(
-       defined *{$this . '::ISA'} or defined &{$this . '::import'}
-       or ($this ne '' and grep defined *{$_}{'CODE'}, values %{$this . "::"})
+       defined *{Symbol::fetch_glob($this . '::ISA')} or defined &{Symbol::fetch_glob($this . '::import')}
+       or ($this ne '' and grep defined *{$_}{'CODE'}, values %{*{Symbol::fetch_glob($this . "::")}})
        # If it has an ISA, an import, or any subs...
     ) {
       # It's a class/module with no version.
@@ -55,7 +55,7 @@ use Locale::Maketext;
     }
     
     $pref = length($this) ? "$this\::" : '';
-    push @stack, map m/^(.+)::$/ ? "$pref$1" : (), keys %{$this . '::'};
+    push @stack, map m/^(.+)::$/ ? "$pref$1" : (), keys %{*{Symbol::fetch_glob($this . '::')}};
     #print "Stack: @stack\n";
   }
   push @out, " Modules in memory:\n";

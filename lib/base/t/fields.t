@@ -6,7 +6,7 @@ BEGIN {
 }
 
 use strict;
-use Test::More tests => 16;
+use Test::More tests => 15;
 
 BEGIN { use_ok('fields'); }
 
@@ -28,7 +28,7 @@ is_deeply( [sort keys %Foo::FIELDS],
 sub show_fields {
     my($base, $mask) = @_;
     no strict 'refs';
-    my $fields = \%{$base.'::FIELDS'};
+    my $fields = \%{*{Symbol::fetch_glob($base.'::FIELDS')}};
     return grep { ($fields::attr{$base}[$fields->{$_}] & $mask) == $mask} 
                 keys %$fields;
 }
@@ -38,16 +38,8 @@ is_deeply( [sort &show_fields('Foo', fields::PUBLIC)],
 is_deeply( [sort &show_fields('Foo', fields::PRIVATE)],
            [sort qw(_no _up_yours)]);
 
-# We should get compile time failures field name typos
-eval q(return; my Foo $obj = Foo->new; $obj->{notthere} = "");
-
-my $error = $Has_PH ? qr/No such(?: [\w-]+)? field "notthere"/
-    : qr/No such class field "notthere" in variable \$obj of type Foo/;
-like( $@, $error );
-
-
 foreach (Foo->new) {
-    my Foo $obj = $_;
+    my $obj = $_;
     my %test = ( Pants => 'Whatever', _no => 'Yeah',
                  what  => 'Ahh',      who => 'Moo',
                  _up_yours => 'Yip' );
@@ -83,7 +75,7 @@ foreach (Foo->new) {
     sub new { fields::new($_[0]) }
 
     package main;
-    my Foo::Autoviv $a = Foo::Autoviv->new();
+    my $a = Foo::Autoviv->new();
     $a->{foo} = ['a', 'ok', 'c'];
     $a->{bar} = { A => 'ok' };
     is( $a->{foo}[1],    'ok' );

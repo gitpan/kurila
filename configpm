@@ -2,8 +2,8 @@
 #
 # configpm
 #
-# Copyright (C) 1994, 1995, 1996 1997, 1998, 1999, 2000, 2001,
-# 2002, 2003, 2004, 2005, 2006 Larry Wall and others.
+# Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
+# 2002, 2003, 2004, 2005, 2006, 2007 Larry Wall and others.
 #
 #
 # Regenerate the files
@@ -12,6 +12,7 @@
 #    lib/Config_heavy.pl
 #    lib/Config.pod
 #    lib/Cross.pm (optionally)
+#
 #
 # from the contents of the static files
 #
@@ -22,18 +23,17 @@
 #
 #    config.sh
 #
+# Note that output directory is xlib/[cross-name]/ for cross-compiling
+#
 # It will only update Config.pm and Config_heavy.pl if the contents of
 # either file would be different. Note that *both* files are updated in
 # this case, since for example an extension makefile that has a dependency
 # on Config.pm should trigger even if only Config_heavy.pl has changed.
 
 sub usage { die <<EOF }
-usage: $0  [ options ] [ Config_file ] [ Glossary_file ]
+usage: $0  [ options ]
     --cross=PLATFORM    cross-compile for a different platform
     --no-glossary       don't include Porting/Glossary in lib/Config.pod
-    --heavy=FILE        alternative name for lib/Config_heavy.pl
-    Config_file         alternative name for lib/Config.pm
-    Glossary_file       alternative name for Porting/Glossary
 EOF
 
 use strict;
@@ -61,7 +61,6 @@ my %Allowed_Opts = (
     'cross'    => '', # --cross=PLATFORM - crosscompiling for PLATFORM
     'glossary' => 1,  # --no-glossary  - no glossary file inclusion,
                       #                  for compactness
-    'heavy' => '',   # pathname of the Config_heavy.pl file
 );
 
 sub opts {
@@ -87,26 +86,25 @@ sub opts {
 
 my %Opts = opts();
 
-my ($Config_PM, $Config_heavy);
-my $Glossary = $ARGV[1] || 'Porting/Glossary';
+my ($Config_SH, $Config_PM, $Config_heavy, $Config_POD);
+my $Glossary = 'Porting/Glossary';
 
 if ($Opts{cross}) {
   # creating cross-platform config file
   mkdir "xlib";
   mkdir "xlib/$Opts{cross}";
-  $Config_PM = $ARGV[0] || "xlib/$Opts{cross}/Config.pm";
+  $Config_PM = "xlib/$Opts{cross}/Config.pm";
+  $Config_POD = "xlib/$Opts{cross}/Config.pod";
+  $Config_SH = "Cross/config-$Opts{cross}.sh";
 }
 else {
-  $Config_PM = $ARGV[0] || 'lib/Config.pm';
+  $Config_PM = "lib/Config.pm";
+  $Config_POD = "lib/Config.pod";
+  $Config_SH = "config.sh";
 }
-if ($Opts{heavy}) {
-  $Config_heavy = $Opts{heavy};
-}
-else {
-  ($Config_heavy = $Config_PM) =~ s!\.pm$!_heavy.pl!;
-  die "Can't automatically determine name for Config_heavy.pl from '$Config_PM'"
-    if $Config_heavy eq $Config_PM;
-}
+($Config_heavy = $Config_PM) =~ s/\.pm$/_heavy.pl/;
+die "Can't automatically determine name for Config_heavy.pl from '$Config_PM'"
+  if $Config_heavy eq $Config_PM;
 
 my $config_txt;
 my $heavy_txt;
@@ -159,10 +157,10 @@ sub import {
     foreach my $func (@funcs) {
 	die sprintf qq{"%%s" is not exported by the %%s module\n},
 	    $func, __PACKAGE__ unless $Export_Cache{$func};
-	*{$callpkg.'::'.$func} = \&{$func};
+	*{Symbol::fetch_glob($callpkg.'::'.$func)} = \&{$func};
     }
 
-    *{"$callpkg\::Config"} = \%%Config if $export_Config;
+    *{Symbol::fetch_glob("$callpkg\::Config")} = \%%Config if $export_Config;
     return;
 }
 
@@ -185,7 +183,7 @@ my %Data     = ();
 my %seen_quotes;
 {
   my ($name, $val);
-  open(CONFIG_SH, 'config.sh') || die "Can't open config.sh: $!";
+  open(CONFIG_SH, $Config_SH) || die "Can't open $Config_SH: $!";
   while (<CONFIG_SH>) {
     next if m:^#!/bin/sh:;
 
@@ -718,7 +716,7 @@ tie %%Config, 'Config', {
 ENDOFTIE
 
 
-open(CONFIG_POD, ">lib/Config.pod") or die "Can't open lib/Config.pod: $!";
+open(CONFIG_POD, ">$Config_POD") or die "Can't open $Config_POD: $!";
 print CONFIG_POD <<'ENDOFTAIL';
 =head1 NAME
 
@@ -918,7 +916,7 @@ ENDOFTAIL
 
 close(GLOS) if $Opts{glossary};
 close(CONFIG_POD);
-print "written lib/Config.pod\n";
+print "written $Config_POD\n";
 
 my $orig_config_txt = "";
 my $orig_heavy_txt = "";

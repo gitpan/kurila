@@ -1,11 +1,10 @@
 package B::Debug;
 
-our $VERSION = '1.03';
+our $VERSION = '1.05';
 
 use strict;
 use B qw(peekop class walkoptree walkoptree_exec
-         main_start main_root cstring sv_undef);
-use B::Asmdata qw(@specialsv_name);
+         main_start main_root cstring sv_undef @specialsv_name);
 
 my %done_gv;
 
@@ -20,9 +19,8 @@ sub B::OP::debug {
 	op_type		%d
 EOT
     if ($] > 5.009) {
-	printf <<'EOT', $op->opt, $op->static;
+	printf <<'EOT', $op->opt;
 	op_opt		%d
-	op_static	%d
 EOT
     } else {
 	printf <<'EOT', $op->seq;
@@ -84,12 +82,11 @@ sub B::COP::debug {
     my ($op) = @_;
     $op->B::OP::debug();
     my $cop_io = class($op->io) eq 'SPECIAL' ? '' : $op->io->as_string;
-    printf <<'EOT', $op->label, $op->stashpv, $op->file, $op->cop_seq, $op->arybase, $op->line, ${$op->warnings}, cstring($cop_io);
+    printf <<'EOT', $op->label, $op->stashpv, $op->file, $op->cop_seq, $op->line, ${$op->warnings}, cstring($cop_io);
 	cop_label	%s
 	cop_stashpv	%s
 	cop_file	%s
 	cop_seq		%d
-	cop_arybase	%d
 	cop_line	%d
 	cop_warnings	0x%x
 	cop_io		%s

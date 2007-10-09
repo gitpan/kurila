@@ -1010,7 +1010,7 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 	        if (*name == '!')
 		    require_tie_mod(gv, "!", newSVpvs("Errno"), "TIEHASH", 1);
 		else if (*name == '-' || *name == '+')
-		    require_tie_mod(gv, name, newSVpvs("Tie::Hash::NamedCapture"), "FETCH", 0);
+		    require_tie_mod(gv, name, newSVpvs("Tie::Hash::NamedCapture"), "TIEHASH", 0);
 	    }
 	}
 	return gv;
@@ -1123,14 +1123,14 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 		break;
             case '\015':        /* $^MATCH */
                 if (strEQ(name2, "ATCH"))
-		    goto ro_magicalize;
+		    goto magicalize;
 	    case '\017':	/* $^OPEN */
 		if (strEQ(name2, "PEN"))
 		    goto magicalize;
 		break;
 	    case '\020':        /* $^PREMATCH  $^POSTMATCH */
 	        if (strEQ(name2, "REMATCH") || strEQ(name2, "OSTMATCH"))
-		    goto ro_magicalize;  
+		    goto magicalize;  
 	    case '\024':	/* ${^TAINT} */
 		if (strEQ(name2, "AINT"))
 		    goto ro_magicalize;
@@ -1157,14 +1157,14 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 	    case '8':
 	    case '9':
 	    {
-		/* ensures variable is only digits */
-		/* ${"1foo"} fails this test (and is thus writeable) */
-		/* added by japhy, but borrowed from is_gv_magical */
+		/* Ensures that we have an all-digit variable, ${"1foo"} fails
+		   this test  */
+		/* This snippet is taken from is_gv_magical */
 		const char *end = name + len;
 		while (--end > name) {
-		    if (!isDIGIT(*end)) return gv;
+		    if (!isDIGIT(*end))	return gv;
 		}
-		goto ro_magicalize;
+		goto magicalize;
 	    }
 	    }
 	}
@@ -1182,7 +1182,7 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 		sv_type == SVt_PVIO
 		) { break; }
 	    PL_sawampersand = TRUE;
-	    goto ro_magicalize;
+	    goto magicalize;
 
 	case ':':
 	    sv_setpv(GvSVn(gv),PL_chopset);
@@ -1219,7 +1219,7 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
             SvREADONLY_on(av);
 
             if (sv_type == SVt_PVHV || sv_type == SVt_PVGV)
-                require_tie_mod(gv, name, newSVpvs("Tie::Hash::NamedCapture"), "FETCH", 0);
+                require_tie_mod(gv, name, newSVpvs("Tie::Hash::NamedCapture"), "TIEHASH", 0);
 
             break;
 	}
@@ -1240,6 +1240,9 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 	    }
 	    goto magicalize;
 	case '\023':	/* $^S */
+	ro_magicalize:
+	    SvREADONLY_on(GvSVn(gv));
+	    /* FALL THROUGH */
 	case '1':
 	case '2':
 	case '3':
@@ -1249,9 +1252,6 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 	case '7':
 	case '8':
 	case '9':
-	ro_magicalize:
-	    SvREADONLY_on(GvSVn(gv));
-	    /* FALL THROUGH */
 	case '[':
 	case '.':
 	case '(':
@@ -1499,9 +1499,10 @@ Perl_Gv_AMupdate(pTHX_ HV *stash)
   dVAR;
   MAGIC* const mg = mg_find((SV*)stash, PERL_MAGIC_overload_table);
   AMT amt;
+  const struct mro_meta* stash_meta = HvMROMETA(stash);
   U32 newgen;
 
-  newgen = PL_sub_generation + HvMROMETA(stash)->cache_gen;
+  newgen = PL_sub_generation + stash_meta->pkg_gen + stash_meta->cache_gen;
   if (mg) {
       const AMT * const amtp = (AMT*)mg->mg_ptr;
       if (amtp->was_ok_am == PL_amagic_generation
@@ -1583,6 +1584,8 @@ Perl_Gv_AMupdate(pTHX_ HV *stash)
 		{
 		    /* Can be an import stub (created by "can"). */
 		    const char * const name = (gvsv && SvPOK(gvsv)) ?  SvPVX_const(gvsv) : "???";
+		    if (PL_dirty) 
+			continue; /* ignore error during global destruction */
 		    Perl_croak(aTHX_ "%s method \"%.256s\" overloading \"%s\" "\
 				"in package \"%.256s\"",
 			       (GvCVGEN(gv) ? "Stub found while resolving"
@@ -1628,11 +1631,13 @@ Perl_gv_handler(pTHX_ HV *stash, I32 id)
     MAGIC *mg;
     AMT *amtp;
     U32 newgen;
+    struct mro_meta* stash_meta;
 
     if (!stash || !HvNAME_get(stash))
         return NULL;
 
-    newgen = PL_sub_generation + HvMROMETA(stash)->cache_gen;
+    stash_meta = HvMROMETA(stash);
+    newgen = PL_sub_generation + stash_meta->pkg_gen + stash_meta->cache_gen;
 
     mg = mg_find((SV*)stash, PERL_MAGIC_overload_table);
     if (!mg) {

@@ -2,7 +2,7 @@
 
 BEGIN { require "./test.pl"; }
 
-plan( tests => 13 );
+plan( tests => 12 );
 
 # Used to segfault (bug #15479)
 fresh_perl_is(
@@ -22,14 +22,14 @@ fresh_perl_is(
 
 {
     no strict 'refs';
-    ok( !defined %oedipa::maas::, q(stashes aren't defined if not used) );
-    ok( !defined %{"oedipa::maas::"}, q(- work with hard refs too) );
+    ok( !scalar %{Symbol::stash("oedipa::maas")}, q(stashes aren't defined if not used) );
+    ok( !scalar %{*{Symbol::fetch_glob("oedipa::maas::")}}, q(- work with hard refs too) );
 
-    ok( defined %tyrone::slothrop::, q(stashes are defined if seen at compile time) );
-    ok( defined %{"tyrone::slothrop::"}, q(- work with hard refs too) );
+    ok( defined %{Symbol::stash("tyrone::slothrop")}, q(stashes are defined if seen at compile time) );
+    ok( defined %{*{Symbol::fetch_glob("tyrone::slothrop::")}}, q(- work with hard refs too) );
 
-    ok( defined %bongo::shaftsbury::, q(stashes are defined if a var is seen at compile time) );
-    ok( defined %{"bongo::shaftsbury::"}, q(- work with hard refs too) );
+    ok( defined %{Symbol::stash("bongo::shaftsbury")}, q(stashes are defined if a var is seen at compile time) );
+    ok( defined %{*{Symbol::fetch_glob("bongo::shaftsbury::")}}, q(- work with hard refs too) );
 }
 
 package tyrone::slothrop;
@@ -51,11 +51,10 @@ package main;
 
 # now tests in eval
 
-ok( !eval  { defined %achtfaden:: },   'works in eval{}' );
+ok( !eval  { scalar %{Symbol::stash("achtfaden")} },   'works in eval{}' );
 ok( !eval q{ defined %schoenmaker:: }, 'works in eval("")' );
 
 # now tests with strictures
 
 use strict;
-ok( !defined %pig::, q(referencing a non-existent stash doesn't produce stricture errors) );
-ok( !exists $pig::{bodine}, q(referencing a non-existent stash element doesn't produce stricture errors) );
+ok( !scalar %{Symbol::stash("pig")}, q(referencing a non-existent stash doesn't produce stricture errors) );

@@ -92,10 +92,10 @@ sub AUTOLOAD {
 #XXX	    *$AUTOLOAD = sub () { $val };
 #XXX	}
 #XXX	else {
-	    *$AUTOLOAD = sub { $val };
+	    *{Symbol::fetch_glob($AUTOLOAD)} = sub { $val };
 #XXX	}
     }
-    goto &$AUTOLOAD;
+    goto &{Symbol::fetch_glob($AUTOLOAD)};
 }
 
 I18N::Langinfo->bootstrap( $VERSION);

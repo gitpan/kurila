@@ -151,11 +151,12 @@ sub import {
     }
     while (@_) {
 	my $name = shift(@_);
-	if ($name =~ /^:(.*)/) {
-	    if (!exists $feature_bundle{$1}) {
-		unknown_feature_bundle($1);
+	if (substr($name, 0, 1) eq ":") {
+	    my $v = substr($name, 1);
+	    if (!exists $feature_bundle{$v}) {
+		unknown_feature_bundle($v);
 	    }
-	    unshift @_, @{$feature_bundle{$1}};
+	    unshift @_, @{$feature_bundle{$v}};
 	    next;
 	}
 	if (!exists $feature{$name}) {
@@ -176,11 +177,12 @@ sub unimport {
 
     while (@_) {
 	my $name = shift;
-	if ($name =~ /^:(.*)/) {
-	    if (!exists $feature_bundle{$1}) {
-		unknown_feature_bundle($1);
+	if (substr($name, 0, 1) eq ":") {
+	    my $v = substr($name, 1);
+	    if (!exists $feature_bundle{$v}) {
+		unknown_feature_bundle($v);
 	    }
-	    unshift @_, @{$feature_bundle{$1}};
+	    unshift @_, @{$feature_bundle{$v}};
 	    next;
 	}
 	if (!exists($feature{$name})) {

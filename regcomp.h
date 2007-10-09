@@ -445,12 +445,15 @@ EXTCONST regexp_engine PL_core_reg_engine;
 #else /* DOINIT */
 EXTCONST regexp_engine PL_core_reg_engine = { 
         Perl_re_compile,
-        Perl_regexec_flags, 
+        Perl_regexec_flags,
         Perl_re_intuit_start,
         Perl_re_intuit_string, 
-        Perl_regfree_internal, 
-        Perl_reg_numbered_buff_get,
-        Perl_reg_named_buff_get,
+        Perl_regfree_internal,
+        Perl_reg_numbered_buff_fetch,
+        Perl_reg_numbered_buff_store,
+        Perl_reg_numbered_buff_length,
+        Perl_reg_named_buff,
+        Perl_reg_named_buff_iter,
         Perl_reg_qr_package,
 #if defined(USE_ITHREADS)        
         Perl_regdupe_internal
@@ -469,7 +472,7 @@ END_EXTERN_C
  *   n - Root of op tree for (?{EVAL}) item
  *   o - Start op for (?{EVAL}) item
  *   p - Pad for (?{EVAL}) item
- *   s - swash for unicode-style character class, and the multicharacter
+ *   s - swash for Unicode-style character class, and the multicharacter
  *       strings resulting from casefolding the single-character entries
  *       in the character class
  *   t - trie struct
@@ -663,6 +666,7 @@ re.pm, especially to the documentation.
 #define RE_DEBUG_COMPILE_OPTIMISE  0x000002
 #define RE_DEBUG_COMPILE_TRIE      0x000004
 #define RE_DEBUG_COMPILE_DUMP      0x000008
+#define RE_DEBUG_COMPILE_FLAGS     0x000010
 
 /* Execute */
 #define RE_DEBUG_EXECUTE_MASK      0x00FF00
@@ -695,7 +699,8 @@ re.pm, especially to the documentation.
     if (re_debug_flags & RE_DEBUG_COMPILE_DUMP) x  )
 #define DEBUG_TRIE_COMPILE_r(x) DEBUG_r( \
     if (re_debug_flags & RE_DEBUG_COMPILE_TRIE) x )
-
+#define DEBUG_FLAGS_r(x) DEBUG_r( \
+    if (re_debug_flags & RE_DEBUG_COMPILE_FLAGS) x )
 /* Execute */
 #define DEBUG_EXECUTE_r(x) DEBUG_r( \
     if (re_debug_flags & RE_DEBUG_EXECUTE_MASK) x  )

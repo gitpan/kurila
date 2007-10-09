@@ -12,7 +12,7 @@ BEGIN {
     # use Test::NoWarnings, if available
     my $extra = 0 ;
     $extra = 1
-        if eval { require Test::NoWarnings ;  Test::NoWarnings->import(); 1 };
+        if eval { require Test::NoWarnings ;  'Test::NoWarnings'->import(); 1 };
 
     plan tests => 48 + $extra ;
 
@@ -28,7 +28,7 @@ sub run
 
     my $AnyConstruct = "IO::Uncompress::${AnyClass}" ;
     no strict 'refs';
-    my $AnyError = \${ "IO::Uncompress::${AnyClass}::${AnyClass}Error" };
+    my $AnyError = \${Symbol::fetch_glob( "IO::Uncompress::${AnyClass}::${AnyClass}Error") };
 
     for my $trans ( 0, 1 )
     {

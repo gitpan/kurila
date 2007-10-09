@@ -167,9 +167,9 @@ sub prelink {
     DL_FUNCS => $args{dl_funcs}     || {},
     FUNCLIST => $args{dl_func_list} || [],
     IMPORTS  => $args{dl_imports}   || {},
-    NAME     => $args{dl_name},
-    DLBASE   => $args{dl_base},
-    FILE     => $args{dl_file},
+    NAME     => $args{dl_name},		# Name of the Perl module
+    DLBASE   => $args{dl_base},		# Basename of DLL file
+    FILE     => $args{dl_file},		# Dir + Basename of symlist file
     VERSION  => (defined $args{dl_version} ? $args{dl_version} : '0.0'),
   );
   
@@ -244,7 +244,7 @@ sub perl_src {
   my $dir   = File::Spec->curdir;
 
   # Try up to 5 levels upwards
-  for (0..5) {
+  for (0..10) {
     if (
 	-f File::Spec->catfile($dir,"config_h.SH")
 	&&

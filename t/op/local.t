@@ -3,7 +3,7 @@
 BEGIN {
     require './test.pl';
 }
-plan tests => 114;
+plan tests => 120;
 
 our (@c, @b, @a, $a, $b, $c, $d, $e, $x, $y, %d, %h, $m);
 
@@ -312,7 +312,7 @@ while (/(o.+?),/gc) {
     $x{a} = 1;
     { local $x{b} = 1; }
     ok(! exists $x{b});
-    { local @x{c,d,e}; }
+    { local @x{'c','d','e'}; }
     ok(! exists $x{c});
 }
 
@@ -331,18 +331,6 @@ like($@, qr/Modification of a read-only value attempted/);
 # The s/// adds 'g' magic to $_, but it should remain non-readonly
 eval { for("a") { for $x (1,2) { local $_="b"; s/(.*)/+$1/ } } };
 is($@, "");
-
-# Special local() behavior for $[
-# (see RT #38207 - Useless localization of constant ($[) in getopts.pl}
-{
-    local $[ = 1;
-    local $TODO = "local() not currently working correctly with \$[";
-    ok(1 == $[);
-    undef $TODO;
-    f();
-}
-
-sub f { ok(0 == $[); }
 
 # sub localisation
 {
@@ -429,5 +417,39 @@ sub f { ok(0 == $[); }
     sub { local $_[0]; shift }->($y);
     ok(!$x,  '[perl #39012]');
     
+}
+
+# when localising a hash element, the key should be copied, not referenced
+
+{
+    my %h=('k1' => 111);
+    my $k='k1';
+    {
+	local $h{$k}=222;
+
+	is($h{'k1'},222);
+	$k='k2';
+    }
+    ok(! exists($h{'k2'}));
+    is($h{'k1'},111);
+}
+{
+    my %h=('k1' => 111);
+    our $k = 'k1';  # try dynamic too
+    {
+	local $h{$k}=222;
+	is($h{'k1'},222);
+	$k='k2';
+    }
+    ok(! exists($h{'k2'}));
+    is($h{'k1'},111);
+}
+
+# Keep this test last, as it can SEGV
+{
+    local *@;
+    pass("Localised *@");
+    eval {1};
+    pass("Can eval with *@ localised");
 }
 

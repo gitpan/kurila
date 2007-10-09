@@ -14,7 +14,7 @@ use warnings; # uses #3 and #4, since warnings uses Carp
 
 use Exporter (); # use #5
 
-our $VERSION   = "0.71";
+our $VERSION   = "0.72";
 our @ISA       = qw(Exporter);
 our @EXPORT_OK = qw( set_style set_style_standard add_callback
 		     concise_subref concise_cv concise_main
@@ -626,16 +626,16 @@ our %hints; # used to display each COP's op_hints values
 
 # strict refs, subs, vars
 @hints{2,512,1024} = ('$', '&', '*');
-# integers, locale, bytes, arybase
-@hints{1,4,8,16,32} = ('i', 'l', 'b', '[');
+# integers, locale, bytes
+@hints{1,4,8,16} = ('i', 'l', 'b');
 # block scope, localise %^H, $^OPEN (in), $^OPEN (out)
 @hints{256,131072,262144,524288} = ('{','%','<','>');
 # overload new integer, float, binary, string, re
 @hints{4096,8192,16384,32768,65536} = ('I', 'F', 'B', 'S', 'R');
 # taint and eval
 @hints{1048576,2097152} = ('T', 'E');
-# filetest access, UTF-8, assertions, assertions seen
-@hints{4194304,8388608,16777216,33554432} = ('X', 'U', 'A', 'a');
+# filetest access, UTF-8
+@hints{4194304,8388608} = ('X', 'U');
 
 sub _flags {
     my($hash, $x) = @_;
@@ -790,9 +790,7 @@ sub concise_op {
 	$loc =~ s[.*/][];
 	$loc .= ":" . $op->line;
 	my($stash, $cseq) = ($op->stash->NAME, $op->cop_seq - $cop_seq_base);
-	my $arybase = $op->arybase;
-	$arybase = $arybase ? ' $[=' . $arybase : "";
-	$h{arg} = "($label$stash $cseq $loc$arybase)";
+	$h{arg} = "($label$stash $cseq $loc)";
     } elsif ($h{class} eq "LOOP") {
 	$h{arg} = "(next->" . seq($op->nextop) . " last->" . seq($op->lastop)
 	  . " redo->" . seq($op->redoop) . ")";
@@ -817,7 +815,6 @@ sub concise_op {
     $h{seq} = "" if $h{seq} eq "-";
     if ($] > 5.009) {
 	$h{opt} = $op->opt;
-	$h{static} = $op->static;
 	$h{label} = $labels{$$op};
     } else {
 	$h{seqnum} = $op->seq;
@@ -1502,13 +1499,6 @@ Whether or not the op has been optimised by the peephole optimiser.
 
 Only available in 5.9 and later.
 
-=item B<#static>
-
-Whether or not the op is statically defined.  This flag is used by the
-B::C compiler backend and indicates that the op should not be freed.
-
-Only available in 5.9 and later.
-
 =item B<#sibaddr>
 
 The address of the OP's next youngest sibling, in hexadecimal.
@@ -1579,6 +1569,7 @@ subroutine rendering is more representative, insofar as a single main
 program will have many subs.
 
 
+=back
 
 =head1 Using B::Concise outside of the O framework
 

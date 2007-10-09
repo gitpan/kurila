@@ -1141,6 +1141,8 @@ $test++;
     ok($x =~ /^.$/u, "wide is extactly one .");
     my $y = qr/^.$/u;
     ok("$y" eq "(?u-xism:^.\$)", "unicode-modifier stringified.");
+    eval q|no utf8; $x =~ m/\x{65e5}/|;
+    ok( $@ , "\\x{...} gives error in non-unicode regex");
 }
 
 use utf8;
@@ -2408,7 +2410,7 @@ print "# some Unicode properties\n";
     $test= 835;
 
     ok("\N{LATIN SMALL LETTER SHARP S}" =~ /\N{LATIN SMALL LETTER SHARP S}/);
-    ok("\N{LATIN SMALL LETTER SHARP S}" =~ /\N{LATIN SMALL LETTER SHARP S}/i);
+    ok("\N{LATIN SMALL LETTER SHARP S}" =~ /\N{LATIN SMALL LETTER SHARP S}/i, " # TODO sharp S with case folding");
 
     ok("\N{LATIN SMALL LETTER SHARP S}" =~ /[\N{LATIN SMALL LETTER SHARP S}]/, " # TODO sharp S in character class");
     ok("\N{LATIN SMALL LETTER SHARP S}" =~ /[\N{LATIN SMALL LETTER SHARP S}]/i, " # TODO sharp S in character class");
@@ -2688,7 +2690,7 @@ EOF
 print "d" =~ /\p{InConsonant}/ ? "ok $test\n" : "not ok $test\n"; $test++;
 print "e" =~ /\P{InConsonant}/ ? "ok $test\n" : "not ok $test\n"; $test++;
 
-{
+if (!$ENV{PERL_SKIP_PSYCHO_TEST}){
     print "# [ID 20020630.002] utf8 regex only matches 32k\n";
     $test = 911;
     for ([ 'byte', "\x{ff}" ], [ 'utf8', "\x{1ff}" ]) {
@@ -2700,6 +2702,8 @@ print "e" =~ /\P{InConsonant}/ ? "ok $test\n" : "not ok $test\n"; $test++;
 	    ok(+(!$r or pos($s) == $len + 1), " # TODO <$type x $len> pos @{[ pos($s) ]}");
 	}
     }
+} else {
+    ok(1,'Skipped Psycho') for 1..12;
 }
 
 $test = 923;
@@ -2907,7 +2911,7 @@ ok("bbbbac" =~ /$pattern/ && $1 eq 'a', "[perl #3547]");
     }
     ok ($p == 5, "[perl #20683] (??{ }) returns stale values");
     { package P; $a=1; sub TIESCALAR { bless[] } sub FETCH { $a++ } }
-    tie $p, P;
+    tie $p, 'P';
     foreach (1,2,3,4) {
 	    /(??{ $p })/
     }
@@ -3051,7 +3055,7 @@ for (120 .. 130) {
     my $head = 'x' x $_;
     for my $tail ('\x{0061}', '\x{1234}') {
 	ok(
-	    eval qq{ "$head$tail" =~ /$head$tail/ },
+	    eval qq{use utf8; "$head$tail" =~ /$head$tail/ },
 	    '\x{...} misparsed in regexp near 127 char EXACT limit'
 	);
     }
@@ -3134,13 +3138,13 @@ use charnames ':full';
 $s="\N{LATIN SMALL LETTER SHARP S}";
 ok(("foba  ba$s" =~ qr/(foo|Ba$s|bar)/i)
     &&  $1 eq "ba$s",
-   "TRIEF + LATIN SMALL LETTER SHARP S =~ ss");
+   " # TODO TRIEF + LATIN SMALL LETTER SHARP S =~ ss");
 ok(("foba  ba$s" =~ qr/(Ba$s|foo|bar)/i)
     &&  $1 eq "ba$s",
-   "TRIEF + LATIN SMALL LETTER SHARP S =~ ss");
+   " # TODO TRIEF + LATIN SMALL LETTER SHARP S =~ ss");
 ok(("foba  ba$s" =~ qr/(foo|bar|Ba$s)/i)
     &&  $1 eq "ba$s",
-   "TRIEF + LATIN SMALL LETTER SHARP S =~ ss");
+   " # TODO TRIEF + LATIN SMALL LETTER SHARP S =~ ss");
 
 ok(("foba  ba$s" =~ qr/(foo|Bass|bar)/i)
     &&  $1 eq "ba$s",
@@ -4126,15 +4130,94 @@ sub kt
         for my $dfi (0..$#df) {
             my $pat= $df[$dfi];
             my $str= $ss[$ssi];
-            (my $sstr=$str)=~s/\xDF/\\xDF/;
+            (my $sstr=$str)=~s/\x{DF}/\\x{DF}/;
 
             my $ret= $str=~/$pat/i;
             next if $pat eq '-';
             ok($ret,
-               "\"$sstr\"=~/\\xDF/i");
+               "\"$sstr\"=~/\\x{DF}/i # TODO multi-char folding");
         }
     }
 }
+{
+    local $Message = "BBC(Bleadperl Breaks CPAN) Today: String::Multibyte";
+    my $re  = qr/(?:[\x00-\xFF]{4})/;
+    my $hyp = "\0\0\0-";
+    my $esc = "\0\0\0\\";
+
+    my $str = "$esc$hyp$hyp$esc$esc";
+    my @a = ($str =~ /\G(?:\Q$esc$esc\E|\Q$esc$hyp\E|$re)/g);
+
+    iseq(0+@a,3);
+    iseq(join('=', @a),"$esc$hyp=$hyp=$esc$esc");
+}
+# test for keys in %+ and %-
+{
+    my $_ = "abcdef";
+    /(?<foo>a)|(?<foo>b)/;
+    iseq( (join ",", sort keys %+), "foo" );
+    iseq( (join ",", sort keys %-), "foo" );
+    iseq( (join ",", sort values %+), "a" );
+    iseq( (join ",", sort map "@$_", values %-), "a " );
+    /(?<bar>a)(?<bar>b)(?<quux>.)/;
+    iseq( (join ",", sort keys %+), "bar,quux" );
+    iseq( (join ",", sort keys %-), "bar,quux" );
+    iseq( (join ",", sort values %+), "a,c" ); # leftmost
+    iseq( (join ",", sort map "@$_", values %-), "a b,c" );
+    /(?<un>a)(?<deux>c)?/; # second buffer won't capture
+    iseq( (join ",", sort keys %+), "un" );
+    iseq( (join ",", sort keys %-), "deux,un" );
+    iseq( (join ",", sort values %+), "a" );
+    iseq( (join ",", sort map "@$_", values %-), ",a" );
+}
+
+# length() on captures, the numbered ones end up in Perl_magic_len
+{
+    my $_ = "aoeu \xe6var ook";
+    /^ \w+ \s (?<eek>\S+)/x;
+
+    iseq( length($`), 0, 'length $`' );
+    iseq( length($'), 4, q[length $'] );
+    iseq( length($&), 9, 'length $&' );
+    iseq( length($1), 4, 'length $1' );
+    iseq( length($+{eek}), 4, 'length $+{eek} == length $1' );
+}
+
+{
+    my $ok=-1;
+
+    $ok=exists($-{x}) ? 1 : 0
+        if 'bar'=~/(?<x>foo)|bar/;
+    iseq($ok,1,'$-{x} exists after "bar"=~/(?<x>foo)|bar/');
+    iseq(scalar(%+), 0, 'scalar %+ == 0 after "bar"=~/(?<x>foo)|bar/');
+    iseq(scalar(%-), 1, 'scalar %- == 1 after "bar"=~/(?<x>foo)|bar/');
+
+    $ok=-1;
+    $ok=exists($+{x}) ? 1 : 0
+        if 'bar'=~/(?<x>foo)|bar/;
+    iseq($ok,0,'$+{x} not exists after "bar"=~/(?<x>foo)|bar/');
+    iseq(scalar(%+), 0, 'scalar %+ == 0 after "bar"=~/(?<x>foo)|bar/');
+    iseq(scalar(%-), 1, 'scalar %- == 1 after "bar"=~/(?<x>foo)|bar/');
+
+    $ok=-1;
+    $ok=exists($-{x}) ? 1 : 0
+        if 'foo'=~/(?<x>foo)|bar/;
+    iseq($ok,1,'$-{x} exists after "foo"=~/(?<x>foo)|bar/');
+    iseq(scalar(%+), 1, 'scalar %+ == 1 after "foo"=~/(?<x>foo)|bar/');
+    iseq(scalar(%-), 1, 'scalar %- == 1 after "foo"=~/(?<x>foo)|bar/');
+
+    $ok=-1;
+    $ok=exists($+{x}) ? 1 : 0
+        if 'foo'=~/(?<x>foo)|bar/;
+    iseq($ok,1,'$+{x} exists after "foo"=~/(?<x>foo)|bar/');
+}
+{
+    local $_;
+    ($_ = 'abc')=~/(abc)/g;
+    $_ = '123'; 
+    iseq("$1",'abc',"/g leads to unsafe match vars: $1");
+}
+
 # Test counter is at bottom of file. Put new tests above here.
 #-------------------------------------------------------------------
 # Keep the following tests last -- they may crash perl
@@ -4181,44 +4264,10 @@ ok($@=~/\QSequence \k... not terminated in regex;\E/);
     iseq($_,"!Bang!1!Bang!2!Bang!3!Bang!");
 }
 
-# test for keys in %+ and %-
-{
-    my $_ = "abcdef";
-    /(?<foo>a)|(?<foo>b)/;
-    iseq( (join ",", sort keys %+), "foo" );
-    iseq( (join ",", sort keys %-), "foo" );
-    iseq( (join ",", sort values %+), "a" );
-    iseq( (join ",", sort map "@$_", values %-), "a " );
-    /(?<bar>a)(?<bar>b)(?<quux>.)/;
-    iseq( (join ",", sort keys %+), "bar,quux" );
-    iseq( (join ",", sort keys %-), "bar,quux" );
-    iseq( (join ",", sort values %+), "a,c" ); # leftmost
-    iseq( (join ",", sort map "@$_", values %-), "a b,c" );
-    /(?<un>a)(?<deux>c)?/; # second buffer won't capture
-    iseq( (join ",", sort keys %+), "un" );
-    iseq( (join ",", sort keys %-), "deux,un" );
-    iseq( (join ",", sort values %+), "a" );
-    iseq( (join ",", sort map "@$_", values %-), ",a" );
-}
-
-# length() on captures, these end up in Perl_magic_len
-{
-    my $_ = "aoeu \xe6var ook";
-    /^ \w+ \s (?<eek>\S+)/x;
-
-    iseq( length($`), 0, 'length $`' );
-    iseq( length($'), 4, q[length $'] );
-    iseq( length($&), 9, 'length $&' );
-    iseq( length($1), 4, 'length $1' );
-    iseq( length($+{eek}), 4, 'length $+{eek} == length $1' );
-}
-
 # Put new tests above the dotted line about a page above this comment
 iseq(0+$::test,$::TestCount,"Got the right number of tests!");
 # Don't forget to update this!
 BEGIN {
-    $::TestCount = 1769;
+    $::TestCount = 1782;
     print "1..$::TestCount\n";
 }
-
-

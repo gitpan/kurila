@@ -13,6 +13,7 @@ use lib qw[../lib];
 
 use constant IS_WIN32   => $^O eq 'MSWin32' ? 1 : 0;
 use constant IS_CYGWIN  => $^O eq 'cygwin'  ? 1 : 0;
+use constant IS_VMS     => $^O eq 'VMS'     ? 1 : 0;
 
 use Cwd                         qw[cwd];
 use Test::More                  qw[no_plan];
@@ -76,9 +77,14 @@ my $tmpl = {
                     method      => 'is_tar',
                     outfile     => 'a',
                 },
-    'x.gz' => {     programs    => [qw[gzip]],
+    'x.gz'  => {    programs    => [qw[gzip]],
                     modules     => [qw[Compress::Zlib]],
                     method      => 'is_gz',
+                    outfile     => 'a',
+                },
+    'x.Z'   => {    programs    => [qw[uncompress]],
+                    modules     => [qw[Compress::Zlib]],
+                    method      => 'is_Z',
                     outfile     => 'a',
                 },
     'x.zip' => {    programs    => [qw[unzip]],
@@ -185,9 +191,9 @@ if( $Debug ) {
 
 ### XXX whitebox test
 ### test __get_extract_dir 
-{   my $meth = '__get_extract_dir';
+SKIP: {   my $meth = '__get_extract_dir';
 
-    ### get the right seperator -- File::Spec does clean ups for
+    ### get the right separator -- File::Spec does clean ups for
     ### paths, so we need to join ourselves.
     my $sep  = [ split '', File::Spec->catfile( 'a', 'b' ) ]->[1];
     
@@ -196,6 +202,9 @@ if( $Debug ) {
     ### to be unpacked in '.' rather than in 'dir'. here we test
     ### for this.
     for my $prefix ( '', '.' ) {
+        skip "Prepending ./ to a valid path doesn't give you another valid path on VMS", 2
+            if IS_VMS && length($prefix);
+
         my $dir = basename( $SrcDir );
 
         ### build a list like [dir, dir/file] and [./dir ./dir/file]
@@ -268,7 +277,9 @@ for my $switch (0,1) {
         ### where to extract to -- try both dir and file for gz files
         ### XXX test me!
         #my @outs = $ae->is_gz ? ($abs_path, $OutDir) : ($OutDir);
-        my @outs = $ae->is_gz || $ae->is_bz2 ? ($abs_path) : ($OutDir);
+        my @outs = $ae->is_gz || $ae->is_bz2 || $ae->is_Z 
+                        ? ($abs_path) 
+                        : ($OutDir);
 
         skip "No binaries or modules to extract ".$archive, 
             (10 * scalar @outs) if $mod_fail && $pgm_fail;
@@ -298,7 +309,7 @@ for my $switch (0,1) {
 
                 diag("Extracting to: $to")                  if $Debug;
                 diag("Buffers enabled: ".!$turn_off)        if $Debug;
-    
+  
                 my $rv = $ae->extract( to => $to );
     
                 ok( $rv, "extract() for '$archive' reports success");
@@ -347,6 +358,14 @@ for my $switch (0,1) {
                     SKIP: {
                         skip "No extract path captured, can't remove paths", 2
                             unless $ae->extract_path;
+        
+                        ### if something went wrong with determining the out
+                        ### path, don't go deleting stuff.. might be Really Bad
+                        my $out_re = quotemeta( $OutDir );
+                        if( $ae->extract_path !~ /^$out_re/ ) {   
+                            ok( 0, "Extractpath WRONG (".$ae->extract_path.")"); 
+                            skip(  "Unsafe operation -- skip cleanup!!!" ), 1;
+                        }                    
         
                         eval { rmtree( $ae->extract_path ) }; 
                         ok( !$@,        "   rmtree gave no error" );

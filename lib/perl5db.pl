@@ -967,15 +967,6 @@ BEGIN {
     $^W       = 0;
 }    # Switch compilation warnings off until another BEGIN.
 
-# test if assertions are supported and actived:
-BEGIN {
-    $ini_assertion = eval "sub asserting_test : assertion {1}; 1";
-
-    # $ini_assertion = undef => assertions unsupported,
-    #        "       = 1     => assertions supported
-    # print "\$ini_assertion=$ini_assertion\n";
-}
-
 local ($^W) = 0;    # Switch run-time warnings off during init.
 
 =head2 THREADS SUPPORT
@@ -1102,10 +1093,10 @@ are to be accepted.
   signalLevel  warnLevel     dieLevel
   inhibit_exit ImmediateStop bareStringify
   CreateTTY    RemotePort    windowSize
-  DollarCaretP OnlyAssertions WarnAssertions
+  DollarCaretP
 );
 
-@RememberOnROptions = qw(DollarCaretP OnlyAssertions);
+@RememberOnROptions = qw(DollarCaretP);
 
 =pod
 
@@ -1134,7 +1125,6 @@ state.
     ImmediateStop => \$ImmediateStop,
     RemotePort    => \$remoteport,
     windowSize    => \$window,
-    WarnAssertions => \$warnassertions,
     HistFile      => \$histfile,
     HistSize      => \$histsize,
 );
@@ -1165,7 +1155,6 @@ option.
     ornaments     => \&ornaments,
     RemotePort    => \&RemotePort,
     DollarCaretP  => \&DollarCaretP,
-    OnlyAssertions=> \&OnlyAssertions,
 );
 
 =pod
@@ -1426,7 +1415,7 @@ EO_GRIPE
 sub is_safe_file {
     my $path = shift;
     stat($path) || return;    # mysteriously vaporized
-    my ( $dev, $ino, $mode, $nlink, $uid, $gid ) = stat(_);
+    my ( $dev, $ino, $mode, $nlink, $uid, $gid ) = stat('_');
 
     return 0 if $uid != 0 && $uid != $<;
     return 0 if $mode & 022;
@@ -2096,7 +2085,7 @@ number information, and print that.
                                  # Perl 5 ones (sorry, we don't print Klingon
                                  #module names)
 
-            $prefix = $sub =~ /::/ ? "" : "${'package'}::";
+            $prefix = $sub =~ /::/ ? "" : "${*{Symbol::fetch_glob('package')}}::";
             $prefix .= "$sub($filename:";
             $after = ( $dbline[$line] =~ /\n$/ ? '' : "\n" );
 
@@ -3697,17 +3686,7 @@ sub sub {
         # Called in array context. call sub and capture output.
         # DB::DB will recursively get control again if appropriate; we'll come
         # back here when the sub is finished.
-        if ($assertion) {
-            $assertion = 0;
-            eval { @ret = &$sub; };
-            if ($@) {
-                print $OUT $@;
-                $signal = 1 unless $warnassertions;
-            }
-        }
-        else {
-            @ret = &$sub;
-        }
+	@ret = &$sub;
 
         # Pop the single-step value back off the stack.
         $single |= $stack[ $stack_depth-- ];
@@ -3748,32 +3727,17 @@ sub sub {
 
     # Scalar context.
     else {
-        if ($assertion) {
-            $assertion = 0;
-            eval {
+	if ( defined wantarray ) {
 
-                # Save the value if it's wanted at all.
-                $ret = &$sub;
-            };
-            if ($@) {
-                print $OUT $@;
-                $signal = 1 unless $warnassertions;
-            }
-            $ret = undef unless defined wantarray;
-        }
-        else {
-            if ( defined wantarray ) {
+	    # Save the value if it's wanted at all.
+	    $ret = &{*{Symbol::fetch_glob($sub)}};
+	}
+	else {
 
-                # Save the value if it's wanted at all.
-                $ret = &$sub;
-            }
-            else {
-
-                # Void return, explicitly.
-                &$sub;
-                undef $ret;
-            }
-        }    # if assertion
+	    # Void return, explicitly.
+	    &{*{Symbol::fetch_glob($sub)}};
+	    undef $ret;
+	}
 
         # Pop the single-step value off the stack.
         $single |= $stack[ $stack_depth-- ];
@@ -3896,7 +3860,7 @@ sub cmd_wrapper {
           || ( $cmd =~ /^[<>{]+/o ? 'prepost' : $cmd ) );
 
     # Call the command subroutine, call it by name.
-    return &$call( $cmd, $line, $dblineno );
+    return &{*{Symbol::fetch_glob($call)}}( $cmd, $line, $dblineno );
 } ## end sub cmd_wrapper
 
 =head3 C<cmd_a> (command)
@@ -4070,7 +4034,7 @@ sub cmd_b {
         $subname =~ s/\'/::/g;
 
         # Qualify it into the current package unless it's already qualified.
-        $subname = "${'package'}::" . $subname unless $subname =~ /::/;
+        $subname = "${*{Symbol::fetch_glob('package')}}::" . $subname unless $subname =~ /::/;
 
         # Add main if it starts with ::.
         $subname = "main" . $subname if substr( $subname, 0, 2 ) eq "::";
@@ -4491,7 +4455,7 @@ sub cmd_b_sub {
         my $s = $subname;
 
         # Put it in this package unless it's already qualified.
-        $subname = "${'package'}::" . $subname
+        $subname = "${*{Symbol::fetch_glob('package')}}::" . $subname
           unless $subname =~ /::/;
 
         # Requalify it into CORE::GLOBAL if qualifying it into this
@@ -4500,7 +4464,7 @@ sub cmd_b_sub {
         $subname = "CORE::GLOBAL::$s"
           if not defined &$subname
           and $s !~ /::/
-          and defined &{"CORE::GLOBAL::$s"};
+          and defined &{*{Symbol::fetch_glob("CORE::GLOBAL::$s")}};
 
         # Put it in package 'main' if it has a leading ::.
         $subname = "main" . $subname if substr( $subname, 0, 2 ) eq "::";
@@ -4809,8 +4773,8 @@ sub cmd_i {
                 map {    # snaffled unceremoniously from Class::ISA
                     "$_"
                       . (
-                        defined( ${"$_\::VERSION"} )
-                        ? ' ' . ${"$_\::VERSION"}
+                        defined( ${*{Symbol::fetch_glob("$_\::VERSION")}} )
+                        ? ' ' . ${*{Symbol::fetch_glob("$_\::VERSION")}}
                         : undef )
                   } Class::ISA::self_and_super_path(ref($isa) || $isa)
             );
@@ -4877,7 +4841,7 @@ sub cmd_l {
         $subname = "CORE::GLOBAL::$s"
           if not defined &$subname
           and $s !~ /::/
-          and defined &{"CORE::GLOBAL::$s"};
+          and defined &{*{Symbol::fetch_glob("CORE::GLOBAL::$s")}};
 
         # Put leading '::' names into 'main::'.
         $subname = "main" . $subname if substr( $subname, 0, 2 ) eq "::";
@@ -5342,38 +5306,6 @@ sub cmd_W {
 
 These are general support routines that are used in a number of places
 throughout the debugger.
-
-=over 4
-
-=item cmd_P
-
-Something to do with assertions
-
-=back
-
-=cut
-
-sub cmd_P {
-    unless ($ini_assertion) {
-        print $OUT "Assertions not supported in this Perl interpreter\n";
-    } else {
-        if ( $cmd =~ /^.\b\s*([+-]?)\s*(~?)\s*(\w+(\s*\|\s*\w+)*)\s*$/ ) {
-            my ( $how, $neg, $flags ) = ( $1, $2, $3 );
-            my $acu = parse_DollarCaretP_flags($flags);
-            if ( defined $acu ) {
-                $acu = ~$acu if $neg;
-                if ( $how eq '+' ) { $^P |= $acu }
-                elsif ( $how eq '-' ) { $^P &= ~$acu }
-                else { $^P = $acu }
-            }
-
-            # else { print $OUT "undefined acu\n" }
-        }
-        my $expanded = expand_DollarCaretP_flags($^P);
-        print $OUT "Internal Perl debugger flags:\n\$^P=$expanded\n";
-        $expanded;
-    }
-}
 
 =head2 save
 
@@ -6946,33 +6878,6 @@ sub DollarCaretP {
     expand_DollarCaretP_flags($^P);
 }
 
-sub OnlyAssertions {
-    if ($term) {
-        &warn("Too late to set up OnlyAssertions mode, enabled on next 'R'!\n")
-          if @_;
-    }
-    if (@_) {
-        unless ( defined $ini_assertion ) {
-            if ($term) {
-                &warn("Current Perl interpreter doesn't support assertions");
-            }
-            return 0;
-        }
-        if (shift) {
-            unless ($ini_assertion) {
-                print "Assertions will be active on next 'R'!\n";
-                $ini_assertion = 1;
-            }
-            $^P &= ~$DollarCaretP_flags{PERLDBf_SUB};
-            $^P |= $DollarCaretP_flags{PERLDBf_ASSERTION};
-        }
-        else {
-            $^P |= $DollarCaretP_flags{PERLDBf_SUB};
-        }
-    }
-    !( $^P & $DollarCaretP_flags{PERLDBf_SUB} ) || 0;
-}
-
 =head2 C<pager>
 
 Set up the C<$pager> variable. Adds a pipe to the front unless there's one
@@ -7120,8 +7025,8 @@ sub list_modules {    # versions
 
         # If the package has a $VERSION package global (as all good packages
         # should!) decode it and save as partial message.
-        if ( defined ${ $_ . '::VERSION' } ) {
-            $version{$file} = "${ $_ . '::VERSION' } from ";
+        if ( defined ${*{Symbol::fetch_glob( $_ . '::VERSION')} } ) {
+            $version{$file} = "${*{Symbol::fetch_glob( $_ . '::VERSION')} } from ";
         }
 
         # Finish up the message with the file the package came from.
@@ -7235,7 +7140,6 @@ B<i> I<class>       Prints nested parents of given class.
 B<e>         Display current thread id.
 B<E>         Display all thread ids the current one will be identified: <n>.
 B<y> [I<n> [I<Vars>]]   List lexicals in higher scope <n>.  Vars same as B<V>.
-B<P> Something to do with assertions...
 
 B<<> ?            List Perl commands to run before each prompt.
 B<<> I<expr>        Define Perl command to run before each prompt.
@@ -7991,10 +7895,10 @@ sub methods_via {
     for $name (
 
         # Keep if this is a defined subroutine in this class.
-        grep { defined &{ ${"${class}::"}{$_} } }
+        grep { defined &{ ${*{Symbol::fetch_glob("${class}::")}}{$_} } }
 
         # Extract from all the symbols in this class.
-        sort keys %{"${class}::"}
+        sort keys %{*{Symbol::fetch_glob("${class}::")}}
       )
     {
 
@@ -8012,7 +7916,7 @@ sub methods_via {
 
     # $crawl_upward true: keep going up the tree.
     # Find all the classes this one is a subclass of.
-    for $name ( @{"${class}::ISA"} ) {
+    for $name ( @{*{Symbol::fetch_glob("${class}::ISA")}} ) {
 
         # Set up the new prefix.
         $prepend = $prefix ? $prefix . " -> $name" : $name;
@@ -8396,7 +8300,7 @@ sub db_complete {
     # The search pattern is current package, ::, extract the next qualifier
     # Prefix and pack are set to undef.
     my ( $itext, $search, $prefix, $pack ) =
-      ( $text, "^\Q${'package'}::\E([^:]+)\$" );
+      ( $text, "^\Q${*{Symbol::fetch_glob('package')}}::\E([^:]+)\$" );
 
 =head3 C<b postpone|compile> 
 
@@ -8468,7 +8372,7 @@ start with 'main::'. Return this list.
 
     return sort map { ( $_, db_complete( $_ . "::", "V ", 2 ) ) }
       grep !/^main::/, grep /^\Q$text/,
-      map { /^(.*)::$/ ? ( $prefix . "::$1" ) : () } keys %{ $prefix . '::' }
+      map { /^(.*)::$/ ? ( $prefix . "::$1" ) : () } keys %{*{Symbol::fetch_glob( $prefix . '::')} }
       if ( substr $line, 0, $start ) =~ /^\|*[Vm]\s+$/
       and $text =~ /^(.*[^:])::?(\w*)$/
       and $prefix = $1;
@@ -8569,7 +8473,7 @@ Look through all the symbols in the package. C<grep> out all the possible hashes
 =cut
 
         my @out = map "$prefix$_", grep /^\Q$text/, grep /^_?[a-zA-Z]/,
-          keys %$pack;
+          keys %{*{Symbol::fetch_glob($pack)}};
 
 =pod
 
@@ -8630,7 +8534,7 @@ If the package is C<::> (C<main>), create an empty list; if it's something else,
 =cut
 
         my @out = map "$prefix$_", grep /^\Q$text/,
-          ( grep /^_?[a-zA-Z]/, keys %$pack ),
+          ( grep /^_?[a-zA-Z]/, keys %{*{Symbol::fetch_glob($pack)}} ),
           ( $pack eq '::' ? () : ( grep /::$/, keys %:: ) );
 
 =item *
@@ -8762,8 +8666,7 @@ BEGIN {
         PERLDBf_GOTO      => 0x80,     # Report goto: call DB::goto
         PERLDBf_NAMEEVAL  => 0x100,    # Informative names for evals
         PERLDBf_NAMEANON  => 0x200,    # Informative names for anon subs
-        PERLDBf_ASSERTION => 0x400,    # Debug assertion subs enter/exit
-        PERLDB_ALL        => 0x33f,    # No _NONAME, _GOTO, _ASSERTION
+        PERLDB_ALL        => 0x33f,    # No _NONAME, _GOTO
     );
 
     %DollarCaretP_flags_r = reverse %DollarCaretP_flags;
@@ -8869,11 +8772,6 @@ sub restart {
 
     # If warn was on before, turn it on again.
     push @flags, '-w' if $ini_warn;
-    if ( $ini_assertion and @{^ASSERTING} ) {
-        push @flags,
-          ( map { /\:\^\(\?\:(.*)\)\$\)/ ? "-A$1" : "-A$_" }
-              @{^ASSERTING} );
-    }
 
     # Rebuild the -I flags that were on the initial
     # command line.
@@ -8895,8 +8793,8 @@ sub restart {
     # the 'require perl5db.pl;' line), and add them back on
     # to the command line to be executed.
     if ( $0 eq '-e' ) {
-        for ( 1 .. $#{'::_<-e'} ) {  # The first line is PERL5DB
-            chomp( $cl = ${'::_<-e'}[$_] );
+        for ( 1 .. $#{*{Symbol::fetch_glob('::_<-e')}} ) {  # The first line is PERL5DB
+            chomp( $cl = ${*{Symbol::fetch_glob('::_<-e')}}[$_] );
             push @script, '-e', $cl;
         }
     } ## end if ($0 eq '-e')
@@ -9199,7 +9097,7 @@ sub cmd_pre580_b {
         $subname =~ s/\'/::/g;
 
         # Qualify it into the current package unless it's already qualified.
-        $subname = "${'package'}::" . $subname
+        $subname = "${*{Symbol::fetch_glob('package')}}::" . $subname
           unless $subname =~ /::/;
 
         # Add main if it starts with ::.

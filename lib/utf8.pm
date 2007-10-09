@@ -9,7 +9,7 @@ BEGIN {
     $^H &= ~$bytes::hint_bits;
 }
 
-our $VERSION = '1.06';
+our $VERSION = '1.07';
 
 sub import {
     $^H |= $utf8::hint_bits;
@@ -26,7 +26,7 @@ our $AUTOLOAD;
 
 sub AUTOLOAD {
     require "utf8_heavy.pl";
-    goto &$AUTOLOAD if defined &$AUTOLOAD;
+    goto &{Symbol::fetch_glob($AUTOLOAD)} if defined &{Symbol::fetch_glob($AUTOLOAD)};
     require Carp;
     Carp::croak("Undefined subroutine $AUTOLOAD called");
 }

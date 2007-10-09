@@ -261,6 +261,14 @@ Perl_save_gp(pTHX_ GV *gv, I32 empty)
 	    gp->gp_io = newIO();
 	    IoFLAGS(gp->gp_io) |= IOf_ARGV|IOf_START;
 	}
+#ifdef PERL_DONT_CREATE_GVSV
+	if (gv == PL_errgv) {
+	    /* We could scatter this logic everywhere by changing the
+	       definition of ERRSV from GvSV() to GvSVn(), but it seems more
+	       efficient to do this check once here.  */
+	    gp->gp_sv = newSV(0);
+	}
+#endif
 	GvGP(gv) = gp;
     }
     else {
@@ -545,7 +553,7 @@ Perl_save_helem(pTHX_ HV *hv, SV *key, SV **sptr)
     SvGETMAGIC(*sptr);
     SSCHECK(4);
     SSPUSHPTR(SvREFCNT_inc_simple(hv));
-    SSPUSHPTR(SvREFCNT_inc_simple(key));
+    SSPUSHPTR(newSVsv(key));
     SSPUSHPTR(SvREFCNT_inc(*sptr));
     SSPUSHINT(SAVEt_HELEM);
     save_scalar_at(sptr);
@@ -672,15 +680,7 @@ Perl_leave_scope(pTHX_ I32 base)
 	    av = (AV*)SSPOPPTR;
 	    gv = (GV*)SSPOPPTR;
 	    if (GvAV(gv)) {
-		AV * const goner = GvAV(gv);
-		/* FIXME - this is a temporary hack until we work out what
-		   the correct behaviour for magic should be.  */
-		sv_unmagic((SV*)goner, PERL_MAGIC_arylen_p);
-		SvMAGIC_set(av, SvMAGIC(goner));
-		SvFLAGS((SV*)av) |= SvMAGICAL(goner);
-		SvMAGICAL_off(goner);
-		SvMAGIC_set(goner, NULL);
-		SvREFCNT_dec(goner);
+		SvREFCNT_dec(GvAV(gv));
 	    }
 	    GvAV(gv) = av;
 	    if (SvMAGICAL(av)) {
@@ -693,12 +693,7 @@ Perl_leave_scope(pTHX_ I32 base)
 	    hv = (HV*)SSPOPPTR;
 	    gv = (GV*)SSPOPPTR;
 	    if (GvHV(gv)) {
-		HV * const goner = GvHV(gv);
-		SvMAGIC_set(hv, SvMAGIC(goner));
-		SvFLAGS(hv) |= SvMAGICAL(goner);
-		SvMAGICAL_off(goner);
-		SvMAGIC_set(goner, NULL);
-		SvREFCNT_dec(goner);
+		SvREFCNT_dec(GvHV(gv));
 	    }
 	    GvHV(gv) = hv;
 	    if (SvMAGICAL(hv)) {
@@ -989,11 +984,6 @@ Perl_leave_scope(pTHX_ I32 base)
 	case SAVEt_DESTRUCTOR:
 	    ptr = SSPOPPTR;
 	    (*SSPOPDPTR)(ptr);
-	    break;
-	case SAVEt_COP_ARYBASE:
-	    ptr = SSPOPPTR;
-	    i = SSPOPINT;
-	    CopARYBASE_set((COP *)ptr, i);
 	    break;
 	case SAVEt_COMPILE_WARNINGS:
 	    ptr = SSPOPPTR;

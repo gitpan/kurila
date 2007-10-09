@@ -83,12 +83,12 @@ sub erase {
     my ($stem, $leaf);
 
     no strict 'refs';
-    $pkg = "main::$pkg\::";	# expand to full symbol table name
-    ($stem, $leaf) = $pkg =~ m/(.*::)(\w+::)$/;
+    $pkg = "main::${pkg}::";	# expand to full symbol table name
+    ($stem, $leaf) = $pkg =~ m/(.*)::(\w+::)$/;
 
     # The 'my $foo' is needed! Without it you get an
     # 'Attempt to free unreferenced scalar' warning!
-    my $stem_symtab = *{$stem}{HASH};
+    my $stem_symtab = Symbol::stash($stem);
 
     #warn "erase($pkg) stem=$stem, leaf=$leaf";
     #warn " stem_symtab hash ".scalar(%$stem_symtab)."\n";
@@ -179,7 +179,7 @@ sub share_from {
     no strict 'refs';
     # Check that 'from' package actually exists
     croak("Package \"$pkg\" does not exist")
-	unless keys %{"$pkg\::"};
+	unless keys %{Symbol::stash("$pkg")};
     my $arg;
     foreach $arg (@$vars) {
 	# catch some $safe->share($var) errors:
@@ -189,12 +189,12 @@ sub share_from {
 	my ($var, $type);
 	$type = $1 if ($var = $arg) =~ s/^(\W)//;
 	# warn "share_from $pkg $type $var";
-	*{$root."::$var"} = (!$type)       ? \&{$pkg."::$var"}
-			  : ($type eq '&') ? \&{$pkg."::$var"}
-			  : ($type eq '$') ? \${$pkg."::$var"}
-			  : ($type eq '@') ? \@{$pkg."::$var"}
-			  : ($type eq '%') ? \%{$pkg."::$var"}
-			  : ($type eq '*') ?  *{$pkg."::$var"}
+	*{Symbol::fetch_glob($root."::$var")} = (!$type)       ? \&{*{Symbol::fetch_glob($pkg."::$var")}}
+			  : ($type eq '&') ? \&{*{Symbol::fetch_glob($pkg."::$var")}}
+			  : ($type eq '$') ? \${*{Symbol::fetch_glob($pkg."::$var")}}
+			  : ($type eq '@') ? \@{*{Symbol::fetch_glob($pkg."::$var")}}
+			  : ($type eq '%') ? \%{*{Symbol::fetch_glob($pkg."::$var")}}
+			  : ($type eq '*') ?  *{Symbol::fetch_glob($pkg."::$var")}
 			  : croak(qq(Can't share "$type$var" of unknown type));
     }
     $obj->share_record($pkg, $vars) unless $no_record or !$vars;
@@ -224,7 +224,7 @@ sub share_forget {
 sub varglob {
     my ($obj, $var) = @_;
     no strict 'refs';
-    return *{$obj->root()."::$var"};
+    return *{Symbol::fetch_glob($obj->root()."::$var")};
 }
 
 

@@ -11,7 +11,7 @@ use vars qw/@ISA $VERSION $BASE $BASE_LEN/;
 
 @ISA = qw(DynaLoader);
 
-$VERSION = '0.13';
+$VERSION = '0.15_01';
 
 Math::BigInt::FastCalc->bootstrap($VERSION);
 
@@ -26,20 +26,21 @@ BEGIN
   # use Calc to override the methods that we do not provide in XS
 
   for my $method (qw/
-    new str
+    str
     add sub mul div
     rsft lsft
     mod modpow modinv
     gcd
-    pow root sqrt log_int fac
+    pow root sqrt log_int fac nok
     digit check
     from_hex from_bin from_oct as_hex as_bin as_oct
     zeros length base_len
     xor or and
+    alen 1ex
     /)
     {
     no strict 'refs';
-    *{'Math::BigInt::FastCalc::_' . $method} = \&{'Math::BigInt::Calc::_' . $method};
+    *{Symbol::fetch_glob('Math::BigInt::FastCalc::_' . $method)} = \&{Symbol::fetch_glob('Math::BigInt::Calc::_' . $method)};
     }
   my ($AND_BITS, $XOR_BITS, $OR_BITS, $BASE_LEN_SMALL, $MAX_VAL);
  
@@ -117,7 +118,7 @@ Further streamlining (api_version 1 etc.) by Tels 2004-2007.
 
 =head1 SEE ALSO
 
-L<Math::BigInt>, L<Math::BigFloat>, L<Math::BigInt::BitVect>,
+L<Math::BigInt>, L<Math::BigFloat>,
 L<Math::BigInt::GMP>, L<Math::BigInt::FastCalc> and L<Math::BigInt::Pari>.
 
 =cut

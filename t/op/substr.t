@@ -22,7 +22,7 @@ $SIG{__WARN__} = sub {
 
 require './test.pl';
 
-plan(259);
+plan(246);
 
 $FATAL_MSG = qr/^substr outside of string/;
 
@@ -35,20 +35,6 @@ eval{substr($a,999,999) = "" ; };# P R Q S
 like ($@, $FATAL_MSG);
 is(substr($a,0,-6), 'abc');  # P=Q R S
 is(substr($a,-3,1), 'x');    # P Q R S
-
-$[ = 1;
-
-is(substr($a,1,3), 'abc' );  # P=Q R S
-is(substr($a,4,3), 'def' );  # P Q R S
-is(substr($a,7,999), 'xyz');# P Q S R
-$b = substr($a,999,999) ; # warn # P R Q S
-is($w--, 1);
-eval{substr($a,999,999) = "" ; } ; # P R Q S
-like ($@, $FATAL_MSG);
-is(substr($a,1,-6), 'abc' );# P=Q R S
-is(substr($a,-3,1), 'x' );  # P Q R S
-
-$[ = 0;
 
 substr($a,3,3) = 'XYZ';
 is($a, 'abcXYZxyz' );
@@ -536,12 +522,10 @@ is($x, "\x{100}\x{200}ab");
 
 {
     # lvalue ref count
-    use Devel::Peek;
-
     my $foo = "bar";
-    is(Devel::Peek::SvREFCNT($foo), 1);
+    is(Internals::SvREFCNT(\$foo), 2);
     substr($foo, -2, 2) = "la";
-    is(Devel::Peek::SvREFCNT($foo), 1);
+    is(Internals::SvREFCNT(\$foo), 2);
 }
 
 # lvalue with regex and eval
@@ -554,36 +538,9 @@ is($x, "\x{100}\x{200}ab");
 # extended lifetime lvalue
 {
     my $foo = "bar";
-    is(Devel::Peek::SvREFCNT($foo), 1);
+    is(Internals::SvREFCNT(\$foo), 2);
     my $y = \ substr($foo, -2, 2);
-    is(Devel::Peek::SvREFCNT($foo), 2);
+    is(Internals::SvREFCNT(\$foo), 3);
     undef $y;
-    is(Devel::Peek::SvREFCNT($foo), 1);
-}
-
-{
-    # lvalue ref count
-    use Devel::Peek;
-
-    my $foo = "bar";
-    is(Devel::Peek::SvREFCNT($foo), 1);
-    substr($foo, -2, 2) = "la";
-    is(Devel::Peek::SvREFCNT($foo), 1);
-}
-
-# lvalue with regex and eval
-{
-    my $x = "abccd";
-    substr($x, 0, -1) =~ s/(c)/ord($1)/ge;
-    is($x, "ab9999d");
-}
-
-# extended lifetime lvalue
-{
-    my $foo = "bar";
-    is(Devel::Peek::SvREFCNT($foo), 1);
-    my $y = \ substr($foo, -2, 2);
-    is(Devel::Peek::SvREFCNT($foo), 2);
-    undef $y;
-    is(Devel::Peek::SvREFCNT($foo), 1);
+    is(Internals::SvREFCNT(\$foo), 2);
 }

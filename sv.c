@@ -246,8 +246,13 @@ S_new_SV(pTHX)
     SvREFCNT(sv) = 1;
     SvFLAGS(sv) = 0;
     sv->sv_debug_optype = PL_op ? PL_op->op_type : 0;
-    sv->sv_debug_line = (U16) ((PL_copline == NOLINE) ?
-        (PL_curcop ? CopLINE(PL_curcop) : 0) : PL_copline);
+    sv->sv_debug_line = (U16) (PL_parser
+	    ?  PL_parser->copline == NOLINE
+		?  PL_curcop
+		    ? CopLINE(PL_curcop)
+		    : 0
+		: PL_parser->copline
+	    : 0);
     sv->sv_debug_inpad = 0;
     sv->sv_debug_cloned = 0;
     sv->sv_debug_file = PL_curcop ? savepv(CopFILE(PL_curcop)): NULL;
@@ -462,7 +467,8 @@ do_clean_named_objs(pTHX_ SV *sv)
 	     SvOBJECT(GvSV(sv))) ||
 	     (GvAV(sv) && SvOBJECT(GvAV(sv))) ||
 	     (GvHV(sv) && SvOBJECT(GvHV(sv))) ||
-	     (GvIO(sv) && SvOBJECT(GvIO(sv))) ||
+	     /* In certain rare cases GvIOp(sv) can be NULL, which would make SvOBJECT(GvIO(sv)) dereference NULL. */
+	     (GvIO(sv) ? (SvFLAGS(GvIOp(sv)) & SVs_OBJECT) : 0) ||
 	     (GvCV(sv) && SvOBJECT(GvCV(sv))) )
 	{
 	    DEBUG_D((PerlIO_printf(Perl_debug_log, "Cleaning named glob object:\n "), sv_dump(sv)));
@@ -780,16 +786,16 @@ are used for this, except for arena_size.
 For the sv-types that have no bodies, arenas are not used, so those
 PL_body_roots[sv_type] are unused, and can be overloaded.  In
 something of a special case, SVt_NULL is borrowed for HE arenas;
-PL_body_roots[SVt_NULL] is filled by S_more_he, but the
+PL_body_roots[HE_SVSLOT=SVt_NULL] is filled by S_more_he, but the
 bodies_by_type[SVt_NULL] slot is not used, as the table is not
-available in hv.c,
+available in hv.c.
 
-PTEs also use arenas, but are never seen in Perl_sv_upgrade.
-Nonetheless, they get their own slot in bodies_by_type[SVt_NULL], so
-they can just use the same allocation semantics.  At first, PTEs were
-also overloaded to a non-body sv-type, but this yielded hard-to-find
-malloc bugs, so was simplified by claiming a new slot.  This choice
-has no consequence at this time.
+PTEs also use arenas, but are never seen in Perl_sv_upgrade. Nonetheless,
+they get their own slot in bodies_by_type[PTE_SVSLOT =SVt_IV], so they can
+just use the same allocation semantics.  At first, PTEs were also
+overloaded to a non-body sv-type, but this yielded hard-to-find malloc
+bugs, so was simplified by claiming a new slot.  This choice has no
+consequence at this time.
 
 */
 
@@ -869,7 +875,7 @@ static const struct body_details bodies_by_type[] = {
       FALSE, NONV, NOARENA, FIT_ARENA(0, sizeof(HE)) },
 
     /* The bind placeholder pretends to be an RV for now.
-       Also it's marked as "can't upgrade" top stop anyone using it before it's
+       Also it's marked as "can't upgrade" to stop anyone using it before it's
        implemented.  */
     { 0, 0, 0, SVt_BIND, TRUE, NONV, NOARENA, 0 },
 
@@ -1187,10 +1193,6 @@ Perl_sv_upgrade(pTHX_ register SV *sv, svtype new_type)
 	   there's no way that it can be safely upgraded, because perl.c
 	   expects to Safefree(SvANY(PL_mess_sv))  */
 	assert(sv != PL_mess_sv);
-	/* This flag bit is used to mean other things in other scalar types.
-	   Given that it only has meaning inside the pad, it shouldn't be set
-	   on anything that can get upgraded.  */
-	assert(!SvPAD_TYPED(sv));
 	break;
     default:
 	if (old_type_details->cant_upgrade)
@@ -2705,15 +2707,16 @@ Perl_sv_2pv_flags(pTHX_ register SV *sv, STRLEN *lp, I32 flags)
 	const U32 isUIOK = SvIsUV(sv);
 	char buf[TYPE_CHARS(UV)];
 	char *ebuf, *ptr;
+	STRLEN len;
 
 	if (SvTYPE(sv) < SVt_PVIV)
 	    sv_upgrade(sv, SVt_PVIV);
  	ptr = uiv_2buf(buf, SvIVX(sv), SvUVX(sv), isUIOK, &ebuf);
+	len = ebuf - ptr;
 	/* inlined from sv_setpvn */
-	SvGROW_mutable(sv, (STRLEN)(ebuf - ptr + 1));
-	Move(ptr,SvPVX_mutable(sv),ebuf - ptr,char);
-	SvCUR_set(sv, ebuf - ptr);
-	s = SvEND(sv);
+	s = SvGROW_mutable(sv, len + 1);
+	Move(ptr, s, len, char);
+	s += len;
 	*s = '\0';
     }
     else if (SvNOKp(sv)) {
@@ -2792,42 +2795,6 @@ Perl_sv_copypv(pTHX_ SV *dsv, register SV *ssv)
     const char * const s = SvPV_const(ssv,len);
     sv_setpvn(dsv,s,len);
 }
-
-/*
-=for apidoc sv_2pvbyte
-
-Return a pointer to the byte-encoded representation of the SV, and set *lp
-to its length.  May cause the SV to be downgraded from UTF-8 as a
-side-effect.
-
-Usually accessed via the C<SvPVbyte> macro.
-
-=cut
-*/
-
-char *
-Perl_sv_2pvbyte(pTHX_ register SV *sv, STRLEN *lp)
-{
-    return lp ? SvPV(sv,*lp) : SvPV_nolen(sv);
-}
-
-/*
-=for apidoc sv_2pvutf8
-
-Return a pointer to the UTF-8-encoded representation of the SV, and set *lp
-to its length.  May cause the SV to be upgraded to UTF-8 as a side-effect.
-
-Usually accessed via the C<SvPVutf8> macro.
-
-=cut
-*/
-
-char *
-Perl_sv_2pvutf8(pTHX_ register SV *sv, STRLEN *lp)
-{
-    return lp ? SvPV(sv,*lp) : SvPV_nolen(sv);
-}
-
 
 /*
 =for apidoc sv_2bool
@@ -2964,7 +2931,7 @@ copy-ish functions and macros use this underneath.
 static void
 S_glob_assign_glob(pTHX_ SV *dstr, SV *sstr, const int dtype)
 {
-    I32 method_changed = 0;
+    I32 mro_changes = 0; /* 1 = method, 2 = isa */
 
     if (dtype != SVt_PVGV) {
 	const char * const name = GvNAME(sstr);
@@ -3006,14 +2973,17 @@ S_glob_assign_glob(pTHX_ SV *dstr, SV *sstr, const int dtype)
         /* If source has a real method, then a method is
            going to change */
         else if(GvCV((GV*)sstr)) {
-            method_changed = 1;
+            mro_changes = 1;
         }
     }
 
     /* If dest already had a real method, that's a change as well */
-    if(!method_changed && GvGP((GV*)dstr) && GvCVu((GV*)dstr)) {
-        method_changed = 1;
+    if(!mro_changes && GvGP((GV*)dstr) && GvCVu((GV*)dstr)) {
+        mro_changes = 1;
     }
+
+    if(strEQ(GvNAME((GV*)dstr),"ISA"))
+        mro_changes = 2;
 
     gp_free((GV*)dstr);
     isGV_with_GP_off(dstr);
@@ -3029,7 +2999,8 @@ S_glob_assign_glob(pTHX_ SV *dstr, SV *sstr, const int dtype)
 	    GvIMPORTED_on(dstr);
 	}
     GvMULTI_on(dstr);
-    if(method_changed) mro_method_changed_in(GvSTASH(dstr));
+    if(mro_changes == 2) mro_isa_changed_in(GvSTASH(dstr));
+    else if(mro_changes) mro_method_changed_in(GvSTASH(dstr));
     return;
 }
 
@@ -3420,9 +3391,11 @@ Perl_sv_setsv_flags(pTHX_ SV *dstr, register SV *sstr, I32 flags)
 	    			/* and won't be needed again, potentially */
 	      !(PL_op && PL_op->op_type == OP_AASSIGN))
 #ifdef PERL_OLD_COPY_ON_WRITE
-            && !((sflags & CAN_COW_MASK) == CAN_COW_FLAGS
-		 && (SvFLAGS(dstr) & CAN_COW_MASK) == CAN_COW_FLAGS
-                 && SvTYPE(sstr) >= SVt_PVIV)
+            && ((flags & SV_COW_SHARED_HASH_KEYS)
+		? (!((sflags & CAN_COW_MASK) == CAN_COW_FLAGS
+		     && (SvFLAGS(dstr) & CAN_COW_MASK) == CAN_COW_FLAGS
+		     && SvTYPE(sstr) >= SVt_PVIV))
+		: 1)
 #endif
             ) {
             /* Failed the swipe test, and it's not a shared hash key either.
@@ -3674,7 +3647,7 @@ Perl_sv_setpvn(pTHX_ register SV *sv, register const char *ptr, register STRLEN 
     Move(ptr,dptr,len,char);
     dptr[len] = '\0';
     SvCUR_set(sv, len);
-    (void)SvPOK_only_UTF8(sv);		/* validate pointer */
+    (void)SvPOK_only(sv);		/* validate pointer */
     SvTAINT(sv);
 }
 
@@ -3719,7 +3692,7 @@ Perl_sv_setpv(pTHX_ register SV *sv, register const char *ptr)
     SvGROW(sv, len + 1);
     Move(ptr,SvPVX(sv),len+1,char);
     SvCUR_set(sv, len);
-    (void)SvPOK_only_UTF8(sv);		/* validate pointer */
+    (void)SvPOK_only(sv);		/* validate pointer */
     SvTAINT(sv);
 }
 
@@ -3800,9 +3773,9 @@ Perl_sv_usepvn_flags(pTHX_ SV *sv, char *ptr, STRLEN len, U32 flags)
     SvCUR_set(sv, len);
     SvLEN_set(sv, allocate);
     if (!(flags & SV_HAS_TRAILING_NUL)) {
-	*SvEND(sv) = '\0';
+	ptr[len] = '\0';
     }
-    (void)SvPOK_only_UTF8(sv);		/* validate pointer */
+    (void)SvPOK_only(sv);		/* validate pointer */
     SvTAINT(sv);
     if (flags & SV_SMAGIC)
 	SvSETMAGIC(sv);
@@ -3929,7 +3902,7 @@ Perl_sv_force_normal_flags(pTHX_ register SV *sv, U32 flags)
 #endif
     if (SvROK(sv))
 	sv_unref_flags(sv, flags);
-    else if (SvFAKE(sv) && SvTYPE(sv) == SVt_PVGV)
+    else if (SvTYPE(sv) == SVt_PVGV)
 	sv_unglob(sv);
 }
 
@@ -4011,7 +3984,7 @@ Perl_sv_catpvn_flags(pTHX_ register SV *dsv, register const char *sstr, register
     Move(sstr, SvPVX(dsv) + dlen, slen, char);
     SvCUR_set(dsv, SvCUR(dsv) + slen);
     *SvEND(dsv) = '\0';
-    (void)SvPOK_only_UTF8(dsv);		/* validate pointer */
+    (void)SvPOK_only(dsv);		/* validate pointer */
     SvTAINT(dsv);
     if (flags & SV_SMAGIC)
 	SvSETMAGIC(dsv);
@@ -4076,7 +4049,7 @@ Perl_sv_catpv(pTHX_ register SV *sv, register const char *ptr)
 	ptr = SvPVX_const(sv);
     Move(ptr,SvPVX(sv)+tlen,len+1,char);
     SvCUR_set(sv, SvCUR(sv) + len);
-    (void)SvPOK_only_UTF8(sv);		/* validate pointer */
+    (void)SvPOK_only(sv);		/* validate pointer */
     SvTAINT(sv);
 }
 
@@ -4656,7 +4629,7 @@ Perl_sv_insert(pTHX_ SV *bigstr, STRLEN offset, STRLEN len, const char *little, 
     if (!bigstr)
 	Perl_croak(aTHX_ "Can't modify non-existent substring");
     SvPV_force(bigstr, curlen);
-    (void)SvPOK_only_UTF8(bigstr);
+    (void)SvPOK_only(bigstr);
     if (offset + len > curlen) {
 	SvGROW(bigstr, offset+len+1);
 	Zero(SvPVX(bigstr)+curlen, offset+len-curlen, char);
@@ -4896,8 +4869,6 @@ Perl_sv_clear(pTHX_ register SV *sv)
 	    SvREFCNT_dec(SvOURSTASH(sv));
 	} else if (SvMAGIC(sv))
 	    mg_free(sv);
-	if (type == SVt_PVMG && SvPAD_TYPED(sv))
-	    SvREFCNT_dec(SvSTASH(sv));
     }
     switch (type) {
 	/* case SVt_BIND: */
@@ -6014,12 +5985,7 @@ Perl_sv_gets(pTHX_ register SV *sv, register PerlIO *fp, I32 append)
     }
     else {
 	/* Get $/ i.e. PL_rs into same encoding as stream wants */
-	if (PerlIO_isutf8(fp)) {
-	    rsptr = SvPVutf8(PL_rs, rslen);
-	}
-	else {
-	    rsptr = SvPV_const(PL_rs, rslen);
-	}
+	rsptr = SvPV_const(PL_rs, rslen);
     }
 
     rslast = rslen ? rsptr[rslen - 1] : '\0';
@@ -7266,7 +7232,7 @@ Perl_sv_pvn_force_flags(pTHX_ SV *sv, STRLEN *lp, I32 flags)
 	    SvGROW(sv, len + 1);
 	    Move(s,SvPVX(sv),len,char);
 	    SvCUR_set(sv, len);
-	    *SvEND(sv) = '\0';
+	    SvPVX(sv)[len] = '\0';
 	}
 	if (!SvPOK(sv)) {
 	    SvPOK_on(sv);		/* validate pointer */
@@ -7276,38 +7242,6 @@ Perl_sv_pvn_force_flags(pTHX_ SV *sv, STRLEN *lp, I32 flags)
 	}
     }
     return SvPVX_mutable(sv);
-}
-
-/*
-=for apidoc sv_pvbyten_force
-
-The backend for the C<SvPVbytex_force> macro. Always use the macro instead.
-
-=cut
-*/
-
-char *
-Perl_sv_pvbyten_force(pTHX_ SV *sv, STRLEN *lp)
-{
-    sv_pvn_force(sv,lp);
-    *lp = SvCUR(sv);
-    return SvPVX(sv);
-}
-
-/*
-=for apidoc sv_pvutf8n_force
-
-The backend for the C<SvPVutf8x_force> macro. Always use the macro instead.
-
-=cut
-*/
-
-char *
-Perl_sv_pvutf8n_force(pTHX_ SV *sv, STRLEN *lp)
-{
-    sv_pvn_force(sv,lp);
-    *lp = SvCUR(sv);
-    return SvPVX(sv);
 }
 
 /*
@@ -8511,6 +8445,15 @@ Perl_sv_vcatpvfn(pTHX_ SV *sv, const char *pat, STRLEN patlen, va_list *args, SV
 	    }
 	    goto string;
 
+	case 'C':
+	    if (vectorize)
+		goto unknown;
+	    uv = (args) ? va_arg(*args, int) : SvIV(argsv);
+	    c = (char)uv;
+	    eptr = &c;
+	    elen = 1;
+	    goto string;
+
 	case 's':
 	    if (vectorize)
 		goto unknown;
@@ -9175,10 +9118,46 @@ Perl_parser_dup(pTHX_ const yy_parser *proto, CLONE_PARAMS* param)
     parser->multi_close	= proto->multi_close;
     parser->multi_open	= proto->multi_open;
     parser->multi_start	= proto->multi_start;
+    parser->multi_end	= proto->multi_end;
     parser->pending_ident = proto->pending_ident;
     parser->preambled	= proto->preambled;
     parser->sublex_info	= proto->sublex_info; /* XXX not quite right */
     parser->linestr	= sv_dup_inc(proto->linestr, param);
+    parser->expect	= proto->expect;
+    parser->copline	= proto->copline;
+    parser->last_lop_op	= proto->last_lop_op;
+    parser->lex_state	= proto->lex_state;
+    parser->rsfp	= fp_dup(proto->rsfp, '<', param);
+    /* rsfp_filters entries have fake IoDIRP() */
+    parser->rsfp_filters= av_dup_inc(proto->rsfp_filters, param);
+    parser->in_my	= proto->in_my;
+    parser->error_count	= proto->error_count;
+
+
+    parser->linestr	= sv_dup_inc(proto->linestr, param);
+
+    {
+	char * const ols = SvPVX(proto->linestr);
+	char * const ls  = SvPVX(parser->linestr);
+
+	parser->bufptr	    = ls + (proto->bufptr >= ols ?
+				    proto->bufptr -  ols : 0);
+	parser->oldbufptr   = ls + (proto->oldbufptr >= ols ?
+				    proto->oldbufptr -  ols : 0);
+	parser->oldoldbufptr= ls + (proto->oldoldbufptr >= ols ?
+				    proto->oldoldbufptr -  ols : 0);
+	parser->linestart   = ls + (proto->linestart >= ols ?
+				    proto->linestart -  ols : 0);
+	parser->last_uni    = ls + (proto->last_uni >= ols ?
+				    proto->last_uni -  ols : 0);
+	parser->last_lop    = ls + (proto->last_lop >= ols ?
+				    proto->last_lop -  ols : 0);
+
+	parser->bufend	    = ls + SvCUR(parser->linestr);
+    }
+
+    Copy(proto->tokenbuf, parser->tokenbuf, 256, char);
+
 
 #ifdef PERL_MAD
     parser->endwhite	= proto->endwhite;
@@ -9193,6 +9172,13 @@ Perl_parser_dup(pTHX_ const yy_parser *proto, CLONE_PARAMS* param)
     parser->thisstuff	= proto->thisstuff;
     parser->thistoken	= proto->thistoken;
     parser->thiswhite	= proto->thiswhite;
+
+    Copy(proto->nexttoke, parser->nexttoke, 5, NEXTTOKE);
+    parser->curforce	= proto->curforce;
+#else
+    Copy(proto->nextval, parser->nextval, 5, YYSTYPE);
+    Copy(proto->nexttype, parser->nexttype, 5,	I32);
+    parser->nexttoke	= proto->nexttoke;
 #endif
     return parser;
 }
@@ -9703,7 +9689,7 @@ Perl_sv_dup(pTHX_ const SV *sstr, CLONE_PARAMS* param)
 		    IoOFP(dstr) = IoIFP(dstr);
 		else
 		    IoOFP(dstr)	= fp_dup(IoOFP(dstr), IoTYPE(dstr), param);
-		/* PL_rsfp_filters entries have fake IoDIRP() */
+		/* PL_parser->rsfp_filters entries have fake IoDIRP() */
 		if(IoFLAGS(dstr) & IOf_FAKE_DIRP) {
 		    /* I have no idea why fake dirp (rsfps)
 		       should be treated differently but otherwise
@@ -10015,9 +10001,9 @@ ANY *
 Perl_ss_dup(pTHX_ PerlInterpreter *proto_perl, CLONE_PARAMS* param)
 {
     dVAR;
-    ANY * const ss	= proto_perl->Tsavestack;
-    const I32 max	= proto_perl->Tsavestack_max;
-    I32 ix		= proto_perl->Tsavestack_ix;
+    ANY * const ss	= proto_perl->Isavestack;
+    const I32 max	= proto_perl->Isavestack_max;
+    I32 ix		= proto_perl->Isavestack_ix;
     ANY *nss;
     SV *sv;
     GV *gv;
@@ -10093,7 +10079,6 @@ Perl_ss_dup(pTHX_ PerlInterpreter *proto_perl, CLONE_PARAMS* param)
 	case SAVEt_I32:				/* I32 reference */
 	case SAVEt_I16:				/* I16 reference */
 	case SAVEt_I8:				/* I8 reference */
-	case SAVEt_COP_ARYBASE:			/* call CopARYBASE_set */
 	    ptr = POPPTR(ss,ix);
 	    TOPPTR(nss,ix) = any_dup(ptr, proto_perl);
 	    i = POPINT(ss,ix);
@@ -10453,6 +10438,7 @@ perl_clone_using(PerlInterpreter *proto_perl, UV flags,
     PL_savestack_ix = 0;
     PL_savestack_max = -1;
     PL_sig_pending = 0;
+    PL_parser = NULL;
     Zero(&PL_debug_pad, 1, struct perl_debug_pad);
 #  else	/* !DEBUGGING */
     Zero(my_perl, 1, PerlInterpreter);
@@ -10487,6 +10473,7 @@ perl_clone_using(PerlInterpreter *proto_perl, UV flags,
     PL_savestack_ix = 0;
     PL_savestack_max = -1;
     PL_sig_pending = 0;
+    PL_parser = NULL;
     Zero(&PL_debug_pad, 1, struct perl_debug_pad);
 #    else	/* !DEBUGGING */
     Zero(my_perl, 1, PerlInterpreter);
@@ -10573,7 +10560,7 @@ perl_clone_using(PerlInterpreter *proto_perl, UV flags,
 	PL_compiling.cop_hints_hash->refcounted_he_refcnt++;
 	HINTS_REFCNT_UNLOCK;
     }
-    PL_curcop		= (COP*)any_dup(proto_perl->Tcurcop, proto_perl);
+    PL_curcop		= (COP*)any_dup(proto_perl->Icurcop, proto_perl);
 #ifdef PERL_DEBUG_READONLY_OPS
     PL_slabs = NULL;
     PL_slab_count = 0;
@@ -10691,13 +10678,11 @@ perl_clone_using(PerlInterpreter *proto_perl, UV flags,
     PL_DBsingle		= sv_dup(proto_perl->IDBsingle, param);
     PL_DBtrace		= sv_dup(proto_perl->IDBtrace, param);
     PL_DBsignal		= sv_dup(proto_perl->IDBsignal, param);
-    PL_DBassertion      = sv_dup(proto_perl->IDBassertion, param);
-    PL_lineary		= av_dup(proto_perl->Ilineary, param);
     PL_dbargs		= av_dup(proto_perl->Idbargs, param);
 
     /* symbol tables */
-    PL_defstash		= hv_dup_inc(proto_perl->Tdefstash, param);
-    PL_curstash		= hv_dup(proto_perl->Tcurstash, param);
+    PL_defstash		= hv_dup_inc(proto_perl->Idefstash, param);
+    PL_curstash		= hv_dup(proto_perl->Icurstash, param);
     PL_debstash		= hv_dup(proto_perl->Idebstash, param);
     PL_globalstash	= hv_dup(proto_perl->Iglobalstash, param);
     PL_curstname	= sv_dup_inc(proto_perl->Icurstname, param);
@@ -10713,6 +10698,7 @@ perl_clone_using(PerlInterpreter *proto_perl, UV flags,
 
     PL_sub_generation	= proto_perl->Isub_generation;
     PL_isarev		= hv_dup_inc(proto_perl->Iisarev, param);
+    PL_delayedisa	= hv_dup_inc(proto_perl->Idelayedisa, param);
 
     /* funky return mechanisms */
     PL_forkprocess	= proto_perl->Iforkprocess;
@@ -10739,7 +10725,6 @@ perl_clone_using(PerlInterpreter *proto_perl, UV flags,
 
     /* runtime control stuff */
     PL_curcopdb		= (COP*)any_dup(proto_perl->Icurcopdb, proto_perl);
-    PL_copline		= proto_perl->Icopline;
 
     PL_filemode		= proto_perl->Ifilemode;
     PL_lastfd		= proto_perl->Ilastfd;
@@ -10783,9 +10768,6 @@ perl_clone_using(PerlInterpreter *proto_perl, UV flags,
     PL_custom_op_descs  = hv_dup_inc(proto_perl->Icustom_op_descs,param);
 
     PL_profiledata	= NULL;
-    PL_rsfp		= fp_dup(proto_perl->Irsfp, '<', param);
-    /* PL_rsfp_filters entries have fake IoDIRP() */
-    PL_rsfp_filters	= av_dup_inc(proto_perl->Irsfp_filters, param);
 
     PL_compcv			= cv_dup(proto_perl->Icompcv, param);
 
@@ -10819,8 +10801,6 @@ perl_clone_using(PerlInterpreter *proto_perl, UV flags,
 
     PL_runops		= proto_perl->Irunops;
 
-    Copy(proto_perl->Itokenbuf, PL_tokenbuf, 256, char);
-
 #ifdef CSH
     PL_cshlen		= proto_perl->Icshlen;
     PL_cshname		= proto_perl->Icshname; /* XXX never deallocated */
@@ -10828,44 +10808,9 @@ perl_clone_using(PerlInterpreter *proto_perl, UV flags,
 
     PL_parser		= parser_dup(proto_perl->Iparser, param);
 
-    PL_lex_state	= proto_perl->Ilex_state;
-
-#ifdef PERL_MAD
-    Copy(proto_perl->Inexttoke, PL_nexttoke, 5, NEXTTOKE);
-    PL_curforce		= proto_perl->Icurforce;
-#else
-    Copy(proto_perl->Inextval, PL_nextval, 5, YYSTYPE);
-    Copy(proto_perl->Inexttype, PL_nexttype, 5,	I32);
-    PL_nexttoke		= proto_perl->Inexttoke;
-#endif
-
-    if (proto_perl->Iparser) {
-	i = proto_perl->Ibufptr - SvPVX_const(proto_perl->Iparser->linestr);
-	PL_bufptr		= SvPVX(PL_parser->linestr) + (i < 0 ? 0 : i);
-	i = proto_perl->Ioldbufptr - SvPVX_const(proto_perl->Iparser->linestr);
-	PL_oldbufptr	= SvPVX(PL_parser->linestr) + (i < 0 ? 0 : i);
-	i = proto_perl->Ioldoldbufptr - SvPVX_const(proto_perl->Iparser->linestr);
-	PL_oldoldbufptr	= SvPVX(PL_parser->linestr) + (i < 0 ? 0 : i);
-	i = proto_perl->Ilinestart - SvPVX_const(proto_perl->Iparser->linestr);
-	PL_linestart	= SvPVX(PL_parser->linestr) + (i < 0 ? 0 : i);
-	PL_bufend		= SvPVX(PL_parser->linestr) + SvCUR(PL_parser->linestr);
-	i = proto_perl->Ilast_uni - SvPVX_const(proto_perl->Iparser->linestr);
-	PL_last_uni		= SvPVX(PL_parser->linestr) + (i < 0 ? 0 : i);
-	i = proto_perl->Ilast_lop - SvPVX_const(proto_perl->Iparser->linestr);
-	PL_last_lop		= SvPVX(PL_parser->linestr) + (i < 0 ? 0 : i);
-    }
-
-    PL_expect		= proto_perl->Iexpect;
-
-    PL_multi_end	= proto_perl->Imulti_end;
-
-    PL_error_count	= proto_perl->Ierror_count;
     PL_subline		= proto_perl->Isubline;
     PL_subname		= sv_dup_inc(proto_perl->Isubname, param);
 
-    PL_last_lop_op	= proto_perl->Ilast_lop_op;
-    PL_in_my		= proto_perl->Iin_my;
-    PL_in_my_stash	= hv_dup(proto_perl->Iin_my_stash, param);
 #ifdef FCRYPT
     PL_cryptseen	= proto_perl->Icryptseen;
 #endif
@@ -10938,19 +10883,9 @@ perl_clone_using(PerlInterpreter *proto_perl, UV flags,
     PL_unlockhook	= proto_perl->Iunlockhook;
     PL_threadhook	= proto_perl->Ithreadhook;
 
-    PL_runops_std	= proto_perl->Irunops_std;
-    PL_runops_dbg	= proto_perl->Irunops_dbg;
-
 #ifdef THREADS_HAVE_PIDS
     PL_ppid		= proto_perl->Ippid;
 #endif
-
-    /* swatch cache */
-    PL_last_swash_hv	= NULL;	/* reinits on demand */
-    PL_last_swash_klen	= 0;
-    PL_last_swash_key[0]= '\0';
-    PL_last_swash_tmps	= (U8*)NULL;
-    PL_last_swash_slen	= 0;
 
     PL_glob_index	= proto_perl->Iglob_index;
     PL_srand_called	= proto_perl->Isrand_called;
@@ -10976,54 +10911,54 @@ perl_clone_using(PerlInterpreter *proto_perl, UV flags,
 	PL_psig_name	= (SV**)NULL;
     }
 
-    /* thrdvar.h stuff */
+    /* intrpvar.h stuff */
 
     if (flags & CLONEf_COPY_STACKS) {
 	/* next allocation will be PL_tmps_stack[PL_tmps_ix+1] */
-	PL_tmps_ix		= proto_perl->Ttmps_ix;
-	PL_tmps_max		= proto_perl->Ttmps_max;
-	PL_tmps_floor		= proto_perl->Ttmps_floor;
+	PL_tmps_ix		= proto_perl->Itmps_ix;
+	PL_tmps_max		= proto_perl->Itmps_max;
+	PL_tmps_floor		= proto_perl->Itmps_floor;
 	Newxz(PL_tmps_stack, PL_tmps_max, SV*);
 	i = 0;
 	while (i <= PL_tmps_ix) {
-	    PL_tmps_stack[i]	= sv_dup_inc(proto_perl->Ttmps_stack[i], param);
+	    PL_tmps_stack[i]	= sv_dup_inc(proto_perl->Itmps_stack[i], param);
 	    ++i;
 	}
 
 	/* next PUSHMARK() sets *(PL_markstack_ptr+1) */
-	i = proto_perl->Tmarkstack_max - proto_perl->Tmarkstack;
+	i = proto_perl->Imarkstack_max - proto_perl->Imarkstack;
 	Newxz(PL_markstack, i, I32);
-	PL_markstack_max	= PL_markstack + (proto_perl->Tmarkstack_max
-						  - proto_perl->Tmarkstack);
-	PL_markstack_ptr	= PL_markstack + (proto_perl->Tmarkstack_ptr
-						  - proto_perl->Tmarkstack);
-	Copy(proto_perl->Tmarkstack, PL_markstack,
+	PL_markstack_max	= PL_markstack + (proto_perl->Imarkstack_max
+						  - proto_perl->Imarkstack);
+	PL_markstack_ptr	= PL_markstack + (proto_perl->Imarkstack_ptr
+						  - proto_perl->Imarkstack);
+	Copy(proto_perl->Imarkstack, PL_markstack,
 	     PL_markstack_ptr - PL_markstack + 1, I32);
 
 	/* next push_scope()/ENTER sets PL_scopestack[PL_scopestack_ix]
 	 * NOTE: unlike the others! */
-	PL_scopestack_ix	= proto_perl->Tscopestack_ix;
-	PL_scopestack_max	= proto_perl->Tscopestack_max;
+	PL_scopestack_ix	= proto_perl->Iscopestack_ix;
+	PL_scopestack_max	= proto_perl->Iscopestack_max;
 	Newxz(PL_scopestack, PL_scopestack_max, I32);
-	Copy(proto_perl->Tscopestack, PL_scopestack, PL_scopestack_ix, I32);
+	Copy(proto_perl->Iscopestack, PL_scopestack, PL_scopestack_ix, I32);
 
 	/* NOTE: si_dup() looks at PL_markstack */
-	PL_curstackinfo		= si_dup(proto_perl->Tcurstackinfo, param);
+	PL_curstackinfo		= si_dup(proto_perl->Icurstackinfo, param);
 
 	/* PL_curstack		= PL_curstackinfo->si_stack; */
-	PL_curstack		= av_dup(proto_perl->Tcurstack, param);
-	PL_mainstack		= av_dup(proto_perl->Tmainstack, param);
+	PL_curstack		= av_dup(proto_perl->Icurstack, param);
+	PL_mainstack		= av_dup(proto_perl->Imainstack, param);
 
 	/* next PUSHs() etc. set *(PL_stack_sp+1) */
 	PL_stack_base		= AvARRAY(PL_curstack);
-	PL_stack_sp		= PL_stack_base + (proto_perl->Tstack_sp
-						   - proto_perl->Tstack_base);
+	PL_stack_sp		= PL_stack_base + (proto_perl->Istack_sp
+						   - proto_perl->Istack_base);
 	PL_stack_max		= PL_stack_base + AvMAX(PL_curstack);
 
 	/* next SSPUSHFOO() sets PL_savestack[PL_savestack_ix]
 	 * NOTE: unlike the others! */
-	PL_savestack_ix		= proto_perl->Tsavestack_ix;
-	PL_savestack_max	= proto_perl->Tsavestack_max;
+	PL_savestack_ix		= proto_perl->Isavestack_ix;
+	PL_savestack_max	= proto_perl->Isavestack_max;
 	/*Newxz(PL_savestack, PL_savestack_max, ANY);*/
 	PL_savestack		= ss_dup(proto_perl, param);
     }
@@ -11036,9 +10971,9 @@ perl_clone_using(PerlInterpreter *proto_perl, UV flags,
 	 * non-refcount means (eg a temp in @_); otherwise they will be
 	 * orphaned
 	 */
-	for (i = 0; i<= proto_perl->Ttmps_ix; i++) {
+	for (i = 0; i<= proto_perl->Itmps_ix; i++) {
 	    SV * const nsv = (SV*)ptr_table_fetch(PL_ptr_table,
-		    proto_perl->Ttmps_stack[i]);
+		    proto_perl->Itmps_stack[i]);
 	    if (nsv && !SvREFCNT(nsv)) {
 		EXTEND_MORTAL(1);
 		PL_tmps_stack[++PL_tmps_ix] = SvREFCNT_inc_simple(nsv);
@@ -11046,47 +10981,47 @@ perl_clone_using(PerlInterpreter *proto_perl, UV flags,
 	}
     }
 
-    PL_start_env	= proto_perl->Tstart_env;	/* XXXXXX */
+    PL_start_env	= proto_perl->Istart_env;	/* XXXXXX */
     PL_top_env		= &PL_start_env;
 
-    PL_op		= proto_perl->Top;
+    PL_op		= proto_perl->Iop;
 
     PL_Sv		= NULL;
     PL_Xpv		= (XPV*)NULL;
-    PL_na		= proto_perl->Tna;
+    PL_na		= proto_perl->Ina;
 
-    PL_statbuf		= proto_perl->Tstatbuf;
-    PL_statcache	= proto_perl->Tstatcache;
-    PL_statgv		= gv_dup(proto_perl->Tstatgv, param);
-    PL_statname		= sv_dup_inc(proto_perl->Tstatname, param);
+    PL_statbuf		= proto_perl->Istatbuf;
+    PL_statcache	= proto_perl->Istatcache;
+    PL_statgv		= gv_dup(proto_perl->Istatgv, param);
+    PL_statname		= sv_dup_inc(proto_perl->Istatname, param);
 #ifdef HAS_TIMES
-    PL_timesbuf		= proto_perl->Ttimesbuf;
+    PL_timesbuf		= proto_perl->Itimesbuf;
 #endif
 
-    PL_tainted		= proto_perl->Ttainted;
-    PL_curpm		= proto_perl->Tcurpm;	/* XXX No PMOP ref count */
-    PL_rs		= sv_dup_inc(proto_perl->Trs, param);
-    PL_last_in_gv	= gv_dup(proto_perl->Tlast_in_gv, param);
-    PL_ofs_sv		= sv_dup_inc(proto_perl->Tofs_sv, param);
-    PL_defoutgv		= gv_dup_inc(proto_perl->Tdefoutgv, param);
-    PL_chopset		= proto_perl->Tchopset;	/* XXX never deallocated */
+    PL_tainted		= proto_perl->Itainted;
+    PL_curpm		= proto_perl->Icurpm;	/* XXX No PMOP ref count */
+    PL_rs		= sv_dup_inc(proto_perl->Irs, param);
+    PL_last_in_gv	= gv_dup(proto_perl->Ilast_in_gv, param);
+    PL_ofs_sv		= sv_dup_inc(proto_perl->Iofs_sv, param);
+    PL_defoutgv		= gv_dup_inc(proto_perl->Idefoutgv, param);
+    PL_chopset		= proto_perl->Ichopset;	/* XXX never deallocated */
 
-    PL_restartop	= proto_perl->Trestartop;
-    PL_in_eval		= proto_perl->Tin_eval;
-    PL_delaymagic	= proto_perl->Tdelaymagic;
-    PL_dirty		= proto_perl->Tdirty;
-    PL_localizing	= proto_perl->Tlocalizing;
+    PL_restartop	= proto_perl->Irestartop;
+    PL_in_eval		= proto_perl->Iin_eval;
+    PL_delaymagic	= proto_perl->Idelaymagic;
+    PL_dirty		= proto_perl->Idirty;
+    PL_localizing	= proto_perl->Ilocalizing;
 
-    PL_errors		= sv_dup_inc(proto_perl->Terrors, param);
+    PL_errors		= sv_dup_inc(proto_perl->Ierrors, param);
     PL_hv_fetch_ent_mh	= NULL;
-    PL_modcount		= proto_perl->Tmodcount;
+    PL_modcount		= proto_perl->Imodcount;
     PL_lastgotoprobe	= NULL;
-    PL_dumpindent	= proto_perl->Tdumpindent;
+    PL_dumpindent	= proto_perl->Idumpindent;
 
-    PL_sortcop		= (OP*)any_dup(proto_perl->Tsortcop, proto_perl);
-    PL_sortstash	= hv_dup(proto_perl->Tsortstash, param);
-    PL_firstgv		= gv_dup(proto_perl->Tfirstgv, param);
-    PL_secondgv		= gv_dup(proto_perl->Tsecondgv, param);
+    PL_sortcop		= (OP*)any_dup(proto_perl->Isortcop, proto_perl);
+    PL_sortstash	= hv_dup(proto_perl->Isortstash, param);
+    PL_firstgv		= gv_dup(proto_perl->Ifirstgv, param);
+    PL_secondgv		= gv_dup(proto_perl->Isecondgv, param);
     PL_efloatbuf	= NULL;		/* reinits on demand */
     PL_efloatsize	= 0;			/* reinits on demand */
 
@@ -11098,24 +11033,24 @@ perl_clone_using(PerlInterpreter *proto_perl, UV flags,
     PL_lastscream	= NULL;
 
 
-    PL_regdummy		= proto_perl->Tregdummy;
+    PL_regdummy		= proto_perl->Iregdummy;
     PL_colorset		= 0;		/* reinits PL_colors[] */
     /*PL_colors[6]	= {0,0,0,0,0,0};*/
 
 
 
     /* Pluggable optimizer */
-    PL_peepp		= proto_perl->Tpeepp;
+    PL_peepp		= proto_perl->Ipeepp;
 
     PL_stashcache       = newHV();
 
     PL_watchaddr	= (char **) ptr_table_fetch(PL_ptr_table,
-					    proto_perl->Twatchaddr);
+					    proto_perl->Iwatchaddr);
     PL_watchok		= PL_watchaddr ? * PL_watchaddr : NULL;
     if (PL_debug && PL_watchaddr) {
 	PerlIO_printf(Perl_debug_log,
 	  "WATCHING: %"UVxf" cloned as %"UVxf" with value %"UVxf"\n",
-	  PTR2UV(proto_perl->Twatchaddr), PTR2UV(PL_watchaddr),
+	  PTR2UV(proto_perl->Iwatchaddr), PTR2UV(PL_watchaddr),
 	  PTR2UV(PL_watchok));
     }
 
@@ -11369,8 +11304,7 @@ S_varname(pTHX_ GV *gv, const char gvtype, PADOFFSET targ,
 	}
     }
     else {
-	U32 unused;
-	CV * const cv = find_runcv(&unused);
+	CV * const cv = find_runcv(NULL);
 	SV *sv;
 	AV *av;
 

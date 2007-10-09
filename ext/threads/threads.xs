@@ -688,10 +688,8 @@ S_ithread_create(
             thread->init_function = newSV(0);
             sv_copypv(thread->init_function, init_function);
         } else {
-            thread->init_function = sv_dup(init_function, &clone_param);
-            if (SvREFCNT(thread->init_function) == 0) {
-                SvREFCNT_inc_void(thread->init_function);
-            }
+            thread->init_function =
+		SvREFCNT_inc(sv_dup(init_function, &clone_param));
         }
 
         thread->params = sv_dup(params, &clone_param);
@@ -848,7 +846,7 @@ ithread_create(...)
     CODE:
         if ((items >= 2) && SvROK(ST(1)) && SvTYPE(SvRV(ST(1)))==SVt_PVHV) {
             if (--items < 2) {
-                Perl_croak(aTHX_ "Usage: threads->create(\\%specs, function, ...)");
+                Perl_croak(aTHX_ "Usage: threads->create(\\%%specs, function, ...)");
             }
             specs = (HV*)SvRV(ST(1));
             idx = 1;

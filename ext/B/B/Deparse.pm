@@ -14,14 +14,14 @@ use B qw(class main_root main_start main_cv svref_2object opnumber perlstring
 	 OPf_KIDS OPf_REF OPf_STACKED OPf_SPECIAL OPf_MOD OPpPAD_STATE
 	 OPpLVAL_INTRO OPpOUR_INTRO OPpENTERSUB_AMPER OPpSLICE OPpCONST_BARE
 	 OPpTRANS_SQUASH OPpTRANS_DELETE OPpTRANS_COMPLEMENT OPpTARGET_MY
-	 OPpCONST_ARYBASE OPpEXISTS_SUB OPpSORT_NUMERIC OPpSORT_INTEGER
+	 OPpEXISTS_SUB OPpSORT_NUMERIC OPpSORT_INTEGER
 	 OPpSORT_REVERSE OPpSORT_INPLACE OPpSORT_DESCEND OPpITER_REVERSED
 	 SVf_IOK SVf_NOK SVf_ROK SVf_POK SVpad_OUR SVf_FAKE SVs_RMG SVs_SMG
-         CVf_METHOD CVf_LOCKED CVf_LVALUE CVf_ASSERTION
+         CVf_METHOD CVf_LOCKED CVf_LVALUE
 	 PMf_KEEP PMf_GLOBAL PMf_CONTINUE PMf_EVAL PMf_ONCE
-	 PMf_MULTILINE PMf_SINGLELINE PMf_FOLD PMf_EXTENDED
-	 RXf_SKIPWHITE);
-our $VERSION = 0.81;
+	 PMf_MULTILINE PMf_SINGLELINE PMf_FOLD PMf_EXTENDED),
+	 ($] < 5.009 ? 'PMf_SKIPWHITE' : 'RXf_SKIPWHITE');
+$VERSION = 0.82;
 use strict;
 use vars qw/$AUTOLOAD/;
 use warnings ();
@@ -144,8 +144,6 @@ use warnings ();
 # - here-docs?
 
 # Current test.deparse failures
-# comp/assertions 38 - disabled assertions should be like "my($x) if 0"
-#    'sub f : assertion {}; no assertions; my $x=1; {f(my $x=2); print "$x\n"}'
 # comp/hints 6 - location of BEGIN blocks wrt. block openings
 # run/switchI 1 - missing -I switches entirely
 #    perl -Ifoo -e 'print @INC'
@@ -350,7 +348,7 @@ sub next_todo {
 		$name = "$self->{'curstash'}::$name" unless $name =~ /::/;
 		$self->{'curstash'} = $stash;
 	    }
-	    $name =~ s/^\Q$stash\E:://;
+	    $name =~ s/^\Q$stash\E::(?!\z|.*::)//;
 	}
         return "${p}${l}sub $name " . $self->deparse_sub($cv);
     }
@@ -463,13 +461,12 @@ sub stash_subs {
 	$stash = \%::;
     }
     else {
-	$pack =~ s/(::)?$/::/;
+	$pack =~ s/(::)?$//;
 	no strict 'refs';
-	$stash = \%$pack;
+	$stash = \%{Symbol::stash($pack)};
     }
     my %stash = svref_2object($stash)->ARRAY;
     while (my ($key, $val) = each %stash) {
-	next if $key eq 'main::';	# avoid infinite recursion
 	my $class = class($val);
 	if ($class eq "PV") {
 	    # Just a prototype. As an ugly but fairly effective way
@@ -498,7 +495,9 @@ sub stash_subs {
 		$self->todo($cv, 0);
 	    }
 	    if (class($val->HV) ne "SPECIAL" && $key =~ /::$/) {
-		$self->stash_subs($pack . $key);
+		$self->stash_subs($pack . $key)
+		    unless $pack eq '' && $key eq 'main::';
+		    # avoid infinite recursion
 	    }
 	}
     }
@@ -554,7 +553,6 @@ sub new {
     $self->{'use_dumper'} = 0;
     $self->{'use_tabs'} = 0;
 
-    $self->{'ambient_arybase'} = 0;
     $self->{'ambient_warnings'} = undef; # Assume no lexical warnings
     $self->{'ambient_hints'} = 0;
     $self->init();
@@ -599,7 +597,6 @@ sub new {
 sub init {
     my $self = shift;
 
-    $self->{'arybase'}  = $self->{'ambient_arybase'};
     $self->{'warnings'} = defined ($self->{'ambient_warnings'})
 				? $self->{'ambient_warnings'} & WARN_MASK
 				: undef;
@@ -662,11 +659,11 @@ sub compile {
 	no strict 'refs';
 	my $laststash = defined $self->{'curcop'}
 	    ? $self->{'curcop'}->stash->NAME : $self->{'curstash'};
-	if (defined *{$laststash."::DATA"}{IO}) {
+	if (defined *{Symbol::fetch_glob($laststash."::DATA")}{IO}) {
 	    print "package $laststash;\n"
 		unless $laststash eq $self->{'curstash'};
 	    print "__DATA__\n";
-	    print readline(*{$laststash."::DATA"});
+	    print readline(*{Symbol::fetch_glob($laststash."::DATA")});
 	}
     }
 }
@@ -682,7 +679,7 @@ sub coderef2text {
 
 sub ambient_pragmas {
     my $self = shift;
-    my ($arybase, $hint_bits, $warning_bits) = (0, 0);
+    my ($hint_bits, $warning_bits) = (0, 0);
 
     while (@_ > 1) {
 	my $name = shift();
@@ -707,10 +704,6 @@ sub ambient_pragmas {
 		@names = split' ', $val;
 	    }
 	    $hint_bits |= strict::bits(@names);
-	}
-
-	elsif ($name eq '$[') {
-	    $arybase = $val;
 	}
 
 	elsif ($name eq 'integer'
@@ -779,7 +772,6 @@ sub ambient_pragmas {
 	croak "The ambient_pragmas method expects an even number of args";
     }
 
-    $self->{'ambient_arybase'} = $arybase;
     $self->{'ambient_warnings'} = $warning_bits;
     $self->{'ambient_hints'} = $hint_bits;
 }
@@ -833,12 +825,11 @@ Carp::confess("SPECIAL in deparse_sub") if $cv->isa("B::SPECIAL");
     if ($cv->FLAGS & SVf_POK) {
 	$proto = "(". $cv->PV . ") ";
     }
-    if ($cv->CvFLAGS & (CVf_METHOD|CVf_LOCKED|CVf_LVALUE|CVf_ASSERTION)) {
+    if ($cv->CvFLAGS & (CVf_METHOD|CVf_LOCKED|CVf_LVALUE)) {
         $proto .= ": ";
         $proto .= "lvalue " if $cv->CvFLAGS & CVf_LVALUE;
         $proto .= "locked " if $cv->CvFLAGS & CVf_LOCKED;
         $proto .= "method " if $cv->CvFLAGS & CVf_METHOD;
-        $proto .= "assertion " if $cv->CvFLAGS & CVf_ASSERTION;
     }
 
     local($self->{'curcv'}) = $cv;
@@ -1104,32 +1095,10 @@ sub lineseq {
 	if defined($self->{'limit_seq'})
 	&& (!defined($limit_seq) || $self->{'limit_seq'} < $limit_seq);
     local $self->{'limit_seq'} = $limit_seq;
-    for (my $i = 0; $i < @ops; $i++) {
-	$expr = "";
-	if (is_state $ops[$i]) {
-	    $expr = $self->deparse($ops[$i], 0);
-	    $i++;
-	    if ($i > $#ops) {
-		push @exprs, $expr;
-		last;
-	    }
-	}
-	if (!is_state $ops[$i] and (my $ls = $ops[$i+1]) and
-	    !null($ops[$i+1]) and $ops[$i+1]->name eq "lineseq")
-	{
-	    if ($ls->first && !null($ls->first) && is_state($ls->first)
-		&& (my $sib = $ls->first->sibling)) {
-		if (!null($sib) && $sib->name eq "leaveloop") {
-		    push @exprs, $expr . $self->for_loop($ops[$i], 0);
-		    $i++;
-		    next;
-		}
-	    }
-	}
-	$expr .= $self->deparse($ops[$i], (@ops != 1)/2);
-	$expr =~ s/;\n?\z//;
-	push @exprs, $expr;
-    }
+
+    $self->walk_lineseq($root, \@ops,
+		       sub { push @exprs, $_[0]} );
+
     my $body = join(";\n", grep {length} @exprs);
     my $subs = "";
     if (defined $root && defined $limit_seq && !$self->{'in_format'}) {
@@ -1194,28 +1163,31 @@ sub deparse_root {
     for (my $kid = $op->first->sibling; !null($kid); $kid = $kid->sibling) {
 	push @kids, $kid;
     }
+    $self->walk_lineseq($op, \@kids,
+			sub { print $self->indent($_[0].';');
+			      print "\n" unless $_[1] == $#kids;
+			  });
+}
+
+sub walk_lineseq {
+    my ($self, $op, $kids, $callback) = @_;
+    my @kids = @$kids;
     for (my $i = 0; $i < @kids; $i++) {
 	my $expr = "";
 	if (is_state $kids[$i]) {
-	    $expr = $self->deparse($kids[$i], 0);
-	    $i++;
+	    $expr = $self->deparse($kids[$i++], 0);
 	    if ($i > $#kids) {
-		print $self->indent($expr);
+		$callback->($expr, $i);
 		last;
 	    }
 	}
 	if (is_for_loop($kids[$i])) {
-	    $expr .= $self->for_loop($kids[$i], 0);
-	    $expr .= ";\n" unless $i == $#kids;
-	    print $self->indent($expr);
-	    $i++;
+	    $callback->($expr . $self->for_loop($kids[$i], 0), $i++);
 	    next;
 	}
 	$expr .= $self->deparse($kids[$i], (@kids != 1)/2);
 	$expr =~ s/;\n?\z//;
-	$expr .= ";";
-	print $self->indent($expr);
-	print "\n" unless $i == $#kids;
+	$callback->($expr, $i);
     }
 }
 
@@ -1231,8 +1203,12 @@ sub gv_name {
 Carp::confess() unless ref($gv) eq "B::GV";
     my $stash = $gv->STASH->NAME;
     my $name = $gv->SAFENAME;
-    if (($stash eq 'main' && $globalnames{$name})
-	or ($stash eq $self->{'curstash'} && !$globalnames{$name})
+    if ($stash eq 'main' && $name =~ /^::/) {
+	$stash = '::';
+    }
+    elsif (($stash eq 'main' && $globalnames{$name})
+	or ($stash eq $self->{'curstash'} && !$globalnames{$name}
+	    && ($stash eq 'main' || $name !~ /::/))
 	or $name =~ /^[^A-Za-z_:]/)
     {
 	$stash = "";
@@ -1378,11 +1354,6 @@ sub pp_nextstate {
     if ($stash ne $self->{'curstash'}) {
 	push @text, "package $stash;\n";
 	$self->{'curstash'} = $stash;
-    }
-
-    if ($self->{'arybase'} != $op->arybase) {
-	push @text, '$[ = '. $op->arybase .";\n";
-	$self->{'arybase'} = $op->arybase;
     }
 
     my $warnings = $op->warnings;
@@ -1796,8 +1767,7 @@ sub pp_refgen {
 	    return $self->anon_hash_or_list($op, $cx);
 	} elsif (!null($kid->sibling) and
 		 $kid->sibling->name eq "anoncode") {
-	    return "sub " .
-		$self->deparse_sub($self->padval($kid->sibling->targ));
+            return $self->e_anoncode({ code => $self->padval($kid->sibling->targ) });
 	} elsif ($kid->name eq "pushmark") {
             my $sib_name = $kid->sibling->name;
             if ($sib_name =~ /^(pad|rv2)[ah]v$/
@@ -1816,6 +1786,12 @@ sub pp_refgen {
         }
     }
     $self->pfixop($op, $cx, "\\", 20);
+}
+
+sub e_anoncode {
+    my ($self, $info) = @_;
+    my $text = $self->deparse_sub($info->{code});
+    return "sub " . $text;
 }
 
 sub pp_srefgen { pp_refgen(@_) }
@@ -2671,7 +2647,7 @@ sub loop_common {
     return $head . "{\n\t" . $body . "\b}" . $cont;
 }
 
-sub pp_leaveloop { loop_common(@_, "") }
+sub pp_leaveloop { shift->loop_common(@_, "") }
 
 sub for_loop {
     my $self = shift;
@@ -2810,7 +2786,7 @@ sub pp_aelemfast {
 	$name = '$' . $name;
     }
 
-    return $name . "[" .  ($op->private + $self->{'arybase'}) . "]";
+    return $name . "[" .  ($op->private) . "]";
 }
 
 sub rv2x {
@@ -3072,7 +3048,7 @@ sub want_list {
     return ($op->flags & OPf_WANT) == OPf_WANT_LIST;
 }
 
-sub method {
+sub _method {
     my $self = shift;
     my($op, $cx) = @_;
     my $kid = $op->first->sibling; # skip pushmark
@@ -3094,18 +3070,18 @@ sub method {
 	$obj = $kid;
 	$kid = $kid->sibling;
 	for (; not null $kid; $kid = $kid->sibling) {
-	    push @exprs, $self->deparse($kid, 6);
+	    push @exprs, $kid;
 	}
     } else {
 	$obj = $kid;
 	$kid = $kid->sibling;
 	for (; !null ($kid->sibling) && $kid->name ne "method_named";
 	      $kid = $kid->sibling) {
-	    push @exprs, $self->deparse($kid, 6);
+	    push @exprs, $kid
 	}
 	$meth = $kid;
     }
-    $obj = $self->deparse($obj, 24);
+
     if ($meth->name eq "method_named") {
 	$meth = $self->const_sv($meth)->PV;
     } else {
@@ -3114,12 +3090,28 @@ sub method {
 	    # As of 5.005_58, this case is probably obsoleted by the
 	    # method_named case above
 	    $meth = $self->const_sv($meth)->PV; # needs to be bare
-	} else {
-	    $meth = $self->deparse($meth, 1);
 	}
     }
-    my $args = join(", ", @exprs);	
-    $kid = $obj . "->" . $meth;
+
+    return { method => $meth, variable_method => ref($meth),
+             object => $obj, args => \@exprs  };
+}
+
+# compat function only
+sub method {
+    my $self = shift;
+    my $info = $self->_method(@_);
+    return $self->e_method( $self->_method(@_) );
+}
+
+sub e_method {
+    my ($self, $info) = @_;
+    my $obj = $self->deparse($info->{object}, 24);
+
+    my $meth = $info->{method};
+    $meth = $self->deparse($meth, 1) if $info->{variable_method};
+    my $args = join(", ", map { $self->deparse($_, 6) } @{$info->{args}} );
+    my $kid = $obj . "->" . $meth;
     if (length $args) {
 	return $kid . "(" . $args . ")"; # parens mandatory
     } else {
@@ -3209,7 +3201,8 @@ sub check_proto {
 sub pp_entersub {
     my $self = shift;
     my($op, $cx) = @_;
-    return $self->method($op, $cx) unless null $op->first->sibling;
+    return $self->e_method($self->_method($op, $cx))
+        unless null $op->first->sibling;
     my $prefix = "";
     my $amper = "";
     my($kid, @exprs);
@@ -3235,6 +3228,13 @@ sub pp_entersub {
 	}
 	$simple = 1; # only calls of named functions can be prototyped
 	$kid = $self->deparse($kid, 24);
+	if (!$amper) {
+	    if ($kid eq 'main::') {
+		$kid = '::';
+	    } elsif ($kid !~ /^(?:\w|::)(?:[\w\d]|::(?!\z))*\z/) {
+		$kid = single_delim("q", "'", $kid) . '->';
+	    }
+	}
     } elsif (is_scalar ($kid->first) && $kid->first->name ne 'rv2cv') {
 	$amper = "&";
 	$kid = $self->deparse($kid, 24);
@@ -3252,7 +3252,7 @@ sub pp_entersub {
 	no warnings 'uninitialized';
 	$declared = exists $self->{'subs_declared'}{$kid}
 	    || (
-		 defined &{ ${$self->{'curstash'}."::"}{$kid} }
+		 defined &{ ${Symbol::stash($self->{'curstash'})}{$kid} }
 		 && !exists
 		     $self->{'subs_deparsed'}{$self->{'curstash'}."::".$kid}
 		 && defined prototype $self->{'curstash'}."::".$kid
@@ -3672,9 +3672,6 @@ sub const_sv {
 sub pp_const {
     my $self = shift;
     my($op, $cx) = @_;
-    if ($op->private & OPpCONST_ARYBASE) {
-        return '$[';
-    }
 #    if ($op->private & OPpCONST_BARE) { # trouble with `=>' autoquoting
 #	return $self->const_sv($op)->PV;
 #    }
@@ -3687,7 +3684,6 @@ sub dq {
     my $op = shift;
     my $type = $op->name;
     if ($type eq "const") {
-	return '$[' if $op->private & OPpCONST_ARYBASE;
 	return uninterp(escape_str(unback($self->const_sv($op)->as_string)));
     } elsif ($type eq "concat") {
 	my $first = $self->dq($op->first);
@@ -3992,7 +3988,6 @@ sub re_dq {
 
     my $type = $op->name;
     if ($type eq "const") {
-	return '$[' if $op->private & OPpCONST_ARYBASE;
 	my $unbacked = re_unback($self->const_sv($op)->as_string);
 	return re_uninterp_extended(escape_extended_re($unbacked))
 	    if $extended;
@@ -4179,7 +4174,9 @@ sub pp_split {
 
     # handle special case of split(), and split(' ') that compiles to /\s+/
     $kid = $op->first;
-    if ( $kid->flags & OPf_SPECIAL and $kid->reflags & RXf_SKIPWHITE ) {
+    if ( $kid->flags & OPf_SPECIAL
+	 and ( $] < 5.009 ? $kid->pmflags & PMf_SKIPWHITE()
+	      : $kid->reflags & RXf_SKIPWHITE() ) ) {
 	$exprs[0] = "' '";
     }
 

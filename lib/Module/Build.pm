@@ -15,7 +15,7 @@ use Module::Build::Base;
 
 use vars qw($VERSION @ISA);
 @ISA = qw(Module::Build::Base);
-$VERSION = '0.2807';
+$VERSION = '0.2808';
 $VERSION = eval $VERSION;
 
 # Okay, this is the brute-force method of finding out what kind of
@@ -34,6 +34,7 @@ my %OSTYPES = qw(
 		 irix      Unix
 		 darwin    Unix
 		 machten   Unix
+		 midnightbsd Unix
 		 next      Unix
 		 openbsd   Unix
 		 netbsd    Unix
@@ -74,12 +75,12 @@ sub _interpose_module {
 
   no strict 'refs';
   my $top_class = $mod;
-  while (@{"${top_class}::ISA"}) {
-    last if ${"${top_class}::ISA"}[0] eq $ISA[0];
-    $top_class = ${"${top_class}::ISA"}[0];
+  while (@{*{Symbol::fetch_glob("${top_class}::ISA")}}) {
+    last if ${*{Symbol::fetch_glob("${top_class}::ISA")}}[0] eq $ISA[0];
+    $top_class = ${*{Symbol::fetch_glob("${top_class}::ISA")}}[0];
   }
 
-  @{"${top_class}::ISA"} = @ISA;
+  @{*{Symbol::fetch_glob("${top_class}::ISA")}} = @ISA;
   @ISA = ($mod);
 }
 
@@ -94,6 +95,10 @@ if (grep {-e File::Spec->catfile($_, qw(Module Build Platform), $^O) . '.pm'} @I
 }
 
 sub os_type { $OSTYPES{$^O} }
+
+sub is_vmsish { return ((os_type() || '') eq 'VMS') }
+sub is_windowsish { return ((os_type() || '') eq 'Windows') }
+sub is_unixish { return ((os_type() || '') eq 'Unix') }
 
 1;
 

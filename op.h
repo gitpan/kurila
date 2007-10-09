@@ -19,20 +19,17 @@
  *	op_type		The type of the operation.
  *	op_opt		Whether or not the op has been optimised by the
  *			peephole optimiser.
- *	op_static	Whether or not the op is statically defined.
- *			This flag is used by the B::C compiler backend
- *			and indicates that the op should not be freed.
  *
  *			See the comments in S_clear_yystack() for more
  *			details on the following three flags:
-
+ *
  *	op_latefree	tell op_free() to clear this op (and free any kids)
  *			but not yet deallocate the struct. This means that
  *			the op may be safely op_free()d multiple times
  *	op_latefreed	an op_latefree op has been op_free()d
  *	op_attached	this op (sub)tree has been attached to a CV
  *
- *	op_spare	two spare bits!
+ *	op_spare	three spare bits!
  *	op_flags	Flags common to all operations.  See OPf_* below.
  *	op_private	Flags peculiar to a particular operation (BUT,
  *			by default, set to the number of children until
@@ -63,11 +60,10 @@
     PADOFFSET	op_targ;		\
     unsigned	op_type:9;		\
     unsigned	op_opt:1;		\
-    unsigned	op_static:1;		\
     unsigned	op_latefree:1;		\
     unsigned	op_latefreed:1;		\
     unsigned	op_attached:1;		\
-    unsigned	op_spare:2;		\
+    unsigned	op_spare:3;		\
     U8		op_flags;		\
     U8		op_private;
 #endif
@@ -228,7 +224,7 @@ Deprecated.  Use C<GIMME_V> instead.
 #define	OPpCONST_SHORTCIRCUIT	4	/* eg the constant 5 in (5 || foo) */
 #define	OPpCONST_STRICT		8	/* bearword subject to strict 'subs' */
 #define OPpCONST_ENTERED	16	/* Has been entered as symbol. */
-#define OPpCONST_ARYBASE	32	/* Was a $[ translated to constant. */
+#define OPpCONST_NOTUSED	32	/* Was OPpCONST_ARYBASE: Was a $[ translated to constant. */
 #define OPpCONST_BARE		64	/* Was a bare word (filehandle?). */
 #define OPpCONST_WARNING	128	/* Was a $^W translated to constant. */
 
@@ -319,7 +315,7 @@ struct pmop {
 #else
     REGEXP *    op_pmregexp;            /* compiled expression */
 #endif
-    U32		op_pmflags;
+    U32         op_pmflags;
     union {
 	OP *	op_pmreplroot;		/* For OP_SUBST */
 #ifdef USE_ITHREADS
@@ -694,13 +690,14 @@ struct token {
  * f       folded constant op
  * F       peg op for format
  * g       op was forced to be a word
+ * G       __END__ section
  * i       if/unless modifier
  * I       if/elsif/unless statement
+ * k       local declarator
  * K       retired kid op
  * l       last index of array ($#foo)
  * L       label
  * m       modifier on regex
- * M       my assignment slurped into some other operator's target
  * n       sub or format name
  * o       current operator/declarator name
  * o       else/continue
@@ -713,7 +710,6 @@ struct token {
  * Q       optimized qw//
  * r       expression producing R
  * R       tr/E/R/ s/E/R/
- * R       assign slurped by split
  * s       sub signature
  * S       use import stub (no import)
  * S       retired sort block

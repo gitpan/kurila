@@ -26,7 +26,6 @@
  * other pp*.c files for the rest of the pp_ functions.
  */
 
-
 #include "EXTERN.h"
 #define PERL_IN_PP_PACK_C
 #include "perl.h"
@@ -365,7 +364,7 @@ STATIC const packprops_t packprops[512] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0,
-    /* C */ sizeof(unsigned char) | PACK_SIZE_UNPREDICTABLE,
+    /* C */ sizeof(unsigned char),
 #if defined(HAS_LONG_DOUBLE) && defined(USE_LONG_DOUBLE)
     /* D */ LONG_DOUBLESIZE,
 #else
@@ -516,7 +515,7 @@ STATIC const packprops_t packprops[512] = {
     /* w */ sizeof(char) | PACK_SIZE_UNPREDICTABLE | PACK_SIZE_CANNOT_CSUM,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    /* C */ sizeof(unsigned char) | PACK_SIZE_UNPREDICTABLE,
+    /* C */ sizeof(unsigned char),
 #if defined(HAS_LONG_DOUBLE) && defined(USE_LONG_DOUBLE)
     /* D */ LONG_DOUBLESIZE,
 #else
@@ -668,23 +667,6 @@ uni_to_bytes(pTHX_ const char **s, const char *end, const char *buf, int buf_len
     return TRUE;
 }
 
-STATIC char *
-S_bytes_to_uni(const U8 *start, STRLEN len, char *dest) {
-    const U8 * const end = start + len;
-
-    while (start < end) {
-	const UV uv = NATIVE_TO_ASCII(*start);
-	if (UNI_IS_INVARIANT(uv))
-	    *dest++ = (char)(U8)UTF_TO_NATIVE(uv);
-	else {
-	    *dest++ = (char)(U8)UTF8_EIGHT_BIT_HI(uv);
-	    *dest++ = (char)(U8)UTF8_EIGHT_BIT_LO(uv);
-	}
-	start++;
-    }
-    return dest;
-}
-
 #define PUSH_BYTES(cur, buf, len)				\
 STMT_START {							\
 	Copy(buf, cur, len, char);				\
@@ -717,10 +699,7 @@ STMT_START {					\
 
 #define PUSH_BYTE(s, byte)		\
 STMT_START {					\
-    if (utf8) {					\
-	const U8 au8 = (byte);			\
-	(s) = bytes_to_uni(&au8, 1, (s));	\
-    } else *(U8 *)(s)++ = (byte);		\
+   *(U8 *)(s)++ = (byte);		\
 } STMT_END
 
 /* Only to be used inside a loop (see the break) */
@@ -1466,11 +1445,15 @@ S_unpack_rec(pTHX_ tempsym_t* symptr, const char *s, const char *strbeg, const c
 	    XPUSHs(sv);
 	    break;
 	}
+	case 'C':
+	case 'W':
 	case 'c':
-	    while (len-- > 0) {
-		int aint = SHIFT_BYTE(s, strend, datumtype);
-		if (aint >= 128)	/* fake up signed chars */
+	    while (len-- > 0 && s < strend) {
+		int aint;
+		aint = *(U8 *)(s)++;
+		if (aint >= 128 && datumtype == 'c')	/* fake up signed chars */
 		    aint -= 256;
+	      W_checksum:
 		if (!checksum)
 		    PUSHs(sv_2mortal(newSViv((IV)aint)));
 		else if (checksum > bits_in_uv)
@@ -1478,25 +1461,6 @@ S_unpack_rec(pTHX_ tempsym_t* symptr, const char *s, const char *strbeg, const c
 		else
 		    cuv += aint;
 	    }
-	    break;
-	case 'C':
-	case 'W':
-	  W_checksum:
-            if (len == 0) {
-                if (explicit_length && datumtype == 'C')
-		    /* Switch to "character" mode */
-		    utf8 = (symptr->flags & FLAG_DO_UTF8) ? 1 : 0;
-		break;
-	    }
-	    if (!checksum)
-		while (len-- > 0) {
-		    const U8 ch = *(U8 *) s++;
-		    PUSHs(sv_2mortal(newSVuv((UV) ch)));
-	    }
-	    else if (checksum > bits_in_uv)
-		while (len-- > 0) cdouble += (NV) *(U8 *) s++;
-	    else
-		while (len-- > 0) cuv += *(U8 *) s++;
 	    break;
 	case 'U':
 	    if (len == 0) {
@@ -2618,11 +2582,6 @@ S_pack_rec(pTHX_ SV *cat, tempsym_t* symptr, SV **beglist, SV **endlist )
 	    break;
 	case 'C':
 	case 'W':
-	    if (len == 0) {
-		utf8 = (symptr->flags & FLAG_DO_UTF8) ? 1 : 0;
-		break;
-	    }
-	    GROWING(0, cat, start, cur, len);
 	    while (len-- > 0) {
 		IV aiv;
 		fromstr = NEXTFROM;
@@ -2631,7 +2590,7 @@ S_pack_rec(pTHX_ SV *cat, tempsym_t* symptr, SV **beglist, SV **endlist )
 		    ckWARN(WARN_PACK))
 		    Perl_warner(aTHX_ packWARN(WARN_PACK),
 				"Character in 'C' format wrapped in pack");
-		*cur++ = (char)(aiv & 0xff);
+		PUSH_BYTE(cur, (U8)(aiv & 0xff));
 	    }
 	    break;
 	case 'U': {

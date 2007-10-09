@@ -352,7 +352,7 @@ Perl_allocmy(pTHX_ const char *const name)
 {
     dVAR;
     PADOFFSET off;
-    const bool is_our = (PL_in_my == KEY_our);
+    const bool is_our = (PL_parser->in_my == KEY_our);
 
     /* complain about "my $<special_var>" etc etc */
     if (*name &&
@@ -373,24 +373,16 @@ Perl_allocmy(pTHX_ const char *const name)
     /* check for duplicate declaration */
     pad_check_dup(name, is_our, (PL_curstash ? PL_curstash : PL_defstash));
 
-    if (PL_in_my_stash && *name != '$') {
-	yyerror(Perl_form(aTHX_
-		    "Can't declare class for non-scalar %s in \"%s\"",
- 		     name,
- 		     is_our ? "our" : PL_in_my == KEY_state ? "state" : "my"));
-    }
-
     /* allocate a spare slot and store the name in that slot */
 
     off = pad_add_name(name,
-		    PL_in_my_stash,
 		    (is_our
 		        /* $_ is always in main::, even with our */
 			? (PL_curstash && !strEQ(name,"$_") ? PL_curstash : PL_defstash)
 			: NULL
 		    ),
 		    0, /*  not fake */
-		    PL_in_my == KEY_state
+		    PL_parser->in_my == KEY_state
     );
     return off;
 }
@@ -422,7 +414,7 @@ Perl_op_free(pTHX_ OP *o)
     dVAR;
     OPCODE type;
 
-    if (!o || o->op_static)
+    if (!o)
 	return;
     if (o->op_latefreed) {
 	if (o->op_latefree)
@@ -781,8 +773,8 @@ S_scalarboolean(pTHX_ OP *o)
 	if (ckWARN(WARN_SYNTAX)) {
 	    const line_t oldline = CopLINE(PL_curcop);
 
-	    if (PL_copline != NOLINE)
-		CopLINE_set(PL_curcop, PL_copline);
+	    if (PL_parser && PL_parser->copline != NOLINE)
+		CopLINE_set(PL_curcop, PL_parser->copline);
 	    Perl_warner(aTHX_ packWARN(WARN_SYNTAX), "Found = in conditional, should be ==");
 	    CopLINE_set(PL_curcop, oldline);
 	}
@@ -797,7 +789,8 @@ Perl_scalar(pTHX_ OP *o)
     OP *kid;
 
     /* assumes no premature commitment */
-    if (!o || PL_error_count || (o->op_flags & OPf_WANT)
+    if (!o || (PL_parser && PL_parser->error_count)
+	 || (o->op_flags & OPf_WANT)
 	 || o->op_type == OP_RETURN)
     {
 	return o;
@@ -895,7 +888,8 @@ Perl_scalarvoid(pTHX_ OP *o)
 
     /* assumes no premature commitment */
     want = o->op_flags & OPf_WANT;
-    if ((want && want != OPf_WANT_SCALAR) || PL_error_count
+    if ((want && want != OPf_WANT_SCALAR)
+	 || (PL_parser && PL_parser->error_count)
 	 || o->op_type == OP_RETURN)
     {
 	return o;
@@ -1020,8 +1014,6 @@ Perl_scalarvoid(pTHX_ OP *o)
 	else {
 	    if (ckWARN(WARN_VOID)) {
 		useless = "a constant";
-		if (o->op_private & OPpCONST_ARYBASE)
-		    useless = NULL;
 		/* don't warn on optimised away booleans, eg 
 		 * use constant Foo, 5; Foo || print; */
 		if (cSVOPo->op_private & OPpCONST_SHORTCIRCUIT)
@@ -1140,7 +1132,8 @@ Perl_list(pTHX_ OP *o)
     OP *kid;
 
     /* assumes no premature commitment */
-    if (!o || (o->op_flags & OPf_WANT) || PL_error_count
+    if (!o || (o->op_flags & OPf_WANT)
+	 || (PL_parser && PL_parser->error_count)
 	 || o->op_type == OP_RETURN)
     {
 	return o;
@@ -1266,7 +1259,7 @@ Perl_mod(pTHX_ OP *o, I32 type)
     /* -1 = error on localize, 0 = ignore localize, 1 = ok to localize */
     int localize = -1;
 
-    if (!o || PL_error_count)
+    if (!o || (PL_parser && PL_parser->error_count))
 	return o;
 
     if ((o->op_private & OPpTARGET_MY)
@@ -1280,24 +1273,6 @@ Perl_mod(pTHX_ OP *o, I32 type)
 	localize = 0;
 	PL_modcount++;
 	return o;
-    case OP_CONST:
-	if (!(o->op_private & OPpCONST_ARYBASE))
-	    goto nomod;
-	localize = 0;
-	if (PL_eval_start && PL_eval_start->op_type == OP_CONST) {
-	    CopARYBASE_set(&PL_compiling,
-			   (I32)SvIV(cSVOPx(PL_eval_start)->op_sv));
-	    PL_eval_start = 0;
-	}
-	else if (!type) {
-	    SAVECOPARYBASE(&PL_compiling);
-	    CopARYBASE_set(&PL_compiling, 0);
-	}
-	else if (type == OP_REFGEN)
-	    goto nomod;
-	else
-	    Perl_croak(aTHX_ "That use of $[ is unsupported");
-	break;
     case OP_STUB:
 	if ((o->op_flags & OPf_PARENS) || PL_madskills)
 	    break;
@@ -1692,7 +1667,7 @@ Perl_doref(pTHX_ OP *o, I32 type, bool set_op_ref)
     dVAR;
     OP *kid;
 
-    if (!o || PL_error_count)
+    if (!o || (PL_parser && PL_parser->error_count))
 	return o;
 
     switch (o->op_type) {
@@ -1814,7 +1789,6 @@ S_apply_attrs(pTHX_ HV *stash, SV *target, OP *attrs, bool for_my)
 
     /* fake up C<use attributes $pkg,$rv,@attrs> */
     ENTER;		/* need to protect against side-effects of 'use' */
-    SAVEI8(PL_expect);
     stashsv = stash ? newSVhek(HvNAME_HEK(stash)) : &PL_sv_no;
 
 #define ATTRSMODULE "attributes"
@@ -1941,7 +1915,7 @@ S_my_kid(pTHX_ OP *o, OP *attrs, OP **imopsp)
     dVAR;
     I32 type;
 
-    if (!o || PL_error_count)
+    if (!o || (PL_parser && PL_parser->error_count))
 	return o;
 
     type = o->op_type;
@@ -1966,11 +1940,12 @@ S_my_kid(pTHX_ OP *o, OP *attrs, OP **imopsp)
 	if (cUNOPo->op_first->op_type != OP_GV) { /* MJD 20011224 */
 	    yyerror(Perl_form(aTHX_ "Can't declare %s in \"%s\"",
 			OP_DESC(o),
-			PL_in_my == KEY_our ? "our" : PL_in_my == KEY_state ? "state" : "my"));
+			PL_parser->in_my == KEY_our
+			    ? "our"
+			    : PL_parser->in_my == KEY_state ? "state" : "my"));
 	} else if (attrs) {
 	    GV * const gv = cGVOPx_gv(cUNOPo->op_first);
-	    PL_in_my = FALSE;
-	    PL_in_my_stash = NULL;
+	    PL_parser->in_my = FALSE;
 	    apply_attrs(GvSTASH(gv),
 			(type == OP_RV2SV ? GvSV(gv) :
 			 type == OP_RV2AV ? (SV*)GvAV(gv) :
@@ -1987,24 +1962,22 @@ S_my_kid(pTHX_ OP *o, OP *attrs, OP **imopsp)
     {
 	yyerror(Perl_form(aTHX_ "Can't declare %s in \"%s\"",
 			  OP_DESC(o),
-			  PL_in_my == KEY_our ? "our" : PL_in_my == KEY_state ? "state" : "my"));
+			  PL_parser->in_my == KEY_our
+			    ? "our"
+			    : PL_parser->in_my == KEY_state ? "state" : "my"));
 	return o;
     }
     else if (attrs && type != OP_PUSHMARK) {
 	HV *stash;
 
-	PL_in_my = FALSE;
-	PL_in_my_stash = NULL;
+	PL_parser->in_my = FALSE;
 
-	/* check for C<my Dog $spot> when deciding package */
-	stash = PAD_COMPNAME_TYPE(o->op_targ);
-	if (!stash)
-	    stash = PL_curstash;
+	stash = PL_curstash;
 	apply_attrs_my(stash, o, attrs, imopsp);
     }
     o->op_flags |= OPf_MOD;
     o->op_private |= OPpLVAL_INTRO;
-    if (PL_in_my == KEY_state)
+    if (PL_parser->in_my == KEY_state)
 	o->op_private |= OPpPAD_STATE;
     return o;
 }
@@ -2038,8 +2011,7 @@ Perl_my_attrs(pTHX_ OP *o, OP *attrs)
 	else
 	    o = append_list(OP_LIST, (LISTOP*)o, (LISTOP*)rops);
     }
-    PL_in_my = FALSE;
-    PL_in_my_stash = NULL;
+    PL_parser->in_my = FALSE;
     return o;
 }
 
@@ -2129,7 +2101,7 @@ Perl_scope(pTHX_ OP *o)
 {
     dVAR;
     if (o) {
-	if (o->op_flags & OPf_PARENS || PERLDB_NOOPT || PL_tainting) {
+	if (o->op_flags & OPf_PARENS || PERLDB_NOOPT) { /* || PL_tainting) { */
 	    o = prepend_elem(OP_LINESEQ, newOP(OP_ENTER, 0), o);
 	    o->op_type = OP_LEAVE;
 	    o->op_ppaddr = PL_ppaddr[OP_LEAVE];
@@ -2257,10 +2229,11 @@ Perl_localize(pTHX_ OP *o, I32 lex)
 	NOOP;
 #endif
     else {
-	if ( PL_bufptr > PL_oldbufptr && PL_bufptr[-1] == ','
+	if ( PL_parser->bufptr > PL_parser->oldbufptr
+	    && PL_parser->bufptr[-1] == ','
 	    && ckWARN(WARN_PARENTHESIS))
 	{
-	    char *s = PL_bufptr;
+	    char *s = PL_parser->bufptr;
 	    bool sigil = FALSE;
 
 	    /* some heuristics to detect a potential error */
@@ -2283,8 +2256,13 @@ Perl_localize(pTHX_ OP *o, I32 lex)
 	    if (sigil && (*s == ';' || *s == '=')) {
 		Perl_warner(aTHX_ packWARN(WARN_PARENTHESIS),
 				"Parentheses missing around \"%s\" list",
-				lex ? (PL_in_my == KEY_our ? "our" : PL_in_my == KEY_state ? "state" : "my")
-				: "local");
+				lex
+				    ? (PL_parser->in_my == KEY_our
+					? "our"
+					: PL_parser->in_my == KEY_state
+					    ? "state"
+					    : "my")
+				    : "local");
 	    }
 	}
     }
@@ -2292,8 +2270,7 @@ Perl_localize(pTHX_ OP *o, I32 lex)
 	o = my(o);
     else
 	o = mod(o, OP_NULL);		/* a bit kludgey */
-    PL_in_my = FALSE;
-    PL_in_my_stash = NULL;
+    PL_parser->in_my = FALSE;
     return o;
 }
 
@@ -2347,7 +2324,7 @@ Perl_fold_constants(pTHX_ register OP *o)
 	break;
     }
 
-    if (PL_error_count)
+    if (PL_parser && PL_parser->error_count)
 	goto nope;		/* Don't try to run w/ errors */
 
     for (curop = LINKLIST(o); curop != o; curop = LINKLIST(curop)) {
@@ -2433,7 +2410,7 @@ Perl_gen_constant_list(pTHX_ register OP *o)
     const I32 oldtmps_floor = PL_tmps_floor;
 
     list(o);
-    if (PL_error_count)
+    if (PL_parser && PL_parser->error_count)
 	return o;		/* Don't attempt to run with errors */
 
     PL_op = curop = LINKLIST(o);
@@ -2802,7 +2779,7 @@ Perl_mad_free(pTHX_ MADPROP* mp)
 	return;
     if (mp->mad_next)
 	mad_free(mp->mad_next);
-/*    if (PL_lex_state != LEX_NOTPARSING && mp->mad_vlen)
+/*    if (PL_parser && PL_parser->lex_state != LEX_NOTPARSING && mp->mad_vlen)
 	PerlIO_printf(PerlIO_stderr(), "DESTROYING '%c'=<%s>\n", mp->mad_key & 255, mp->mad_val); */
     switch (mp->mad_type) {
     case MAD_NULL:
@@ -3449,8 +3426,8 @@ Perl_pmruntime(pTHX_ OP *o, OP *expr, bool isreg)
 	OP *curop;
 	if (pm->op_pmflags & PMf_EVAL) {
 	    curop = NULL;
-	    if (CopLINE(PL_curcop) < (line_t)PL_multi_end)
-		CopLINE_set(PL_curcop, (line_t)PL_multi_end);
+	    if (CopLINE(PL_curcop) < (line_t)PL_parser->multi_end)
+		CopLINE_set(PL_curcop, (line_t)PL_parser->multi_end);
 	}
 	else if (repl->op_type == OP_CONST)
 	    curop = repl;
@@ -3618,8 +3595,8 @@ Perl_package(pTHX_ OP *o)
     sv_setsv(PL_curstname, sv);
 
     PL_hints |= HINT_BLOCK_SCOPE;
-    PL_copline = NOLINE;
-    PL_expect = XSTATE;
+    PL_parser->copline = NOLINE;
+    PL_parser->expect = XSTATE;
 
 #ifndef PERL_MAD
     op_free(o);
@@ -3743,8 +3720,8 @@ Perl_utilize(pTHX_ int aver, I32 floor, OP *version, OP *idop, OP *arg)
      */
 
     PL_hints |= HINT_BLOCK_SCOPE;
-    PL_copline = NOLINE;
-    PL_expect = XSTATE;
+    PL_parser->copline = NOLINE;
+    PL_parser->expect = XSTATE;
     PL_cop_seqmax++; /* Purely for B::*'s benefit */
 
 #ifdef PERL_MAD
@@ -3822,17 +3799,19 @@ Perl_vload_module(pTHX_ U32 flags, SV *name, SV *ver, va_list *args)
 	    sv = va_arg(*args, SV*);
 	}
     }
-    {
-	const line_t ocopline = PL_copline;
-	COP * const ocurcop = PL_curcop;
-	const U8 oexpect = PL_expect;
 
-	utilize(!(flags & PERL_LOADMOD_DENY), start_subparse(0),
-		veop, modname, imop);
-	PL_expect = oexpect;
-	PL_copline = ocopline;
-	PL_curcop = ocurcop;
-    }
+    /* utilize() fakes up a BEGIN { require ..; import ... }, so make sure
+     * that it has a PL_parser to play with while doing that, and also
+     * that it doesn't mess with any existing parser, by creating a tmp
+     * new parser with lex_start(). This won't actually be used for much,
+     * since pp_require() will create another parser for the real work. */
+
+    ENTER;
+    SAVEVPTR(PL_curcop);
+    lex_start(NULL, NULL, FALSE);
+    utilize(!(flags & PERL_LOADMOD_DENY), start_subparse(0),
+	    veop, modname, imop);
+    LEAVE;
 }
 
 OP *
@@ -4082,17 +4061,8 @@ Perl_newASSIGNOP(pTHX_ I32 flags, OP *left, I32 optype, OP *right)
 	return newBINOP(OP_NULL, flags, mod(scalar(left), OP_SASSIGN), scalar(right));
     }
     else {
-	PL_eval_start = right;	/* Grandfathering $[ assignment here.  Bletch.*/
 	o = newBINOP(OP_SASSIGN, flags,
 	    scalar(right), mod(scalar(left), OP_SASSIGN) );
-	if (PL_eval_start)
-	    PL_eval_start = 0;
-	else {
-	    /* FIXME for MAD */
-	    op_free(o);
-	    o = newSVOP(OP_CONST, 0, newSViv(CopARYBASE_get(&PL_compiling)));
-	    o->op_private |= OPpCONST_ARYBASE;
-	}
     }
     return o;
 }
@@ -4126,9 +4096,6 @@ Perl_newSTATEOP(pTHX_ I32 flags, char *label, OP *o)
 	PL_hints |= HINT_BLOCK_SCOPE;
     }
     cop->cop_seq = seq;
-    /* CopARYBASE is now "virtual", in that it's stored as a flag bit in
-       CopHINTS and a possible value in cop_hints_hash, so no need to copy it.
-    */
     cop->cop_warnings = DUP_WARNINGS(PL_curcop->cop_warnings);
     cop->cop_hints_hash = PL_curcop->cop_hints_hash;
     if (cop->cop_hints_hash) {
@@ -4137,11 +4104,12 @@ Perl_newSTATEOP(pTHX_ I32 flags, char *label, OP *o)
 	HINTS_REFCNT_UNLOCK;
     }
 
-    if (PL_copline == NOLINE)
+    if (PL_parser && PL_parser->copline == NOLINE)
         CopLINE_set(cop, CopLINE(PL_curcop));
     else {
-	CopLINE_set(cop, PL_copline);
-        PL_copline = NOLINE;
+	CopLINE_set(cop, PL_parser->copline);
+	if (PL_parser)
+	    PL_parser->copline = NOLINE;
     }
 #ifdef USE_ITHREADS
     CopFILE_set(cop, CopFILE(PL_curcop));	/* XXX share in a pvtable? */
@@ -4189,8 +4157,7 @@ S_new_logop(pTHX_ I32 type, I32 flags, OP** firstp, OP** otherp)
     if (first->op_type == OP_NOT
 	&& (first->op_flags & OPf_SPECIAL)
 	&& (first->op_flags & OPf_KIDS)
-	&& !PL_madskills
-	) {
+	&& !PL_madskills) {
 	if (type == OP_AND || type == OP_OR) {
 	    if (type == OP_AND)
 		type = OP_OR;
@@ -4202,7 +4169,7 @@ S_new_logop(pTHX_ I32 type, I32 flags, OP** firstp, OP** otherp)
 		first->op_next = o->op_next;
 	    cUNOPo->op_first = NULL;
 	    op_free(o);
-}
+	}
     }
     if (first->op_type == OP_CONST) {
 	if (first->op_private & OPpCONST_STRICT)
@@ -4285,7 +4252,7 @@ S_new_logop(pTHX_ I32 type, I32 flags, OP** firstp, OP** otherp)
 	}
 	if (warnop) {
 	    const line_t oldline = CopLINE(PL_curcop);
-	    CopLINE_set(PL_curcop, PL_copline);
+	    CopLINE_set(PL_curcop, PL_parser->copline);
 	    Perl_warner(aTHX_ packWARN(WARN_MISC),
 		 "Value of %s%s can be \"0\"; test with defined()",
 		 PL_op_desc[warnop],
@@ -4554,7 +4521,7 @@ whileline, OP *expr, OP *block, OP *cont, I32 has_my)
     redo = LINKLIST(listop);
 
     if (expr) {
-	PL_copline = (line_t)whileline;
+	PL_parser->copline = (line_t)whileline;
 	scalar(listop);
 	o = new_logop(OP_AND, 0, &expr, &listop);
 	if (o == expr && o->op_type == OP_CONST && !SvTRUE(cSVOPo->op_sv)) {
@@ -4713,7 +4680,7 @@ Perl_newFOROP(pTHX_ I32 flags, char *label, line_t forline, OP *sv, OP *expr, OP
     wop = newWHILEOP(flags, 1, loop, forline, newOP(OP_ITER, 0), block, cont, 0);
     if (madsv)
 	op_getmad(madsv, (OP*)loop, 'v');
-    PL_copline = forline;
+    PL_parser->copline = forline;
     return newSTATEOP(0, label, wop);
 }
 
@@ -5062,6 +5029,9 @@ Perl_op_const_sv(pTHX_ const OP *o, CV *cv)
     dVAR;
     SV *sv = NULL;
 
+    if (PL_madskills)
+	return NULL;
+
     if (!o)
 	return NULL;
 
@@ -5277,8 +5247,8 @@ Perl_newATTRSUB(pTHX_ I32 floor, OP *o, OP *proto, OP *attrs, OP *block)
 			&& (!const_sv || sv_cmp(cv_const_sv(cv), const_sv))))
 		{
 		    const line_t oldline = CopLINE(PL_curcop);
-		    if (PL_copline != NOLINE)
-			CopLINE_set(PL_curcop, PL_copline);
+		    if (PL_parser && PL_parser->copline != NOLINE)
+			CopLINE_set(PL_curcop, PL_parser->copline);
 		    Perl_warner(aTHX_ packWARN(WARN_REDEFINE),
 			CvCONST(cv) ? "Constant subroutine %s redefined"
 				    : "Subroutine %s redefined", name);
@@ -5408,7 +5378,7 @@ Perl_newATTRSUB(pTHX_ I32 floor, OP *o, OP *proto, OP *attrs, OP *block)
     if (ps)
 	sv_setpvn((SV*)cv, ps, ps_len);
 
-    if (PL_error_count) {
+    if (PL_parser && PL_parser->error_count) {
 	op_free(block);
 	block = NULL;
 	if (name) {
@@ -5493,12 +5463,13 @@ Perl_newATTRSUB(pTHX_ I32 floor, OP *o, OP *proto, OP *attrs, OP *block)
 	    }
 	}
 
-	if (name && !PL_error_count)
+	if (name && ! (PL_parser && PL_parser->error_count))
 	    process_special_blocks(name, gv, cv);
     }
 
   done:
-    PL_copline = NOLINE;
+    if (PL_parser)
+	PL_parser->copline = NOLINE;
     LEAVE_SCOPE(floor);
     return cv;
 }
@@ -5594,7 +5565,7 @@ Perl_newCONSTSUB(pTHX_ HV *stash, const char *name, SV *sv)
     ENTER;
 
     SAVECOPLINE(PL_curcop);
-    CopLINE_set(PL_curcop, PL_copline);
+    CopLINE_set(PL_curcop, PL_parser ? PL_parser->copline : NOLINE);
 
     SAVEHINTS();
     PL_hints &= ~HINT_BLOCK_SCOPE;
@@ -5707,8 +5678,8 @@ Perl_newXS(pTHX_ const char *name, XSUBADDR_t subaddr, const char *filename)
 			const char *redefined_name = HvNAME_get(stash);
 			if ( strEQ(redefined_name,"autouse") ) {
 			    const line_t oldline = CopLINE(PL_curcop);
-			    if (PL_copline != NOLINE)
-				CopLINE_set(PL_curcop, PL_copline);
+			    if (PL_parser && PL_parser->copline != NOLINE)
+				CopLINE_set(PL_curcop, PL_parser->copline);
 			    Perl_warner(aTHX_ packWARN(WARN_REDEFINE),
 					CvCONST(cv) ? "Constant subroutine %s redefined"
 						    : "Subroutine %s redefined"
@@ -6133,7 +6104,8 @@ Perl_ck_exists(pTHX_ OP *o)
 	OP * const kid = cUNOPo->op_first;
 	if (kid->op_type == OP_ENTERSUB) {
 	    (void) ref(kid, o->op_type);
-	    if (kid->op_type != OP_RV2CV && !PL_error_count)
+	    if (kid->op_type != OP_RV2CV
+			&& !(PL_parser && PL_parser->error_count))
 		Perl_croak(aTHX_ "%s argument is not a subroutine name",
 			    OP_DESC(o));
 	    o->op_private |= OPpEXISTS_SUB;
@@ -6154,7 +6126,6 @@ Perl_ck_rvconst(pTHX_ register OP *o)
     dVAR;
     SVOP * const kid = (SVOP*)cUNOPo->op_first;
 
-    o->op_private |= (PL_hints & HINT_STRICT_REFS);
     if (o->op_type == OP_RV2CV)
 	o->op_private &= ~1;
 
@@ -6191,18 +6162,7 @@ Perl_ck_rvconst(pTHX_ register OP *o)
 		Perl_croak(aTHX_ "Constant is not %s reference", badtype);
 	    return o;
 	}
-	else if ((o->op_type == OP_RV2HV || o->op_type == OP_RV2SV) &&
-		(PL_hints & HINT_STRICT_REFS) && SvPOK(kidsv)) {
-	    /* If this is an access to a stash, disable "strict refs", because
-	     * stashes aren't auto-vivified at compile-time (unless we store
-	     * symbols in them), and we don't want to produce a run-time
-	     * stricture error when auto-vivifying the stash. */
-	    const char *s = SvPV_nolen(kidsv);
-	    const STRLEN l = SvCUR(kidsv);
-	    if (l > 1 && s[l-1] == ':' && s[l-2] == ':')
-		o->op_private &= ~HINT_STRICT_REFS;
-	}
-	if ((o->op_private & HINT_STRICT_REFS) && (kid->op_private & OPpCONST_BARE)) {
+	if ((kid->op_private & OPpCONST_BARE)) {
 	    const char *badthing;
 	    switch (o->op_type) {
 	    case OP_RV2SV:
@@ -6649,7 +6609,7 @@ Perl_ck_grep(pTHX_ OP *o)
     PADOFFSET offset;
 
     o->op_ppaddr = PL_ppaddr[OP_GREPSTART];
-    /* don't allocate gwop here, as we may leak it if PL_error_count > 0 */
+    /* don't allocate gwop here, as we may leak it if PL_parser->error_count > 0 */
 
     if (o->op_flags & OPf_STACKED) {
 	OP* k;
@@ -6670,7 +6630,7 @@ Perl_ck_grep(pTHX_ OP *o)
     else
 	scalar(kid);
     o = ck_fun(o);
-    if (PL_error_count)
+    if (PL_parser && PL_parser->error_count)
 	return o;
     kid = cLISTOPo->op_first->op_sibling;
     if (kid->op_type != OP_NULL)
@@ -7098,8 +7058,6 @@ Perl_ck_select(pTHX_ OP *o)
     }
     o = ck_fun(o);
     kid = cLISTOPo->op_first->op_sibling;    /* get past pushmark */
-    if (kid && kid->op_type == OP_RV2GV)
-	kid->op_private &= ~HINT_STRICT_REFS;
     return o;
 }
 
@@ -7393,26 +7351,6 @@ Perl_ck_subr(pTHX_ OP *o)
 		    proto = SvPV((SV*)cv, len);
 		    proto_end = proto + len;
 		}
-		if (CvASSERTION(cv)) {
-		    U32 asserthints = 0;
-		    HV *const hinthv = GvHV(PL_hintgv);
-		    if (hinthv) {
-			SV **svp = hv_fetchs(hinthv, "assertions", FALSE);
-			if (svp && *svp)
-			    asserthints = SvUV(*svp);
-		    }
-		    if (asserthints & HINT_ASSERTING) {
-			if (PERLDB_ASSERTION && PL_curstash != PL_debstash)
-			    o->op_private |= OPpENTERSUB_DB;
-		    }
-		    else {
-			delete_op = 1;
-			if (!(asserthints & HINT_ASSERTIONSSEEN) && ckWARN(WARN_ASSERTIONS)) {
-			    Perl_warner(aTHX_ packWARN(WARN_ASSERTIONS),
-					"Impossible to activate assertion call");
-			}
-		    }
-		}
 	    }
 	}
     }
@@ -7425,7 +7363,6 @@ Perl_ck_subr(pTHX_ OP *o)
 		sib->op_private &= ~OPpCONST_STRICT;
 	}
     }
-    o->op_private |= (PL_hints & HINT_STRICT_REFS);
     if (PERLDB_SUB && PL_curstash != PL_debstash)
 	o->op_private |= OPpENTERSUB_DB;
     while (o2 != cvop) {
@@ -7827,7 +7764,7 @@ Perl_peep(pTHX_ register OP *o)
 		    pop->op_next->op_type == OP_AELEM &&
 		    !(pop->op_next->op_private &
 		      (OPpLVAL_INTRO|OPpLVAL_DEFER|OPpDEREF|OPpMAYBE_LVSUB)) &&
-		    (i = SvIV(((SVOP*)pop)->op_sv) - CopARYBASE_get(PL_curcop))
+		    (i = SvIV(((SVOP*)pop)->op_sv))
 				<= 255 &&
 		    i >= 0)
 		{
@@ -7947,7 +7884,6 @@ Perl_peep(pTHX_ register OP *o)
 	case OP_HELEM: {
 	    UNOP *rop;
             SV *lexname;
-	    GV **fields;
 	    SV **svp, *sv;
 	    const char *key = NULL;
 	    STRLEN keylen;
@@ -7971,30 +7907,12 @@ Perl_peep(pTHX_ register OP *o)
 	    if (rop->op_type != OP_RV2HV || rop->op_first->op_type != OP_PADSV)
 		break;
 	    lexname = *av_fetch(PL_comppad_name, rop->op_first->op_targ, TRUE);
-	    if (!SvPAD_TYPED(lexname))
-		break;
-	    fields = (GV**)hv_fetchs(SvSTASH(lexname), "FIELDS", FALSE);
-	    if (!fields || !GvHV(*fields))
-		break;
-	    key = SvPV_const(*svp, keylen);
-	    if (!hv_fetch(GvHV(*fields), key, (I32)keylen, FALSE))
-	    {
-		Perl_croak(aTHX_ "No such class field \"%s\" " 
-			   "in variable %s of type %s", 
-		      key, SvPV_nolen_const(lexname), HvNAME_get(SvSTASH(lexname)));
-	    }
-
             break;
         }
 
 	case OP_HSLICE: {
 	    UNOP *rop;
 	    SV *lexname;
-	    GV **fields;
-	    SV **svp;
-	    const char *key;
-	    STRLEN keylen;
-	    SVOP *first_key_op, *key_op;
 
 	    if ((o->op_private & (OPpLVAL_INTRO))
 		/* I bet there's always a pushmark... */
@@ -8019,27 +7937,6 @@ Perl_peep(pTHX_ register OP *o)
 	    }
 		    
 	    lexname = *av_fetch(PL_comppad_name, rop->op_targ, TRUE);
-	    if (!SvPAD_TYPED(lexname))
-		break;
-	    fields = (GV**)hv_fetchs(SvSTASH(lexname), "FIELDS", FALSE);
-	    if (!fields || !GvHV(*fields))
-		break;
-	    /* Again guessing that the pushmark can be jumped over.... */
-	    first_key_op = (SVOP*)((LISTOP*)((LISTOP*)o)->op_first->op_sibling)
-		->op_first->op_sibling;
-	    for (key_op = first_key_op; key_op;
-		 key_op = (SVOP*)key_op->op_sibling) {
-		if (key_op->op_type != OP_CONST)
-		    continue;
-		svp = cSVOPx_svp(key_op);
-		key = SvPV_const(*svp, keylen);
-		if (!hv_fetch(GvHV(*fields), key, (I32)keylen, FALSE))
-		{
-		    Perl_croak(aTHX_ "No such class field \"%s\" "
-			       "in variable %s of type %s",
-			  key, SvPV_nolen(lexname), HvNAME_get(SvSTASH(lexname)));
-		}
-	    }
 	    break;
 	}
 
@@ -8306,7 +8203,7 @@ Perl_peep(pTHX_ register OP *o)
     LEAVE;
 }
 
-char*
+const char*
 Perl_custom_op_name(pTHX_ const OP* o)
 {
     dVAR;
@@ -8326,7 +8223,7 @@ Perl_custom_op_name(pTHX_ const OP* o)
     return SvPV_nolen(HeVAL(he));
 }
 
-char*
+const char*
 Perl_custom_op_desc(pTHX_ const OP* o)
 {
     dVAR;

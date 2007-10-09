@@ -80,9 +80,6 @@ true)
 		linklibperl="-L. -lperl"
 		shrpldflags="$shrpldflags -Wl,--image-base,0x57000000"
 		;;
-	linux*)
-		shrpldflags="$shrpldflags $ldflags $perllibs $cryptlib"
-		;;
 	aix*)
 		shrpldflags="-H512 -T512 -bhalt:4 -bM:SRE -bE:perl.exp"
 		case "$osvers" in
@@ -159,13 +156,6 @@ esac
 : Prepare dependency lists for Makefile.
 dynamic_list=' '
 extra_dep=''
-case "$d_cplusplus" in
-define)
-  : delete as a function name will not work.
-  dynamic_ext=`echo $dynamic_ext | sed 's/ODBM_File//'`
-  static_ext=`echo $static_ext | sed 's/ODBM_File//'`
-  ;;
-esac
 for f in $dynamic_ext; do
     : the dependency named here will never exist
       base=`echo "$f" | sed 's/.*\///'`
@@ -251,6 +241,9 @@ STATIC = $static_target
 # The following is used to include the current directory in
 # the dynamic loader path you are building a shared libperl.
 LDLIBPTH = $ldlibpth
+
+# Sometimes running an executable is an adventure.
+RUN = $run
 
 dynamic_ext = $dynamic_list
 static_ext = $static_list
@@ -486,7 +479,7 @@ opmini\$(OBJ_EXT): opmini.c
 globals\$(OBJ_EXT): uudmap.h
 
 uudmap.h: generate_uudmap\$(EXE_EXT)
-	./generate_uudmap\$(EXE_EXT) >uudmap.h
+	\$(RUN) ./generate_uudmap\$(EXE_EXT) >uudmap.h
 
 generate_uudmap\$(EXE_EXT): generate_uudmap\$(OBJ_EXT)
 	\$(CC) -o generate_uudmap \$(LDFLAGS) generate_uudmap\$(OBJ_EXT) \$(libs)
@@ -641,7 +634,7 @@ miniperl: $& miniperlmain$(OBJ_EXT) $(obj) opmini$(OBJ_EXT)
 	$(CC) -o miniperl $(CLDFLAGS) \
 	    `echo $(obj) | sed 's/ op$(OBJ_EXT) / /'` \
 	    miniperlmain$(OBJ_EXT) opmini$(OBJ_EXT) $(libs)
-	$(LDLIBPTH) ./miniperl -w -Ilib -MExporter -e '<?>' || $(MAKE) minitest
+	$(LDLIBPTH) $(RUN) ./miniperl -w -Ilib -MExporter -e 'glob("?")' || $(MAKE) minitest
 !NO!SUBS!
 		;;
 	next4*)
@@ -649,7 +642,7 @@ miniperl: $& miniperlmain$(OBJ_EXT) $(obj) opmini$(OBJ_EXT)
 miniperl: $& miniperlmain$(OBJ_EXT) $(obj) opmini$(OBJ_EXT)
 	$(CC) -o miniperl `echo $(obj) | sed 's/ op$(OBJ_EXT) / /'` \
 	    miniperlmain$(OBJ_EXT) opmini$(OBJ_EXT) $(libs)
-	$(LDLIBPTH) ./miniperl -w -Ilib -MExporter -e '<?>' || $(MAKE) minitest
+	$(LDLIBPTH) $(RUN) ./miniperl -w -Ilib -MExporter -e 'glob("?")' || $(MAKE) minitest
 !NO!SUBS!
 		;;
 	darwin*)
@@ -671,7 +664,7 @@ miniperl$(EXE_EXT): $& miniperlmain$(OBJ_EXT) $(obj) opmini$(OBJ_EXT)
 	$(CC) $(CLDFLAGS) $(NAMESPACEFLAGS) -o miniperl \
 	    `echo $(obj) | sed 's/ op$(OBJ_EXT) / /'` \
 	    miniperlmain$(OBJ_EXT) opmini$(OBJ_EXT) $(libs)
-	$(LDLIBPTH) ./miniperl -w -Ilib -MExporter -e '<?>' || $(MAKE) minitest
+	$(LDLIBPTH) $(RUN) ./miniperl -w -Ilib -MExporter -e 'glob("?")' || $(MAKE) minitest
 !NO!SUBS!
 		;;
 	*)
@@ -681,7 +674,7 @@ miniperl$(EXE_EXT): $& miniperlmain$(OBJ_EXT) $(obj) opmini$(OBJ_EXT)
 	$(LDLIBPTH) $(CC) $(CLDFLAGS) -o miniperl \
 	    `echo $(obj) | sed 's/ op$(OBJ_EXT) / /'` \
 	    miniperlmain$(OBJ_EXT) opmini$(OBJ_EXT) $(libs)
-	$(LDLIBPTH) ./miniperl -w -Ilib -MExporter -e '<?>' || $(MAKE) minitest
+	$(LDLIBPTH) $(RUN) ./miniperl -w -Ilib -MExporter -e 'glob("?")' || $(MAKE) minitest
 !NO!SUBS!
 		;;
 	esac
@@ -821,23 +814,23 @@ sperl$(OBJ_EXT): perl.c $(h)
 preplibrary: miniperl$(EXE_EXT) $(CONFIGPM) lib/lib.pm $(PREPLIBRARY_LIBPERL)
 	@sh ./makedir lib/auto
 	@echo "	AutoSplitting perl library"
-	$(LDLIBPTH) ./miniperl -Ilib -e 'use AutoSplit; \
+	$(LDLIBPTH) $(RUN) ./miniperl -Ilib -e 'use AutoSplit; \
 		autosplit_lib_modules(@ARGV)' lib/*.pm
-	$(LDLIBPTH) ./miniperl -Ilib -e 'use AutoSplit; \
+	$(LDLIBPTH) $(RUN) ./miniperl -Ilib -e 'use AutoSplit; \
 		autosplit_lib_modules(@ARGV)' lib/*/*.pm
 	$(MAKE) lib/re.pm
 
 .PHONY: makeppport
 makeppport: miniperl$(EXE_EXT) $(CONFIGPM)
-	$(LDLIBPTH) ./miniperl$(EXE_EXT) -Ilib mkppport
+	$(LDLIBPTH) $(RUN) ./miniperl$(EXE_EXT) -Ilib mkppport
 
 lib/Config.pod: config.sh miniperl$(EXE_EXT) configpm Porting/Glossary
-	$(LDLIBPTH) ./miniperl -Ilib configpm --heavy=lib/Config_heavy.pl lib/Config.pm
+	$(LDLIBPTH) $(RUN) ./miniperl -Ilib configpm
 
 $(CONFIGPM): lib/Config.pod
 
 lib/ExtUtils/Miniperl.pm: miniperlmain.c miniperl$(EXE_EXT) minimod.pl $(CONFIGPM)
-	$(LDLIBPTH) ./miniperl minimod.pl > lib/ExtUtils/Miniperl.pm
+	$(LDLIBPTH) $(RUN) ./miniperl minimod.pl > lib/ExtUtils/Miniperl.pm
 
 lib/re.pm: ext/re/re.pm
 	@-rm -f $@
@@ -845,19 +838,19 @@ lib/re.pm: ext/re/re.pm
 
 $(plextract):	miniperl$(EXE_EXT) $(CONFIGPM) x2p/s2p
 	@-rm -f $@
-	$(LDLIBPTH) ./miniperl -I`pwd`/lib $@.PL
+	$(LDLIBPTH) $(RUN) ./miniperl -I`pwd`/lib $@.PL
 
 x2p/s2p: miniperl$(EXE_EXT) $(CONFIGPM) x2p/s2p.PL
 	cd x2p; $(LDLIBPTH) $(MAKE) s2p
 
 lib/lib.pm:	miniperl$(EXE_EXT) $(CONFIGPM)
 	@-rm -f $@
-	$(LDLIBPTH) ./miniperl -Ilib lib/lib_pm.PL
+	$(LDLIBPTH) $(RUN) ./miniperl -Ilib lib/lib_pm.PL
 
 unidatafiles $(unidatafiles): uni.data
 
 uni.data: miniperl$(EXE_EXT) $(CONFIGPM) lib/unicore/mktables
-	cd lib/unicore && $(LDLIBPTH) ../../miniperl -I../../lib mktables -w
+	cd lib/unicore && $(LDLIBPTH) $(RUN) ../../miniperl -I../../lib mktables -w
 	touch uni.data
 
 extra.pods: miniperl$(EXE_EXT)
@@ -886,7 +879,7 @@ extras.install: perl$(EXE_EXT)
 	no-install install.perl install.man install.html
 
 META.yml:	Porting/makemeta Porting/Maintainers.pl Porting/Maintainers.pm
-	$(LDLIBPTH) ./miniperl -Ilib Porting/makemeta
+	$(LDLIBPTH) $(RUN) ./miniperl -Ilib Porting/makemeta
 
 install-strip:
 	$(MAKE) STRIPFLAGS=-s install DESTDIR="$(DESTDIR)"
@@ -955,7 +948,7 @@ perly.h: perly.y
 # No interp.sym since 5.005_03.
 SYM  = global.sym globvar.sym perlio.sym pp.sym
 
-SYMH = perlvars.h intrpvar.h thrdvar.h
+SYMH = perlvars.h intrpvar.h
 
 CHMOD_W = chmod +w
 
@@ -1089,7 +1082,7 @@ _cleaner1:
 	-@for x in $(DYNALOADER) $(dynamic_ext) $(static_ext) $(nonxs_ext) ; do \
 	$(LDLIBPTH) sh ext/util/make_ext $(CLEAN) $$x MAKE=$(MAKE) ; \
 	done
-	-@test ! -f ./miniperl$(EXE_EXT) || $(LDLIBPTH) ./miniperl$(EXE_EXT) -Ilib mkppport --clean
+	-@test ! -f $(RUN) ./miniperl$(EXE_EXT) || $(LDLIBPTH) $(RUN) ./miniperl$(EXE_EXT) -Ilib mkppport --clean
 
 # Some systems do not support "?", so keep these files separate.
 _cleaner2:
@@ -1187,10 +1180,10 @@ _test_notty:
 	cd t && $(PERL_DEBUG) PERL_SKIP_TTY_TEST=1 $(LDLIBPTH) $(PERL) $(TESTFILE) $(TEST_ARGS)
 
 unpack_files:
-	$(LDLIBPTH) ./miniperl$(EXE_EXT) -Ilib uupacktool.pl -u -m
+	$(LDLIBPTH) $(RUN) ./miniperl$(EXE_EXT) -Ilib uupacktool.pl -u -m
 
 cleanup_unpacked_files:
-	-@test ! -f ./miniperl$(EXE_EXT) || $(LDLIBPTH) ./miniperl$(EXE_EXT) -Ilib uupacktool.pl -c
+	-@test ! -f $(RUN) ./miniperl$(EXE_EXT) || $(LDLIBPTH) $(RUN) ./miniperl$(EXE_EXT) -Ilib uupacktool.pl -c
 
 # The second branch is for testing without a tty or controlling terminal,
 # see t/op/stat.t

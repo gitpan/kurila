@@ -11,21 +11,30 @@
 
 START_EXTERN_C
 
-extern REGEXP*	my_re_compile (pTHX_ const SV * const pattern, U32 pm_flags);
+extern REGEXP*	my_re_compile (pTHX_ const SV * const pattern, const U32 pm_flags);
 extern I32	my_regexec (pTHX_ REGEXP * const prog, char* stringarg, char* strend,
 			    char* strbeg, I32 minend, SV* screamer,
 			    void* data, U32 flags);
 
 extern char*	my_re_intuit_start (pTHX_ REGEXP * const prog, SV *sv, char *strpos,
-				    char *strend, U32 flags,
+				    char *strend, const U32 flags,
 				    struct re_scream_pos_data_s *data);
 extern SV*	my_re_intuit_string (pTHX_ REGEXP * const prog);
 
 extern void	my_regfree (pTHX_ REGEXP * const r);
-extern void my_reg_numbered_buff_get(pTHX_ REGEXP * const rx, const I32 paren,
-                                     SV * const usesv);
-extern SV*      my_reg_named_buff_get(pTHX_ REGEXP * const rx, SV * const namesv,
-                                      const U32 flags);
+
+extern void	my_reg_numbered_buff_fetch(pTHX_ REGEXP * const rx, const I32 paren,
+					   SV * const usesv);
+extern void	my_reg_numbered_buff_store(pTHX_ REGEXP * const rx, const I32 paren,
+					   SV const * const value);
+extern I32	my_reg_numbered_buff_length(pTHX_ REGEXP * const rx,
+					    const SV * const sv, const I32 paren);
+
+extern SV*	my_reg_named_buff(pTHX_ REGEXP * const, SV * const, SV * const,
+                              const U32);
+extern SV*	my_reg_named_buff_iter(pTHX_ REGEXP * const rx,
+                                   const SV * const lastkey, const U32 flags);
+
 extern SV*      my_reg_qr_package(pTHX_ REGEXP * const rx);
 #if defined(USE_ITHREADS)
 extern void*	my_regdupe (pTHX_ REGEXP * const r, CLONE_PARAMS *param);
@@ -41,32 +50,16 @@ const struct regexp_engine my_reg_engine = {
         my_re_intuit_start, 
         my_re_intuit_string, 
         my_regfree, 
-        my_reg_numbered_buff_get,
-        my_reg_named_buff_get,
+        my_reg_numbered_buff_fetch,
+        my_reg_numbered_buff_store,
+        my_reg_numbered_buff_length,
+        my_reg_named_buff,
+        my_reg_named_buff_iter,
         my_reg_qr_package,
 #if defined(USE_ITHREADS)
         my_regdupe 
 #endif
 };
-
-REGEXP *
-get_re_arg( pTHX_ SV *sv, U32 flags, MAGIC **mgp) {
-    MAGIC *mg;
-    if (sv) {
-        if (SvMAGICAL(sv))
-            mg_get(sv);
-        if (SvROK(sv) &&
-            (sv = (SV*)SvRV(sv)) &&     /* assign deliberate */
-            SvTYPE(sv) == SVt_PVMG &&
-            (mg = mg_find(sv, PERL_MAGIC_qr))) /* assign deliberate */
-        {        
-            if (mgp) *mgp = mg;
-            return (REGEXP *)mg->mg_obj;       
-        }
-    }    
-    if (mgp) *mgp = NULL;
-    return ((flags && PL_curpm) ? PM_GETRE(PL_curpm) : NULL);
-}
 
 MODULE = re	PACKAGE = re
 
@@ -83,7 +76,6 @@ regexp_pattern(sv)
     SV * sv
 PROTOTYPE: $
 PREINIT:
-    MAGIC *mg;
     REGEXP *re;
 PPCODE:
 {
@@ -98,7 +90,7 @@ PPCODE:
        on the object. 
     */
 
-    if ( re = get_re_arg( aTHX_ sv, 0, &mg) ) /* assign deliberate */
+    if ((re = SvRX(sv))) /* assign deliberate */
     {
         /* Housten, we have a regex! */
         SV *pattern;
@@ -169,7 +161,7 @@ PREINIT:
     REGEXP *re;
 PPCODE:
 {
-    if ( re = get_re_arg( aTHX_ sv, 0, 0) ) /* assign deliberate */
+    if ((re = SvRX(sv))) /* assign deliberate */
     {
         SV *an = &PL_sv_no;
         SV *fl = &PL_sv_no;

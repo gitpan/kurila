@@ -510,7 +510,7 @@ Perl_fbm_compile(pTHX_ SV *sv, U32 flags)
     s = (U8*)SvPV_force_mutable(sv, len);
     if (len == 0)		/* TAIL might be on a zero-length string. */
 	return;
-    SvUPGRADE(sv, SVt_PVGV);
+    SvUPGRADE(sv, SVt_PVMG);
     SvIOK_off(sv);
     SvNOK_off(sv);
     SvVALID_on(sv);
@@ -781,7 +781,7 @@ Perl_screaminstr(pTHX_ SV *bigstr, SV *littlestr, I32 start_shift, I32 end_shift
     register const unsigned char *littleend;
     I32 found = 0;
 
-    assert(SvTYPE(littlestr) == SVt_PVGV);
+    assert(SvTYPE(littlestr) == SVt_PVMG);
     assert(SvVALID(littlestr));
 
     if (*old_posp == -1
@@ -1830,24 +1830,51 @@ Perl_my_memcmp(const char *s1, const char *s2, register I32 len)
 #endif /* !HAS_MEMCMP || !HAS_SANE_MEMCMP */
 
 #ifndef HAS_VPRINTF
+/* This vsprintf replacement should generally never get used, since
+   vsprintf was available in both System V and BSD 2.11.  (There may
+   be some cross-compilation or embedded set-ups where it is needed,
+   however.)
+
+   If you encounter a problem in this function, it's probably a symptom
+   that Configure failed to detect your system's vprintf() function.
+   See the section on "item vsprintf" in the INSTALL file.
+
+   This version may compile on systems with BSD-ish <stdio.h>,
+   but probably won't on others.
+*/
 
 #ifdef USE_CHAR_VSPRINTF
 char *
 #else
 int
 #endif
-vsprintf(char *dest, const char *pat, char *args)
+vsprintf(char *dest, const char *pat, void *args)
 {
     FILE fakebuf;
 
+#if defined(STDIO_PTR_LVALUE) && defined(STDIO_CNT_LVALUE)
+    FILE_ptr(&fakebuf) = (STDCHAR *) dest;
+    FILE_cnt(&fakebuf) = 32767;
+#else
+    /* These probably won't compile -- If you really need
+       this, you'll have to figure out some other method. */
     fakebuf._ptr = dest;
     fakebuf._cnt = 32767;
+#endif
 #ifndef _IOSTRG
 #define _IOSTRG 0
 #endif
     fakebuf._flag = _IOWRT|_IOSTRG;
     _doprnt(pat, args, &fakebuf);	/* what a kludge */
-    (void)putc('\0', &fakebuf);
+#if defined(STDIO_PTR_LVALUE)
+    *(FILE_ptr(&fakebuf)++) = '\0';
+#else
+    /* PerlIO has probably #defined away fputc, but we want it here. */
+#  ifdef fputc
+#    undef fputc  /* XXX Should really restore it later */
+#  endif
+    (void)fputc('\0', &fakebuf);
+#endif
 #ifdef USE_CHAR_VSPRINTF
     return(dest);
 #else
@@ -1880,7 +1907,10 @@ Perl_my_htonl(pTHX_ long l)
 	char c[sizeof(long)];
     } u;
 
-#if BYTEORDER == 0x1234
+#if BYTEORDER == 0x1234 || BYTEORDER == 0x12345678
+#if BYTEORDER == 0x12345678
+    u.result = 0; 
+#endif 
     u.c[0] = (l >> 24) & 255;
     u.c[1] = (l >> 16) & 255;
     u.c[2] = (l >> 8) & 255;
@@ -2184,7 +2214,7 @@ Perl_my_swabn(void *ptr, int n)
 PerlIO *
 Perl_my_popen_list(pTHX_ char *mode, int n, SV **args)
 {
-#if (!defined(DOSISH) || defined(HAS_FORK) || defined(AMIGAOS)) && !defined(OS2) && !defined(VMS) && !defined(__OPEN_VM) && !defined(EPOC) && !defined(MACOS_TRADITIONAL) && !defined(NETWARE)
+#if (!defined(DOSISH) || defined(HAS_FORK) || defined(AMIGAOS)) && !defined(OS2) && !defined(VMS) && !defined(__OPEN_VM) && !defined(EPOC) && !defined(MACOS_TRADITIONAL) && !defined(NETWARE) && !defined(__LIBCATAMOUNT__)
     dVAR;
     int p[2];
     register I32 This, that;
@@ -2320,7 +2350,7 @@ Perl_my_popen_list(pTHX_ char *mode, int n, SV **args)
 }
 
     /* VMS' my_popen() is in VMS.c, same with OS/2. */
-#if (!defined(DOSISH) || defined(HAS_FORK) || defined(AMIGAOS)) && !defined(VMS) && !defined(__OPEN_VM) && !defined(EPOC) && !defined(MACOS_TRADITIONAL)
+#if (!defined(DOSISH) || defined(HAS_FORK) || defined(AMIGAOS)) && !defined(VMS) && !defined(__OPEN_VM) && !defined(EPOC) && !defined(MACOS_TRADITIONAL) && !defined(__LIBCATAMOUNT__)
 PerlIO *
 Perl_my_popen(pTHX_ const char *cmd, const char *mode)
 {
@@ -2479,7 +2509,7 @@ Perl_my_popen(pTHX_ const char *cmd, const char *mode)
 #if defined(atarist) || defined(EPOC)
 FILE *popen();
 PerlIO *
-Perl_my_popen((pTHX_ const char *cmd, const char *mode)
+Perl_my_popen(pTHX_ const char *cmd, const char *mode)
 {
     PERL_FLUSHALL_FOR_CHILD;
     /* Call system's popen() to get a FILE *, then import it.
@@ -2492,7 +2522,7 @@ Perl_my_popen((pTHX_ const char *cmd, const char *mode)
 #if defined(DJGPP)
 FILE *djgpp_popen();
 PerlIO *
-Perl_my_popen((pTHX_ const char *cmd, const char *mode)
+Perl_my_popen(pTHX_ const char *cmd, const char *mode)
 {
     PERL_FLUSHALL_FOR_CHILD;
     /* Call system's popen() to get a FILE *, then import it.
@@ -2501,6 +2531,14 @@ Perl_my_popen((pTHX_ const char *cmd, const char *mode)
     */
     return PerlIO_importFILE(djgpp_popen(cmd, mode), 0);
 }
+#else
+#if defined(__LIBCATAMOUNT__)
+PerlIO *
+Perl_my_popen(pTHX_ const char *cmd, const char *mode)
+{
+    return NULL;
+}
+#endif
 #endif
 #endif
 
@@ -2763,7 +2801,7 @@ Perl_rsignal_restore(pTHX_ int signo, Sigsave_t *save)
 #endif /* !PERL_MICRO */
 
     /* VMS' my_pclose() is in VMS.c; same with OS/2 */
-#if (!defined(DOSISH) || defined(HAS_FORK) || defined(AMIGAOS)) && !defined(VMS) && !defined(__OPEN_VM) && !defined(EPOC) && !defined(MACOS_TRADITIONAL)
+#if (!defined(DOSISH) || defined(HAS_FORK) || defined(AMIGAOS)) && !defined(VMS) && !defined(__OPEN_VM) && !defined(EPOC) && !defined(MACOS_TRADITIONAL) && !defined(__LIBCATAMOUNT__)
 I32
 Perl_my_pclose(pTHX_ PerlIO *ptr)
 {
@@ -2818,9 +2856,17 @@ Perl_my_pclose(pTHX_ PerlIO *ptr)
     }
     return(pid2 < 0 ? pid2 : status == 0 ? 0 : (errno = 0, status));
 }
+#else
+#if defined(__LIBCATAMOUNT__)
+I32
+Perl_my_pclose(pTHX_ PerlIO *ptr)
+{
+    return -1;
+}
+#endif
 #endif /* !DOSISH */
 
-#if  (!defined(DOSISH) || defined(OS2) || defined(WIN32) || defined(NETWARE)) && !defined(MACOS_TRADITIONAL)
+#if  (!defined(DOSISH) || defined(OS2) || defined(WIN32) || defined(NETWARE)) && !defined(MACOS_TRADITIONAL) && !defined(__LIBCATAMOUNT__)
 I32
 Perl_wait4pid(pTHX_ Pid_t pid, int *statusp, int flags)
 {
@@ -3018,6 +3064,7 @@ Perl_find_script(pTHX_ const char *scriptname, bool dosearch,
     register char *s;
     I32 len = 0;
     int retval;
+    char *bufend;
 #if defined(DOSISH) && !defined(OS2) && !defined(atarist)
 #  define SEARCH_EXTS ".bat", ".cmd", NULL
 #  define MAX_EXT_LEN 4
@@ -3142,10 +3189,10 @@ Perl_find_script(pTHX_ const char *scriptname, bool dosearch,
     {
 	bool seen_dot = 0;
 
-	PL_bufend = s + strlen(s);
-	while (s < PL_bufend) {
+	bufend = s + strlen(s);
+	while (s < bufend) {
 #ifdef MACOS_TRADITIONAL
-	    s = delimcpy(tmpbuf, tmpbuf + sizeof tmpbuf, s, PL_bufend,
+	    s = delimcpy(tmpbuf, tmpbuf + sizeof tmpbuf, s, bufend,
 			',',
 			&len);
 #else
@@ -3161,12 +3208,12 @@ Perl_find_script(pTHX_ const char *scriptname, bool dosearch,
 	    if (len < sizeof tmpbuf)
 		tmpbuf[len] = '\0';
 #else  /* ! (atarist || DOSISH) */
-	    s = delimcpy(tmpbuf, tmpbuf + sizeof tmpbuf, s, PL_bufend,
+	    s = delimcpy(tmpbuf, tmpbuf + sizeof tmpbuf, s, bufend,
 			':',
 			&len);
 #endif /* ! (atarist || DOSISH) */
 #endif /* MACOS_TRADITIONAL */
-	    if (s < PL_bufend)
+	    if (s < bufend)
 		s++;
 	    if (len + 1 + strlen(scriptname) + MAX_EXT_LEN >= sizeof tmpbuf)
 		continue;	/* don't search dir with too-long name */
@@ -5819,6 +5866,26 @@ Perl_my_dirfd(pTHX_ DIR * dir) {
    /* NOT REACHED */
     return 0;
 #endif 
+}
+
+REGEXP *
+Perl_get_re_arg(pTHX_ SV *sv) {
+    SV    *tmpsv;
+    MAGIC *mg;
+
+    if (sv) {
+        if (SvMAGICAL(sv))
+            mg_get(sv);
+        if (SvROK(sv) &&
+            (tmpsv = (SV*)SvRV(sv)) &&            /* assign deliberate */
+            SvTYPE(tmpsv) == SVt_PVMG &&
+            (mg = mg_find(tmpsv, PERL_MAGIC_qr))) /* assign deliberate */
+        {
+            return (REGEXP *)mg->mg_obj;
+        }
+    }
+ 
+    return NULL;
 }
 
 /*

@@ -83,7 +83,7 @@ ok (Cedric->isa('Programmer'));
 
 {
     package Alice;
-    base::->import('Programmer');
+    'base'->import('Programmer');
 }
 
 ok $a->isa('Programmer');
@@ -117,7 +117,7 @@ like $@, qr/^Alice version 2.719 required--this is only version 2.718 at /;
 ok (eval { $a->VERSION(2.718) });
 is $@, '';
 
-my $subs = join ' ', sort grep { defined &{"UNIVERSAL::$_"} } keys %UNIVERSAL::;
+my $subs = join ' ', sort grep { defined &{Symbol::fetch_glob("UNIVERSAL::$_")} } keys %UNIVERSAL::;
 ## The test for import here is *not* because we want to ensure that UNIVERSAL
 ## can always import; it is an historical accident that UNIVERSAL can import.
 if ('a' lt 'A') {
@@ -141,7 +141,7 @@ eval "use UNIVERSAL";
 
 ok $a->isa("UNIVERSAL");
 
-my $sub2 = join ' ', sort grep { defined &{"UNIVERSAL::$_"} } keys %UNIVERSAL::;
+my $sub2 = join ' ', sort grep { defined &{Symbol::fetch_glob("UNIVERSAL::$_")} } keys %UNIVERSAL::;
 # XXX import being here is really a bug
 if ('a' lt 'A') {
     is $sub2, "can import isa DOES VERSION";
@@ -191,7 +191,7 @@ ok $x->isa('UNIVERSAL');
 
 # Check that the "historical accident" of UNIVERSAL having an import()
 # method doesn't effect anyone else.
-eval { Some::Package->import("bar") };
+eval { 'Some::Package'->import("bar") };
 is $@, '';
 
 

@@ -63,25 +63,21 @@ like( $@, qr/^Base class package "reallyReAlLyNotexists" is empty./,
                                           '  self-inheriting');
 }
 
-BEGIN { $Has::Version_0::VERSION = 0 }
+{
+    BEGIN { $Has::Version_0::VERSION = 0 }
 
-package Test::Version3;
+    package Test::Version3;
 
-use base qw(Has::Version_0);
-::is( $Has::Version_0::VERSION, 0, '$VERSION==0 preserved' );
+    use base qw(Has::Version_0);
+    ::is( $Has::Version_0::VERSION, 0, '$VERSION==0 preserved' );
+}
 
 
-package Test::SIGDIE;
+{
+    package Schlozhauer;
+    use constant FIELDS => 6;
 
-{ 
-    local $SIG{__DIE__} = sub { 
-        ::fail('sigdie not caught, this test should not run') 
-    };
-    eval {
-      'base'->import(qw(Huh::Boo));
-    };
-
-    ::like($@, qr/^Base class package "Huh::Boo" is empty/, 
-         'Base class empty error message');
-
+    package Basilisco;
+    eval q{ use base 'Schlozhauer' };
+    ::is( $@, '', 'Can coexist with a FIELDS constant' );
 }

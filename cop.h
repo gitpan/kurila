@@ -135,6 +135,9 @@ typedef struct jmpenv JMPENV;
 
 struct cop {
     BASEOP
+    /* On LP64 putting this here takes advantage of the fact that BASEOP isn't
+       an exact multiple of 8 bytes to save structure padding.  */
+    line_t      cop_line;       /* line # of this command */
     char *	cop_label;	/* label for this construct */
 #ifdef USE_ITHREADS
     char *	cop_stashpv;	/* package line was compiled in */
@@ -145,7 +148,6 @@ struct cop {
 #endif
     U32		cop_hints;	/* hints bits from pragmata */
     U32		cop_seq;	/* parse sequence number */
-    line_t      cop_line;       /* line # of this command */
     /* Beware. mg.c and warnings.pl assume the type of this is STRLEN *:  */
     STRLEN *	cop_warnings;	/* lexical warnings bitmask */
     /* compile time state of %^H.  See the comment in op.c for how this is
@@ -242,27 +244,6 @@ struct cop {
 #else
 #  define OutCopFILE(c) CopFILE(c)
 #endif
-
-/* If $[ is non-zero, it's stored in cop_hints under the key "$[", and
-   HINT_ARYBASE is set to indicate this.
-   Setting it is ineficient due to the need to create 2 mortal SVs, but as
-   using $[ is highly discouraged, no sane Perl code will be using it.  */
-#define CopARYBASE_get(c)	\
-	((CopHINTS_get(c) & HINT_ARYBASE)				\
-	 ? SvIV(Perl_refcounted_he_fetch(aTHX_ (c)->cop_hints_hash, 0,	\
-					 "$[", 2, 0, 0))		\
-	 : 0)
-#define CopARYBASE_set(c, b) STMT_START { \
-	if (b || ((c)->cop_hints & HINT_ARYBASE)) {			\
-	    (c)->cop_hints |= HINT_ARYBASE;				\
-	    if ((c) == &PL_compiling)					\
-		PL_hints |= HINT_LOCALIZE_HH | HINT_ARYBASE;		\
-	    (c)->cop_hints_hash						\
-	       = Perl_refcounted_he_new(aTHX_ (c)->cop_hints_hash,	\
-					sv_2mortal(newSVpvs("$[")),	\
-					sv_2mortal(newSViv(b)));	\
-	}								\
-    } STMT_END
 
 /* FIXME NATIVE_HINTS if this is changed from op_private (see perl.h)  */
 #define CopHINTS_get(c)		((c)->cop_hints + 0)

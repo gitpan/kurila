@@ -20,13 +20,13 @@ BaseTests("version");
 diag "Tests with empty derived class" unless $ENV{PERL_CORE};
 
 package version::Empty;
-use base version;
+use base 'version';
 $VERSION = 0.01;
 no warnings 'redefine';
 *::qv = sub { return bless version::qv(shift), __PACKAGE__; };
 
 package version::Bad;
-use base version;
+use base 'version';
 sub new { my($self,$n)=@_;  bless \$n, $self }
 
 package main;
@@ -480,9 +480,9 @@ EOF
     close F;
     # need to eliminate any other qv()'s
     undef *main::qv;
-    ok(!defined(&{"main\::qv"}), "make sure we cleared qv() properly");
+    ok(!defined(&{Symbol::fetch_glob("main\::qv")}), "make sure we cleared qv() properly");
     eval "use lib '.'; use vvv;";
-    ok(defined(&{"main\::qv"}), "make sure we exported qv() properly");
+    ok(defined(&{Symbol::fetch_glob("main\::qv")}), "make sure we exported qv() properly");
     isa_ok( qv(1.2), "vvv");
     unlink 'vvv.pm';
 

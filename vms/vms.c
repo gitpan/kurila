@@ -419,7 +419,7 @@ int utf8_flag;
 	    }
 	}
 
-	/* High bit set, but not a unicode character! */
+	/* High bit set, but not a Unicode character! */
 
 	/* Non printing DECMCS or ISO Latin-1 character? */
 	if (*inspec <= 0x9F) {
@@ -521,6 +521,16 @@ int utf8_flag;
     case ']':
     case '%':
     case '^':
+        /* Don't escape again if following character is 
+         * already something we escape.
+         */
+        if (strchr(".~!#&\'`()+@{},;[]%^=_", *(inspec+1))) {
+	    *outspec = *inspec;
+	    *output_cnt = 1;
+	    return 1;
+	    break;
+        }
+        /* But otherwise fall through and escape it. */
     case '=':
 	/* Assume that this is to be escaped */
 	outspec[0] = '^';
@@ -564,17 +574,25 @@ int scnt;
     if (*inspec == '^') {
 	inspec++;
 	switch (*inspec) {
+        /* Spaces and non-trailing dots should just be passed through, 
+         * but eat the escape character.
+         */
 	case '.':
-	    /* Non trailing dots should just be passed through */
 	    *outspec = *inspec;
-	    count++;
+	    count += 2;
 	    (*output_cnt)++;
 	    break;
 	case '_': /* space */
 	    *outspec = ' ';
-	    inspec++;
-	    count++;
+	    count += 2;
 	    (*output_cnt)++;
+	    break;
+	case '^':
+            /* Hmm.  Better leave the escape escaped. */
+            outspec[0] = '^';
+            outspec[1] = '^';
+	    count += 2;
+	    (*output_cnt) += 2;
 	    break;
 	case 'U': /* Unicode - FIX-ME this is wrong. */
 	    inspec++;
@@ -2824,14 +2842,20 @@ pipe_exit_routine(pTHX)
     unsigned long int retsts = SS$_NORMAL, abort = SS$_TIMEOUT;
     int sts, did_stuff, need_eof, j;
 
-    /* 
-        flush any pending i/o
+   /* 
+    * Flush any pending i/o, but since we are in process run-down, be
+    * careful about referencing PerlIO structures that may already have
+    * been deallocated.  We may not even have an interpreter anymore.
     */
     info = open_pipes;
     while (info) {
         if (info->fp) {
-           if (!info->useFILE) 
-               PerlIO_flush(info->fp);   /* first, flush data */
+           if (!info->useFILE
+#if defined(USE_ITHREADS)
+             && my_perl
+#endif
+             && PL_perlio_fd_refcnt) 
+               PerlIO_flush(info->fp);
            else 
                fflush((FILE *)info->fp);
         }
@@ -4378,8 +4402,12 @@ I32 Perl_my_pclose(pTHX_ PerlIO *fp)
      *  the first EOF closing the pipe (and DASSGN'ing the channel)...
      */
      if (info->fp) {
-        if (!info->useFILE) 
-            PerlIO_flush(info->fp);   /* first, flush data */
+        if (!info->useFILE
+#if defined(USE_ITHREADS)
+          && my_perl
+#endif
+          && PL_perlio_fd_refcnt) 
+            PerlIO_flush(info->fp);
         else 
             fflush((FILE *)info->fp);
     }
@@ -4401,7 +4429,11 @@ I32 Perl_my_pclose(pTHX_ PerlIO *fp)
                            0, 0, 0, 0, 0, 0));
     _ckvmssts(sys$setast(1));
     if (info->fp) {
-     if (!info->useFILE) 
+     if (!info->useFILE
+#if defined(USE_ITHREADS)
+         && my_perl
+#endif
+         && PL_perlio_fd_refcnt) 
         PerlIO_close(info->fp);
      else 
         fclose((FILE *)info->fp);
@@ -5183,7 +5215,7 @@ static char *mp_do_fileify_dirspec(pTHX_ const char *dir,char *buf,int ts, int *
 	(!decc_posix_compliant_pathnames && decc_disable_posix_root)) {
       strcpy(trndir,*dir == '/' ? dir + 1: dir);
       trnlnm_iter_count = 0;
-      while (!strpbrk(trndir,"/]>:>") && my_trnlnm(trndir,trndir,0)) {
+      while (!strpbrk(trndir,"/]>:") && my_trnlnm(trndir,trndir,0)) {
         trnlnm_iter_count++; 
         if (trnlnm_iter_count >= PERL_LNM_MAX_ITER) break;
       }
@@ -6078,7 +6110,7 @@ static char *mp_do_tounixspec(pTHX_ const char *spec, char *buf, int ts, int * u
     }
     if ((*cp2 == '^')) {
 	/* EFS file escape, pass the next character as is */
-	/* Fix me: HEX encoding for UNICODE not implemented */
+	/* Fix me: HEX encoding for Unicode not implemented */
 	cp2++;
     }
     else if ( *cp2 == '.') {
@@ -6093,7 +6125,7 @@ static char *mp_do_tounixspec(pTHX_ const char *spec, char *buf, int ts, int * u
   for (; cp2 <= dirend; cp2++) {
     if ((*cp2 == '^')) {
 	/* EFS file escape, pass the next character as is */
-	/* Fix me: HEX encoding for UNICODE not implemented */
+	/* Fix me: HEX encoding for Unicode not implemented */
 	*(cp1++) = *(++cp2);
         /* An escaped dot stays as is -- don't convert to slash */
         if (*cp2 == '.') cp2++;
@@ -7546,6 +7578,14 @@ static char *mp_do_tovmsspec
     case '#':
     case '%':
     case '^':
+        /* Don't escape again if following character is 
+         * already something we escape.
+         */
+        if (strchr("\"~`!#%^&()=+\'@[]{}:\\|<>_.", *(cp2+1))) {
+	    *(cp1++) = *(cp2++);
+	    break;
+        }
+        /* But otherwise fall through and escape it. */
     case '&':
     case '(':
     case ')':
@@ -7717,20 +7757,20 @@ char *Perl_tounixpath_utf8_ts(pTHX_ const char *path, char *buf, int * utf8_fl)
   { return do_tounixpath(path,buf,1,utf8_fl); }
 
 /*
- * @(#)argproc.c 2.2 94/08/16	Mark Pizzolato (mark@infocomm.com)
+ * @(#)argproc.c 2.2 94/08/16	Mark Pizzolato (mark AT infocomm DOT com)
  *
  *****************************************************************************
  *                                                                           *
- *  Copyright (C) 1989-1994 by                                               *
+ *  Copyright (C) 1989-1994, 2007 by                                         *
  *  Mark Pizzolato - INFO COMM, Danville, California  (510) 837-5600         *
  *                                                                           *
- *  Permission is hereby  granted for the reproduction of this software,     *
- *  on condition that this copyright notice is included in the reproduction, *
- *  and that such reproduction is not for purposes of profit or material     *
- *  gain.                                                                    *
+ *  Permission is hereby granted for the reproduction of this software       *
+ *  on condition that this copyright notice is included in source            *
+ *  distributions of the software.  The code may be modified and             *
+ *  distributed under the same terms as Perl itself.                         *
  *                                                                           *
  *  27-Aug-1994 Modified for inclusion in perl5                              *
- *              by Charles Bailey  bailey@newman.upenn.edu                   *
+ *              by Charles Bailey  (bailey AT newman DOT upenn DOT edu)      *
  *****************************************************************************
  */
 
@@ -7746,7 +7786,7 @@ char *Perl_tounixpath_utf8_ts(pTHX_ const char *path, char *buf, int * utf8_fl)
  * of program.  With suitable modification, it may useful for other
  * portability problems as well.
  *
- * Author:  Mark Pizzolato	mark@infocomm.com
+ * Author:  Mark Pizzolato	(mark AT infocomm DOT com)
  */
 struct list_item
     {
@@ -8746,12 +8786,6 @@ Perl_opendir(pTHX_ const char *name)
     DIR *dd;
     char *dir;
     Stat_t sb;
-    int unix_flag;
-
-    unix_flag = 0;
-    if (decc_efs_charset) {
-        unix_flag = is_unix_filespec(name);
-    }
 
     Newx(dir, VMS_MAXRSS, char);
     if (do_tovmspath(name,dir,0,NULL) == NULL) {
@@ -8782,8 +8816,12 @@ Perl_opendir(pTHX_ const char *name)
     dd->context = 0;
     dd->count = 0;
     dd->flags = 0;
-    if (unix_flag)
-	dd->flags = PERL_VMSDIR_M_UNIXSPECS;
+    /* By saying we always want the result of readdir() in unix format, we 
+     * are really saying we want all the escapes removed.  Otherwise the caller,
+     * having no way to know whether it's already in VMS format, might send it
+     * through tovmsspec again, thus double escaping.
+     */
+    dd->flags = PERL_VMSDIR_M_UNIXSPECS;
     dd->pat.dsc$a_pointer = dd->pattern;
     dd->pat.dsc$w_length = strlen(dd->pattern);
     dd->pat.dsc$b_dtype = DSC$K_DTYPE_T;
@@ -8983,25 +9021,25 @@ Perl_readdir(pTHX_ DIR *dd)
     if (dd->flags & PERL_VMSDIR_M_UNIXSPECS) {
 
 	/* Translate the encoded characters. */
-	/* Fixme: unicode handling could result in embedded 0 characters */
+	/* Fixme: Unicode handling could result in embedded 0 characters */
 	if (strchr(dd->entry.d_name, '^') != NULL) {
 	    char new_name[256];
 	    char * q;
-	    int cnt;
 	    p = dd->entry.d_name;
 	    q = new_name;
 	    while (*p != 0) {
-		int x, y;
-		x = copy_expand_vms_filename_escape(q, p, &y);
-		p += x;
-		q += y;
+		int inchars_read, outchars_added;
+		inchars_read = copy_expand_vms_filename_escape(q, p, &outchars_added);
+		p += inchars_read;
+		q += outchars_added;
 		/* fix-me */
-		/* if y > 1, then this is a wide file specification */
+		/* if outchars_added > 1, then this is a wide file specification */
 		/* Wide file specifications need to be passed in Perl */
-		/* counted strings apparently with a unicode flag */
+		/* counted strings apparently with a Unicode flag */
 	    }
 	    *q = 0;
 	    strcpy(dd->entry.d_name, new_name);
+	    dd->entry.d_namlen = strlen(dd->entry.d_name);
 	}
     }
 
@@ -10924,11 +10962,10 @@ static I32
 Perl_cando_by_name_int
    (pTHX_ I32 bit, bool effective, const char *fname, int opts)
 {
-  static char usrname[L_cuserid];
-  static struct dsc$descriptor_s usrdsc =
+  char usrname[L_cuserid];
+  struct dsc$descriptor_s usrdsc =
          {0, DSC$K_DTYPE_T, DSC$K_CLASS_S, usrname};
-  char vmsname[NAM$C_MAXRSS+1];
-  char *fileified;
+  char *vmsname = NULL, *fileified = NULL;
   unsigned long int objtyp = ACL$C_FILE, access, retsts, privused, iosb[2], flags;
   unsigned short int retlen, trnlnm_iter_count;
   struct dsc$descriptor_s namdsc = {0, DSC$K_DTYPE_T, DSC$K_CLASS_S, 0};
@@ -10942,39 +10979,62 @@ Perl_cando_by_name_int
   struct itmlst_3 usrprolst[2] = {{sizeof curprv, CHP$_PRIV, &curprv, &retlen},
          {0,0,0,0}};
   struct dsc$descriptor_s usrprodsc = {0, DSC$K_DTYPE_T, DSC$K_CLASS_S, 0};
+  Stat_t st;
+  static int profile_context = -1;
 
   if (!fname || !*fname) return FALSE;
-  /* Make sure we expand logical names, since sys$check_access doesn't */
 
-  fileified = NULL;
-  if ((opts & PERL_RMSEXPAND_M_VMS_IN) != 0) {
-    fileified = PerlMem_malloc(VMS_MAXRSS);
-    if (!strpbrk(fname,"/]>:")) {
+  /* Make sure we expand logical names, since sys$check_access doesn't */
+  fileified = PerlMem_malloc(VMS_MAXRSS);
+  if (fileified == NULL) _ckvmssts(SS$_INSFMEM);
+  if (!strpbrk(fname,"/]>:")) {
       strcpy(fileified,fname);
       trnlnm_iter_count = 0;
-      while (!strpbrk(fileified,"/]>:>") && my_trnlnm(fileified,fileified,0)) {
+      while (!strpbrk(fileified,"/]>:") && my_trnlnm(fileified,fileified,0)) {
         trnlnm_iter_count++; 
         if (trnlnm_iter_count >= PERL_LNM_MAX_ITER) break;
       }
       fname = fileified;
-    }
+  }
+
+  vmsname = PerlMem_malloc(VMS_MAXRSS);
+  if (vmsname == NULL) _ckvmssts(SS$_INSFMEM);
+  if ( !(opts & PERL_RMSEXPAND_M_VMS_IN) ) {
+    /* Don't know if already in VMS format, so make sure */
     if (!do_rmsexpand(fname, vmsname, 0, NULL, PERL_RMSEXPAND_M_VMS, NULL, NULL)) {
       PerlMem_free(fileified);
+      PerlMem_free(vmsname);
       return FALSE;
-    }
-    retlen = namdsc.dsc$w_length = strlen(vmsname);
-    namdsc.dsc$a_pointer = vmsname;
-    if (vmsname[retlen-1] == ']' || vmsname[retlen-1] == '>' ||
-      vmsname[retlen-1] == ':') {
-      if (!do_fileify_dirspec(vmsname,fileified,1,NULL)) return FALSE;
-      namdsc.dsc$w_length = strlen(fileified);
-      namdsc.dsc$a_pointer = fileified;
     }
   }
   else {
-    retlen = namdsc.dsc$w_length = strlen(fname);
-    namdsc.dsc$a_pointer = (char *)fname; /* cast ok */
+    strcpy(vmsname,fname);
   }
+
+  /* sys$check_access needs a file spec, not a directory spec.
+   * Don't use flex_stat here, as that depends on thread context
+   * having been initialized, and we may get here during startup.
+   */
+
+  retlen = namdsc.dsc$w_length = strlen(vmsname);
+  if (vmsname[retlen-1] == ']' 
+      || vmsname[retlen-1] == '>' 
+      || vmsname[retlen-1] == ':'
+      || (!stat(vmsname, (stat_t *)&st) && S_ISDIR(st.st_mode))) {
+
+      if (!do_fileify_dirspec(vmsname,fileified,1,NULL)) {
+        PerlMem_free(fileified);
+        PerlMem_free(vmsname);
+        return FALSE;
+      }
+      fname = fileified;
+  }
+  else {
+      fname = vmsname;
+  }
+
+  retlen = namdsc.dsc$w_length = strlen(fname);
+  namdsc.dsc$a_pointer = (char *)fname;
 
   switch (bit) {
     case S_IXUSR: case S_IXGRP: case S_IXOTH:
@@ -10996,6 +11056,8 @@ Perl_cando_by_name_int
     default:
       if (fileified != NULL)
 	PerlMem_free(fileified);
+      if (vmsname != NULL)
+	PerlMem_free(vmsname);
       return FALSE;
   }
 
@@ -11014,16 +11076,16 @@ Perl_cando_by_name_int
 
   /* find out the space required for the profile */
   _ckvmssts(sys$create_user_profile(&usrdsc,&usrprolst,0,0,
-                                    &usrprodsc.dsc$w_length,0));
+                                    &usrprodsc.dsc$w_length,&profile_context));
 
   /* allocate space for the profile and get it filled in */
   usrprodsc.dsc$a_pointer = PerlMem_malloc(usrprodsc.dsc$w_length);
   if (usrprodsc.dsc$a_pointer == NULL) _ckvmssts(SS$_INSFMEM);
   _ckvmssts(sys$create_user_profile(&usrdsc,&usrprolst,0,usrprodsc.dsc$a_pointer,
-                                    &usrprodsc.dsc$w_length,0));
+                                    &usrprodsc.dsc$w_length,&profile_context));
 
   /* use the profile to check access to the file; free profile & analyze results */
-  retsts = sys$check_access(&objtyp,&namdsc,0,armlst,0,0,0,&usrprodsc);
+  retsts = sys$check_access(&objtyp,&namdsc,0,armlst,&profile_context,0,0,&usrprodsc);
   PerlMem_free(usrprodsc.dsc$a_pointer);
   if (retsts == SS$_NOCALLPRIV) retsts = SS$_NOPRIV; /* not really 3rd party */
 
@@ -11042,17 +11104,23 @@ Perl_cando_by_name_int
     else set_errno(ENOENT);
     if (fileified != NULL)
       PerlMem_free(fileified);
+    if (vmsname != NULL)
+      PerlMem_free(vmsname);
     return FALSE;
   }
   if (retsts == SS$_NORMAL || retsts == SS$_ACCONFLICT) {
     if (fileified != NULL)
       PerlMem_free(fileified);
+    if (vmsname != NULL)
+      PerlMem_free(vmsname);
     return TRUE;
   }
   _ckvmssts(retsts);
 
   if (fileified != NULL)
     PerlMem_free(fileified);
+  if (vmsname != NULL)
+    PerlMem_free(vmsname);
   return FALSE;  /* Should never get here */
 
 }
@@ -11191,6 +11259,16 @@ Perl_flex_stat_int(pTHX_ const char *fspec, Stat_t *statbufp, int lstat_flag)
      *
      * If we are in Posix filespec mode, accept the filename as is.
      */
+
+
+#if __CRTL_VER >= 70300000 && !defined(__VAX)
+  /* The CRTL stat() falls down hard on multi-dot filenames in unix format unless
+   * DECC$EFS_CHARSET is in effect, so temporarily enable it if it isn't already.
+   */
+  if (!decc_efs_charset)
+    decc$feature_set_value(decc$feature_get_index("DECC$EFS_CHARSET"),1,1); 
+#endif
+
 #if __CRTL_VER >= 80200000 && !defined(__VAX)
   if (decc_posix_compliant_pathnames == 0) {
 #endif
@@ -11217,6 +11295,13 @@ Perl_flex_stat_int(pTHX_ const char *fspec, Stat_t *statbufp, int lstat_flag)
       save_spec = temp_fspec;
   }
 #endif
+
+#if __CRTL_VER >= 70300000 && !defined(__VAX)
+  /* As you were... */
+  if (!decc_efs_charset)
+    decc$feature_set_value(decc$feature_get_index("DECC$EFS_CHARSET"),1,0); 
+#endif
+
     if (!retval) {
     char * cptr;
       cptr = do_rmsexpand
@@ -11968,6 +12053,8 @@ Perl_vms_start_glob
 	if (!stat_sts && S_ISDIR(st.st_mode)) {
 	    wilddsc.dsc$a_pointer = tovmspath_utf8(SvPVX(tmpglob),vmsspec,NULL);
 	    ok = (wilddsc.dsc$a_pointer != NULL);
+	    /* maybe passed 'foo' rather than '[.foo]', thus not detected above */
+	    hasdir = 1; 
 	}
 	else {
 	    wilddsc.dsc$a_pointer = tovmsspec_utf8(SvPVX(tmpglob),vmsspec,NULL);
@@ -12321,7 +12408,7 @@ static int set_features
 	 vms_debug_on_exception = 0;
     }
 
-    /* Create VTF-7 filenames from UNICODE instead of UTF-8 */
+    /* Create VTF-7 filenames from Unicode instead of UTF-8 */
     vms_vtf7_filenames = 0;
     status = sys_trnlnm("PERL_VMS_VTF7_FILENAMES", val_str, sizeof(val_str));
     if ($VMS_STATUS_SUCCESS(status)) {

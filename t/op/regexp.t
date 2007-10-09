@@ -73,7 +73,7 @@ BEGIN {
 }
 
 $bang = sprintf "\\%03o", ord "!"; # \41 would not be portable.
-$ffff  = "\xFF\xFF";
+$ffff  = "\x[FF]\x[FF]";
 $nulnul = "\0" x 2;
 $OP = $qr ? 'qr' : 'm';
 
@@ -91,6 +91,10 @@ foreach (@tests) {
     chomp;
     s/\\n/\n/g;
     my ($pat, $subject, $result, $repl, $expect, $reason) = split(/\t/,$_,6);
+    if ($result =~ m/c/ and $ENV{PERL_VALGRIND}) {
+        print "ok $test # TODO fix memory leak with compilation error\n";
+        next;
+    }
     $reason = '' unless defined $reason;
     my $input = join(':',$pat,$subject,$result,$repl,$expect);
     $pat = "'$pat'" unless $pat =~ /^[:'\/]/;
@@ -167,8 +171,8 @@ EOFCODE
 		    print "not ok $test ($study) $input => `$got', match=$match\n$code\n";
 		}
 		else { # better diagnostics
-		    my $s = Data::Dumper->new([$subject],['subject'])->Useqq(1)->Dump;
-		    my $g = Data::Dumper->new([$got],['got'])->Useqq(1)->Dump;
+		    my $s = 'Data::Dumper'->new([$subject],['subject'])->Useqq(1)->Dump;
+		    my $g = 'Data::Dumper'->new([$got],['got'])->Useqq(1)->Dump;
 		    print "not ok $test ($study) $input => `$got', match=$match\n$s\n$g\n$code\n";
 		}
 		next TEST;

@@ -49,7 +49,23 @@
 #define PL_preambled		(PL_parser->preambled)
 #define PL_sublex_info		(PL_parser->sublex_info)
 #define PL_linestr		(PL_parser->linestr)
-
+#define PL_expect		(PL_parser->expect)
+#define PL_copline		(PL_parser->copline)
+#define PL_bufptr		(PL_parser->bufptr)
+#define PL_oldbufptr		(PL_parser->oldbufptr)
+#define PL_oldoldbufptr		(PL_parser->oldoldbufptr)
+#define PL_linestart		(PL_parser->linestart)
+#define PL_bufend		(PL_parser->bufend)
+#define PL_last_uni		(PL_parser->last_uni)
+#define PL_last_lop		(PL_parser->last_lop)
+#define PL_last_lop_op		(PL_parser->last_lop_op)
+#define PL_lex_state		(PL_parser->lex_state)
+#define PL_rsfp			(PL_parser->rsfp)
+#define PL_rsfp_filters		(PL_parser->rsfp_filters)
+#define PL_in_my		(PL_parser->in_my)
+#define PL_tokenbuf		(PL_parser->tokenbuf)
+#define PL_multi_end		(PL_parser->multi_end)
+#define PL_error_count		(PL_parser->error_count)
 
 #ifdef PERL_MAD
 #  define PL_endwhite		(PL_parser->endwhite)
@@ -64,6 +80,13 @@
 #  define PL_thisstuff		(PL_parser->thisstuff)
 #  define PL_thistoken		(PL_parser->thistoken)
 #  define PL_thiswhite		(PL_parser->thiswhite)
+#  define PL_thiswhite		(PL_parser->thiswhite)
+#  define PL_nexttoke		(PL_parser->nexttoke)
+#  define PL_curforce		(PL_parser->curforce)
+#else
+#  define PL_nexttoke		(PL_parser->nexttoke)
+#  define PL_nexttype		(PL_parser->nexttype)
+#  define PL_nextval		(PL_parser->nextval)
 #endif
 
 static int
@@ -72,7 +95,6 @@ S_pending_ident(pTHX);
 static const char ident_too_long[] = "Identifier too long";
 static const char commaless_variable_list[] = "comma-less variable list";
 
-static void restore_rsfp(pTHX_ void *f);
 #ifndef PERL_NO_UTF16_FILTER
 static I32 utf16_textfilter(pTHX_ int idx, SV *sv, int maxlen);
 static I32 utf16rev_textfilter(pTHX_ int idx, SV *sv, int maxlen);
@@ -607,21 +629,30 @@ S_cr_textfilter(pTHX_ int idx, SV *sv, int maxlen)
 
 /*
  * Perl_lex_start
+ *
  * Create a parser object and initialise its parser and lexer fields
+ *
+ * rsfp       is the opened file handle to read from (if any),
+ *
+ * line       holds any initial content already read from the file (or in
+ *            the case of no file, such as an eval, the whole contents);
+ *
+ * new_filter indicates that this is a new file and it shouldn't inherit
+ *            the filters from the current parser (ie require).
  */
 
 void
-Perl_lex_start(pTHX_ SV *line)
+Perl_lex_start(pTHX_ SV *line, PerlIO *rsfp, bool new_filter)
 {
     dVAR;
     const char *s = NULL;
     STRLEN len;
-    yy_parser *parser;
+    yy_parser *parser, *oparser;
 
     /* create and initialise a parser */
 
     Newxz(parser, 1, yy_parser);
-    parser->old_parser = PL_parser;
+    parser->old_parser = oparser = PL_parser;
     PL_parser = parser;
 
     Newx(parser->stack, YYINITDEPTH, yy_stack_frame);
@@ -634,52 +665,25 @@ Perl_lex_start(pTHX_ SV *line)
 
     /* on scope exit, free this parser and restore any outer one */
     SAVEPARSER(parser);
+    parser->saved_curcop = PL_curcop;
 
     /* initialise lexer state */
 
-    SAVEI8(PL_lex_state);
 #ifdef PERL_MAD
-    if (PL_lex_state == LEX_KNOWNEXT) {
-	I32 toke = parser->old_parser->lasttoke;
- 	while (--toke >= 0) {
-	    SAVEI32(PL_nexttoke[toke].next_type);
-	    SAVEVPTR(PL_nexttoke[toke].next_val);
-	    if (PL_madskills)
-		SAVEVPTR(PL_nexttoke[toke].next_mad);
-	}
-    }
-    SAVEI32(PL_curforce);
-    PL_curforce = -1;
+    parser->curforce = -1;
 #else
-    if (PL_lex_state == LEX_KNOWNEXT) {
-	I32 toke = PL_nexttoke;
-	while (--toke >= 0) {
-	    SAVEI32(PL_nexttype[toke]);
-	    SAVEVPTR(PL_nextval[toke]);
-	}
-	SAVEI32(PL_nexttoke);
-    }
+    parser->nexttoke = 0;
 #endif
-    SAVECOPLINE(PL_curcop);
-    SAVEPPTR(PL_bufptr);
-    SAVEPPTR(PL_bufend);
-    SAVEPPTR(PL_oldbufptr);
-    SAVEPPTR(PL_oldoldbufptr);
-    SAVEPPTR(PL_last_lop);
-    SAVEPPTR(PL_last_uni);
-    SAVEPPTR(PL_linestart);
-    SAVEDESTRUCTOR_X(restore_rsfp, PL_rsfp);
-    SAVEI8(PL_expect);
+    parser->copline = NOLINE;
+    parser->lex_state = LEX_NORMAL;
+    parser->expect = XSTATE;
+    parser->rsfp = rsfp;
+    parser->rsfp_filters = (new_filter || !oparser) ? newAV()
+		: (AV*)SvREFCNT_inc(oparser->rsfp_filters);
 
-    PL_copline = NOLINE;
-    PL_lex_state = LEX_NORMAL;
-    PL_expect = XSTATE;
     Newx(parser->lex_brackstack, 120, char);
     Newx(parser->lex_casestack, 12, char);
     *parser->lex_casestack = '\0';
-#ifndef PERL_MAD
-    PL_nexttoke = 0;
-#endif
 
     if (line) {
 	s = SvPV_const(line, len);
@@ -698,10 +702,12 @@ Perl_lex_start(pTHX_ SV *line)
 	SvREFCNT_inc_simple_void_NN(line);
 	parser->linestr = line;
     }
-    PL_oldoldbufptr = PL_oldbufptr = PL_bufptr = PL_linestart = SvPVX(parser->linestr);
-    PL_bufend = PL_bufptr + SvCUR(parser->linestr);
-    PL_last_lop = PL_last_uni = NULL;
-    PL_rsfp = 0;
+    parser->oldoldbufptr =
+	parser->oldbufptr =
+	parser->bufptr =
+	parser->linestart = SvPVX(parser->linestr);
+    parser->bufend = parser->bufptr + SvCUR(parser->linestr);
+    parser->last_lop = parser->last_uni = NULL;
 }
 
 
@@ -710,7 +716,15 @@ Perl_lex_start(pTHX_ SV *line)
 void
 Perl_parser_free(pTHX_  const yy_parser *parser)
 {
+    PL_curcop = parser->saved_curcop;
     SvREFCNT_dec(parser->linestr);
+
+    if (parser->rsfp == PerlIO_stdin())
+	PerlIO_clearerr(parser->rsfp);
+    else if (parser->rsfp && parser->old_parser
+			  && parser->rsfp != parser->old_parser->rsfp)
+	PerlIO_close(parser->rsfp);
+    SvREFCNT_dec(parser->rsfp_filters);
 
     Safefree(parser->stack);
     Safefree(parser->lex_brackstack);
@@ -1245,7 +1259,7 @@ S_curmad(pTHX_ char slot, SV *sv)
     /* keep a slot open for the head of the list? */
     if (slot != '_' && *where && (*where)->mad_key == '^') {
 	(*where)->mad_key = slot;
-	sv_free((*where)->mad_val);
+	sv_free((SV*)((*where)->mad_val));
 	(*where)->mad_val = (void*)sv;
     }
     else
@@ -2555,6 +2569,9 @@ Perl_filter_add(pTHX_ filter_t funcp, SV *datasv)
     if (!funcp)
 	return NULL;
 
+    if (!PL_parser)
+	return NULL;
+
     if (!PL_rsfp_filters)
 	PL_rsfp_filters = newAV();
     if (!datasv)
@@ -2582,7 +2599,7 @@ Perl_filter_del(pTHX_ filter_t funcp)
     DEBUG_P(PerlIO_printf(Perl_debug_log, "filter_del func %p",
 			  FPTR2DPTR(void*, funcp)));
 #endif
-    if (!PL_rsfp_filters || AvFILLp(PL_rsfp_filters)<0)
+    if (!PL_parser || !PL_rsfp_filters || AvFILLp(PL_rsfp_filters)<0)
 	return;
     /* if filter is on top of stack (usual case) just pop it off */
     datasv = FILTER_DATA(AvFILLp(PL_rsfp_filters));
@@ -2618,7 +2635,7 @@ Perl_filter_read(pTHX_ int idx, SV *buf_sv, int maxlen)
 #endif
 	: maxlen;
 
-    if (!PL_rsfp_filters)
+    if (!PL_parser || !PL_rsfp_filters)
 	return -1;
     if (idx > AvFILLp(PL_rsfp_filters)) {       /* Any more filters?	*/
 	/* Provide a default input filter to make life easy.	*/
@@ -2688,33 +2705,6 @@ S_filter_gets(pTHX_ register SV *sv, register PerlIO *fp, STRLEN append)
     }
     else
         return (sv_gets(sv, fp, append));
-}
-
-STATIC HV *
-S_find_in_my_stash(pTHX_ const char *pkgname, I32 len)
-{
-    dVAR;
-    GV *gv;
-
-    if (len == 11 && *pkgname == '_' && strEQ(pkgname, "__PACKAGE__"))
-        return PL_curstash;
-
-    if (len > 2 &&
-        (pkgname[len - 2] == ':' && pkgname[len - 1] == ':') &&
-        (gv = gv_fetchpvn_flags(pkgname, len, 0, SVt_PVHV)))
-    {
-        return GvHV(gv);			/* Foo:: */
-    }
-
-    /* use constant CLASS => 'MyClass' */
-    gv = gv_fetchpvn_flags(pkgname, len, 0, SVt_PVCV);
-    if (gv && GvCV(gv)) {
-	SV * const sv = cv_const_sv(GvCV(gv));
-	if (sv)
-            pkgname = SvPV_nolen_const(sv);
-    }
-
-    return gv_stashpv(pkgname, 0);
 }
 
 /*
@@ -2862,7 +2852,7 @@ Perl_madlex(pTHX)
     case 0:
 	optype = PEG;
 	if (PL_endwhite) {
-	    addmad(newMADsv('p', PL_endwhite), &PL_thismad, 0);
+	    addmad(newMADsv('G', PL_endwhite), &PL_thismad, 0);
 	    PL_endwhite = 0;
 	}
 	break;
@@ -4049,10 +4039,6 @@ Perl_yylex(pTHX)
 			sv_free(sv);
 			CvMETHOD_on(PL_compcv);
 		    }
-		    else if (!PL_in_my && len == 9 && strnEQ(SvPVX(sv), "assertion", len)) {
-			sv_free(sv);
-		        CvASSERTION_on(PL_compcv);
-		    }
 		    /* After we've set the flags, it could be argued that
 		       we don't need to do the attributes.pm-based setting
 		       process, and shouldn't bother appending recognized
@@ -4147,7 +4133,9 @@ Perl_yylex(pTHX)
 	    --PL_lex_brackets;
 	if (PL_lex_state == LEX_INTERPNORMAL) {
 	    if (PL_lex_brackets == 0) {
-		if (*s != '[' && *s != '{' && (*s != '-' || s[1] != '>'))
+		if (*s == '-' && s[1] == '>')
+		    PL_lex_state = LEX_INTERPENDMAYBE;
+		else if (*s != '[' && *s != '{')
 		    PL_lex_state = LEX_INTERPEND;
 	    }
 	}
@@ -4525,14 +4513,6 @@ Perl_yylex(pTHX)
 	    if (s == PL_bufend)
 		yyerror("Final $ should be \\$ or $name");
 	    PREREF('$');
-	}
-
-	/* This kludge not intended to be bulletproof. */
-	if (PL_tokenbuf[1] == '[' && !PL_tokenbuf[2]) {
-	    yylval.opval = newSVOP(OP_CONST, 0,
-				   newSViv(CopARYBASE_get(&PL_compiling)));
-	    yylval.opval->op_private = OPpCONST_ARYBASE;
-	    TERM(THING);
 	}
 
 	d = s;
@@ -5862,26 +5842,10 @@ Perl_yylex(pTHX)
 	    PL_in_my = (U16)tmp;
 	    s = SKIPSPACE1(s);
 	    if (isIDFIRST_lazy_if(s,UTF)) {
-#ifdef PERL_MAD
-		char* start = s;
-#endif
 		s = scan_word(s, PL_tokenbuf, sizeof PL_tokenbuf, TRUE, &len);
 		if (len == 3 && strnEQ(PL_tokenbuf, "sub", 3))
 		    goto really_sub;
-		PL_in_my_stash = find_in_my_stash(PL_tokenbuf, len);
-		if (!PL_in_my_stash) {
-		    char tmpbuf[1024];
-		    PL_bufptr = s;
-		    my_snprintf(tmpbuf, sizeof(tmpbuf), "No such class %.1000s", PL_tokenbuf);
-		    yyerror(tmpbuf);
-		}
-#ifdef PERL_MAD
-		if (PL_madskills) {	/* just add type to declarator token */
-		    sv_catsv(PL_thistoken, PL_nextwhite);
-		    PL_nextwhite = 0;
-		    sv_catpvn(PL_thistoken, start, s - start);
-		}
-#endif
+		Perl_croak(aTHX_ "Expected variable after declarator");
 	    }
 	    yylval.ival = 1;
 	    OPERATOR(MY);
@@ -11026,12 +10990,7 @@ S_scan_inputsymbol(pTHX_ char *start)
     */
 
     if (d - PL_tokenbuf != len) {
-	yylval.ival = OP_GLOB;
-	set_csh();
-	s = scan_str(start,!!PL_madskills,FALSE);
-	if (!s)
-	   Perl_croak(aTHX_ "Glob not terminated");
-	return s;
+	Perl_croak(aTHX_ "Usage of the <> operator with a glob pattern, use the 'glob' function instead");
     }
     else {
 	bool readline_overriden = FALSE;
@@ -12041,7 +12000,6 @@ Perl_yyerror(pTHX_ const char *s)
             OutCopFILE(PL_curcop));
     }
     PL_in_my = 0;
-    PL_in_my_stash = NULL;
     return 0;
 }
 #ifdef __SC__
@@ -12159,23 +12117,6 @@ S_swallow_bom(pTHX_ U8 *s)
     return (char*)s;
 }
 
-/*
- * restore_rsfp
- * Restore a source filter.
- */
-
-static void
-restore_rsfp(pTHX_ void *f)
-{
-    dVAR;
-    PerlIO * const fp = (PerlIO*)f;
-
-    if (PL_rsfp == PerlIO_stdin())
-	PerlIO_clearerr(PL_rsfp);
-    else if (PL_rsfp && (PL_rsfp != fp))
-	PerlIO_close(PL_rsfp);
-    PL_rsfp = fp;
-}
 
 #ifndef PERL_NO_UTF16_FILTER
 static I32

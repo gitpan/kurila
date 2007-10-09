@@ -54,12 +54,15 @@ PERLVAR(Gop_mutex,	perl_mutex)	/* Mutex for op refcounting */
 PERLVAR(Gdollarzero_mutex, perl_mutex)	/* Modifying $0 */
 #endif
 
+
 /* This is constant on most architectures, a global on OS/2 */
 #ifdef OS2
-PERLVARI(Gsh_path,	      char *,	SH_PATH)/* full path of shell */
+#  define PERL___C
 #else
-PERLVARI(Gsh_path,	const char *,	SH_PATH)/* full path of shell */
+#  define PERL___C const
 #endif
+PERLVARI(Gsh_path,	PERL___C char *, SH_PATH) /* full path of shell */
+#undef PERL___C
 
 #ifndef PERL_MICRO
 /* If Perl has to ignore SIGPFE, this is its saved state.
@@ -150,4 +153,10 @@ PERLVAR(Gperlio_mutex, perl_mutex)    /* Mutex for perlio fd refcounts */
 /* this is currently set without MUTEX protection, so keep it a type which
  * can be set atomically (ie not a bit field) */
 PERLVARI(Gveto_cleanup,	int, FALSE)	/* exit without cleanup */
+
+/* dummy variables that hold pointers to both runops functions, thus forcing
+ * them *both* to get linked in (useful for Peek.xs, debugging etc) */
+
+PERLVARI(Grunops_std,	runops_proc_t,	MEMBER_TO_FPTR(Perl_runops_standard))
+PERLVARI(Grunops_dbg,	runops_proc_t,	MEMBER_TO_FPTR(Perl_runops_debug))
 

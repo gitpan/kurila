@@ -597,7 +597,6 @@ BOOT:
     specialsv_list[5] = (SV *) pWARN_NONE;
     specialsv_list[6] = (SV *) pWARN_STD;
 #if PERL_VERSION <= 8
-#  define CVf_ASSERTION	0
 #  define OPpPAD_STATE 0
 #endif
 #include "defsubs.h"
@@ -846,7 +845,6 @@ threadsv_names()
 #define OP_type(o)	o->op_type
 #if PERL_VERSION >= 9
 #  define OP_opt(o)	o->op_opt
-#  define OP_static(o)	o->op_static
 #else
 #  define OP_seq(o)	o->op_seq
 #endif
@@ -911,10 +909,6 @@ OP_type(o)
 
 U8
 OP_opt(o)
-	B::OP		o
-
-U8
-OP_static(o)
 	B::OP		o
 
 #else
@@ -990,6 +984,8 @@ LISTOP_children(o)
 #  define PMOP_pmreplstart(o)	o->op_pmstashstartu.op_pmreplstart
 #else
 #  define PMOP_pmreplstart(o)	o->op_pmreplstart
+#  define PMOP_pmpermflags(o)	o->op_pmpermflags
+#  define PMOP_pmdynflags(o)      o->op_pmdynflags
 #endif
 #define PMOP_pmnext(o)		o->op_pmnext
 #define PMOP_pmregexp(o)	PM_GETRE(o)
@@ -1085,6 +1081,18 @@ U32
 PMOP_pmflags(o)
 	B::PMOP		o
 
+#if PERL_VERSION < 9
+
+U32
+PMOP_pmpermflags(o)
+	B::PMOP		o
+
+U8
+PMOP_pmdynflags(o)
+        B::PMOP         o
+
+#endif
+
 void
 PMOP_precomp(o)
 	B::PMOP		o
@@ -1095,6 +1103,8 @@ PMOP_precomp(o)
 	if (rx)
 	    sv_setpvn(ST(0), rx->precomp, rx->prelen);
 
+#if PERL_VERSION >= 9
+
 void
 PMOP_reflags(o)
 	B::PMOP		o
@@ -1104,6 +1114,8 @@ PMOP_reflags(o)
 	rx = PM_GETRE(o);
 	if (rx)
 	    sv_setuv(ST(0), rx->extflags);
+
+#endif
 
 #define SVOP_sv(o)     cSVOPo->op_sv
 #define SVOP_gv(o)     ((GV*)cSVOPo->op_sv)
@@ -1187,7 +1199,6 @@ LOOP_lastop(o)
 #define COP_file(o)	CopFILE(o)
 #define COP_filegv(o)	CopFILEGV(o)
 #define COP_cop_seq(o)	o->cop_seq
-#define COP_arybase(o)	CopARYBASE_get(o)
 #define COP_line(o)	CopLINE(o)
 #define COP_hints(o)	CopHINTS_get(o)
 #if PERL_VERSION < 9
@@ -1220,10 +1231,6 @@ COP_filegv(o)
 
 U32
 COP_cop_seq(o)
-	B::COP	o
-
-I32
-COP_arybase(o)
 	B::COP	o
 
 U32
@@ -1671,38 +1678,6 @@ long
 IoLINES(io)
 	B::IO	io
 
-long
-IoPAGE_LEN(io)
-	B::IO	io
-
-long
-IoLINES_LEFT(io)
-	B::IO	io
-
-char *
-IoTOP_NAME(io)
-	B::IO	io
-
-B::GV
-IoTOP_GV(io)
-	B::IO	io
-
-char *
-IoFMT_NAME(io)
-	B::IO	io
-
-B::GV
-IoFMT_GV(io)
-	B::IO	io
-
-char *
-IoBOTTOM_NAME(io)
-	B::IO	io
-
-B::GV
-IoBOTTOM_GV(io)
-	B::IO	io
-
 short
 IoSUBPROCESS(io)
 	B::IO	io
@@ -1791,12 +1766,6 @@ AvFLAGS(av)
 	B::AV	av
 
 #endif
-
-MODULE = B	PACKAGE = B::FM		PREFIX = Fm
-
-IV
-FmLINES(form)
-	B::FM	form
 
 MODULE = B	PACKAGE = B::CV		PREFIX = Cv
 

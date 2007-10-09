@@ -237,8 +237,8 @@ sub AUTOLOAD {
         die "$error at $file line $line.\n";
     }
     no strict 'refs';
-    *$AUTOLOAD = sub { $val };
-    goto &$AUTOLOAD;
+    *{Symbol::fetch_glob($AUTOLOAD)} = sub { $val };
+    goto &{*{Symbol::fetch_glob($AUTOLOAD)}};
 }
 
 1;

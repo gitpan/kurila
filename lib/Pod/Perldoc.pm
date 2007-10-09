@@ -64,7 +64,7 @@ $Pod2man = "pod2man" . ( $Config{'versiononly'} ? $Config{'version'} : '' );
 
 foreach my $subname (map "opt_$_", split '', q{mhlvriFfXqnTdUL}) {
   no strict 'refs';
-  *$subname = do{ use strict 'refs';  sub () { shift->_elem($subname, @_) } };
+  *{Symbol::fetch_glob($subname)} = do{ use strict 'refs';  sub () { shift->_elem($subname, @_) } };
 }
 
 # And these are so that GetOptsOO knows they take options:
@@ -647,7 +647,7 @@ sub options_processing {
         $self->{'podidx'} = $podidx;
     }
 
-    $self->{'output_to_stdout'} = 1  if  $self->opt_T or ! -t STDOUT;
+    $self->{'output_to_stdout'} = 1  if  $self->opt_T or ! -t *STDOUT;
 
     $self->options_sanity;
 

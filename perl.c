@@ -293,7 +293,6 @@ perl_construct(pTHXx)
     init_stacks();
 
     init_ids();
-    PL_lex_state = LEX_NOTPARSING;
 
     JMPENV_BOOTSTRAP;
     STATUS_ALL_SUCCESS;
@@ -871,14 +870,11 @@ perl_destruct(pTHXx)
 
     /* loosen bonds of global variables */
 
-    if(PL_rsfp) {
-	(void)PerlIO_close(PL_rsfp);
-	PL_rsfp = NULL;
+    /* XXX can PL_parser still be non-null here? */
+    if(PL_parser && PL_parser->rsfp) {
+	(void)PerlIO_close(PL_parser->rsfp);
+	PL_parser->rsfp = NULL;
     }
-
-    /* Filters for program text */
-    SvREFCNT_dec(PL_rsfp_filters);
-    PL_rsfp_filters = NULL;
 
     if (PL_minus_F) {
 	Safefree(PL_splitstr);
@@ -977,7 +973,6 @@ perl_destruct(pTHXx)
     PL_DBsingle = NULL;
     PL_DBtrace = NULL;
     PL_DBsignal = NULL;
-    PL_DBassertion = NULL;
     PL_DBcv = NULL;
     PL_dbargs = NULL;
     PL_debstash = NULL;
@@ -1652,7 +1647,7 @@ STATIC void *
 S_parse_body(pTHX_ char **env, XSINIT_t xsinit)
 {
     dVAR;
-    PerlIO *tmpfp;
+    PerlIO *rsfp;
     int argc = PL_origargc;
     char **argv = PL_origargv;
     const char *scriptname = NULL;
@@ -1665,6 +1660,7 @@ S_parse_body(pTHX_ char **env, XSINIT_t xsinit)
     bool minus_f = FALSE;
 #endif
     SV *linestr_sv = newSV_type(SVt_PVIV);
+    bool add_read_e_script = FALSE;
 
     SvGROW(linestr_sv, 80);
     sv_setpvn(linestr_sv,"",0);
@@ -1716,7 +1712,6 @@ S_parse_body(pTHX_ char **env, XSINIT_t xsinit)
 	case 'W':
 	case 'X':
 	case 'w':
-	case 'A':
 	    if ((s = moreswitches(s)))
 		goto reswitch;
 	    break;
@@ -1748,7 +1743,7 @@ S_parse_body(pTHX_ char **env, XSINIT_t xsinit)
 	    forbid_setid('e', -1);
 	    if (!PL_e_script) {
 		PL_e_script = newSVpvs("");
-		filter_add(read_e_script, NULL);
+		add_read_e_script = TRUE;
 	    }
 	    if (*++s)
 		sv_catpv(PL_e_script, s);
@@ -2110,9 +2105,10 @@ S_parse_body(pTHX_ char **env, XSINIT_t xsinit)
     {
 	int suidscript;
 	const int fdscript
-	    = open_script(scriptname, dosearch, sv, &suidscript);
+	    = open_script(scriptname, dosearch, sv, &suidscript, &rsfp);
 
-	validate_suid(validarg, scriptname, fdscript, suidscript, linestr_sv);
+	validate_suid(validarg, scriptname, fdscript, suidscript,
+		linestr_sv, rsfp);
 
 #ifndef PERL_MICRO
 #  if defined(SIGCHLD) || defined(SIGCLD)
@@ -2142,7 +2138,7 @@ S_parse_body(pTHX_ char **env, XSINIT_t xsinit)
 	    forbid_setid('x', suidscript);
 	    /* Hence you can't get here if suidscript >= 0  */
 
-	    find_beginning(linestr_sv);
+	    find_beginning(linestr_sv, rsfp);
 	    if (cddir && PerlDir_chdir( (char *)cddir ) < 0)
 		Perl_croak(aTHX_ "Can't chdir to %s",cddir);
 	}
@@ -2257,18 +2253,17 @@ S_parse_body(pTHX_ char **env, XSINIT_t xsinit)
     }
 #endif
 
-    tmpfp = PL_rsfp;
-    PL_rsfp = NULL;
-    lex_start(linestr_sv);
-    PL_rsfp = tmpfp;
+    lex_start(linestr_sv, rsfp, TRUE);
     PL_subname = newSVpvs("main");
+
+    if (add_read_e_script)
+	filter_add(read_e_script, NULL);
 
     /* now parse the script */
 
     SETERRNO(0,SS_NORMAL);
-    PL_error_count = 0;
 #ifdef MACOS_TRADITIONAL
-    if (gMacPerl_SyntaxError = (yyparse() || PL_error_count)) {
+    if (gMacPerl_SyntaxError = (yyparse() || PL_parser->error_count)) {
 	if (PL_minus_c)
 	    Perl_croak(aTHX_ "%s had compilation errors.\n", MacPerl_MPWFileName(PL_origfilename));
 	else {
@@ -2277,7 +2272,7 @@ S_parse_body(pTHX_ char **env, XSINIT_t xsinit)
 	}
     }
 #else
-    if (yyparse() || PL_error_count) {
+    if (yyparse() || PL_parser->error_count) {
 	if (PL_minus_c)
 	    Perl_croak(aTHX_ "%s had compilation errors.\n", PL_origfilename);
 	else {
@@ -2907,7 +2902,6 @@ S_usage(pTHX_ const char *name)		/* XXX move this out into a module ? */
 
     static const char * const usage_msg[] = {
 "-0[octal]         specify record separator (\\0, if no argument)",
-"-A[mod][=pattern] activate all/given assertions",
 "-a                autosplit mode with -n or -p (splits $_ into @F)",
 "-C[number/list]   enables the listed Unicode features",
 "-c                check syntax only (runs BEGIN and CHECK blocks)",
@@ -3204,27 +3198,6 @@ Perl_moreswitches(pTHX_ char *s)
 	    }
 	}
 	return s;
-    case 'A':
-	forbid_setid('A', -1);
-	s++;
-	{
-	    char * const start = s;
-	    SV * const sv = newSVpvs("use assertions::activate");
-	    while(isALNUM(*s) || *s == ':') ++s;
-	    if (s != start) {
-		sv_catpvs(sv, "::");
-		sv_catpvn(sv, start, s-start);
-	    }
-	    if (*s == '=') {
-		Perl_sv_catpvf(aTHX_ sv, " split(/,/,q%c%s%c)", 0, ++s, 0);
-		s+=strlen(s);
-	    }
-	    else if (*s != '\0') {
-		Perl_croak(aTHX_ "Can't use '%c' after -A%.*s", *s, (int)(s-start), start);
-	    }
-	    Perl_av_create_and_push(aTHX_ &PL_preambleav, sv);
-	    return s;
-	}
     case 'M':
 	forbid_setid('M', -1);	/* XXX ? */
 	/* FALL THROUGH */
@@ -3304,9 +3277,9 @@ Perl_moreswitches(pTHX_ char *s)
 	    upg_version(PL_patchlevel, TRUE);
 #if !defined(DGUX)
 	PerlIO_printf(PerlIO_stdout(),
-		Perl_form(aTHX_ "\nThis is perl, %"SVf
-#ifdef PERL_PATCHNUM
-			  " DEVEL" STRINGIFY(PERL_PATCHNUM)
+		Perl_form(aTHX_ "\nThis is kurila, %"SVf
+#ifdef KURILA_PATCHNUM
+			  " DEVEL" STRINGIFY(KURILA_PATCHNUM)
 #endif
 			  " built for %s",
 			  SVfARG(vstringify(PL_patchlevel)),
@@ -3314,7 +3287,7 @@ Perl_moreswitches(pTHX_ char *s)
 #else /* DGUX */
 /* Adjust verbose output as in the perl that ships with the DG/UX OS from EMC */
 	PerlIO_printf(PerlIO_stdout(),
-		Perl_form(aTHX_ "\nThis is perl, %"SVf"\n",
+		Perl_form(aTHX_ "\nThis is kurila, %"SVf"\n",
 		    SVfARG(vstringify(PL_patchlevel))));
 	PerlIO_printf(PerlIO_stdout(),
 			Perl_form(aTHX_ "        built under %s at %s %s\n",
@@ -3334,7 +3307,7 @@ Perl_moreswitches(pTHX_ char *s)
 #endif
 
 	PerlIO_printf(PerlIO_stdout(),
-		      "\n\nCopyright 1987-2007, Larry Wall\n");
+		      "\n\nCopyright 2007, Gerard Goossen\n");
 #ifdef MACOS_TRADITIONAL
 	PerlIO_printf(PerlIO_stdout(),
 		      "\nMac OS port Copyright 1991-2002, Matthias Neeracher;\n"
@@ -3404,11 +3377,8 @@ Perl_moreswitches(pTHX_ char *s)
 #endif
 	PerlIO_printf(PerlIO_stdout(),
 		      "\n\
-Perl may be copied only under the terms of either the Artistic License or the\n\
-GNU General Public License, which may be found in the Perl 5 source kit.\n\n\
-Complete documentation for Perl, including FAQ lists, should be found on\n\
-this system using \"man perl\" or \"perldoc perl\".  If you have access to the\n\
-Internet, point your browser at http://www.perl.org/, the Perl Home Page.\n\n");
+Perl Kurila may be copied only under the terms of either the Artistic License or the\n\
+GNU General Public License, which may be found in the Perl Kurila source kit.\n");
 	my_exit(0);
     case 'w':
 	if (! (PL_dowarn & G_WARN_ALL_MASK)) {
@@ -3506,7 +3476,6 @@ S_init_interp(pTHX)
 #    define PERLVARIC(var,type,init)	PERL_GET_INTERP->var = init;
 #  endif
 #  include "intrpvar.h"
-#  include "thrdvar.h"
 #  undef PERLVAR
 #  undef PERLVARA
 #  undef PERLVARI
@@ -3517,7 +3486,6 @@ S_init_interp(pTHX)
 #  define PERLVARI(var,type,init)	PL_##var = init;
 #  define PERLVARIC(var,type,init)	PL_##var = init;
 #  include "intrpvar.h"
-#  include "thrdvar.h"
 #  undef PERLVAR
 #  undef PERLVARA
 #  undef PERLVARI
@@ -3580,7 +3548,7 @@ S_init_main_stash(pTHX)
 
 STATIC int
 S_open_script(pTHX_ const char *scriptname, bool dosearch, SV *sv,
-	      int *suidscript)
+	      int *suidscript, PerlIO **rsfpp)
 {
 #ifndef IAMSUID
     const char *quote;
@@ -3638,11 +3606,11 @@ S_open_script(pTHX_ const char *scriptname, bool dosearch, SV *sv,
     if (*PL_origfilename == '-' && PL_origfilename[1] == '\0')
 	scriptname = (char *)"";
     if (fdscript >= 0) {
-	PL_rsfp = PerlIO_fdopen(fdscript,PERL_SCRIPT_MODE);
+	*rsfpp = PerlIO_fdopen(fdscript,PERL_SCRIPT_MODE);
 #       if defined(HAS_FCNTL) && defined(F_SETFD)
-	    if (PL_rsfp)
+	    if (*rsfpp)
                 /* ensure close-on-exec */
-	        fcntl(PerlIO_fileno(PL_rsfp),F_SETFD,1);
+	        fcntl(PerlIO_fileno(*rsfpp),F_SETFD,1);
 #       endif
     }
 #ifdef IAMSUID
@@ -3724,24 +3692,64 @@ S_open_script(pTHX_ const char *scriptname, bool dosearch, SV *sv,
                               "PL_preprocess: cmd=\"%s\"\n",
                               SvPVX_const(cmd)));
 
-	PL_rsfp = PerlProc_popen((char *)SvPVX_const(cmd), (char *)"r");
+	*rsfpp = PerlProc_popen((char *)SvPVX_const(cmd), (char *)"r");
 	SvREFCNT_dec(cmd);
 	SvREFCNT_dec(cpp);
     }
     else if (!*scriptname) {
 	forbid_setid(0, *suidscript);
-	PL_rsfp = PerlIO_stdin();
+	*rsfpp = PerlIO_stdin();
     }
     else {
-	PL_rsfp = PerlIO_open(scriptname,PERL_SCRIPT_MODE);
+#ifdef FAKE_BIT_BUCKET
+	/* This hack allows one not to have /dev/null (or BIT_BUCKET as it
+	 * is called) and still have the "-e" work.  (Believe it or not,
+	 * a /dev/null is required for the "-e" to work because source
+	 * filter magic is used to implement it. ) This is *not* a general
+	 * replacement for a /dev/null.  What we do here is create a temp
+	 * file (an empty file), open up that as the script, and then
+	 * immediately close and unlink it.  Close enough for jazz. */ 
+#define FAKE_BIT_BUCKET_PREFIX "/tmp/perlnull-"
+#define FAKE_BIT_BUCKET_SUFFIX "XXXXXXXX"
+#define FAKE_BIT_BUCKET_TEMPLATE FAKE_BIT_BUCKET_PREFIX FAKE_BIT_BUCKET_SUFFIX
+	char tmpname[sizeof(FAKE_BIT_BUCKET_TEMPLATE)] = {
+	    FAKE_BIT_BUCKET_TEMPLATE
+	};
+	const char * const err = "Failed to create a fake bit bucket";
+	if (strEQ(scriptname, BIT_BUCKET)) {
+#ifdef HAS_MKSTEMP /* Hopefully mkstemp() is safe here. */
+	    int tmpfd = mkstemp(tmpname);
+	    if (tmpfd > -1) {
+		scriptname = tmpname;
+		close(tmpfd);
+	    } else
+		Perl_croak(aTHX_ err);
+#else
+#  ifdef HAS_MKTEMP
+	    scriptname = mktemp(tmpname);
+	    if (!scriptname)
+		Perl_croak(aTHX_ err);
+#  endif
+#endif
+	}
+#endif
+	*rsfpp = PerlIO_open(scriptname,PERL_SCRIPT_MODE);
+#ifdef FAKE_BIT_BUCKET
+	if (memEQ(scriptname, FAKE_BIT_BUCKET_PREFIX,
+		  sizeof(FAKE_BIT_BUCKET_PREFIX) - 1)
+	    && strlen(scriptname) == sizeof(tmpname) - 1) {
+	    unlink(scriptname);
+	}
+	scriptname = BIT_BUCKET;
+#endif
 #       if defined(HAS_FCNTL) && defined(F_SETFD)
-	    if (PL_rsfp)
+	    if (*rsfpp)
                 /* ensure close-on-exec */
-	        fcntl(PerlIO_fileno(PL_rsfp),F_SETFD,1);
+	        fcntl(PerlIO_fileno(*rsfpp),F_SETFD,1);
 #       endif
     }
 #endif /* IAMSUID */
-    if (!PL_rsfp) {
+    if (!*rsfpp) {
 	/* PSz 16 Sep 03  Keep neat error message */
 	if (PL_e_script)
 	    Perl_croak(aTHX_ "Can't open "BIT_BUCKET": %s\n", Strerror(errno));
@@ -3888,7 +3896,7 @@ S_fd_on_nosuid_fs(pTHX_ int fd)
 
 STATIC void
 S_validate_suid(pTHX_ const char *validarg, const char *scriptname,
-		int fdscript, int suidscript, SV *linestr_sv)
+		int fdscript, int suidscript, SV *linestr_sv, PerlIO *rsfp)
 {
     dVAR;
 #ifdef IAMSUID
@@ -3925,7 +3933,7 @@ S_validate_suid(pTHX_ const char *validarg, const char *scriptname,
 #ifdef DOSUID
     const char *s, *s2;
 
-    if (PerlLIO_fstat(PerlIO_fileno(PL_rsfp),&PL_statbuf) < 0)	/* normal stat is insecure */
+    if (PerlLIO_fstat(PerlIO_fileno(rsfp),&PL_statbuf) < 0)	/* normal stat is insecure */
 	Perl_croak(aTHX_ "Can't stat script \"%s\"",PL_origfilename);
     if (PL_statbuf.st_mode & (S_ISUID|S_ISGID)) {
 	I32 len;
@@ -4014,7 +4022,7 @@ S_validate_suid(pTHX_ const char *validarg, const char *scriptname,
 	 * Seems safe enough to do as root.
 	 */
 #if !defined(NO_NOSUID_CHECK)
-	if (fd_on_nosuid_fs(PerlIO_fileno(PL_rsfp))) {
+	if (fd_on_nosuid_fs(PerlIO_fileno(rsfp))) {
 	    Perl_croak(aTHX_ "Setuid script on nosuid or noexec filesystem\n");
 	}
 #endif
@@ -4028,7 +4036,7 @@ S_validate_suid(pTHX_ const char *validarg, const char *scriptname,
 	PL_doswitches = FALSE;		/* -s is insecure in suid */
 	/* PSz 13 Nov 03  But -s was caught elsewhere ... so unsetting it here is useless(?!) */
 	CopLINE_inc(PL_curcop);
-	if (sv_gets(linestr_sv, PL_rsfp, 0) == NULL)
+	if (sv_gets(linestr_sv, rsfp, 0) == NULL)
 	    Perl_croak(aTHX_ "No #! line");
 	linestr = SvPV_nolen_const(linestr_sv);
 	/* required even on Sys V */
@@ -4116,8 +4124,8 @@ FIX YOUR KERNEL, OR PUT A C WRAPPER AROUND THIS SCRIPT!\n");
 	     * in fact will use that to distinguish this from "normal"
 	     * usage, see comments above.
 	     */
-	    PerlIO_rewind(PL_rsfp);
-	    PerlLIO_lseek(PerlIO_fileno(PL_rsfp),(Off_t)0,0);  /* just in case rewind didn't */
+	    PerlIO_rewind(rsfp);
+	    PerlLIO_lseek(PerlIO_fileno(rsfp),(Off_t)0,0);  /* just in case rewind didn't */
 	    /* PSz 27 Feb 04  Sanity checks on scriptname */
 	    if ((!scriptname) || (!*scriptname) ) {
 		Perl_croak(aTHX_ "No setuid script name\n");
@@ -4134,9 +4142,9 @@ FIX YOUR KERNEL, OR PUT A C WRAPPER AROUND THIS SCRIPT!\n");
 		Perl_croak(aTHX_ "Can't change argv to have fd script\n");
 	    }
 	    PL_origargv[which] = savepv(Perl_form(aTHX_ "/dev/fd/%d/%s",
-					  PerlIO_fileno(PL_rsfp), PL_origargv[which]));
+					  PerlIO_fileno(rsfp), PL_origargv[which]));
 #if defined(HAS_FCNTL) && defined(F_SETFD)
-	    fcntl(PerlIO_fileno(PL_rsfp),F_SETFD,0);	/* ensure no close-on-exec */
+	    fcntl(PerlIO_fileno(rsfp),F_SETFD,0);	/* ensure no close-on-exec */
 #endif
 	    PERL_FPU_PRE_EXEC
 	    PerlProc_execv(Perl_form(aTHX_ "%s/sperl"PERL_FS_VER_FMT, BIN_EXP,
@@ -4253,8 +4261,8 @@ FIX YOUR KERNEL, OR PUT A C WRAPPER AROUND THIS SCRIPT!\n");
      * #endif
      * into the perly bits.
      */
-    PerlIO_rewind(PL_rsfp);
-    PerlLIO_lseek(PerlIO_fileno(PL_rsfp),(Off_t)0,0);  /* just in case rewind didn't */
+    PerlIO_rewind(rsfp);
+    PerlLIO_lseek(PerlIO_fileno(rsfp),(Off_t)0,0);  /* just in case rewind didn't */
     /* PSz 11 Nov 03
      * Keep original arguments: suidperl already has fd script.
      */
@@ -4264,9 +4272,9 @@ FIX YOUR KERNEL, OR PUT A C WRAPPER AROUND THIS SCRIPT!\n");
 /*	Perl_croak(aTHX_ "Permission denied\n");			*/
 /*  }									*/
 /*  PL_origargv[which] = savepv(Perl_form(aTHX_ "/dev/fd/%d/%s",	*/
-/*				  PerlIO_fileno(PL_rsfp), PL_origargv[which]));	*/
+/*				  PerlIO_fileno(rsfp), PL_origargv[which]));	*/
 #if defined(HAS_FCNTL) && defined(F_SETFD)
-    fcntl(PerlIO_fileno(PL_rsfp),F_SETFD,0);	/* ensure no close-on-exec */
+    fcntl(PerlIO_fileno(rsfp),F_SETFD,0);	/* ensure no close-on-exec */
 #endif
     PERL_FPU_PRE_EXEC
     PerlProc_execv(Perl_form(aTHX_ "%s/perl"PERL_FS_VER_FMT, BIN_EXP,
@@ -4280,7 +4288,7 @@ FIX YOUR KERNEL, OR PUT A C WRAPPER AROUND THIS SCRIPT!\n");
     PERL_UNUSED_ARG(suidscript);
     if (PL_euid != PL_uid || PL_egid != PL_gid) {	/* (suidperl doesn't exist, in fact) */
 #ifndef SETUID_SCRIPTS_ARE_SECURE_NOW
-	PerlLIO_fstat(PerlIO_fileno(PL_rsfp),&PL_statbuf);	/* may be either wrapped or real suid */
+	PerlLIO_fstat(PerlIO_fileno(rsfp),&PL_statbuf);	/* may be either wrapped or real suid */
 	if ((PL_euid != PL_uid && PL_euid == PL_statbuf.st_uid && PL_statbuf.st_mode & S_ISUID)
 	    ||
 	    (PL_egid != PL_gid && PL_egid == PL_statbuf.st_gid && PL_statbuf.st_mode & S_ISGID)
@@ -4298,7 +4306,7 @@ FIX YOUR KERNEL, PUT A C WRAPPER AROUND THIS SCRIPT, OR USE -u AND UNDUMP!\n");
 }
 
 STATIC void
-S_find_beginning(pTHX_ SV* linestr_sv)
+S_find_beginning(pTHX_ SV* linestr_sv, PerlIO *rsfp)
 {
     dVAR;
     register char *s;
@@ -4313,7 +4321,7 @@ S_find_beginning(pTHX_ SV* linestr_sv)
     /* Since the Mac OS does not honor #! arguments for us, we do it ourselves */
 
     while (PL_doextract || gMacPerl_AlwaysExtract) {
-	if ((s = sv_gets(linestr_sv, PL_rsfp, 0)) == NULL) {
+	if ((s = sv_gets(linestr_sv, rsfp, 0)) == NULL) {
 	    if (!gMacPerl_AlwaysExtract)
 		Perl_croak(aTHX_ "No Perl script found in input\n");
 
@@ -4324,18 +4332,18 @@ S_find_beginning(pTHX_ SV* linestr_sv)
 		    PL_doextract = FALSE;
 
 	    /* Pater peccavi, file does not have #! */
-	    PerlIO_rewind(PL_rsfp);
+	    PerlIO_rewind(rsfp);
 
 	    break;
 	}
 #else
     while (PL_doextract) {
-	if ((s = sv_gets(linestr_sv, PL_rsfp, 0)) == NULL)
+	if ((s = sv_gets(linestr_sv, rsfp, 0)) == NULL)
 	    Perl_croak(aTHX_ "No Perl script found in input\n");
 #endif
 	s2 = s;
 	if (*s == '#' && s[1] == '!' && ((s = instr(s,"perl")) || (s = instr(s2,"PERL")))) {
-	    PerlIO_ungetc(PL_rsfp, '\n');		/* to keep line count right */
+	    PerlIO_ungetc(rsfp, '\n');		/* to keep line count right */
 	    PL_doextract = FALSE;
 	    while (*s && !(isSPACE (*s) || *s == '#')) s++;
 	    s2 = s;
@@ -4353,7 +4361,7 @@ S_find_beginning(pTHX_ SV* linestr_sv)
 	     * by counting lines we already skipped over
 	     */
 	    for (; maclines > 0 ; maclines--)
-		PerlIO_ungetc(PL_rsfp, '\n');
+		PerlIO_ungetc(rsfp, '\n');
 
 	    break;
 
@@ -4500,8 +4508,6 @@ Perl_init_debugger(pTHX)
     sv_setiv(PL_DBtrace, 0);
     PL_DBsignal = GvSV((gv_fetchpvs("DB::signal", GV_ADDMULTI, SVt_PV)));
     sv_setiv(PL_DBsignal, 0);
-    PL_DBassertion = GvSV((gv_fetchpvs("DB::assertion", GV_ADDMULTI, SVt_PV)));
-    sv_setiv(PL_DBassertion, 0);
     PL_curstash = ostash;
 }
 

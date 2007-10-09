@@ -127,8 +127,11 @@ struct utsname {
 /* Define USE_FIXED_OSFHANDLE to fix MSVCRT's _open_osfhandle() on W95.
    It now uses some black magic to work seamlessly with the DLL CRT and
    works with MSVC++ 4.0+ or GCC/Mingw32
-	-- BKS 1-24-2000 */
-#if (defined(_M_IX86) && _MSC_VER >= 1000) || defined(__MINGW32__)
+	-- BKS 1-24-2000
+   Only use this fix for VC++ 6.x or earlier (and for GCC, which we assume
+   uses MSVCRT.DLL). Later versions use MSVCR70.dll, MSVCR71.dll, etc, which
+   do not require the fix. */
+#if (defined(_M_IX86) && _MSC_VER >= 1000 && _MSC_VER <= 1200) || defined(__MINGW32__)
 #define USE_FIXED_OSFHANDLE
 #endif
 
@@ -339,7 +342,6 @@ extern char *		win32_get_sitelib(const char *pl);
 extern char *		win32_get_vendorlib(const char *pl);
 extern int		IsWin95(void);
 extern int		IsWinNT(void);
-extern void		win32_argv2utf8(int argc, char** argv);
 
 #ifdef PERL_IMPLICIT_SYS
 extern void		win32_delete_internal_host(void *h);
@@ -361,10 +363,6 @@ typedef  char *		caddr_t;	/* In malloc.c (core address). */
 #define EMBEDMYMALLOC	/**/
 /* #define USE_PERL_SBRK	/**/
 /* #define PERL_SBRK_VIA_MALLOC	/**/
-#endif
-
-#if defined(PERLDLL) && !defined(PERL_CORE)
-#define PERL_CORE
 #endif
 
 #ifdef PERL_TEXTMODE_SCRIPTS

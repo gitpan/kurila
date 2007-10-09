@@ -175,6 +175,8 @@ the current filename and line number.
 
 =item more tests, validate against older perls
 
+=back
+
 =head1 BUGS
 
 This is only a very preliminary version.
@@ -329,7 +331,7 @@ for (
     my ( $subname, $attr, $pad_attr ) = @$_;
     my $target = do {    ## no critic strict
         no strict 'refs';
-        \*$subname;
+        \*{Symbol::fetch_glob($subname)};
     };
     *$target = sub {
         my ($op) = @_;
@@ -437,7 +439,7 @@ PRIVATE_NAMES: {
         my $method = $methop->sv_harder->PV;
         next
             unless $method =~ m/\A_/xms
-            and not defined &{"$curstash\::$method"};
+            and not defined &{*{Symbol::fetch_glob("$curstash\::$method")}};
 
         warning q[Illegal reference to private method name '%s'], $method;
     }
@@ -546,7 +548,7 @@ BARE_SUBS: {
 
         # Check that it's a function.
         next
-            unless exists &{"$curstash\::$sub"};
+            unless exists &{*{Symbol::fetch_glob("$curstash\::$sub")}};
 
         warning q[Bare sub name '%s' interpreted as string], $sub;
     }

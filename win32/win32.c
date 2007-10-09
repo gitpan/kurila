@@ -19,7 +19,7 @@
 #  define HWND_MESSAGE     ((HWND)-3)
 #endif
 #ifndef WC_NO_BEST_FIT_CHARS
-#  define WC_NO_BEST_FIT_CHARS 0x00000400
+#  define WC_NO_BEST_FIT_CHARS 0x00000400 /* requires Windows 2000 or later */
 #endif
 #include <winnt.h>
 #include <tlhelp32.h>
@@ -59,13 +59,6 @@ typedef struct {
 #include <sys/stat.h>
 #include "EXTERN.h"
 #include "perl.h"
-
-/* GCC-2.95.2/Mingw32-1.1 forgot the WINAPI on CommandLineToArgvW() */
-#if defined(__MINGW32__) && (__MINGW32_MAJOR_VERSION==1)
-#  include <shellapi.h>
-#else
-EXTERN_C LPWSTR* WINAPI CommandLineToArgvW(LPCWSTR lpCommandLine, int * pNumArgs);
-#endif
 
 #define NO_XSLOCKS
 #define PERL_NO_GET_CONTEXT
@@ -206,6 +199,12 @@ IsWinNT(void)
     return (g_osver.dwPlatformId == VER_PLATFORM_WIN32_NT);
 }
 
+int
+IsWin2000(void)
+{
+    return (g_osver.dwMajorVersion > 4);
+}
+
 EXTERN_C void
 set_w32_module_name(void)
 {
@@ -219,7 +218,7 @@ set_w32_module_name(void)
     osver.dwOSVersionInfoSize = sizeof(osver);
     GetVersionEx(&osver);
 
-    if (osver.dwPlatformId == VER_PLATFORM_WIN32_NT) {
+    if (osver.dwMajorVersion > 4) {
         WCHAR modulename[MAX_PATH];
         WCHAR fullname[MAX_PATH];
         char *ansi;
@@ -858,7 +857,7 @@ win32_opendir(const char *filename)
     scanname[len] = '\0';
 
     /* do the FindFirstFile call */
-    if (IsWinNT()) {
+    if (IsWin2000()) {
         WCHAR wscanname[sizeof(scanname)];
         MultiByteToWideChar(CP_ACP, 0, scanname, -1, wscanname, sizeof(wscanname)/sizeof(WCHAR));
 	dirp->handle = FindFirstFileW(PerlDir_mapW(wscanname), &wFindData);
@@ -949,7 +948,7 @@ win32_readdir(DIR *dirp)
 	    /* finding the next file that matches the wildcard
 	     * (which should be all of them in this directory!).
 	     */
-	    if (IsWinNT()) {
+	    if (IsWin2000()) {
                 WIN32_FIND_DATAW wFindData;
 		res = FindNextFileW(dirp->handle, &wFindData);
 		if (res) {
@@ -1348,6 +1347,7 @@ win32_kill(int pid, int sig)
                     /* Yield and wait for the other thread to send us its message_hwnd */
                     Sleep(0);
                     win32_async_check(aTHX);
+		    hwnd = w32_pseudo_child_message_hwnds[child];
                     ++count;
                 }
                 if (hwnd != INVALID_HANDLE_VALUE) {
@@ -4582,15 +4582,17 @@ Perl_init_os_extras(void)
 {
     dTHX;
     char *file = __FILE__;
-    CV *cv;
-    dXSUB_SYS;
 
-    /* load Win32 CORE stubs, assuming Win32CORE was statically linked */
-    if ((cv = get_cv("Win32CORE::bootstrap", 0))) {
-	dSP;
-	PUSHMARK(SP);
-	(void)call_sv((SV *)cv, G_EVAL|G_DISCARD|G_VOID);
-    }
+    /* Initialize Win32CORE if it has been statically linked. */
+    void (*pfn_init)(pTHX);
+#if defined(__BORLANDC__)
+    /* makedef.pl seems to have given up on fixing this issue in the .def file */
+    pfn_init = (void (*)(pTHX))GetProcAddress((HMODULE)w32_perldll_handle, "_init_Win32CORE");
+#else
+    pfn_init = (void (*)(pTHX))GetProcAddress((HMODULE)w32_perldll_handle, "init_Win32CORE");
+#endif
+    if (pfn_init)
+        pfn_init(aTHX);
 
     newXS("Win32::SetChildShowWindow", w32_SetChildShowWindow, file);
 }
@@ -4676,8 +4678,8 @@ ansify_path(void)
     WCHAR *wide_path;
     WCHAR *wide_dir;
 
-    /* there is no Unicode environment on Windows 9X */
-    if (IsWin95())
+    /* win32_ansipath() requires Windows 2000 or later */
+    if (!IsWin2000())
         return;
 
     /* fetch Unicode version of PATH */
@@ -4844,19 +4846,6 @@ win32_signal(int sig, Sighandler_t subcode)
     }
 }
 
-
-#ifdef HAVE_INTERP_INTERN
-
-static void
-win32_csighandler(int sig)
-{
-#if 0
-    dTHXa(PERL_GET_SIG_CONTEXT);
-    Perl_warn(aTHX_ "Got signal %d",sig);
-#endif
-    /* Does nothing */
-}
-
 HWND
 win32_create_message_window()
 {
@@ -4868,10 +4857,22 @@ win32_create_message_window()
      * "right" place with DispatchMessage() anymore, as there is no WindowProc
      * if there is no window handle.
      */
-    if (g_osver.dwMajorVersion < 5)
+    if (!IsWin2000())
         return NULL;
 
     return CreateWindow("Static", "", 0, 0, 0, 0, 0, HWND_MESSAGE, 0, 0, NULL);
+}
+
+#ifdef HAVE_INTERP_INTERN
+
+static void
+win32_csighandler(int sig)
+{
+#if 0
+    dTHXa(PERL_GET_SIG_CONTEXT);
+    Perl_warn(aTHX_ "Got signal %d",sig);
+#endif
+    /* Does nothing */
 }
 
 #if defined(__MINGW32__) && defined(__cplusplus)
@@ -4969,32 +4970,3 @@ Perl_sys_intern_dup(pTHX_ struct interp_intern *src, struct interp_intern *dst)
 }
 #  endif /* USE_ITHREADS */
 #endif /* HAVE_INTERP_INTERN */
-
-static void
-win32_free_argvw(pTHX_ void *ptr)
-{
-    char** argv = (char**)ptr;
-    while(*argv) {
-	Safefree(*argv);
-	*argv++ = Nullch;
-    }
-}
-
-void
-win32_argv2utf8(int argc, char** argv)
-{
-    dTHX;
-    char* psz;
-    int length, wargc;
-    LPWSTR* lpwStr = CommandLineToArgvW(GetCommandLineW(), &wargc);
-    if (lpwStr && argc) {
-	while (argc--) {
-	    length = WideCharToMultiByte(CP_UTF8, 0, lpwStr[--wargc], -1, NULL, 0, NULL, NULL);
-	    Newxz(psz, length, char);
-	    WideCharToMultiByte(CP_UTF8, 0, lpwStr[wargc], -1, psz, length, NULL, NULL);
-	    argv[argc] = psz;
-	}
-	call_atexit(win32_free_argvw, argv);
-    }
-    GlobalFree((HGLOBAL)lpwStr);
-}

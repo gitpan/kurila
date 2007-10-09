@@ -1,7 +1,7 @@
 package Socket;
 
 our($VERSION, @ISA, @EXPORT, @EXPORT_OK, %EXPORT_TAGS);
-$VERSION = "1.78";
+$VERSION = "1.79";
 
 =head1 NAME
 
@@ -395,8 +395,8 @@ sub AUTOLOAD {
     if ($error) {
 	croak $error;
     }
-    *$AUTOLOAD = sub { $val };
-    goto &$AUTOLOAD;
+    *{Symbol::fetch_glob($AUTOLOAD)} = sub { $val };
+    goto &{Symbol::fetch_glob($AUTOLOAD)};
 }
 
 XSLoader::load 'Socket', $VERSION;

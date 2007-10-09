@@ -13,7 +13,7 @@ sub import {
     my $caller = caller;
 
     no strict 'refs';
-    *{$caller.'::Config'} = \%Config;
+    *{Symbol::fetch_glob($caller.'::Config')} = \%Config;
 }
 
 1;

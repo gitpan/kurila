@@ -364,7 +364,7 @@ ARCHNAME	= $(ARCHNAME)-thread
 # version of 8.x can.)
 !IF "$(CCTYPE)" == "MSVC60" || "$(CCTYPE)" == "MSVC70" || \
     "$(CCTYPE)" == "MSVC80" || "$(CCTYPE)" == "MSVC80FREE"
-DELAYLOAD	= -DELAYLOAD:ws2_32.dll -DELAYLOAD:shell32.dll delayimp.lib
+DELAYLOAD	= -DELAYLOAD:ws2_32.dll delayimp.lib
 !ENDIF
 
 # Visual C++ 2005 (VC++ 8.x) creates manifest files for EXEs and DLLs. These
@@ -745,7 +745,6 @@ CORE_NOCFG_H	=		\
 		..\EXTERN.h	\
 		..\perlvars.h	\
 		..\intrpvar.h	\
-		..\thrdvar.h	\
 		.\include\dirent.h	\
 		.\include\netdb.h	\
 		.\include\sys\socket.h	\
@@ -819,7 +818,7 @@ all : .\config.h $(GLOBEXE) $(MINIMOD) $(CONFIGPM) $(UNIDATAFILES) $(PERLEXE) \
 	$(X2P) MakePPPort Extensions $(PERLSTATIC)
 	@echo	Everything is up to date. '$(MAKE_BARE) test' to run test suite.
 
-..\regnodes.h : ..\regcomp.sym
+..\regnodes.h : ..\regcomp.sym ..\regcomp.pl ..\regexp.h
 	cd ..
 	regcomp.pl
 	cd win32
@@ -985,13 +984,13 @@ perlmain.c : runperl.c
 	copy runperl.c perlmain.c
 
 perlmain$(o) : perlmain.c
-	$(CC) $(CFLAGS_O) -UPERLDLL $(OBJOUT_FLAG)$@ -c perlmain.c
+	$(CC) $(CFLAGS_O:-DPERLDLL=-UPERLDLL) $(OBJOUT_FLAG)$@ -c perlmain.c
 
 perlmainst.c : runperl.c
 	copy runperl.c perlmainst.c
 
 perlmainst$(o) : perlmainst.c
-	$(CC) $(CFLAGS_O) -DPERLDLL $(OBJOUT_FLAG)$@ -c perlmainst.c
+	$(CC) $(CFLAGS_O) $(OBJOUT_FLAG)$@ -c perlmainst.c
 
 $(PERLEXE): $(PERLDLL) $(CONFIGPM) $(PERLEXE_OBJ) $(PERLEXE_RES)
 	$(LINK32) -subsystem:console -out:$@ -stack:0x1000000 $(LINK_FLAGS) \
@@ -1195,11 +1194,7 @@ distclean: realclean
 	-del /f bin\*.bat
 	-del /f perllibst.h
 	-del /f $(PERLEXE_ICO) perl.base
-	ren ..\lib\Net\Changes.libnet Changes.tenbil
-	ren ..\lib\Net\README.libnet  README.tenbil	
 	-cd .. && del /s *.lib *.map *.pdb *.ilk *.bs *$(o) .exists pm_to_blib
-	ren ..\lib\Net\Changes.tenbil Changes.libnet
-	ren ..\lib\Net\README.tenbil  README.libnet	
 	-cd $(EXTDIR) && del /s *.def Makefile Makefile.old
 	-if exist $(AUTODIR) rmdir /s /q $(AUTODIR)
 	-if exist $(COREDIR) rmdir /s /q $(COREDIR)
@@ -1305,11 +1300,7 @@ _clean :
 	-@$(DEL) $(WIN32_OBJ)
 	-@$(DEL) $(DLL_OBJ)
 	-@$(DEL) $(X2P_OBJ)
-	ren ..\lib\Net\Changes.libnet Changes.tenbil
-	ren ..\lib\Net\README.libnet  README.tenbil	
 	-@$(DEL) ..\*$(o) ..\*.lib ..\*.exp *$(o) *.lib *.exp *.res
-	ren ..\lib\Net\Changes.tenbil Changes.libnet
-	ren ..\lib\Net\README.tenbil  README.libnet	
 	-@$(DEL) ..\t\*.exe ..\t\*.dll ..\t\*.bat
 	-@$(DEL) ..\x2p\*.exe ..\x2p\*.bat
 	-@$(DEL) *.ilk

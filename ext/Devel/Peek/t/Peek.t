@@ -20,6 +20,7 @@ our $DEBUG = 0;
 open(SAVERR, ">&STDERR") or die "Can't dup STDERR: $!";
 
 sub do_test {
+    local $Level = $Level + 1;
     my $pattern = pop;
     if (open(OUT,">peek$$")) {
 	open(STDERR, ">&OUT") or die "Can't dup OUT: $!";
@@ -127,8 +128,8 @@ do_test( 7,
   FLAGS = \\(NOK,pNOK\\)
   IV = \\d+
   NV = 789\\.(?:1(?:000+\d+)?|0999+\d+)
-  PV = $ADDR "789"\\\0 \\[UTF8 "789\\.1"\\]
-  CUR = 5
+  PV = $ADDR "789"\\\0 \\[UTF8 "789"\\]
+  CUR = 3
   LEN = \\d+');
 
 do_test( 8,
@@ -150,18 +151,12 @@ do_test(10,
   REFCNT = 1
   FLAGS = \\(ROK\\)
   RV = $ADDR
-  SV = PVMG\\($ADDR\\) at $ADDR
+  SV = PV\\($ADDR\\) at $ADDR
     REFCNT = 2
-    FLAGS = \\(SMG,POK,pPOK\\)
-    IV = 0
-    NV = 0
+    FLAGS = \\(POK,pPOK\\)
     PV = $ADDR "foo"\\\0 \\[UTF8 "foo"\\]
     CUR = 3
     LEN = \\d+
-    MAGIC = $ADDR
-      MG_VIRTUAL = &PL_vtbl_utf8
-      MG_TYPE = PERL_MAGIC_utf8\\(w\\)
-      MG_LEN = 3
 ');
 
 my $c_pattern;
@@ -338,7 +333,7 @@ do_test(18,
 'SV = PV\\($ADDR\\) at $ADDR
   REFCNT = 1
   FLAGS = \\((?:PADTMP,)?POK,pPOK\\)
-  PV = $ADDR "\\\304\\\200\\\0\\\310\\\200"\\\0 \\[UTF8 "\\\x\\{100\\}\\\x\\{0\\}\\\x\\{200\\}"\\]
+  PV = $ADDR "\\\x\\[c4\\]\\\x\\[80\\]\\\x\\[0\\]\\\x\\[c8\\]\\\x\\[80\\]"\\\0 \\[UTF8 "\\\x\\{100\\}\\\x\\{0\\}\\\x\\{200\\}"\\]
   CUR = 5
   LEN = \\d+');
 
@@ -358,11 +353,11 @@ do_test(19,
     MAX = 7
     RITER = -1
     EITER = $ADDR
-    Elt "\\\304\\\200" \\[UTF8 "\\\x[{]100[}]"\\] HASH = $ADDR
+    Elt "\\\x\\[c4\\]\\\x\\[80\\]" \\[UTF8 "\\\x[{]100[}]"\\] HASH = $ADDR
     SV = PV\\($ADDR\\) at $ADDR
       REFCNT = 1
       FLAGS = \\(POK,pPOK\\)
-      PV = $ADDR "\\\310\\\200"\\\0 \\[UTF8 "\\\x[{]200[}]"]
+      PV = $ADDR "\\\x\\[c8\\]\\\x\\[80\\]"\\\0 \\[UTF8 "\\\x[{]200[}]"]
       CUR = 2
       LEN = \\d+');
 
@@ -378,9 +373,6 @@ do_test(20,
   PV = $ADDR ""\\\0 \\[UTF8 ""\\]
   CUR = 0
   LEN = \d+
-  MAGIC = $ADDR
-    MG_VIRTUAL = &PL_vtbl_utf8
-    MG_TYPE = PERL_MAGIC_utf8[(]w[)]
   MAGIC = $ADDR
     MG_VIRTUAL = &PL_vtbl_mglob
     MG_TYPE = PERL_MAGIC_regex_global\\(g\\)
@@ -441,10 +433,6 @@ do_test(22,
     PV = $ADDR "" \\[UTF8 ""\\]
     CUR = 0
     LEN = 0
-    MAGIC = $ADDR
-      MG_VIRTUAL = &PL_vtbl_utf8
-      MG_TYPE = PERL_MAGIC_utf8[(]w[)]
-      MG_LEN = 16
     STASH = $ADDR\s+"Foobar"');
 
 # Constant subroutines

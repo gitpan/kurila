@@ -55,8 +55,17 @@ typedef struct regexp_paren_pair {
     I32 end;
 } regexp_paren_pair;
 
-/* this is ordered such that the most commonly used 
-   fields are at the start of the struct */
+/*
+  The regexp/REGEXP struct, see L<perlreapi> for further documentation
+  on the individual fields. The struct is ordered so that the most
+  commonly used fields are placed at the start.
+
+  Any patch that adds items to this struct will need to include
+  changes to F<sv.c> (C<Perl_re_dup()>) and F<regcomp.c>
+  (C<pregfree()>). This involves freeing or cloning items in the
+  regexp's data array based on the data item's type.
+*/
+
 typedef struct regexp {
         /* what engine created this regexp? */
 	const struct regexp_engine* engine; 
@@ -117,19 +126,95 @@ typedef struct regexp_engine {
                      char* strbeg, I32 minend, SV* screamer,
                      void* data, U32 flags);
     char*   (*intuit) (pTHX_ REGEXP * const rx, SV *sv, char *strpos,
-                       char *strend, U32 flags,
-                       struct re_scream_pos_data_s *data);
+                       char *strend, const U32 flags,
+                       re_scream_pos_data *data);
     SV*     (*checkstr) (pTHX_ REGEXP * const rx);
     void    (*free) (pTHX_ REGEXP * const rx);
-    void    (*numbered_buff_get) (pTHX_ REGEXP * const rx,
-                const I32 paren, SV * const usesv);
-    SV*     (*named_buff_get)(pTHX_ REGEXP * const rx, SV * const namesv,
-                const U32 flags);
+    void    (*numbered_buff_FETCH) (pTHX_ REGEXP * const rx, const I32 paren,
+                                    SV * const sv);
+    void    (*numbered_buff_STORE) (pTHX_ REGEXP * const rx, const I32 paren,
+                                   SV const * const value);
+    I32     (*numbered_buff_LENGTH) (pTHX_ REGEXP * const rx, const SV * const sv,
+                                    const I32 paren);
+    SV*     (*named_buff) (pTHX_ REGEXP * const rx, SV * const key,
+                           SV * const value, const U32 flags);
+    SV*     (*named_buff_iter) (pTHX_ REGEXP * const rx, const SV * const lastkey,
+                                const U32 flags);
     SV*     (*qr_package)(pTHX_ REGEXP * const rx);
 #ifdef USE_ITHREADS
     void*   (*dupe) (pTHX_ REGEXP * const rx, CLONE_PARAMS *param);
-#endif    
+#endif
 } regexp_engine;
+
+/*
+  These are passed to the numbered capture variable callbacks as the
+  paren name. >= 1 is reserved for actual numbered captures, i.e. $1,
+  $2 etc.
+*/
+#define RX_BUFF_IDX_PREMATCH  -2 /* $` / ${^PREMATCH}  */
+#define RX_BUFF_IDX_POSTMATCH -1 /* $' / ${^POSTMATCH} */
+#define RX_BUFF_IDX_FULLMATCH      0 /* $& / ${^MATCH}     */
+
+/*
+  Flags that are passed to the named_buff and named_buff_iter
+  callbacks above. Those routines are called from universal.c via the
+  Tie::Hash::NamedCapture interface for %+ and %- and the re::
+  functions in the same file.
+*/
+
+/* The Tie::Hash::NamedCapture operation this is part of, if any */
+#define RXapif_FETCH     0x0001
+#define RXapif_STORE     0x0002
+#define RXapif_DELETE    0x0004
+#define RXapif_CLEAR     0x0008
+#define RXapif_EXISTS    0x0010
+#define RXapif_SCALAR    0x0020
+#define RXapif_FIRSTKEY  0x0040
+#define RXapif_NEXTKEY   0x0080
+
+/* Whether %+ or %- is being operated on */
+#define RXapif_ONE       0x0100 /* %+ */
+#define RXapif_ALL       0x0200 /* %- */
+
+/* Whether this is being called from a re:: function */
+#define RXapif_REGNAME         0x0400
+#define RXapif_REGNAMES        0x0800
+#define RXapif_REGNAMES_COUNT  0x1000 
+
+/*
+=head1 REGEXP Functions
+
+=for apidoc Am|REGEXP *|SvRX|SV *sv
+
+Convenience macro to get the REGEXP from a SV. This is approximately
+equivalent to the following snippet:
+
+    if (SvMAGICAL(sv))
+        mg_get(sv);
+    if (SvROK(sv) &&
+        (tmpsv = (SV*)SvRV(sv)) &&
+        SvTYPE(tmpsv) == SVt_PVMG &&
+        (tmpmg = mg_find(tmpsv, PERL_MAGIC_qr)))
+    {
+        return (REGEXP *)tmpmg->mg_obj;
+    }
+
+NULL will be returned if a REGEXP* is not found.
+
+=for apidoc Am|bool|SvRXOK|SV* sv
+
+Returns a boolean indicating whether the SV contains qr magic
+(PERL_MAGIC_qr).
+
+If you want to do something with the REGEXP* later use SvRX instead
+and check for NULL.
+
+=cut
+*/
+
+#define SvRX(sv)   (Perl_get_re_arg(aTHX_ sv))
+#define SvRXOK(sv) (Perl_get_re_arg(aTHX_ sv) ? TRUE : FALSE)
+
 
 /* Flags stored in regexp->extflags 
  * These are used by code external to the regexp engine
@@ -162,7 +247,7 @@ typedef struct regexp_engine {
 #define RXf_PMf_FOLD    	0x00004000 /* /i         */
 #define RXf_PMf_EXTENDED	0x00008000 /* /x         */
 #define RXf_PMf_UTF8            0x00010000 /* /u         */
-#define RXf_PMf_KEEPCOPY	0x00020000 /* /k         */
+#define RXf_PMf_KEEPCOPY	0x00020000 /* /p         */
 /* these flags are transfered from the PMOP->op_pmflags member during compilation */
 #define RXf_PMf_STD_PMMOD	(RXf_PMf_MULTILINE|RXf_PMf_SINGLELINE|RXf_PMf_FOLD|RXf_PMf_EXTENDED|RXf_PMf_UTF8)
 #define RXf_PMf_COMPILETIME	(RXf_PMf_MULTILINE|RXf_PMf_SINGLELINE|RXf_PMf_FOLD|RXf_PMf_EXTENDED|RXf_PMf_KEEPCOPY|RXf_PMf_UTF8)
@@ -213,8 +298,8 @@ typedef struct regexp_engine {
 #define RXf_CANY_SEEN   	0x00100000
 
 /* Special */
-#define RXf_NOSCAN      	0x00200000
-#define RXf_CHECK_ALL   	0x00400000
+#define RXf_NOSCAN      	0x00100000
+#define RXf_CHECK_ALL   	0x00200000
 
 /* Intuit related */
 #define RXf_USE_INTUIT_NOML	0x02000000

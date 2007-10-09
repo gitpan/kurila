@@ -219,11 +219,44 @@
 #define CALLREGFREE_PVT(prog) \
     if(prog) CALL_FPTR((prog)->engine->free)(aTHX_ (prog))
 
-#define CALLREG_NUMBUF(rx,paren,usesv) \
-    CALL_FPTR((rx)->engine->numbered_buff_get)(aTHX_ (rx),(paren),(usesv))
+#define CALLREG_NUMBUF_FETCH(rx,paren,usesv)                                \
+    CALL_FPTR((rx)->engine->numbered_buff_FETCH)(aTHX_ (rx),(paren),(usesv))
 
-#define CALLREG_NAMEDBUF(rx,name,flags) \
-    CALL_FPTR((rx)->engine->named_buff_get)(aTHX_ (rx),(name),(flags))
+#define CALLREG_NUMBUF_STORE(rx,paren,value) \
+    CALL_FPTR((rx)->engine->numbered_buff_STORE)(aTHX_ (rx),(paren),(value))
+
+#define CALLREG_NUMBUF_LENGTH(rx,sv,paren)                              \
+    CALL_FPTR((rx)->engine->numbered_buff_LENGTH)(aTHX_ (rx),(sv),(paren))
+
+#define CALLREG_NAMED_BUFF_FETCH(rx, key, flags) \
+    CALL_FPTR((rx)->engine->named_buff)(aTHX_ (rx), (key), NULL, ((flags) | RXapif_FETCH))
+
+#define CALLREG_NAMED_BUFF_STORE(rx, key, value, flags) \
+    CALL_FPTR((rx)->engine->named_buff)(aTHX_ (rx), (key), (value), ((flags) | RXapif_STORE))
+
+#define CALLREG_NAMED_BUFF_DELETE(rx, key, flags) \
+    CALL_FPTR((rx)->engine->named_buff)(aTHX_ (rx),(key), NULL, ((flags) | RXapif_DELETE))
+
+#define CALLREG_NAMED_BUFF_CLEAR(rx, flags) \
+    CALL_FPTR((rx)->engine->named_buff)(aTHX_ (rx), NULL, NULL, ((flags) | RXapif_CLEAR))
+
+#define CALLREG_NAMED_BUFF_EXISTS(rx, key, flags) \
+    CALL_FPTR((rx)->engine->named_buff)(aTHX_ (rx), (key), NULL, ((flags) | RXapif_EXISTS))
+
+#define CALLREG_NAMED_BUFF_FIRSTKEY(rx, flags) \
+    CALL_FPTR((rx)->engine->named_buff_iter)(aTHX_ (rx), NULL, ((flags) | RXapif_FIRSTKEY))
+
+#define CALLREG_NAMED_BUFF_NEXTKEY(rx, lastkey, flags) \
+    CALL_FPTR((rx)->engine->named_buff_iter)(aTHX_ (rx), (lastkey), ((flags) | RXapif_NEXTKEY))
+
+#define CALLREG_NAMED_BUFF_SCALAR(rx, flags) \
+    CALL_FPTR((rx)->engine->named_buff)(aTHX_ (rx), NULL, NULL, ((flags) | RXapif_SCALAR))
+
+#define CALLREG_NAMED_BUFF_COUNT(rx) \
+    CALL_FPTR((rx)->engine->named_buff)(aTHX_ (rx), NULL, NULL, RXapif_REGNAMES_COUNT)
+
+#define CALLREG_NAMED_BUFF_ALL(rx, flags) \
+    CALL_FPTR((rx)->engine->named_buff)(aTHX_ (rx), NULL, NULL, flags)
 
 #define CALLREG_PACKAGE(rx) \
     CALL_FPTR((rx)->engine->qr_package)(aTHX_ (rx))
@@ -640,6 +673,11 @@ EXTERN_C int syscall(int, ...);
 
 #if defined(HAS_USLEEP) && !defined(HAS_USLEEP_PROTO) && !defined(PERL_MICRO)
 EXTERN_C int usleep(unsigned int);
+#endif
+
+/* Funky places that do not have socket stuff. */
+#if defined(__LIBCATAMOUNT__)
+#  define MYSWAP
 #endif
 
 #ifdef PERL_MICRO /* Last chance to export Perl_my_swap */
@@ -3207,8 +3245,14 @@ union any {
 typedef I32 (*filter_t) (pTHX_ int, SV *, int);
 
 #define FILTER_READ(idx, sv, len)  filter_read(idx, sv, len)
-#define FILTER_DATA(idx)	   (AvARRAY(PL_rsfp_filters)[idx])
-#define FILTER_ISREADER(idx)	   (idx >= AvFILLp(PL_rsfp_filters))
+#define FILTER_DATA(idx) \
+	    (PL_parser ? AvARRAY(PL_parser->rsfp_filters)[idx] : NULL)
+#define FILTER_ISREADER(idx) \
+	    (PL_parser && PL_parser->rsfp_filters \
+		&& idx >= AvFILLp(PL_parser->rsfp_filters))
+#define PERL_FILTER_EXISTS(i) \
+	    (PL_parser && PL_parser->rsfp_filters \
+		&& (i) <= av_len(PL_parser->rsfp_filters))
 
 #if defined(_AIX) && !defined(_AIX43)
 #if defined(USE_REENTRANT) || defined(_REENTRANT) || defined(_THREAD_SAFE)
@@ -3228,6 +3272,12 @@ typedef        struct crypt_data {     /* straight from /usr/include/crypt.h */
 
 #if !defined(OS2) && !defined(MACOS_TRADITIONAL)
 #  include "iperlsys.h"
+#endif
+
+#ifdef __LIBCATAMOUNT__
+#undef HAS_PASSWD  /* unixish.h but not unixish enough. */ 
+#undef HAS_GROUP
+#define FAKE_BIT_BUCKET
 #endif
 
 /* [perl #22371] Algorimic Complexity Attack on Perl 5.6.1, 5.8.0.
@@ -3280,8 +3330,8 @@ struct _sublex_info {
     U8 super_state;	/* lexer state to save */
     U16 sub_inwhat;	/* "lex_inwhat" to use */
     OP *sub_op;		/* "lex_op" to use */
-    char *super_bufptr;	/* PL_bufptr that was */
-    char *super_bufend;	/* PL_bufend that was */
+    char *super_bufptr;	/* PL_parser->bufptr that was */
+    char *super_bufend;	/* PL_parser->bufend that was */
 };
 
 #include "parser.h"
@@ -3678,7 +3728,6 @@ Gid_t getegid (void);
 #define PERL_MAGIC_nkeys	  'k' /* scalar(keys()) lvalue */
 #define PERL_MAGIC_dbfile	  'L' /* Debugger %_<filename */
 #define PERL_MAGIC_dbline	  'l' /* Debugger %_<filename element */
-#define PERL_MAGIC_mutex	  'm' /* for lock op */
 #define PERL_MAGIC_shared	  'N' /* Shared between threads */
 #define PERL_MAGIC_shared_scalar  'n' /* Shared between threads */
 #define PERL_MAGIC_collxfrm	  'o' /* Locale transformation */
@@ -4356,10 +4405,10 @@ enum {		/* pass one of these to get_vtbl */
    special and there is no need for HINT_PRIVATE_MASK for COPs
    However, bitops store HINT_INTEGER in their op_private.  */
 #define HINT_INTEGER		0x00000001 /* integer pragma */
-#define HINT_STRICT_REFS	0x00000002 /* strict pragma */
+#define HINT_NOTUSED2	0x00000002 /* not used: was strict refs pragma */
 #define HINT_NOTUSED		0x00000004 /* not used. was: locale pragma */
 #define HINT_BYTES		0x00000008 /* bytes pragma */
-#define HINT_ARYBASE		0x00000010 /* $[ is non-zero */
+#define HINT_NOTUSED_2		0x00000010 /* not used. was: HINT_ARYBASE: $[ is non-zero */
 				/* Note: 20,40,80 used for NATIVE_HINTS */
 				/* currently defined by vms/vmsish.h */
 
@@ -4384,17 +4433,13 @@ enum {		/* pass one of these to get_vtbl */
 #define HINT_UTF8		0x00800000 /* utf8 pragma */
 #define HINT_CODEPOINTS         0x01000000 /* utf8 pragma (for codepoints) */
 
-/* assertions pragma, stored in $^H{assertions} */
-#define HINT_ASSERTING          0x00000001
-#define HINT_ASSERTIONSSEEN     0x00000002
-
 /* The following are stored in $^H{sort}, not in PL_hints */
 #define HINT_SORT_SORT_BITS	0x000000FF /* allow 256 different ones */
 #define HINT_SORT_QUICKSORT	0x00000001
 #define HINT_SORT_MERGESORT	0x00000002
 #define HINT_SORT_STABLE	0x00000100 /* sort styles (currently one) */
 
-#define DEFAULT_HINTS 0 /* ( HINT_STRICT_REFS | HINT_STRICT_SUBS ) */
+#define DEFAULT_HINTS ( HINT_STRICT_SUBS ) /* ( HINT_STRICT_REFS | HINT_STRICT_SUBS ) */
 
 /* Various states of the input record separator SV (rs) */
 #define RsSNARF(sv)   (! SvOK(sv))
@@ -4424,7 +4469,7 @@ typedef I32 (CPERLscope(*regexec_t)) (pTHX_ regexp* prog, char* stringarg,
 typedef char* (CPERLscope(*re_intuit_start_t)) (pTHX_ regexp *prog, SV *sv,
 						char *strpos, char *strend,
 						U32 flags,
-						struct re_scream_pos_data_s *d);
+						re_scream_pos_data *d);
 typedef SV*	(CPERLscope(*re_intuit_string_t)) (pTHX_ regexp *prog);
 typedef void	(CPERLscope(*regfree_t)) (pTHX_ struct regexp* r);
 typedef regexp*(CPERLscope(*regdupe_t)) (pTHX_ const regexp* r, CLONE_PARAMS *param);
@@ -4493,7 +4538,6 @@ struct perl_vars *PL_VarsPtr;
 */
 
 struct interpreter {
-#  include "thrdvar.h"
 #  include "intrpvar.h"
 };
 
@@ -4558,7 +4602,6 @@ struct tempsym; /* defined in pp_pack.c */
 #if !defined(MULTIPLICITY)
 START_EXTERN_C
 #  include "intrpvar.h"
-#  include "thrdvar.h"
 END_EXTERN_C
 #endif
 
@@ -5092,7 +5135,6 @@ typedef struct am_table_short AMTS;
 #define PERLDBf_GOTO		0x80	/* Report goto: call DB::goto */
 #define PERLDBf_NAMEEVAL	0x100	/* Informative names for evals */
 #define PERLDBf_NAMEANON	0x200	/* Informative names for anon subs */
-#define PERLDBf_ASSERTION       0x400   /* Debug assertion subs enter/exit */
 
 #define PERLDB_SUB	(PL_perldb && (PL_perldb & PERLDBf_SUB))
 #define PERLDB_LINE	(PL_perldb && (PL_perldb & PERLDBf_LINE))

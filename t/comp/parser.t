@@ -9,7 +9,7 @@ BEGIN {
 }
 
 BEGIN { require "./test.pl"; }
-plan( tests => 108 );
+plan( tests => 102 );
 
 eval '%@x=0;';
 like( $@, qr/^Can't modify hash dereference in repeat \(x\)/, '%@x=0' );
@@ -156,15 +156,6 @@ EOF
     like( $@, qr/syntax error/, "use without body" );
 }
 
-# Bug #27024
-{
-    # this used to segfault (because $[=1 is optimized away to a null block)
-    my $x;
-    $[ = 1 while $x;
-    pass();
-    $[ = 0; # restore the original value for less side-effects
-}
-
 # [perl #2738] perl segfautls on input
 {
     eval q{ sub _ <> {} };
@@ -175,28 +166,6 @@ EOF
 
     eval q{ sub _ __FILE__ {} };
     like($@, qr/Illegal declaration of subroutine main::_/, "__FILE__ as prototype");
-}
-
-# [perl #36313] perl -e "1for$[=0" crash
-{
-    my $x;
-    $x = 1 for ($[) = 0;
-    pass('optimized assignment to $[ used to segfault in list context');
-    if ($[ = 0) { $x = 1 }
-    pass('optimized assignment to $[ used to segfault in scalar context');
-    $x = ($[=2.4);
-    is($x, 2, 'scalar assignment to $[ behaves like other variables');
-    $x = (($[) = 0);
-    is($x, 1, 'list assignment to $[ behaves like other variables');
-    $x = eval q{ ($[, $x) = (0) };
-    like($@, qr/That use of \$\[ is unsupported/,
-             'cannot assign to $[ in a list');
-    eval q{ ($[) = (0, 1) };
-    like($@, qr/That use of \$\[ is unsupported/,
-             'cannot assign list of >1 elements to $[');
-    eval q{ ($[) = () };
-    like($@, qr/That use of \$\[ is unsupported/,
-             'cannot assign list of <1 elements to $[');
 }
 
 # tests for "Bad name"
@@ -351,6 +320,16 @@ eval <<'EOSTANZA'; die $@ if $@;
 #line 61 "Great hail! we cry to the comers|From the dazzling unknown shore;|Bring us hither your sun and your summers;|And renew our world as of yore;|You shall teach us your song's new numbers,|And things that we dreamed not before:|Yea, in spite of a dreamer who slumbers,|And a singer who sings no more."
 check(qr/^Great hail!.*no more\.$/, 61, "Overflow both small buffer checks");
 EOSTANZA
+
+{
+    my @x = 'string';
+    is(eval q{ "$x[0]->strung" }, 'string->strung',
+	'literal -> after an array subscript within ""');
+    @x = ['string'];
+    # this used to give "string"
+    like("$x[0]-> [0]", qr/^ARRAY\([^)]*\)-> \[0]\z/,
+	'literal -> [0] after an array subscript within ""');
+}
 
 __END__
 # Don't add new tests HERE. See note above

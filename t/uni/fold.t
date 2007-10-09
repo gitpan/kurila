@@ -7,7 +7,7 @@ use File::Spec;
 
 use utf8;
 
-my $CF = File::Spec->catfile(File::Spec->catdir(File::Spec->updir,
+my $CF = 'File::Spec'->catfile('File::Spec'->catdir('File::Spec'->updir,
 					       "lib", "unicore"),
 			    "CaseFolding.txt");
 
@@ -36,6 +36,7 @@ if (open(CF, $CF)) {
 	$i++;
 	my $a = pack("U0U*", hex $code);
 	my $b = pack("U0U*", map { hex } split " ", $mapping);
+        $todo = (utf8::length($b) > 1 ? "TODO" : "");
 	my $t0 = ":$a:" =~ /:$a:/    ? 1 : 0;
 	my $t1 = ":$a:" =~ /:$a:/i   ? 1 : 0;
 	my $t2 = ":$a:" =~ /:[$a]:/  ? 1 : 0;

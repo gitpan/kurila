@@ -177,7 +177,6 @@ ref $xref			# ref
 ref $cstr			# ref nonref
 `$runme -e "print qq[1\\n]"`				# backtick skip(MSWin32)
 `$undefed`			# backtick undef skip(MSWin32)
-<*>				# glob
 <OP>				# readline
 'faked'				# rcatline
 (@z = (1 .. 3))			# aassign
@@ -245,7 +244,6 @@ uc $cstr			# uc
 lc $cstr			# lc
 quotemeta $cstr			# quotemeta
 @$aref				# rv2av
-do { no strict; @$undefed }			# rv2av undef
 (each %h) % 2 == 1		# each
 values %h			# values
 keys %h				# keys

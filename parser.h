@@ -45,19 +45,37 @@ typedef struct yy_parser {
     U8		lex_defer;	/* state after determined token */
     bool	lex_dojoin;	/* doing an array interpolation */
     U8		lex_expect;	/* expect after determined token */
+    U8		expect;		/* how to interpret ambiguous tokens */
     OP		*lex_inpat;	/* in pattern $) and $| are special */
     OP		*lex_op;	/* extra info to pass back on op */
     SV		*lex_repl;	/* runtime replacement from s/// */
     U16		lex_inwhat;	/* what kind of quoting are we in */
+    OPCODE	last_lop_op;	/* last list operator */
     I32		lex_starts;	/* how many interps done on level */
     SV		*lex_stuff;	/* runtime pattern from m// or s/// */
     I32		multi_start;	/* 1st line of multi-line string */
+    I32		multi_end;	/* last line of multi-line string */
     char	multi_open;	/* delimiter of said string */
     char	multi_close;	/* delimiter of said string */
     char	pending_ident;	/* pending identifier lookup */
     bool	preambled;
+    /* XXX I32 space */
     SUBLEXINFO	sublex_info;
     SV		*linestr;	/* current chunk of src text */
+    char	*bufptr;	
+    char	*oldbufptr;	
+    char	*oldoldbufptr;	
+    char	*bufend;	
+    char	*linestart;	/* beginning of most recently read line */
+    char	*last_uni;	/* position of last named-unary op */
+    char	*last_lop;	/* position of last list operator */
+    line_t	copline;	/* current line number */
+    U16		in_my;		/* we're compiling a "my"/"our" declaration */
+    U8		lex_state;	/* next token is determined */
+    /* space for a U8 here */
+    PerlIO	*rsfp;		/* current source file pointer */
+    AV		*rsfp_filters;	/* holds chain of active source filters */
+    U8		error_count;	/* how many compile errors so far, max 10 */
 
 #ifdef PERL_MAD
     SV		*endwhite;
@@ -72,7 +90,19 @@ typedef struct yy_parser {
     SV		*thisstuff;
     SV		*thistoken;
     SV		*thiswhite;
+
+/* What we know when we're in LEX_KNOWNEXT state. */
+    NEXTTOKE	nexttoke[5];	/* value of next token, if any */
+    I32		curforce;
+#else
+    YYSTYPE	nextval[5];	/* value of next token, if any */
+    I32		nexttype[5];	/* type of next token */
+    I32		nexttoke;
 #endif
+
+    COP		*saved_curcop;	/* the previous PL_curcop */
+    char	tokenbuf[256];
+
 } yy_parser;
     
 

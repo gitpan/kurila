@@ -139,8 +139,8 @@ prog	:	progstart
 
 /* An ordinary block */
 block	:	'{' remember lineseq '}'
-			{ if (PL_copline > (line_t)IVAL($1))
-			      PL_copline = (line_t)IVAL($1);
+			{ if (PL_parser->copline > (line_t)IVAL($1))
+			      PL_parser->copline = (line_t)IVAL($1);
 			  $$ = block_end($2, $3);
 			  TOKEN_GETMAD($1,$$,'{');
 			  TOKEN_GETMAD($4,$$,'}');
@@ -157,14 +157,14 @@ mydefsv:	/* NULL */	/* lexicalize $_ */
 
 progstart:
 		{
-		    PL_expect = XSTATE; $$ = block_start(TRUE);
+		    PL_parser->expect = XSTATE; $$ = block_start(TRUE);
 		}
 	;
 
 
 mblock	:	'{' mremember lineseq '}'
-			{ if (PL_copline > (line_t)IVAL($1))
-			      PL_copline = (line_t)IVAL($1);
+			{ if (PL_parser->copline > (line_t)IVAL($1))
+			      PL_parser->copline = (line_t)IVAL($1);
 			  $$ = block_end($2, $3);
 			  TOKEN_GETMAD($1,$$,'{');
 			  TOKEN_GETMAD($4,$$,'}');
@@ -216,17 +216,17 @@ line	:	label cond
 			      $$ = IF_MAD(
 					newOP(OP_NULL, 0),
 					Nullop);
-                              PL_copline = NOLINE;
+                              PL_parser->copline = NOLINE;
 			      TOKEN_FREE($1);
 			      TOKEN_GETMAD($2,$$,';');
 			  }
-			  PL_expect = XSTATE;
+			  PL_parser->expect = XSTATE;
 			}
 	|	label sideff ';'
 			{
 			  $$ = newSTATEOP(0, PVAL($1), $2);
-			  PL_expect = XSTATE;
-			  DO_MAD(
+			  PL_parser->expect = XSTATE;
+			  DO_MAD({
 			      /* sideff might already have a nexstate */
 			      OP* op = ((LISTOP*)$$)->op_first;
 			      if (op) {
@@ -236,7 +236,7 @@ line	:	label cond
 				  token_getmad($1,op,'L');
 				  token_getmad($3,op,';');
 			      }
-			  )
+			  })
 			}
 	;
 
@@ -276,7 +276,7 @@ else	:	/* NULL */
 			  TOKEN_GETMAD($1,$$,'o');
 			}
 	|	ELSIF '(' mexpr ')' mblock else
-			{ PL_copline = (line_t)IVAL($1);
+			{ PL_parser->copline = (line_t)IVAL($1);
 			    $$ = newCONDOP(0, $3, scope($5), $6);
 			    PL_hints |= HINT_BLOCK_SCOPE;
 			  TOKEN_GETMAD($1,$$,'I');
@@ -287,7 +287,7 @@ else	:	/* NULL */
 
 /* Real conditional expressions */
 cond	:	IF '(' remember mexpr ')' mblock else
-			{ PL_copline = (line_t)IVAL($1);
+			{ PL_parser->copline = (line_t)IVAL($1);
 			    $$ = block_end($3,
 				   newCONDOP(0, $4, scope($6), $7));
 			  TOKEN_GETMAD($1,$$,'I');
@@ -295,7 +295,7 @@ cond	:	IF '(' remember mexpr ')' mblock else
 			  TOKEN_GETMAD($5,$$,')');
 			}
 	|	UNLESS '(' remember miexpr ')' mblock else
-			{ PL_copline = (line_t)IVAL($1);
+			{ PL_parser->copline = (line_t)IVAL($1);
 			    $$ = block_end($3,
 				   newCONDOP(0, $4, scope($6), $7));
 			  TOKEN_GETMAD($1,$$,'I');
@@ -324,7 +324,7 @@ cont	:	/* NULL */
 /* Loops: while, until, for, and a bare block */
 loop	:	label WHILE '(' remember texpr ')' mintro mblock cont
 			{ OP *innerop;
-			  PL_copline = (line_t)$2;
+			  PL_parser->copline = (line_t)$2;
 			    $$ = block_end($4,
 				   newSTATEOP(0, PVAL($1),
 				     innerop = newWHILEOP(0, 1, (LOOP*)Nullop,
@@ -337,7 +337,7 @@ loop	:	label WHILE '(' remember texpr ')' mintro mblock cont
 
 	|	label UNTIL '(' remember iexpr ')' mintro mblock cont
 			{ OP *innerop;
-			  PL_copline = (line_t)$2;
+			  PL_parser->copline = (line_t)$2;
 			    $$ = block_end($4,
 				   newSTATEOP(0, PVAL($1),
 				     innerop = newWHILEOP(0, 1, (LOOP*)Nullop,
@@ -382,7 +382,7 @@ loop	:	label WHILE '(' remember texpr ')' mintro mblock cont
 	    	    mblock
 			/* basically fake up an initialize-while lineseq */
 			{ OP *forop;
-			  PL_copline = (line_t)IVAL($2);
+			  PL_parser->copline = (line_t)IVAL($2);
 			  forop = newSTATEOP(0, PVAL($1),
 					    newWHILEOP(0, 1, (LOOP*)Nullop,
 						IVAL($2), scalar($7),
@@ -419,7 +419,7 @@ loop	:	label WHILE '(' remember texpr ')' mintro mblock cont
 
 /* Switch blocks */
 switch	:	label GIVEN '(' remember mydefsv mexpr ')' mblock
-			{ PL_copline = (line_t) $2;
+			{ PL_parser->copline = (line_t) $2;
 			    $$ = block_end($4,
 				newSTATEOP(0, PVAL($1),
 				    newGIVENOP($6, scope($8),
@@ -517,16 +517,18 @@ mysubrout:	MYSUB startsub subname proto subattrlist subbody
 subrout	:	SUB startsub subname proto subattrlist subbody
 			{ SvREFCNT_inc_simple_void(PL_compcv);
 #ifdef MAD
-			  OP* o = newSVOP(OP_ANONCODE, 0,
-			    (SV*)newATTRSUB($2, $3, $4, $5, $6));
-			  $$ = newOP(OP_NULL,0);
-			  op_getmad(o,$$,'&');
-			  op_getmad($3,$$,'n');
-			  op_getmad($4,$$,'s');
-			  op_getmad($5,$$,'a');
-			  token_getmad($1,$$,'d');
-			  append_madprops($6->op_madprop, $$, 0);
-			  $6->op_madprop = 0;
+			  {
+			      OP* o = newSVOP(OP_ANONCODE, 0,
+				(SV*)newATTRSUB($2, $3, $4, $5, $6));
+			      $$ = newOP(OP_NULL,0);
+			      op_getmad(o,$$,'&');
+			      op_getmad($3,$$,'n');
+			      op_getmad($4,$$,'s');
+			      op_getmad($5,$$,'a');
+			      token_getmad($1,$$,'d');
+			      append_madprops($6->op_madprop, $$, 0);
+			      $6->op_madprop = 0;
+			    }
 #else
 			  newATTRSUB($2, $3, $4, $5, $6);
 			  $$ = Nullop;
@@ -596,7 +598,7 @@ subbody	:	block	{ $$ = $1; }
 				    newOP(OP_NULL,0),
 				    Nullop
 				);
-			  PL_expect = XSTATE;
+			  PL_parser->expect = XSTATE;
 			  TOKEN_GETMAD($1,$$,';');
 			}
 	;
@@ -622,7 +624,8 @@ use	:	USE startsub
 			  $$ = utilize(IVAL($1), $2, $4, $5, $6);
 			  token_getmad($1,$$,'o');
 			  token_getmad($7,$$,';');
-			  if (PL_rsfp_filters && AvFILLp(PL_rsfp_filters) >= 0)
+			  if (PL_parser->rsfp_filters &&
+				      AvFILLp(PL_parser->rsfp_filters) >= 0)
 			      append_madprops(newMADPROP('!', MAD_PV, "", 0), $$, 0);
 #else
 			  utilize(IVAL($1), $2, $4, $5, $6);
@@ -742,7 +745,7 @@ subscripted:    star '{' expr ';' '}'        /* *main::{something} */
                         /* In this and all the hash accessors, ';' is
                          * provided by the tokeniser */
 			{ $$ = newBINOP(OP_GELEM, 0, $1, scalar($3));
-			    PL_expect = XOPERATOR;
+			    PL_parser->expect = XOPERATOR;
 			  TOKEN_GETMAD($2,$$,'{');
 			  TOKEN_GETMAD($4,$$,';');
 			  TOKEN_GETMAD($5,$$,'}');
@@ -769,7 +772,7 @@ subscripted:    star '{' expr ';' '}'        /* *main::{something} */
 			}
 	|	scalar '{' expr ';' '}'    /* $foo->{bar();} */
 			{ $$ = newBINOP(OP_HELEM, 0, oopsHV($1), jmaybe($3));
-			    PL_expect = XOPERATOR;
+			    PL_parser->expect = XOPERATOR;
 			  TOKEN_GETMAD($2,$$,'{');
 			  TOKEN_GETMAD($4,$$,';');
 			  TOKEN_GETMAD($5,$$,'}');
@@ -778,7 +781,7 @@ subscripted:    star '{' expr ';' '}'        /* *main::{something} */
 			{ $$ = newBINOP(OP_HELEM, 0,
 					ref(newHVREF($1),OP_RV2HV),
 					jmaybe($4));
-			    PL_expect = XOPERATOR;
+			    PL_parser->expect = XOPERATOR;
 			  TOKEN_GETMAD($2,$$,'a');
 			  TOKEN_GETMAD($3,$$,'{');
 			  TOKEN_GETMAD($5,$$,';');
@@ -788,7 +791,7 @@ subscripted:    star '{' expr ';' '}'        /* *main::{something} */
 			{ $$ = newBINOP(OP_HELEM, 0,
 					ref(newHVREF($1),OP_RV2HV),
 					jmaybe($3));
-			    PL_expect = XOPERATOR;
+			    PL_parser->expect = XOPERATOR;
 			  TOKEN_GETMAD($2,$$,'{');
 			  TOKEN_GETMAD($4,$$,';');
 			  TOKEN_GETMAD($5,$$,'}');
@@ -880,14 +883,14 @@ termbinop:	term ASSIGNOP term                     /* $x = $y */
 	|	term DOTDOT term                       /* $x..$y, $x...$y */
 			{
 			  $$ = newRANGE(IVAL($2), scalar($1), scalar($3));
-			  DO_MAD(
+			  DO_MAD({
 			      UNOP *op;
 			      op = (UNOP*)$$;
 			      op = (UNOP*)op->op_first;	/* get to flop */
 			      op = (UNOP*)op->op_first;	/* get to flip */
 			      op = (UNOP*)op->op_first;	/* get to range */
 			      token_getmad($2,(OP*)op,'o');
-			    )
+			    })
 			}
 	|	term ANDAND term                       /* $x && $y */
 			{ $$ = newLOGOP(OP_AND, 0, $1, $3);
@@ -1096,7 +1099,7 @@ term	:	termbinop
 				    newLISTOP(OP_HSLICE, 0,
 					list($3),
 					ref(oopsHV($1), OP_HSLICE)));
-			    PL_expect = XOPERATOR;
+			    PL_parser->expect = XOPERATOR;
 			  TOKEN_GETMAD($2,$$,'{');
 			  TOKEN_GETMAD($4,$$,';');
 			  TOKEN_GETMAD($5,$$,'}');
@@ -1114,14 +1117,14 @@ term	:	termbinop
 			{
 			  $$ = newUNOP(OP_ENTERSUB, OPf_STACKED,
 				append_elem(OP_LIST, $3, scalar($1)));
-			  DO_MAD(
+			  DO_MAD({
 			      OP* op = $$;
 			      if (op->op_type == OP_CONST) { /* defeat const fold */
 				op = (OP*)op->op_madprop->mad_val;
 			      }
 			      token_getmad($2,op,'(');
 			      token_getmad($4,op,')');
-			  )
+			  })
 			}
 	|	NOAMP WORD listexpr                  /* foo(@args) */
 			{ $$ = newUNOP(OP_ENTERSUB, OPf_STACKED,
@@ -1264,7 +1267,7 @@ listexprcom:	/* NULL */
 /* A little bit of trickery to make "for my $foo (@bar)" actually be
    lexical */
 my_scalar:	scalar
-			{ PL_in_my = 0; $$ = my($1); }
+			{ PL_parser->in_my = 0; $$ = my($1); }
 	;
 
 amper	:	'&' indirob

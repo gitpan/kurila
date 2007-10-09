@@ -10,7 +10,7 @@ my $no_endianness = $] > 5.009 ? '' :
 my $no_signedness = $] > 5.009 ? '' :
   "Signed/unsigned pack modifiers not available on this perl";
 
-plan tests => 14652;
+plan tests => 14651;
 
 use strict;
 use warnings qw(FATAL all);
@@ -171,7 +171,7 @@ sub list_eq ($$) {
     $x = pack('w*', 5000000000); $y = '';
     eval {
     use Math::BigInt;
-    $y = pack('w*', Math::BigInt::->new(5000000000));
+    $y = pack('w*', 'Math::BigInt'->new(5000000000));
     };
     is($x, $y);
 
@@ -920,10 +920,11 @@ SKIP: {
     is("1.20.300.4000", sprintf "%vd", pack("U*",1,20,300,4000));
     is("1.20.300.4000", sprintf "%vd", pack("  U*",1,20,300,4000));
 }
-isnt(v1.20.300.4000, sprintf "%vd", pack("C0U*",1,20,300,4000));
 
 {
 use utf8;
+
+isnt("\x{1}\x{14}\x{12c}\x{fa0}", sprintf "%vd", pack("C0U*",1,20,300,4000));
 
 my $rslt = $Is_EBCDIC ? "156 67" : "199 162";
 is(join(" ", unpack("C*", "\x{1e2}")), $rslt);
@@ -944,11 +945,9 @@ is("@{[unpack('U*', pack('U*', 100, 200))]}", "100 200");
 SKIP: {
     skip "Not for EBCDIC", 4 if $Is_EBCDIC;
 
-    # does unpack C unravel pack U?
-    is("@{[unpack('C*', pack('U*', 100, 200))]}", "100 195 136");
-
+    use utf8;
     # does pack U0C create Unicode?
-    is("@{[pack('U0C*', 100, 195, 136)]}", v100.v200);
+    is("@{[pack('U0C*', 100, 195, 136)]}", "\x{64}"."\x{c8}");
 
     # does pack C0U create characters?
     is("@{[pack('C0U*', 100, 200)]}", pack("C*", 100, 195, 136));
@@ -1641,7 +1640,7 @@ is(unpack('c'), 65, "one-arg unpack (change #18751)"); # defaulting to $_
           skip "cannot pack/unpack $format on this perl", 9 if
               $@ && is_valid_error($@);
           use utf8;
-          my $up = pack("a0 $format", "\x{100}", $val);
+          my $up = pack("$format", $val);
           is($down, $up, "$format generated strings are equal though");
           no utf8;
           my @down_expanded = unpack("$format W", $down . chr(0x66));

@@ -184,12 +184,7 @@ PP(pp_rv2gv)
 		    SvSETMAGIC(sv);
 		    goto wasref;
 		}
-		if (PL_op->op_flags & OPf_REF ||
-		    PL_op->op_private & HINT_STRICT_REFS)
-		    DIE(aTHX_ PL_no_usym, "a symbol");
-		if (ckWARN(WARN_UNINITIALIZED))
-		    report_uninit(sv);
-		RETSETUNDEF;
+		DIE(aTHX_ PL_no_usym, "a symbol");
 	    }
 	    if ((PL_op->op_flags & OPf_SPECIAL) &&
 		!(PL_op->op_flags & OPf_MOD))
@@ -203,16 +198,7 @@ PP(pp_rv2gv)
 		sv = temp;
 	    }
 	    else {
-		if (PL_op->op_private & HINT_STRICT_REFS)
-		    DIE(aTHX_ PL_no_symref_sv, sv, "a symbol");
-		if ((PL_op->op_private & (OPpLVAL_INTRO|OPpDONT_INIT_GV))
-		    == OPpDONT_INIT_GV) {
-		    /* We are the target of a coderef assignment.  Return
-		       the scalar unchanged, and let pp_sasssign deal with
-		       things.  */
-		    RETURN;
-		}
-		sv = (SV*)gv_fetchsv(sv, GV_ADD, SVt_PVGV);
+		DIE(aTHX_ PL_no_symref_sv, sv, "a symbol");
 	    }
 	}
     }
@@ -224,46 +210,13 @@ PP(pp_rv2gv)
 
 /* Helper function for pp_rv2sv and pp_rv2av  */
 GV *
-Perl_softref2xv(pTHX_ SV *const sv, const char *const what, const U32 type,
-		SV ***spp)
+Perl_softref2xv(pTHX_ SV *const sv, const char *const what)
 {
-    dVAR;
-    GV *gv;
-
-    if (PL_op->op_private & HINT_STRICT_REFS) {
-	if (SvOK(sv))
-	    Perl_die(aTHX_ PL_no_symref_sv, sv, what);
-	else
-	    Perl_die(aTHX_ PL_no_usym, what);
-    }
-    if (!SvOK(sv)) {
-	if (PL_op->op_flags & OPf_REF)
-	    Perl_die(aTHX_ PL_no_usym, what);
-	if (ckWARN(WARN_UNINITIALIZED))
-	    report_uninit(sv);
-	if (type != SVt_PV && GIMME_V == G_ARRAY) {
-	    (*spp)--;
-	    return NULL;
-	}
-	**spp = &PL_sv_undef;
-	return NULL;
-    }
-    if ((PL_op->op_flags & OPf_SPECIAL) &&
-	!(PL_op->op_flags & OPf_MOD))
-	{
-	    gv = gv_fetchsv(sv, 0, type);
-	    if (!gv
-		&& (!is_gv_magical_sv(sv,0)
-		    || !(gv = gv_fetchsv(sv, GV_ADD, type))))
-		{
-		    **spp = &PL_sv_undef;
-		    return NULL;
-		}
-	}
-    else {
-	gv = gv_fetchsv(sv, GV_ADD, type);
-    }
-    return gv;
+    if (SvOK(sv))
+	Perl_die(aTHX_ PL_no_symref_sv, sv, what);
+    else
+	Perl_die(aTHX_ PL_no_usym, what);
+    return NULL;
 }
 
 PP(pp_rv2sv)
@@ -294,7 +247,7 @@ PP(pp_rv2sv)
 		if (SvROK(sv))
 		    goto wasref;
 	    }
-	    gv = Perl_softref2xv(aTHX_ sv, "a SCALAR", SVt_PV, &sp);
+	    gv = Perl_softref2xv(aTHX_ sv, "a SCALAR");
 	    if (!gv)
 		RETURN;
 	}
@@ -350,7 +303,7 @@ PP(pp_pos)
 		I32 i = mg->mg_len;
 		if (DO_UTF8(sv))
 		    sv_pos_b2u(sv, &i);
-		PUSHi(i + CopARYBASE_get(PL_curcop));
+		PUSHi(i);
 		RETURN;
 	    }
 	}
@@ -1548,10 +1501,7 @@ PP(pp_repeat)
 	    }
 	    *SvEND(TARG) = '\0';
 	}
-	if (isutf)
-	    (void)SvPOK_only_UTF8(TARG);
-	else
-	    (void)SvPOK_only(TARG);
+	(void)SvPOK_only(TARG);
 
 	if (PL_op->op_private & OPpREPEAT_DOLIST) {
 	    /* The parser saw this as a list repeat, and there
@@ -2951,7 +2901,6 @@ PP(pp_substr)
     I32 fail;
     const I32 lvalue = PL_op->op_flags & OPf_MOD || LVRET;
     const char *tmps;
-    const I32 arybase = CopARYBASE_get(PL_curcop);
     SV *repl_sv = NULL;
     const char *repl = NULL;
     STRLEN repl_len;
@@ -2973,8 +2922,7 @@ PP(pp_substr)
     if (IN_CODEPOINTS)
 	curlen = sv_len_utf8(sv);
 
-    if (pos >= arybase) {
-	pos -= arybase;
+    if (pos >= 0) {
 	rem = curlen-pos;
 	fail = rem;
 	if (num_args > 2) {
@@ -3046,7 +2994,7 @@ PP(pp_substr)
 		if (isGV_with_GP(sv))
 		    SvPV_force_nolen(sv);
 		else if (SvOK(sv))	/* is it defined ? */
-		    (void)SvPOK_only_UTF8(sv);
+		    (void)SvPOK_only(sv);
 		else
 		    sv_setpvn(sv,"",0);	/* avoid lexical reincarnation */
 	    }
@@ -3105,13 +3053,10 @@ PP(pp_index)
     I32 retval;
     const char *big_p;
     const char *little_p;
-    const I32 arybase = CopARYBASE_get(PL_curcop);
     const bool is_index = PL_op->op_type == OP_INDEX;
 
     if (MAXARG >= 3) {
-	/* arybase is in characters, like offset, so combine prior to the
-	   UTF-8 to bytes calculation.  */
-	offset = POPi - arybase;
+	offset = POPi;
     }
     little = POPs;
     big = POPs;
@@ -3164,7 +3109,7 @@ PP(pp_index)
     }
     if (temp)
 	SvREFCNT_dec(temp);
-    PUSHi(retval + arybase);
+    PUSHi(retval);
     RETURN;
 }
 
@@ -3603,7 +3548,7 @@ PP(pp_quotemeta)
 	}
 	*d = '\0';
 	SvCUR_set(TARG, d - SvPVX_const(TARG));
-	(void)SvPOK_only_UTF8(TARG);
+	(void)SvPOK_only(TARG);
     }
     else
 	sv_setpvn(TARG, s, len);
@@ -3622,7 +3567,6 @@ PP(pp_aslice)
     register const I32 lval = (PL_op->op_flags & OPf_MOD || LVRET);
 
     if (SvTYPE(av) == SVt_PVAV) {
-	const I32 arybase = CopARYBASE_get(PL_curcop);
 	if (lval && PL_op->op_private & OPpLVAL_INTRO) {
 	    register SV **svp;
 	    I32 max = -1;
@@ -3638,8 +3582,6 @@ PP(pp_aslice)
 	    register SV **svp;
 	    I32 elem = SvIV(*MARK);
 
-	    if (elem > 0)
-		elem -= arybase;
 	    svp = av_fetch(av, elem, lval);
 	    if (lval) {
 		if (!svp || *svp == &PL_sv_undef)
@@ -3874,7 +3816,6 @@ PP(pp_lslice)
     SV ** const lastlelem = PL_stack_base + POPMARK;
     SV ** const firstlelem = PL_stack_base + POPMARK + 1;
     register SV ** const firstrelem = lastlelem + 1;
-    const I32 arybase = CopARYBASE_get(PL_curcop);
     I32 is_something_there = FALSE;
 
     register const I32 max = lastrelem - lastlelem;
@@ -3884,8 +3825,6 @@ PP(pp_lslice)
 	I32 ix = SvIV(*lastlelem);
 	if (ix < 0)
 	    ix += max;
-	else
-	    ix -= arybase;
 	if (ix < 0 || ix >= max)
 	    *firstlelem = &PL_sv_undef;
 	else
@@ -3903,8 +3842,6 @@ PP(pp_lslice)
 	I32 ix = SvIV(*lelem);
 	if (ix < 0)
 	    ix += max;
-	else
-	    ix -= arybase;
 	if (ix < 0 || ix >= max)
 	    *lelem = &PL_sv_undef;
 	else {
@@ -3982,8 +3919,6 @@ PP(pp_splice)
 	offset = i = SvIV(*MARK);
 	if (offset < 0)
 	    offset += AvFILLp(ary) + 1;
-	else
-	    offset -= CopARYBASE_get(PL_curcop);
 	if (offset < 0)
 	    DIE(aTHX_ PL_no_aelem, i);
 	if (++MARK < SP) {
@@ -4292,7 +4227,7 @@ PP(pp_reverse)
 		*up++ = *down;
 		*down-- = (char)tmp;
 	    }
-	    (void)SvPOK_only_UTF8(TARG);
+	    (void)SvPOK_only(TARG);
 	}
 	SP = MARK + 1;
 	SETTARG;

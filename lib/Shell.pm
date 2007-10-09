@@ -23,7 +23,7 @@ sub import {
     }
     foreach my $sym (@EXPORT) {
         no strict 'refs';
-        *{"${callpack}::$sym"} = \&{"Shell::$sym"};
+        *{Symbol::fetch_glob("${callpack}::$sym")} = \&{Symbol::fetch_glob("Shell::$sym")};
     }
 }
 
@@ -62,7 +62,7 @@ sub _make_cmd {
                 local(*SAVEOUT, *READ, *WRITE);
 
                 open SAVEOUT, '>&STDOUT' or die;
-                pipe READ, WRITE or die;
+                pipe READ, 'WRITE' or die;
                 open STDOUT, '>&WRITE' or die;
                 close WRITE;
 
@@ -134,8 +134,8 @@ sub AUTOLOAD {
     my $cmd = $AUTOLOAD;
     $cmd =~ s/^.*:://;
     no strict 'refs';
-    *$AUTOLOAD = _make_cmd($cmd);
-    goto &$AUTOLOAD;
+    *{Symbol::fetch_glob($AUTOLOAD)} = _make_cmd($cmd);
+    goto &{Symbol::fetch_glob($AUTOLOAD)};
 }
 
 1;

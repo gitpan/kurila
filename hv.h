@@ -42,8 +42,8 @@ struct shared_he {
 */
 
 typedef enum {
-    MRO_DFS, /* 0 */
-    MRO_C3   /* 1 */
+    MRO_C3,  /* 0 */
+    MRO_DFS  /* 1 */
 } mro_alg;
 
 struct mro_meta {
@@ -51,6 +51,7 @@ struct mro_meta {
     AV      *mro_linear_c3;  /* cached c3 @ISA linearization */
     HV      *mro_nextmethod; /* next::method caching */
     U32     cache_gen;       /* Bumping this invalidates our method cache */
+    U32     pkg_gen;         /* Bumps when local methods/@ISA change */
     mro_alg mro_which;       /* which mro alg is in use? */
 };
 
@@ -258,17 +259,21 @@ C<SV*>.
 #define HvRITER_set(hv,r)	Perl_hv_riter_set(aTHX_ (HV*)(hv), r)
 #define HvEITER_set(hv,e)	Perl_hv_eiter_set(aTHX_ (HV*)(hv), e)
 #define HvRITER_get(hv)	(SvOOK(hv) ? HvAUX(hv)->xhv_riter : -1)
-#define HvEITER_get(hv)	(SvOOK(hv) ? HvAUX(hv)->xhv_eiter : 0)
+#define HvEITER_get(hv)	(SvOOK(hv) ? HvAUX(hv)->xhv_eiter : NULL)
 #define HvNAME(hv)	HvNAME_get(hv)
-#define HvMROMETA(hv)	(SvOOK(hv) \
-			? (HvAUX(hv)->xhv_mro_meta ? HvAUX(hv)->xhv_mro_meta : mro_meta_init(hv)) \
-			: NULL)
+
+/* Checking that hv is a valid package stash is the
+   caller's responsibility */
+#define HvMROMETA(hv) (HvAUX(hv)->xhv_mro_meta \
+                       ? HvAUX(hv)->xhv_mro_meta \
+                       : mro_meta_init(hv))
+
 /* FIXME - all of these should use a UTF8 aware API, which should also involve
    getting the length. */
 /* This macro may go away without notice.  */
-#define HvNAME_HEK(hv) (SvOOK(hv) ? HvAUX(hv)->xhv_name : 0)
+#define HvNAME_HEK(hv) (SvOOK(hv) ? HvAUX(hv)->xhv_name : NULL)
 #define HvNAME_get(hv)	((SvOOK(hv) && (HvAUX(hv)->xhv_name)) \
-			 ? HEK_KEY(HvAUX(hv)->xhv_name) : 0)
+			 ? HEK_KEY(HvAUX(hv)->xhv_name) : NULL)
 #define HvNAMELEN_get(hv)	((SvOOK(hv) && (HvAUX(hv)->xhv_name)) \
 				 ? HEK_LEN(HvAUX(hv)->xhv_name) : 0)
 
@@ -291,18 +296,6 @@ C<SV*>.
 #define HvSHAREKEYS_on(hv)	(SvFLAGS(hv) |= SVphv_SHAREKEYS)
 #define HvSHAREKEYS_off(hv)	(SvFLAGS(hv) &= ~SVphv_SHAREKEYS)
 
-/* This is an optimisation flag. It won't be set if all hash keys have a 0
- * flag. Currently the only flags relate to utf8.
- * Hence it won't be set if all keys are 8 bit only. It will be set if any key
- * is utf8 (including 8 bit keys that were entered as utf8, and need upgrading
- * when retrieved during iteration. It may still be set when there are no longer
- * any utf8 keys.
- * See HVhek_ENABLEHVKFLAGS for the trigger.
- */
-#define HvHASKFLAGS(hv)		(SvFLAGS(hv) & SVphv_HASKFLAGS)
-#define HvHASKFLAGS_on(hv)	(SvFLAGS(hv) |= SVphv_HASKFLAGS)
-#define HvHASKFLAGS_off(hv)	(SvFLAGS(hv) &= ~SVphv_HASKFLAGS)
-
 #define HvLAZYDEL(hv)		(SvFLAGS(hv) & SVphv_LAZYDEL)
 #define HvLAZYDEL_on(hv)	(SvFLAGS(hv) |= SVphv_LAZYDEL)
 #define HvLAZYDEL_off(hv)	(SvFLAGS(hv) &= ~SVphv_LAZYDEL)
@@ -317,10 +310,7 @@ C<SV*>.
 #define HeKEY(he)		HEK_KEY(HeKEY_hek(he))
 #define HeKEY_sv(he)		(*(SV**)HeKEY(he))
 #define HeKLEN(he)		HEK_LEN(HeKEY_hek(he))
-#define HeKUTF8(he)  HEK_UTF8(HeKEY_hek(he))
-#define HeKWASUTF8(he)  HEK_WASUTF8(HeKEY_hek(he))
 #define HeKREHASH(he)  HEK_REHASH(HeKEY_hek(he))
-#define HeKLEN_UTF8(he)  (HeKUTF8(he) ? -HeKLEN(he) : HeKLEN(he))
 #define HeKFLAGS(he)  HEK_FLAGS(HeKEY_hek(he))
 #define HeVAL(he)		(he)->he_valu.hent_val
 #define HeHASH(he)		HEK_HASH(HeKEY_hek(he))
@@ -353,17 +343,6 @@ C<SV*>.
 #define HVhek_PLACEHOLD	0x200 /* Internal flag to create placeholder.
                                * (may change, but Storable is a core module) */
 #define HVhek_MASK	0xFF
-
-/* Which flags enable HvHASKFLAGS? Somewhat a hack on a hack, as
-   HVhek_REHASH is only needed because the rehash flag has to be duplicated
-   into all keys as hv_iternext has no access to the hash flags. At this
-   point Storable's tests get upset, because sometimes hashes are "keyed"
-   and sometimes not, depending on the order of data insertion, and whether
-   it triggered rehashing. So currently HVhek_REHASH is exempt.
-   Similarly UNSHARED
-*/
-   
-#define HVhek_ENABLEHVKFLAGS	(HVhek_MASK & ~(HVhek_REHASH|HVhek_UNSHARED))
 
 #define HEK_REHASH(hek)		(HEK_FLAGS(hek) & HVhek_REHASH)
 #define HEK_REHASH_on(hek)	(HEK_FLAGS(hek) |= HVhek_REHASH)
@@ -435,8 +414,7 @@ struct refcounted_he {
 #define HVrhek_delete	0x10 /* Value is placeholder - signifies delete. */
 #define HVrhek_IV	0x20 /* Value is IV. */
 #define HVrhek_UV	0x30 /* Value is UV. */
-#define HVrhek_PV	0x40 /* Value is a (byte) string. */
-#define HVrhek_PV_UTF8	0x50 /* Value is a (utf8) string. */
+#define HVrhek_PV	0x40 /* Value is a string. */
 /* Two spare. As these have to live in the optree, you can't store anything
    interpreter specific, such as SVs. :-( */
 #define HVrhek_typemask 0x70

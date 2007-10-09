@@ -439,6 +439,7 @@ sub newtype {
 sub madness {
     my $self = shift;
     my @keys = split(' ', shift);
+    @keys = map { $_ eq 'd' ? ('k', 'd') : $_ } @keys;
     my @vals = ();
 
     @keys = map { $_ eq 'd' ? ('local', 'd') : $_ } @keys; # always 'local' before 'defintion'
@@ -524,9 +525,10 @@ sub hash {
     { 'Q', "quote_close" },
     { '=', "assign" },
     { 'X', "value" },
-    { 'B', "bareword" },
+    { 'G', "endsection" },
+    { 'g', "forcedword" },
     { '^', "hat" },
-    { ';', "colon" },
+    { ';', "semicolon" },
     { 'o', "operator" },
     { '$', "variable" },
     { '(', "round_open" },
@@ -591,7 +593,7 @@ sub hash {
             $k = $mapping{$k} || $k;
         }
 	$firstthing ||= $k;
-        die "duplicate key $k - '$hash{$k}' - '$v'" if exists $hash{$k} and $hash{$k} ne "" and $hash{$k} ne $v;
+        die "duplicate key $k - '$hash{$k}' - '$v'" if exists $hash{$k} and $hash{$k} ne $v;
         $lastthing = $k;
 	$hash{$k} = $v;
     }
@@ -739,14 +741,13 @@ sub ast {
     my $self = shift;
 
     my @retval;
-    my @before;
     my @after;
     if (@retval = $self->madness('X')) {
-	push @before, $self->madness('o x');
+	my @before, $self->madness('o x');
 	return P5AST::listop->new(Kids => [@before,@retval]);
     }
 
-    push @retval, $self->madness('o ( [ {');
+    push @retval, $self->madness('o d ( [ {');
 
     my @newkids;
     for my $kid (@{$$self{Kids}}) {
@@ -764,7 +765,7 @@ sub ast {
     push @retval, @newkids;
 
     push @retval, $self->madness('} ] )');
-    return $self->newtype->new(Kids => [@before,@retval,@after]);
+    return $self->newtype->new(Kids => [@retval,@after]);
 }
 
 package PLXML::logop;
@@ -964,7 +965,7 @@ BEGIN {
 	'p' => sub {		# peg for #! line, etc.
 	    my $self = shift;
 	    my @newkids;
-	    push @newkids, $self->madness('p px');
+	    push @newkids, $self->madness('p G');
 	    $::curstate = 0;
 	    return P5AST::peg->new(Kids => [@newkids])
 	},
@@ -2266,16 +2267,6 @@ sub ast {
 package PLXML::op_unpack;
 package PLXML::op_pack;
 package PLXML::op_split;
-
-sub ast {
-    my $self = shift;
-    my $results = $self->SUPER::ast(@_);
-    if (my @dest = $self->madness('R')) {
-	return PLXML::op_aassign->newtype->new(Kids => [@dest, $results]);
-    }
-    return $results;
-}
-
 package PLXML::op_join;
 package PLXML::op_list;
 

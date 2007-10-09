@@ -40,12 +40,9 @@ STATIC void
 S_more_he(pTHX)
 {
     dVAR;
-    HE* he;
-    HE* heend;
+    HE* he = (HE*) Perl_get_arena(aTHX_ PERL_ARENA_SIZE, HE_SVSLOT);
+    HE * const heend = &he[PERL_ARENA_SIZE / sizeof(HE) - 1];
 
-    he = (HE*) Perl_get_arena(aTHX_ PERL_ARENA_SIZE, HE_SVSLOT);
-
-    heend = &he[PERL_ARENA_SIZE / sizeof(HE) - 1];
     PL_body_roots[HE_SVSLOT] = he;
     while (he < heend) {
 	HeNEXT(he) = (HE*)(he + 1);
@@ -653,8 +650,6 @@ S_hv_fetch_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
 		}
 		else
 		    HeKFLAGS(entry) = masked_flags;
-		if (masked_flags & HVhek_ENABLEHVKFLAGS)
-		    HvHASKFLAGS_on(hv);
 	    }
 	    if (HeVAL(entry) == &PL_sv_placeholder) {
 		/* yes, can store into placeholder slot */
@@ -768,8 +763,6 @@ S_hv_fetch_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
 
     if (val == &PL_sv_placeholder)
 	HvPLACEHOLDERS(hv)++;
-    if (masked_flags & HVhek_ENABLEHVKFLAGS)
-	HvHASKFLAGS_on(hv);
 
     {
 	const HE *counter = HeNEXT(entry);
@@ -1025,8 +1018,6 @@ S_hv_delete_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
 	    else
 		hv_free_ent(hv, entry);
 	    xhv->xhv_keys--; /* HvTOTALKEYS(hv)-- */
-	    if (xhv->xhv_keys == 0)
-	        HvHASKFLAGS_off(hv);
 	}
 	return sv;
     }
@@ -1045,7 +1036,7 @@ STATIC void
 S_hsplit(pTHX_ HV *hv)
 {
     dVAR;
-    register XPVHV* xhv = (XPVHV*)SvANY(hv);
+    register XPVHV* const xhv = (XPVHV*)SvANY(hv);
     const I32 oldsize = (I32) xhv->xhv_max+1; /* HvMAX(hv)+1 (sick) */
     register I32 newsize = oldsize * 2;
     register I32 i;
@@ -1525,7 +1516,6 @@ Perl_hv_clear(pTHX_ HV *hv)
     if (SvRMAGICAL(hv))
 	mg_clear((SV*)hv);
 
-    HvHASKFLAGS_off(hv);
     HvREHASH_off(hv);
     reset:
     if (SvOOK(hv)) {
@@ -1588,8 +1578,6 @@ S_clear_placeholders(pTHX_ HV *hv, U32 items)
 		if (--items == 0) {
 		    /* Finished.  */
 		    HvTOTALKEYS(hv) -= (IV)HvPLACEHOLDERS_get(hv);
-		    if (HvKEYS(hv) == 0)
-			HvHASKFLAGS_off(hv);
 		    HvPLACEHOLDERS_set(hv, 0);
 		    return;
 		}
@@ -1935,7 +1923,7 @@ Perl_hv_name_set(pTHX_ HV *hv, const char *name, U32 len, U32 flags)
 	iter = hv_auxinit(hv);
     }
     PERL_HASH(hash, name, len);
-    iter->xhv_name = name ? share_hek(name, len, hash) : 0;
+    iter->xhv_name = name ? share_hek(name, len, hash) : NULL;
 }
 
 AV **
@@ -2488,7 +2476,6 @@ S_refcounted_he_value(pTHX_ const struct refcounted_he *he)
 	value = newSVuv(he->refcounted_he_val.refcounted_he_u_uv);
 	break;
     case HVrhek_PV:
-    case HVrhek_PV_UTF8:
 	/* Create a string SV that directly points to the bytes in our
 	   structure.  */
 	value = newSV_type(SVt_PV);
@@ -2600,10 +2587,6 @@ Perl_refcounted_he_chain_2hv(pTHX_ const struct refcounted_he *chain)
 	HvTOTALKEYS(hv) -= placeholders;
     }
 
-    /* We could check in the loop to see if we encounter any keys with key
-       flags, but it's probably not worth it, as this per-hash flag is only
-       really meant as an optimisation for things like Storable.  */
-    HvHASKFLAGS_on(hv);
     DEBUG_A(Perl_hv_assert(aTHX_ hv));
 
     return hv;
@@ -2798,7 +2781,6 @@ Perl_hv_assert(pTHX_ HV *hv)
 {
     dVAR;
     HE* entry;
-    int withflags = 0;
     int placeholders = 0;
     int real = 0;
     int bad = 0;
@@ -2831,12 +2813,6 @@ Perl_hv_assert(pTHX_ HV *hv)
 	    PerlIO_printf(Perl_debug_log, bad_count, placeholders, "placeholder", nhashplaceholders );
 	    bad = 1;
 	}
-    }
-    if (withflags && ! HvHASKFLAGS(hv)) {
-	PerlIO_printf(Perl_debug_log,
-		    "Hash has HASKFLAGS off but I count %d key(s) with flags\n",
-		    withflags);
-	bad = 1;
     }
     if (bad) {
 	sv_dump((SV *)hv);

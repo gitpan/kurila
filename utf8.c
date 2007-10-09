@@ -378,7 +378,7 @@ Perl_is_utf8_string_loclen(pTHX_ const U8 *s, STRLEN len, const U8 **ep, STRLEN 
 =for apidoc A|UV|utf8n_to_uvuni|const U8 *s|STRLEN curlen|STRLEN *retlen|U32 flags
 
 Bottom level UTF-8 decode routine.
-Returns the unicode code point value of the first character in the string C<s>
+Returns the Unicode code point value of the first character in the string C<s>
 which is assumed to be in UTF-8 encoding and no longer than C<curlen>;
 C<retlen> will be set to the length, in bytes, of that character.
 
@@ -1548,7 +1548,6 @@ Perl_swash_init(pTHX_ const char* pkg, const char* name, SV *listsv, I32 minbits
 {
     dVAR;
     SV* retval;
-    SV* const tokenbufsv = sv_newmortal();
     dSP;
     const size_t pkg_len = strlen(pkg);
     const size_t name_len = strlen(name);
@@ -1586,12 +1585,6 @@ Perl_swash_init(pTHX_ const char* pkg, const char* name, SV *listsv, I32 minbits
     PUSHs(sv_2mortal(newSViv(minbits)));
     PUSHs(sv_2mortal(newSViv(none)));
     PUTBACK;
-    if (IN_PERL_COMPILETIME) {
-	/* XXX ought to be handled by lex_start */
-	SAVEI16(PL_in_my);
-	PL_in_my = 0;
-	sv_setpv(tokenbufsv, PL_tokenbuf);
-    }
     errsv_save = newSVsv(ERRSV);
     if (call_method("SWASHNEW", G_SCALAR))
 	retval = newSVsv(*PL_stack_sp--);
@@ -1603,10 +1596,6 @@ Perl_swash_init(pTHX_ const char* pkg, const char* name, SV *listsv, I32 minbits
     LEAVE;
     POPSTACK;
     if (IN_PERL_COMPILETIME) {
-	STRLEN len;
-	const char* const pv = SvPV_const(tokenbufsv, len);
-
-	Copy(pv, PL_tokenbuf, len+1, char);
 	CopHINTS_set(PL_curcop, PL_hints);
     }
     if (!SvROK(retval) || SvTYPE(SvRV(retval)) != SVt_PVHV) {
@@ -1682,14 +1671,7 @@ Perl_swash_fetch(pTHX_ SV *swash, const U8 *ptr, bool do_utf8)
      * NB: this code assumes that swatches are never modified, once generated!
      */
 
-    if (hv   == PL_last_swash_hv &&
-	klen == PL_last_swash_klen &&
-	(!klen || memEQ((char *)ptr, (char *)PL_last_swash_key, klen)) )
     {
-	tmps = PL_last_swash_tmps;
-	slen = PL_last_swash_slen;
-    }
-    else {
 	/* Try our second-level swatch cache, kept in a hash. */
 	SV** svp = hv_fetch(hv, (const char*)ptr, klen, FALSE);
 
@@ -1716,15 +1698,6 @@ Perl_swash_fetch(pTHX_ SV *swash, const U8 *ptr, bool do_utf8)
 		     || (slen << 3) < needents)
 		Perl_croak(aTHX_ "panic: swash_fetch got improper swatch");
 	}
-
-	PL_last_swash_hv = hv;
-	assert(klen <= sizeof(PL_last_swash_key));
-	PL_last_swash_klen = (U8)klen;
-	/* FIXME change interpvar.h?  */
-	PL_last_swash_tmps = (U8 *) tmps;
-	PL_last_swash_slen = slen;
-	if (klen)
-	    Copy(ptr, PL_last_swash_key, klen, U8);
     }
 
     switch ((int)((slen << 3) / needents)) {

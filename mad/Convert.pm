@@ -5,6 +5,8 @@ use warnings;
 
 use Nomad;
 
+$ENV{madpath} or die "No madpath specified";
+
 sub convert {
     my ($input, $convert, %options) = @_;
 
@@ -15,7 +17,7 @@ sub convert {
     $infile->print($input);
     close $infile or die;
     $options{switches} ||= '';
-    if( $input =~ m/^[#][!].*perl(.*)/) {
+    if( $input =~ m/^[#][!].*perl([^#\n]*)/) {
         $options{switches} .= " " . $1;
     }
 

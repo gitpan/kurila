@@ -233,7 +233,8 @@ inet_aton(host)
 	struct hostent * phe;
 	int ok = (*host != '\0') && inet_aton(host, &ip_address);
 
-	if (!ok && (phe = gethostbyname(host))) {
+	if (!ok && (phe = gethostbyname(host)) &&
+			phe->h_addrtype == AF_INET && phe->h_length == 4) {
 		Copy( phe->h_addr, &ip_address, phe->h_length, char );
 		ok = 1;
 	}
@@ -252,7 +253,7 @@ inet_ntoa(ip_address_sv)
 	struct in_addr addr;
 	char * addr_str;
 	char * ip_address;
-	ip_address = SvPVbyte(ip_address_sv, addrlen);
+	ip_address = SvPV(ip_address_sv, addrlen);
 	if (addrlen == sizeof(addr) || addrlen == 4)
 	        addr.s_addr =
 		    (ip_address[0] & 0xFF) << 24 |
@@ -282,7 +283,7 @@ sockaddr_family(sockaddr)
 	SV *	sockaddr
 	PREINIT:
 	STRLEN sockaddr_len;
-	char *sockaddr_pv = SvPVbyte(sockaddr, sockaddr_len);
+	char *sockaddr_pv = SvPV(sockaddr, sockaddr_len);
 	CODE:
 	if (sockaddr_len < offsetof(struct sockaddr, sa_data)) {
 	    croak("Bad arg length for %s, length is %d, should be at least %d",
@@ -348,7 +349,7 @@ unpack_sockaddr_un(sun_sv)
 #ifdef I_SYS_UN
 	struct sockaddr_un addr;
 	STRLEN sockaddrlen;
-	char * sun_ad = SvPVbyte(sun_sv,sockaddrlen);
+	char * sun_ad = SvPV(sun_sv,sockaddrlen);
 	char * e;
 #   ifndef __linux__
 	/* On Linux sockaddrlen on sockets returned by accept, recvfrom,
@@ -390,7 +391,7 @@ pack_sockaddr_in(port, ip_address_sv)
 	struct in_addr addr;
 	STRLEN addrlen;
 	char * ip_address;
-	ip_address = SvPVbyte(ip_address_sv, addrlen);
+	ip_address = SvPV(ip_address_sv, addrlen);
 	if (addrlen == sizeof(addr) || addrlen == 4)
 	        addr.s_addr =
 		    (ip_address[0] & 0xFF) << 24 |
@@ -417,7 +418,7 @@ unpack_sockaddr_in(sin_sv)
 	struct sockaddr_in addr;
 	unsigned short	port;
 	struct in_addr  ip_address;
-	char *	sin = SvPVbyte(sin_sv,sockaddrlen);
+	char *	sin = SvPV(sin_sv,sockaddrlen);
 	if (sockaddrlen != sizeof(addr)) {
 	    croak("Bad arg length for %s, length is %d, should be %d",
 			"Socket::unpack_sockaddr_in",

@@ -625,9 +625,15 @@ the searchable archives.
 
 The CPAN testers ( http://testers.cpan.org/ ) are a group of
 volunteers who test CPAN modules on a variety of platforms.  Perl
-Smokers ( http://www.nntp.perl.org/group/perl.daily-build )
+Smokers ( http://www.nntp.perl.org/group/perl.daily-build and
+http://www.nntp.perl.org/group/perl.daily-build.reports/ )
 automatically test Perl source releases on platforms with various
-configurations.  Both efforts welcome volunteers.
+configurations.  Both efforts welcome volunteers. In order to get
+involved in smoke testing of the perl itself visit
+L<http://search.cpan.org/dist/Test-Smoke>. In order to start smoke
+testing CPAN modules visit L<http://search.cpan.org/dist/CPAN-YACSmoke/>
+or L<http://search.cpan.org/dist/POE-Component-CPAN-YACSmoke/> or
+L<http://search.cpan.org/dist/CPAN-Reporter/>.
 
 It's a good idea to read and lurk for a while before chipping in.
 That way you'll get to see the dynamic of the conversations, learn the
@@ -1919,7 +1925,7 @@ we can write the more sensible (see L<Test::More> for a full
 explanation of is() and other testing functions).
 
  is( "1.20.300.4000", sprintf "%vd", pack("U*",1,20,300,4000), 
-                                       "U* produces unicode" );
+                                       "U* produces Unicode" );
 
 Now we'll test that we got that space-at-the-beginning business right:
 
@@ -1930,7 +1936,7 @@ And finally we'll test that we don't make Unicode strings if C<U> is B<not>
 the first active format:
 
  isnt( v1.20.300.4000, sprintf "%vd", pack("C0U*",1,20,300,4000),
-                                       "U* not first isn't unicode" );
+                                       "U* not first isn't Unicode" );
 
 Mustn't forget to change the number of tests which appears at the top,
 or else the automated tester will get confused.  This will either look

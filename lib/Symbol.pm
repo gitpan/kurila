@@ -6,6 +6,11 @@ Symbol - manipulate Perl symbols and their names
 
 =head1 SYNOPSIS
 
+    print ${*{Symbol::fetch_glob("$class\::VERSION")}};
+    *{Symbol::fetch_glob("foo") = sub { "this is foo" };
+
+    keys %{Symbol::stash("main")};
+
     use Symbol;
 
     $sym = gensym;
@@ -35,6 +40,15 @@ Symbol - manipulate Perl symbols and their names
     print "deleted\n" unless exists $Foo::{'Bar::'};
 
 =head1 DESCRIPTION
+
+C<Symbol::fetch_glob> returns a reference to the glob for the
+specified symbol name. If the symbol does not already exists it will
+be created. If the symbol name is unqualified it will be looked up in
+the calling package.
+
+C<Symbol::stash> returns a refernce to the stash for the specified
+name. If the stash does not already exists it will be created. The
+name of the stash does not include the "::" at the end.
 
 C<Symbol::gensym> creates an anonymous glob and returns a reference
 to it.  Such a glob reference can be used as a file or directory
@@ -89,7 +103,7 @@ our @EXPORT_OK = qw(delete_package geniosym);
 
 our $VERSION = '1.06';
 
-my $genpkg = "Symbol::";
+my $genpkg = "Symbol";
 my $genseq = 0;
 
 my %global = map {$_ => 1} qw(ARGV ARGVOUT ENV INC SIG STDERR STDIN STDOUT);
@@ -102,8 +116,9 @@ my %global = map {$_ => 1} qw(ARGV ARGVOUT ENV INC SIG STDERR STDIN STDOUT);
 sub gensym () {
     my $name = "GEN" . $genseq++;
     no strict 'refs';
-    my $ref = \*{$genpkg . $name};
-    delete $$genpkg{$name};
+    my $ref = \*{Symbol::qualify_to_ref($genpkg . "::" . $name)};
+    $ref = \*{Symbol::qualify_to_ref($genpkg . "::" . $name)};  # second time to supress only-used once warning.
+    delete ${Symbol::stash($genpkg)}{$name};
     $ref;
 }
 
@@ -134,8 +149,8 @@ sub qualify ($;$) {
     $name;
 }
 
-sub qualify_to_ref ($;$) {
-    return \*{ qualify $_[0], @_ > 1 ? $_[1] : caller };
+sub qualify_to_ref ($) {
+    return \*{ Symbol::fetch_glob( qualify $_[0], @_ > 1 ? $_[1] : caller ) };
 }
 
 #
@@ -155,7 +170,7 @@ sub delete_package ($) {
     }
 
     my($stem, $leaf) = $pkg =~ m/(.*::)(\w+::)$/;
-    my $stem_symtab = *{$stem}{HASH};
+    my $stem_symtab = *{Symbol::qualify_to_ref($stem)}{HASH};
     return unless defined $stem_symtab and exists $stem_symtab->{$leaf};
 
 
@@ -163,7 +178,7 @@ sub delete_package ($) {
 
     my $leaf_symtab = *{$stem_symtab->{$leaf}}{HASH};
     foreach my $name (keys %$leaf_symtab) {
-        undef *{$pkg . $name};
+        undef *{Symbol::qualify_to_ref($pkg . $name)};
     }
 
     # delete the symbol table
