@@ -20,16 +20,6 @@ not, but if your patch is incorporated, then we'll add your name to the
 F<AUTHORS> file, which ships in the official distribution. How many other
 programming languages offer you 1 line of immortality?
 
-=head1 The roadmap to 5.10
-
-The roadmap to 5.10 envisages feature based releases, as various items in this
-TODO are completed.
-
-=head2 Needed for the final 5.10.0 release
-
-Review perlguts. Significant changes have occured since 5.8, and we can't
-release a new version without making sure these are covered.
-
 =head1 Tasks that only need Perl knowledge
 
 =head2 common test code for timed bail out
@@ -117,6 +107,9 @@ As part of the "dists" plan, anything that doesn't belong in the smallest perl
 distribution needs to be dual lifed. Anything else can be too. Figure out what
 changes would be needed to package that module and its tests up for CPAN, and
 do so. Test it with older perl releases, and fix the problems you find.
+
+To make a minimal perl distribution, it's useful to look at
+F<t/lib/commonsense.t>.
 
 =head2 Improving C<threads::shared>
 
@@ -531,6 +524,18 @@ or a willingness to learn.
 
 It would be nice to extend the syntax of the C<~~> operator to also
 understand numeric (and maybe alphanumeric) ranges.
+
+=head2 A does() built-in
+
+Like ref(), only useful. It would call the C<DOES> method on objects; it
+would also tell whether something can be dereferenced as an
+array/hash/etc., or used as a regexp, etc.
+L<http://www.xray.mpe.mpg.de/mailing-lists/perl5-porters/2007-03/msg00481.html>
+
+=head2 Tied filehandles and write() don't mix
+
+There is no method on tied filehandles to allow them to be called back by
+formats.
 
 =head2 Attach/detach debugger from running program
 

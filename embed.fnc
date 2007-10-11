@@ -315,14 +315,6 @@ ApMdR	|HE*	|hv_iternext_flags|NN HV* tb|I32 flags
 ApdR	|SV*	|hv_iterval	|NN HV* tb|NN HE* entry
 Ap	|void	|hv_ksplit	|NN HV* hv|IV newmax
 Apdbm	|void	|hv_magic	|NN HV* hv|NULLOK GV* gv|int how
-XEdpoM	|HV *	|refcounted_he_chain_2hv|NULLOK const struct refcounted_he *c
-XEpoM	|SV *	|refcounted_he_fetch|NULLOK const struct refcounted_he *chain \
-				|NULLOK SV *keysv|NULLOK const char *key \
-				|STRLEN klen, int flags, U32 hash
-dpoM	|void	|refcounted_he_free|NULLOK struct refcounted_he *he
-XEdpoM	|struct refcounted_he *|refcounted_he_new \
-				|NULLOK struct refcounted_he *const parent \
-				|NULLOK SV *const key|NULLOK SV *const value
 Apd	|SV**	|hv_store	|NULLOK HV* tb|NULLOK const char* key|I32 klen|NULLOK SV* val \
 				|U32 hash
 Apd	|HE*	|hv_store_ent	|NULLOK HV* tb|NULLOK SV* key|NULLOK SV* val|U32 hash
@@ -1144,7 +1136,6 @@ sM	|SV*	|hv_delete_common|NULLOK HV* tb|NULLOK SV* keysv|NULLOK const char* key 
 sM	|HE*	|hv_fetch_common|NULLOK HV* tb|NULLOK SV* keysv|NULLOK const char* key \
 		|STRLEN klen|int flags|int action|NULLOK SV* val|U32 hash
 sM	|void	|clear_placeholders	|NN HV* hb|U32 items
-sM	|SV *	|refcounted_he_value	|NN const struct refcounted_he *he
 #endif
 
 #if defined(PERL_IN_MG_C) || defined(PERL_DECL_PROT)
@@ -1307,7 +1298,7 @@ sR	|I32	|dopoptosub	|I32 startingblock
 sR	|I32	|dopoptosub_at	|NN const PERL_CONTEXT* cxstk|I32 startingblock
 sR	|I32	|dopoptowhen	|I32 startingblock
 s	|void	|save_lines	|NULLOK AV *array|NN SV *sv
-sR	|OP*	|doeval		|int gimme|NULLOK OP** startop|NULLOK CV* outside|U32 seq
+s	|bool	|doeval		|int gimme|NULLOK OP** startop|NULLOK CV* outside|U32 seq
 sR	|PerlIO *|check_type_and_open|NN const char *name|NN const char *mode
 sR	|PerlIO *|doopen_pm	|NN const char *name|NN const char *mode
 sRn	|bool	|path_is_absolute|NN const char *name
@@ -1650,7 +1641,7 @@ sd	|PADOFFSET|pad_findlex	|NN const char *name|NN const CV* cv|U32 seq|int warn 
 sd	|void	|cv_dump	|NN const CV *cv|NN const char *title
 #  endif
 #endif
-pdR	|CV*	|find_runcv	|NULLOK U32 *db_seqp
+ApdR	|CV*	|find_runcv	|NULLOK U32 *db_seqp
 p	|void	|free_tied_hv_pool
 #if defined(DEBUGGING)
 pR	|int	|get_debug_opts	|NN const char **s|bool givehelp

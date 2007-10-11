@@ -138,10 +138,9 @@ PP(pp_regcomp)
 	        ReREFCNT_dec(re);
 		PM_SETRE(pm, NULL);	/* crucial if regcomp aborts */
 	    } else if (PL_curcop->cop_hints_hash) {
-	        SV *ptr = Perl_refcounted_he_fetch(aTHX_ PL_curcop->cop_hints_hash, 0,
-				       "regcomp", 7, 0, 0);
-                if (ptr && SvIOK(ptr) && SvIV(ptr))
-                    eng = INT2PTR(regexp_engine*,SvIV(ptr));
+	        SV **ptr = hv_fetch(PL_curcop->cop_hints_hash, "regcomp", 7, 0);
+                if (ptr && *ptr && SvIOK(*ptr) && SvIV(*ptr))
+                    eng = INT2PTR(regexp_engine*,SvIV(*ptr));
 	    }
 
 	    if (PL_op->op_flags & OPf_SPECIAL)
@@ -696,7 +695,6 @@ S_dopoptolabel(pTHX_ const char *label)
 	switch (CxTYPE(cx)) {
 	case CXt_SUBST:
 	case CXt_SUB:
-	case CXt_FORMAT:
 	case CXt_EVAL:
 	case CXt_NULL:
 	case CXt_GIVEN:
@@ -784,7 +782,6 @@ S_dopoptosub_at(pTHX_ const PERL_CONTEXT *cxstk, I32 startingblock)
 	    continue;
 	case CXt_EVAL:
 	case CXt_SUB:
-	case CXt_FORMAT:
 	    DEBUG_l( Perl_deb(aTHX_ "(Found sub #%ld)\n", (long)i));
 	    return i;
 	}
@@ -820,7 +817,6 @@ S_dopoptoloop(pTHX_ I32 startingblock)
 	switch (CxTYPE(cx)) {
 	case CXt_SUBST:
 	case CXt_SUB:
-	case CXt_FORMAT:
 	case CXt_EVAL:
 	case CXt_NULL:
 	    if (ckWARN(WARN_EXITING))
@@ -905,9 +901,6 @@ Perl_dounwind(pTHX_ I32 cxix)
 	    POPLOOP(cx);
 	    break;
 	case CXt_NULL:
-	    break;
-	case CXt_FORMAT:
-	    POPFORMAT(cx);
 	    break;
 	}
 	cxstack_ix--;
@@ -1073,7 +1066,7 @@ PP(pp_caller)
     }
 
     cx = &ccstack[cxix];
-    if (CxTYPE(cx) == CXt_SUB || CxTYPE(cx) == CXt_FORMAT) {
+    if (CxTYPE(cx) == CXt_SUB) {
         const I32 dbcxix = dopoptosub_at(ccstack, cxix - 1);
 	/* We expect that ccstack[dbcxix] is CXt_SUB, anyway, the
 	   field below is defined for any cx. */
@@ -1105,7 +1098,7 @@ PP(pp_caller)
     PUSHs(sv_2mortal(newSViv((I32)CopLINE(cx->blk_oldcop))));
     if (!MAXARG)
 	RETURN;
-    if (CxTYPE(cx) == CXt_SUB || CxTYPE(cx) == CXt_FORMAT) {
+    if (CxTYPE(cx) == CXt_SUB) {
 	GV * const cvgv = CvGV(ccstack[cxix].blk_sub.cv);
 	/* So is ccstack[dbcxix]. */
 	if (isGV(cvgv)) {
@@ -1197,9 +1190,7 @@ PP(pp_caller)
     }
 
     PUSHs(cx->blk_oldcop->cop_hints_hash ?
-	  sv_2mortal(newRV_noinc(
-	    (SV*)Perl_refcounted_he_chain_2hv(aTHX_
-					      cx->blk_oldcop->cop_hints_hash)))
+	  sv_2mortal(newRV((SV*)cx->blk_oldcop->cop_hints_hash))
 	  : &PL_sv_undef);
     RETURN;
 }
@@ -1490,10 +1481,6 @@ PP(pp_return)
 	    DIE(aTHX_ "%"SVf" did not return a true value", SVfARG(nsv));
 	}
 	break;
-    case CXt_FORMAT:
-	POPFORMAT(cx);
-	retop = cx->blk_sub.retop;
-	break;
     default:
 	DIE(aTHX_ "panic: return");
     }
@@ -1593,10 +1580,6 @@ PP(pp_last)
     case CXt_EVAL:
 	POPEVAL(cx);
 	nextop = cx->blk_eval.retop;
-	break;
-    case CXt_FORMAT:
-	POPFORMAT(cx);
-	nextop = cx->blk_sub.retop;
 	break;
     default:
 	DIE(aTHX_ "panic: last");
@@ -2001,7 +1984,6 @@ PP(pp_goto)
 		    break;
 		}
 		/* FALL THROUGH */
-	    case CXt_FORMAT:
 	    case CXt_NULL:
 		DIE(aTHX_ "Can't \"goto\" out of a pseudo block");
 	    default:
@@ -2203,7 +2185,6 @@ Perl_sv_compile_2op(pTHX_ SV *sv, OP** startop, const char *code, PAD** padp)
     I32 gimme = G_VOID;
     I32 optype;
     OP dummy;
-    OP *rop;
     char tbuf[TYPE_DIGITS(long) + 12 + 10];
     char *tmpbuf = tbuf;
     char *safestr;
@@ -2261,9 +2242,9 @@ Perl_sv_compile_2op(pTHX_ SV *sv, OP** startop, const char *code, PAD** padp)
     PUSHEVAL(cx, 0, NULL);
 
     if (runtime)
-	rop = doeval(G_SCALAR, startop, runcv, PL_curcop->cop_seq);
+	(void) doeval(G_SCALAR, startop, runcv, PL_curcop->cop_seq);
     else
-	rop = doeval(G_SCALAR, startop, PL_compcv, PL_cop_seqmax);
+	(void) doeval(G_SCALAR, startop, PL_compcv, PL_cop_seqmax);
     POPBLOCK(cx,PL_curpm);
     POPEVAL(cx);
 
@@ -2281,7 +2262,7 @@ Perl_sv_compile_2op(pTHX_ SV *sv, OP** startop, const char *code, PAD** padp)
     PERL_UNUSED_VAR(newsp);
     PERL_UNUSED_VAR(optype);
 
-    return rop;
+    return PL_eval_start;
 }
 
 
@@ -2309,7 +2290,7 @@ Perl_find_runcv(pTHX_ U32 *db_seqp)
         I32 ix;
 	for (ix = si->si_cxix; ix >= 0; ix--) {
 	    const PERL_CONTEXT *cx = &(si->si_cxstack[ix]);
-	    if (CxTYPE(cx) == CXt_SUB || CxTYPE(cx) == CXt_FORMAT) {
+	    if (CxTYPE(cx) == CXt_SUB) {
 		CV * const cv = cx->blk_sub.cv;
 		/* skip DB:: code */
 		if (db_seqp && PL_debstash && CvSTASH(cv) == PL_debstash) {
@@ -2330,9 +2311,12 @@ Perl_find_runcv(pTHX_ U32 *db_seqp)
  * In the last case, startop is non-null, and contains the address of
  * a pointer that should be set to the just-compiled code.
  * outside is the lexically enclosing CV (if any) that invoked us.
+ * Returns a bool indicating whether the compile was successful; if so,
+ * PL_eval_start contains the first op of the compiled ocde; otherwise,
+ * pushes undef (also croaks if startop != NULL).
  */
 
-STATIC OP *
+STATIC bool
 S_doeval(pTHX_ int gimme, OP** startop, CV* outside, U32 seq)
 {
     dVAR; dSP;
@@ -2413,8 +2397,8 @@ S_doeval(pTHX_ int gimme, OP** startop, CV* outside, U32 seq)
 	    const SV * const nsv = cx->blk_eval.old_namesv;
 	    (void)hv_store(GvHVn(PL_incgv), SvPVX_const(nsv), SvCUR(nsv),
                           &PL_sv_undef, 0);
-	    DIE(aTHX_ "%sCompilation failed in require",
-		*msg ? msg : "Unknown error\n");
+	    Perl_croak(aTHX_ "%sCompilation failed in require",
+		       *msg ? msg : "Unknown error\n");
 	}
 	else if (startop) {
 	    POPBLOCK(cx,PL_curpm);
@@ -2428,7 +2412,9 @@ S_doeval(pTHX_ int gimme, OP** startop, CV* outside, U32 seq)
 	    }
 	}
 	PERL_UNUSED_VAR(newsp);
-	RETPUSHUNDEF;
+	PUSHs(&PL_sv_undef);
+	PUTBACK;
+	return FALSE;
     }
     CopLINE_set(&PL_compiling, 0);
     if (startop) {
@@ -2475,7 +2461,8 @@ S_doeval(pTHX_ int gimme, OP** startop, CV* outside, U32 seq)
     PL_op = saveop;			/* The caller may need it. */
     PL_parser->lex_state = LEX_NOTPARSING;	/* $^S needs this. */
 
-    RETURNOP(PL_eval_start);
+    PUTBACK;
+    return TRUE;
 }
 
 STATIC PerlIO *
@@ -2872,7 +2859,10 @@ PP(pp_require)
     encoding = PL_encoding;
     PL_encoding = NULL;
 
-    op = DOCATCH(doeval(gimme, NULL, NULL, PL_curcop->cop_seq));
+    if (doeval(gimme, NULL, NULL, PL_curcop->cop_seq))
+	op = DOCATCH(PL_eval_start);
+    else
+	op = PL_op->op_next;
 
     /* Restore encoding. */
     PL_encoding = encoding;
@@ -2891,7 +2881,7 @@ PP(pp_entereval)
     char *tmpbuf = tbuf;
     char *safestr;
     STRLEN len;
-    OP *ret;
+    bool ok;
     CV* runcv;
     U32 seq;
     HV *saved_hh = NULL;
@@ -2940,12 +2930,12 @@ PP(pp_entereval)
     SAVECOMPILEWARNINGS();
     PL_compiling.cop_warnings = DUP_WARNINGS(PL_curcop->cop_warnings);
     if (PL_compiling.cop_hints_hash) {
-	Perl_refcounted_he_free(aTHX_ PL_compiling.cop_hints_hash);
+	SvREFCNT_dec(PL_compiling.cop_hints_hash);
     }
     PL_compiling.cop_hints_hash = PL_curcop->cop_hints_hash;
     if (PL_compiling.cop_hints_hash) {
 	HINTS_REFCNT_LOCK;
-	PL_compiling.cop_hints_hash->refcounted_he_refcnt++;
+	SvREFCNT_inc(PL_compiling.cop_hints_hash);
 	HINTS_REFCNT_UNLOCK;
     }
     /* special case: an eval '' executed within the DB package gets lexically
@@ -2964,13 +2954,13 @@ PP(pp_entereval)
     if (PERLDB_LINE && PL_curstash != PL_debstash)
 	save_lines(CopFILEAV(&PL_compiling), PL_parser->linestr);
     PUTBACK;
-    ret = doeval(gimme, NULL, runcv, seq);
+    ok = doeval(gimme, NULL, runcv, seq);
     if (PERLDB_INTER && was != (I32)PL_sub_generation /* Some subs defined here. */
-	&& ret != PL_op->op_next) {	/* Successive compilation. */
+	&& ok) {
 	/* Copy in anything fake and short. */
 	my_strlcpy(safestr, fakestr, fakelen);
     }
-    return DOCATCH(ret);
+    return ok ? DOCATCH(PL_eval_start) : PL_op->op_next;
 }
 
 PP(pp_leaveeval)

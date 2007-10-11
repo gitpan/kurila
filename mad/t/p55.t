@@ -97,15 +97,11 @@ use File::Find;
 our %failing = map { $_, 1 } qw|
 ../t/comp/require.t
 
-../t/io/layers.t
-
 ../t/op/array.t
 ../t/op/local.t
 ../t/op/substr.t
 
 ../t/comp/parser.t
-
-../t/op/getppid.t
 
 ../t/op/switch.t
 
@@ -114,6 +110,9 @@ our %failing = map { $_, 1 } qw|
 ../t/op/symbolcache.t
 
 ../t/op/threads.t
+
+../t/op/exec.t
+../t/io/say.t
 |;
 
 my @files;
@@ -127,7 +126,6 @@ for my $file (@files) {
 __DATA__
 use strict;
 #ABC
-new Foo;
 Foo->new;
 ########
 sub pi() { 3.14 }
@@ -154,7 +152,7 @@ s//m#.#/ge;
 #
 eval { require 5.005 }
 ########
-# TODO Reduced test case from t/io/layers.t
+# Reduced test case from t/io/layers.t
 sub PerlIO::F_UTF8 () { 0x00008000 } # from perliol.h
 BEGIN { PerlIO::Layer->find("encoding",1);}
 ########

@@ -166,9 +166,6 @@ Perl_hv_iternext_flags
 Perl_hv_iterval
 Perl_hv_ksplit
 Perl_hv_magic
-Perl_refcounted_he_chain_2hv
-Perl_refcounted_he_fetch
-Perl_refcounted_he_new
 Perl_hv_store
 Perl_hv_store_ent
 Perl_hv_store_flags
@@ -724,6 +721,7 @@ Perl_PerlIO_stdin
 Perl_PerlIO_stdout
 Perl_PerlIO_stderr
 Perl_pad_push
+Perl_find_runcv
 Perl_save_set_svflags
 Perl_hv_assert
 Perl_hv_scalar

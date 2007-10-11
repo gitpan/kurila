@@ -4936,6 +4936,7 @@ Perl_yylex(pTHX)
 		int pkgname = 0;
 		const char lastchar = (PL_bufptr == PL_oldoldbufptr ? 0 : PL_bufptr[-1]);
 		CV *cv;
+		SV **compsub;
 #ifdef PERL_MAD
 		SV *nextPL_nextwhite = 0;
 #endif
@@ -4963,6 +4964,23 @@ Perl_yylex(pTHX)
 		    else
 			no_op("Bareword",s);
 		}
+
+		/* Is this a compile time function? */
+		SV **compsubtable = hv_fetch(PL_compiling.cop_hints_hash, "compsub", 7, FALSE);
+		if (compsubtable && SvROK(*compsubtable) && SvTYPE(SvRV(*compsubtable)) == SVt_PVHV) {
+		    compsub = hv_fetch((HV *)SvRV(*compsubtable), PL_tokenbuf, len, FALSE);
+		    if (compsub) {
+			yylval.opval = (OP*)newSVOP(OP_CONST, 0, SvREFCNT_inc(SvRV(*compsub)));
+			yylval.opval->op_private = OPpCONST_BARE;
+			PL_expect = XTERM;
+			s = skipspace(s);
+			PL_bufptr = s;
+			PL_last_uni = PL_oldbufptr;
+			PL_last_lop_op = OP_COMPSUB;
+			return REPORT( (int)COMPSUB );
+		    }
+		}
+ 
 
 		/* Look for a subroutine with this name in current package,
 		   unless name is "Foo::", in which case Foo is a bearword
@@ -5105,18 +5123,7 @@ Perl_yylex(pTHX)
 			    d++;
 			if (*d == ')' && (sv = gv_const_sv(gv))) {
 			    s = d + 1;
-#ifdef PERL_MAD
-			    if (PL_madskills) {
-				char *par = SvPVX(PL_linestr) + PL_realtokenstart; 
-				sv_catpvn(PL_thistoken, par, s - par);
-				if (PL_nextwhite) {
-				    sv_free(PL_nextwhite);
-				    PL_nextwhite = 0;
-				}
-			    }
-			    else
-#endif
-				goto its_constant;
+			    goto its_constant;
 			}
 		    }
 #ifdef PERL_MAD
@@ -5148,7 +5155,7 @@ Perl_yylex(pTHX)
 				"Ambiguous use of -%s resolved as -&%s()",
 				PL_tokenbuf, PL_tokenbuf);
 		    /* Check for a constant sub */
-		    if ((sv = gv_const_sv(gv)) && !PL_madskills) {
+		    if ((sv = gv_const_sv(gv))) {
 		  its_constant:
 			SvREFCNT_dec(((SVOP*)yylval.opval)->op_sv);
 			((SVOP*)yylval.opval)->op_sv = SvREFCNT_inc_simple(sv);
@@ -5207,45 +5214,6 @@ Perl_yylex(pTHX)
 			    curmad('X', PL_thistoken);
 			    PL_thistoken = newSVpvs("");
 			}
-			force_next(WORD);
-			TOKEN(NOAMP);
-		    }
-		}
-
-		/* Guess harder when madskills require "best effort". */
-		if (PL_madskills && (!gv || !GvCVu(gv))) {
-		    int probable_sub = 0;
-		    if (strchr("\"'`$@%0123456789!*+{[<", *s))
-			probable_sub = 1;
-		    else if (isALPHA(*s)) {
-			char tmpbuf[1024];
-			STRLEN tmplen;
-			d = s;
-			d = scan_word(d, tmpbuf, sizeof tmpbuf, TRUE, &tmplen);
-			if (!keyword(tmpbuf, tmplen, 0))
-			    probable_sub = 1;
-			else {
-			    while (d < PL_bufend && isSPACE(*d))
-				d++;
-			    if (*d == '=' && d[1] == '>')
-				probable_sub = 1;
-			}
-		    }
-		    if (probable_sub) {
-			gv = gv_fetchpv(PL_tokenbuf, GV_ADD, SVt_PVCV);
-			op_free(yylval.opval);
-			yylval.opval = newCVREF(0, newGVOP(OP_GV, 0, gv));
-			yylval.opval->op_private |= OPpENTERSUB_NOPAREN;
-			PL_last_lop = PL_oldbufptr;
-			PL_last_lop_op = OP_ENTERSUB;
-			PL_nextwhite = PL_thiswhite;
-			PL_thiswhite = 0;
-			start_force(PL_curforce);
-			NEXTVAL_NEXTTOKE.opval = yylval.opval;
-			PL_expect = XTERM;
-			PL_nextwhite = nextPL_nextwhite;
-			curmad('X', PL_thistoken);
-			PL_thistoken = newSVpvs("");
 			force_next(WORD);
 			TOKEN(NOAMP);
 		    }
@@ -11987,8 +11955,10 @@ Perl_yyerror(pTHX_ const char *s)
                 (int)PL_multi_open,(int)PL_multi_close,(IV)PL_multi_start);
         PL_multi_end = 0;
     }
-    if (PL_in_eval & EVAL_WARNONLY && ckWARN_d(WARN_SYNTAX))
-	Perl_warner(aTHX_ packWARN(WARN_SYNTAX), "%"SVf, SVfARG(msg));
+    if (PL_in_eval & EVAL_WARNONLY) {
+	if (ckWARN_d(WARN_SYNTAX))
+	    Perl_warner(aTHX_ packWARN(WARN_SYNTAX), "%"SVf, SVfARG(msg));
+    }
     else
 	qerror(msg);
     if (PL_error_count >= 10) {

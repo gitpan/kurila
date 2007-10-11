@@ -894,8 +894,8 @@ Perl_leave_scope(pTHX_ I32 base)
 		GvHV(PL_hintgv) = NULL;
 	    }
 	    *(I32*)&PL_hints = (I32)SSPOPINT;
-	    Perl_refcounted_he_free(aTHX_ PL_compiling.cop_hints_hash);
-	    PL_compiling.cop_hints_hash = (struct refcounted_he *) SSPOPPTR;
+	    SvREFCNT_dec(PL_compiling.cop_hints_hash);
+ 	    PL_compiling.cop_hints_hash = (HV*) SSPOPPTR;
 	    if (PL_hints & HINT_LOCALIZE_HH) {
 		SvREFCNT_dec((SV*)GvHV(PL_hintgv));
 		GvHV(PL_hintgv) = (HV*)SSPOPPTR;
@@ -1039,18 +1039,6 @@ Perl_cx_dump(pTHX_ PERL_CONTEXT *cx)
     switch (CxTYPE(cx)) {
     case CXt_NULL:
     case CXt_BLOCK:
-	break;
-    case CXt_FORMAT:
-	PerlIO_printf(Perl_debug_log, "BLK_SUB.CV = 0x%"UVxf"\n",
-		PTR2UV(cx->blk_sub.cv));
-	PerlIO_printf(Perl_debug_log, "BLK_SUB.GV = 0x%"UVxf"\n",
-		PTR2UV(cx->blk_sub.gv));
-	PerlIO_printf(Perl_debug_log, "BLK_SUB.DFOUTGV = 0x%"UVxf"\n",
-		PTR2UV(cx->blk_sub.dfoutgv));
-	PerlIO_printf(Perl_debug_log, "BLK_SUB.HASARGS = %d\n",
-		(int)cx->blk_sub.hasargs);
-	PerlIO_printf(Perl_debug_log, "BLK_SUB.RETOP = 0x%"UVxf"\n",
-		PTR2UV(cx->blk_sub.retop));
 	break;
     case CXt_SUB:
 	PerlIO_printf(Perl_debug_log, "BLK_SUB.CV = 0x%"UVxf"\n",

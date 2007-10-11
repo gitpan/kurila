@@ -67,7 +67,7 @@
 %token <i_tkval> '{' '}' '[' ']' '-' '+' '$' '@' '%' '*' '&' ';'
 
 %token <opval> WORD METHOD FUNCMETH THING PMFUNC PRIVATEREF
-%token <opval> FUNC0SUB UNIOPSUB LSTOPSUB
+%token <opval> FUNC0SUB UNIOPSUB LSTOPSUB COMPSUB
 %token <p_tkval> LABEL
 %token <i_tkval> SUB ANONSUB PACKAGE USE
 %token <i_tkval> WHILE UNTIL IF UNLESS ELSE ELSIF CONTINUE FOR
@@ -79,7 +79,7 @@
 %token <i_tkval> LOCAL MY MYSUB REQUIRE
 %token <i_tkval> COLONATTR
 
-%type <ival> prog progstart remember mremember savescope
+%type <ival> prog progstart remember mremember
 %type <ival>  startsub startanonsub
 /* FIXME for MAD - are these two ival? */
 %type <ival> mydefsv mintro
@@ -115,6 +115,7 @@
 %nonassoc RELOP
 %nonassoc UNIOP UNIOPSUB
 %nonassoc REQUIRE
+%nonassoc COMPSUB
 %left <i_tkval> SHIFTOP
 %left ADDOP
 %left MULOP
@@ -175,9 +176,6 @@ mremember:	/* NULL */	/* start a partial lexical scope */
 			{ $$ = block_start(FALSE); }
 	;
 
-savescope:	/* NULL */	/* remember stack pos in case of error */
-		{ $$ = PL_savestack_ix; }
-
 /* A collection of "lines" in the program */
 lineseq	:	/* NULL */
 			{ $$ = Nullop; }
@@ -188,12 +186,13 @@ lineseq	:	/* NULL */
 			    	    (LISTOP*)$1, (LISTOP*)$2),
 				$1);
 			}
-	|	lineseq savescope line
-			{   LEAVE_SCOPE($2);
-			    $$ = append_list(OP_LINESEQ,
-				(LISTOP*)$1, (LISTOP*)$3);
+	|	lineseq line
+			{   $$ = append_list(OP_LINESEQ,
+				(LISTOP*)$1, (LISTOP*)$2);
 			    PL_pad_reset_pending = TRUE;
-			    if ($1 && $3) PL_hints |= HINT_BLOCK_SCOPE; }
+			    if ($1 && $2)
+				PL_hints |= HINT_BLOCK_SCOPE;
+			}
 	;
 
 /* A "line" in the program */
@@ -1163,6 +1162,10 @@ term	:	termbinop
 	|	REQUIRE term                         /* require Foo */
 			{ $$ = newUNOP(OP_REQUIRE, $1 ? OPf_SPECIAL : 0, $2);
 			  TOKEN_GETMAD($1,$$,'o');
+			}
+	|	COMPSUB listexpr                  /* foo @args */
+			{ 
+                            $$ = newBINOP(OP_COMPSUB, 0, $1, $2);
 			}
 	|	UNIOPSUB
 			{ $$ = newUNOP(OP_ENTERSUB, OPf_STACKED, scalar($1)); }

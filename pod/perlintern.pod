@@ -331,28 +331,6 @@ Found in file pad.h
 
 =back
 
-=head1 Functions in file pp_ctl.c
-
-
-=over 8
-
-=item find_runcv
-X<find_runcv>
-
-Locate the CV corresponding to the currently executing sub or eval.
-If db_seqp is non_null, skip CVs that are in the DB package and populate
-*db_seqp with the cop sequence number at the point that the DB:: code was
-entered. (allows debuggers to eval in the scope of the breakpoint rather
-than in the scope of the debugger itself).
-
-	CV*	find_runcv(U32 *db_seqp)
-
-=for hackers
-Found in file pp_ctl.c
-
-
-=back
-
 =head1 GV Functions
 
 =over 8
@@ -386,48 +364,6 @@ Returns C<TRUE> if given the name of a magical GV. Calls is_gv_magical.
 
 =for hackers
 Found in file gv.c
-
-
-=back
-
-=head1 Hash Manipulation Functions
-
-=over 8
-
-=item refcounted_he_chain_2hv
-X<refcounted_he_chain_2hv>
-
-Generates and returns a C<HV *> by walking up the tree starting at the passed
-in C<struct refcounted_he *>.
-
-	HV *	refcounted_he_chain_2hv(const struct refcounted_he *c)
-
-=for hackers
-Found in file hv.c
-
-=item refcounted_he_free
-X<refcounted_he_free>
-
-Decrements the reference count of the passed in C<struct refcounted_he *>
-by one. If the reference count reaches zero the structure's memory is freed,
-and C<refcounted_he_free> iterates onto the parent node.
-
-	void	refcounted_he_free(struct refcounted_he *he)
-
-=for hackers
-Found in file hv.c
-
-=item refcounted_he_new
-X<refcounted_he_new>
-
-Creates a new C<struct refcounted_he>. As S<key> is copied, and value is
-stored in a compact form, all references remain the property of the caller.
-The C<struct refcounted_he> is returned with a reference count of 1.
-
-	struct refcounted_he *	refcounted_he_new(struct refcounted_he *const parent, SV *const key, SV *const value)
-
-=for hackers
-Found in file hv.c
 
 
 =back

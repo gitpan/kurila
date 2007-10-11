@@ -747,10 +747,6 @@ PERL_CALLCONV void	Perl_hv_ksplit(pTHX_ HV* hv, IV newmax)
 /* PERL_CALLCONV void	Perl_hv_magic(pTHX_ HV* hv, GV* gv, int how)
 			__attribute__nonnull__(pTHX_1); */
 
-PERL_CALLCONV HV *	Perl_refcounted_he_chain_2hv(pTHX_ const struct refcounted_he *c);
-PERL_CALLCONV SV *	Perl_refcounted_he_fetch(pTHX_ const struct refcounted_he *chain, SV *keysv, const char *key, STRLEN klen, int flags, U32 hash);
-PERL_CALLCONV void	Perl_refcounted_he_free(pTHX_ struct refcounted_he *he);
-PERL_CALLCONV struct refcounted_he *	Perl_refcounted_he_new(pTHX_ struct refcounted_he *const parent, SV *const key, SV *const value);
 PERL_CALLCONV SV**	Perl_hv_store(pTHX_ HV* tb, const char* key, I32 klen, SV* val, U32 hash);
 PERL_CALLCONV HE*	Perl_hv_store_ent(pTHX_ HV* tb, SV* key, SV* val, U32 hash);
 PERL_CALLCONV SV**	Perl_hv_store_flags(pTHX_ HV* tb, const char* key, I32 klen, SV* val, U32 hash, int flags);
@@ -1833,7 +1829,7 @@ PERL_CALLCONV OP*	Perl_pmtrans(pTHX_ OP* o, OP* expr, OP* repl)
 PERL_CALLCONV void	Perl_pop_scope(pTHX);
 PERL_CALLCONV OP*	Perl_prepend_elem(pTHX_ I32 optype, OP* head, OP* tail);
 PERL_CALLCONV void	Perl_push_scope(pTHX);
-/* PERL_CALLCONV OP*	ref(pTHX_ OP* o, I32 type); */
+/* PERL_CALLCONV OP*	Perl_ref(pTHX_ OP* o, I32 type); */
 PERL_CALLCONV OP*	Perl_refkids(pTHX_ OP* o, I32 type);
 PERL_CALLCONV void	Perl_regdump(pTHX_ const regexp* r)
 			__attribute__nonnull__(pTHX_1);
@@ -2157,7 +2153,7 @@ STATIC char*	S_glob_2pv(pTHX_ GV* const gv, STRLEN * const len)
 			__attribute__nonnull__(pTHX_1);
 
 #endif
-/* PERL_CALLCONV IV	sv_2iv(pTHX_ SV* sv)
+/* PERL_CALLCONV IV	Perl_sv_2iv(pTHX_ SV* sv)
 			__attribute__nonnull__(pTHX_1); */
 
 PERL_CALLCONV IV	Perl_sv_2iv_flags(pTHX_ SV* sv, I32 flags)
@@ -2167,7 +2163,7 @@ PERL_CALLCONV SV*	Perl_sv_2mortal(pTHX_ SV* sv);
 PERL_CALLCONV NV	Perl_sv_2nv(pTHX_ SV* sv)
 			__attribute__nonnull__(pTHX_1);
 
-/* PERL_CALLCONV char*	sv_2pv(pTHX_ SV* sv, STRLEN* lp)
+/* PERL_CALLCONV char*	Perl_sv_2pv(pTHX_ SV* sv, STRLEN* lp)
 			__attribute__nonnull__(pTHX_1); */
 
 PERL_CALLCONV char*	Perl_sv_2pv_flags(pTHX_ SV* sv, STRLEN* lp, I32 flags)
@@ -2182,7 +2178,7 @@ PERL_CALLCONV char*	Perl_sv_2pvbyte(pTHX_ SV* sv, STRLEN* lp)
 PERL_CALLCONV char*	Perl_sv_pvn_nomg(pTHX_ SV* sv, STRLEN* lp)
 			__attribute__nonnull__(pTHX_1);
 
-/* PERL_CALLCONV UV	sv_2uv(pTHX_ SV* sv)
+/* PERL_CALLCONV UV	Perl_sv_2uv(pTHX_ SV* sv)
 			__attribute__nonnull__(pTHX_1); */
 
 PERL_CALLCONV UV	Perl_sv_2uv_flags(pTHX_ SV* sv, I32 flags)
@@ -2233,11 +2229,11 @@ PERL_CALLCONV void	Perl_sv_catpv(pTHX_ SV* sv, const char* ptr)
 			__attribute__nonnull__(pTHX_1)
 			__attribute__nonnull__(pTHX_2);
 
-/* PERL_CALLCONV void	sv_catpvn(pTHX_ SV* sv, const char* ptr, STRLEN len)
+/* PERL_CALLCONV void	Perl_sv_catpvn(pTHX_ SV* sv, const char* ptr, STRLEN len)
 			__attribute__nonnull__(pTHX_1)
 			__attribute__nonnull__(pTHX_2); */
 
-/* PERL_CALLCONV void	sv_catsv(pTHX_ SV* dsv, SV* ssv)
+/* PERL_CALLCONV void	Perl_sv_catsv(pTHX_ SV* dsv, SV* ssv)
 			__attribute__nonnull__(pTHX_1); */
 
 PERL_CALLCONV void	Perl_sv_chop(pTHX_ SV* sv, const char* ptr)
@@ -2334,7 +2330,7 @@ PERL_CALLCONV void	Perl_sv_pos_u2b(pTHX_ SV* sv, I32* offsetp, I32* lenp)
 PERL_CALLCONV void	Perl_sv_pos_b2u(pTHX_ SV* sv, I32* offsetp)
 			__attribute__nonnull__(pTHX_2);
 
-/* PERL_CALLCONV char*	sv_pvn_force(pTHX_ SV* sv, STRLEN* lp)
+/* PERL_CALLCONV char*	Perl_sv_pvn_force(pTHX_ SV* sv, STRLEN* lp)
 			__attribute__nonnull__(pTHX_1); */
 
 PERL_CALLCONV char*	Perl_sv_pvutf8n_force(pTHX_ SV* sv, STRLEN* lp)
@@ -2409,10 +2405,10 @@ PERL_CALLCONV void	Perl_sv_setpv(pTHX_ SV* sv, const char* ptr)
 PERL_CALLCONV void	Perl_sv_setpvn(pTHX_ SV* sv, const char* ptr, STRLEN len)
 			__attribute__nonnull__(pTHX_1);
 
-/* PERL_CALLCONV void	sv_setsv(pTHX_ SV* dsv, SV* ssv)
+/* PERL_CALLCONV void	Perl_sv_setsv(pTHX_ SV* dsv, SV* ssv)
 			__attribute__nonnull__(pTHX_1); */
 
-/* PERL_CALLCONV void	sv_taint(pTHX_ SV* sv)
+/* PERL_CALLCONV void	Perl_sv_taint(pTHX_ SV* sv)
 			__attribute__nonnull__(pTHX_1); */
 
 PERL_CALLCONV bool	Perl_sv_tainted(pTHX_ SV* sv)
@@ -2803,15 +2799,15 @@ PERL_CALLCONV void	Perl_reginitcolors(pTHX);
 			__attribute__warn_unused_result__
 			__attribute__nonnull__(pTHX_1); */
 
-/* PERL_CALLCONV char*	sv_pv(pTHX_ SV *sv)
+/* PERL_CALLCONV char*	Perl_sv_pv(pTHX_ SV *sv)
 			__attribute__warn_unused_result__
 			__attribute__nonnull__(pTHX_1); */
 
-/* PERL_CALLCONV char*	sv_pvutf8(pTHX_ SV *sv)
+/* PERL_CALLCONV char*	Perl_sv_pvutf8(pTHX_ SV *sv)
 			__attribute__warn_unused_result__
 			__attribute__nonnull__(pTHX_1); */
 
-/* PERL_CALLCONV char*	sv_pvbyte(pTHX_ SV *sv)
+/* PERL_CALLCONV char*	Perl_sv_pvbyte(pTHX_ SV *sv)
 			__attribute__warn_unused_result__
 			__attribute__nonnull__(pTHX_1); */
 
@@ -3046,9 +3042,6 @@ STATIC struct xpvhv_aux*	S_hv_auxinit(HV *hv)
 STATIC SV*	S_hv_delete_common(pTHX_ HV* tb, SV* keysv, const char* key, STRLEN klen, int k_flags, I32 d_flags, U32 hash);
 STATIC HE*	S_hv_fetch_common(pTHX_ HV* tb, SV* keysv, const char* key, STRLEN klen, int flags, int action, SV* val, U32 hash);
 STATIC void	S_clear_placeholders(pTHX_ HV* hb, U32 items)
-			__attribute__nonnull__(pTHX_1);
-
-STATIC SV *	S_refcounted_he_value(pTHX_ const struct refcounted_he *he)
 			__attribute__nonnull__(pTHX_1);
 
 #endif
@@ -3505,9 +3498,7 @@ STATIC I32	S_dopoptowhen(pTHX_ I32 startingblock)
 STATIC void	S_save_lines(pTHX_ AV *array, SV *sv)
 			__attribute__nonnull__(pTHX_2);
 
-STATIC OP*	S_doeval(pTHX_ int gimme, OP** startop, CV* outside, U32 seq)
-			__attribute__warn_unused_result__;
-
+STATIC bool	S_doeval(pTHX_ int gimme, OP** startop, CV* outside, U32 seq);
 STATIC PerlIO *	S_check_type_and_open(pTHX_ const char *name, const char *mode)
 			__attribute__warn_unused_result__
 			__attribute__nonnull__(pTHX_1)

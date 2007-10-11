@@ -921,7 +921,7 @@ Interaction, perlfaq9 - Networking
 
 =back
 
-=head2 perlfaq1 - General Questions About Perl ($Revision: 9671 $)
+=head2 perlfaq1 - General Questions About Perl ($Revision: 9681 $)
 
 =over 4
 
@@ -935,11 +935,11 @@ Interaction, perlfaq9 - Networking
 
 =item Which version of Perl should I use?
 
-=item What are perl4, perl5, or perl6?
+=item What are Perl 4, Perl 5, or Perl 6?
 
 =item What was Ponie?
 
-=item What is perl6?
+=item What is Perl 6?
 
 =item How stable is Perl?
 
@@ -1113,7 +1113,7 @@ program; what am I doing wrong?
 
 =back
 
-=head2 perlfaq4 - Data Manipulation ($Revision: 9491 $)
+=head2 perlfaq4 - Data Manipulation ($Revision: 9681 $)
 
 =over 4
 
@@ -1646,7 +1646,7 @@ methods?
 
 =back
 
-=head2 perlfaq8 - System Interaction ($Revision: 9667 $)
+=head2 perlfaq8 - System Interaction ($Revision: 9681 $)
 
 =over 4
 
@@ -2671,6 +2671,8 @@ X<SYS$LOGIN>
 
 =item DESCRIPTION
 
+=item SEE ALSO
+
 =back
 
 =head2 perllexwarn - Perl Lexical Warnings
@@ -2701,8 +2703,6 @@ X<warning, fatal>
 X<warning, reporting> X<warning, registering>
 
 =back
-
-=item TODO
 
 =item SEE ALSO
 
@@ -2900,7 +2900,7 @@ m X</m> X<regex, multiline> X<regexp, multiline> X<regular expression,
 multiline>, s X</s> X<regex, single-line> X<regexp, single-line> X<regular
 expression, single-line>, i X</i> X<regex, case-insensitive> X<regexp,
 case-insensitive> X<regular expression, case-insensitive>, x X</x>, p X</p>
-X<regex, preserve> X<regexp, preserve>
+X<regex, preserve> X<regexp, preserve>, g and c X</g> X</c>
 
 =item Regular Expressions
 
@@ -5747,6 +5747,10 @@ X<sv_pvn>, sv_pvutf8 X<sv_pvutf8>, sv_pvutf8n X<sv_pvutf8n>, sv_taint
 X<sv_taint>, sv_unref X<sv_unref>, sv_usepvn X<sv_usepvn>, sv_usepvn_mg
 X<sv_usepvn_mg>, sv_uv X<sv_uv>, unpack_str X<unpack_str>
 
+=item Functions in file pp_ctl.c
+
+find_runcv X<find_runcv>
+
 =item Functions in file pp_pack.c
 
 packlist X<packlist>, unpackstring X<unpackstring>
@@ -6012,18 +6016,9 @@ PAD_SET_CUR X<PAD_SET_CUR>, PAD_SET_CUR_NOSAVE X<PAD_SET_CUR_NOSAVE>,
 PAD_SV X<PAD_SV>, PAD_SVl X<PAD_SVl>, SAVECLEARSV X<SAVECLEARSV>,
 SAVECOMPPAD X<SAVECOMPPAD>, SAVEPADSV X<SAVEPADSV>
 
-=item Functions in file pp_ctl.c
-
-find_runcv X<find_runcv>
-
 =item GV Functions
 
 is_gv_magical X<is_gv_magical>, is_gv_magical_sv X<is_gv_magical_sv>
-
-=item Hash Manipulation Functions
-
-refcounted_he_chain_2hv X<refcounted_he_chain_2hv>, refcounted_he_free
-X<refcounted_he_free>, refcounted_he_new X<refcounted_he_new>
 
 =item IO Functions
 
@@ -6355,19 +6350,45 @@ I<The Road goes ever on and on, down from the door where it began.>
 
 =back
 
-=head2 perltodo - Perl TO-DO List
+=head2 perlcommunity - a brief overview of the Perl community
 
 =over 4
 
 =item DESCRIPTION
 
-=item The roadmap to 5.10
+=over 4
+
+=item Where to find the community
+
+=item Mailing lists and Newsgroups
+
+=item IRC
+
+=item Websites
+
+L<http://perl.com/>, L<http://use.perl.org/>, L<http://www.perlmonks.org/>
+
+=item User Groups
+
+=item Workshops
+
+=item Hackathons
+
+=item Conventions
+
+=item Calendar of Perl Events
+
+=back
+
+=item AUTHOR
+
+=back
+
+=head2 perltodo - Perl TO-DO List
 
 =over 4
 
-=item Needed for the final 5.10.0 release
-
-=back
+=item DESCRIPTION
 
 =item Tasks that only need Perl knowledge
 
@@ -6470,6 +6491,10 @@ I<The Road goes ever on and on, down from the door where it began.>
 =over 4
 
 =item Implement $value ~~ 0 .. $range
+
+=item A does() built-in
+
+=item Tied filehandles and write() don't mix
 
 =item Attach/detach debugger from running program
 
@@ -6687,6 +6712,8 @@ locale, the locale pramga has been removed
 
 =item C<(?p{})> has been removed
 
+=item Pseudo-hashes have been removed
+
 =item Removal of the bytecode compiler and of perlcc
 
 =item Removal of the JPL
@@ -6817,6 +6844,8 @@ C<Attribute::Handlers>, C<B::Lint>, C<B>, C<Thread>
 =item strictures and array/hash dereferencing in defined()
 
 =item C<(?p{})> has been removed
+
+=item Pseudo-hashes have been removed
 
 =item Removal of the bytecode compiler and of perlcc
 
@@ -10105,7 +10134,7 @@ C<PATH>, I<nroff>, Permissions
 =item Optional Libraries for Perl on Cygwin
 
 C<-lcrypt>, C<-lgdbm> (C<use GDBM_File>), C<-ldb> (C<use DB_File>),
-C<-lcygipc> (C<use IPC::SysV>), C<-lutil>
+C<cygserver> (C<use IPC::SysV>), C<-lutil>
 
 =item Configure-time Options for Perl on Cygwin
 
@@ -10152,7 +10181,9 @@ C<chown()>, Miscellaneous
 
 =item Prebuilt methods:
 
-C<Cwd::cwd>, C<Cygwin::pid_to_winpid>, C<Cygwin::winpid_to_pid>
+C<Cwd::cwd>, C<Cygwin::pid_to_winpid>, C<Cygwin::winpid_to_pid>,
+C<Cygwin::win_to_posix_path>, C<Cygwin::posix_to_win_path>,
+C<Cygwin::is_binmount>, C<Cygwin::is_textmount>
 
 =back
 
@@ -11850,6 +11881,37 @@ escapes
 
 =back
 
+=head2 compsub - Package for defining compilation subroutines
+
+=over 4
+
+=item SYNOPSIS
+
+=item WARNING
+
+=item DESCRIPTION
+
+=over 4
+
+=item Compilation subroutines
+
+=item Using compilation subs
+
+=item Writing compilation subs
+
+Freeing opcodes, Examples, Calling a subroutine or not depending on some
+global environment, parsing arguments and declaring lexical variables
+
+=item IMPLEMENTATION
+
+=back
+
+=item AUTHOR
+
+=item BUGS
+
+=back
+
 =head2 constant - Perl pragma to declare constants
 
 =over 4
@@ -13149,11 +13211,26 @@ XSUBANY, CvFLAGS, const_sv
 
 FILL, MAX, KEYS, RITER, NAME, ARRAY, PMROOT
 
+=back
+
+=item AUTHOR
+
+=back
+
+=head2 B-OP, B::OP - Inspect and manipulate op trees.
+
+=over 4
+
+=item DESCRIPTION
+
+=over 4
+
 =item OP-RELATED CLASSES
 
 =item B::OP Methods
 
-next, sibling, name, ppaddr, desc, targ, type, opt, flags, private, spare
+next, sibling, name, ppaddr, desc, targ, type, opt, flags, private, spare,
+free
 
 =item B::UNOP METHOD
 
@@ -13198,7 +13275,31 @@ label, stash, stashpv, file, cop_seq, line, warnings, io, hints
 
 =back
 
+=item CREATING OPTREES
+
+=over 4
+
+=item SYNOPSIS
+
+=item WARNING
+
+=item DESCRIPTION
+
+=item OTHER METHODS
+
+ $b_sv->sv, $op->dump, $b_sv->dump, $b_op->linklist
+
+=item EXPORT
+
+=back
+
 =item AUTHOR
+
+=item MAINTAINERS
+
+=item LICENSE
+
+=item SEE ALSO
 
 =back
 
@@ -13400,6 +13501,92 @@ validate against older perls
 =item BUGS
 
 =item AUTHOR
+
+=back
+
+=head2 B::OP - Inspect and manipulate op trees.
+
+=over 4
+
+=item DESCRIPTION
+
+=over 4
+
+=item OP-RELATED CLASSES
+
+=item B::OP Methods
+
+next, sibling, name, ppaddr, desc, targ, type, opt, flags, private, spare,
+free
+
+=item B::UNOP METHOD
+
+first
+
+=item B::BINOP METHOD
+
+last
+
+=item B::LOGOP METHOD
+
+other
+
+=item B::LISTOP METHOD
+
+children
+
+=item B::PMOP Methods
+
+pmreplroot, pmreplstart, pmnext, pmregexp, pmflags, extflags, precomp,
+pmoffset
+
+=item B::SVOP METHOD
+
+sv, gv
+
+=item B::PADOP METHOD
+
+padix
+
+=item B::PVOP METHOD
+
+pv
+
+=item B::LOOP Methods
+
+redoop, nextop, lastop
+
+=item B::COP Methods
+
+label, stash, stashpv, file, cop_seq, line, warnings, io, hints
+
+=back
+
+=item CREATING OPTREES
+
+=over 4
+
+=item SYNOPSIS
+
+=item WARNING
+
+=item DESCRIPTION
+
+=item OTHER METHODS
+
+ $b_sv->sv, $op->dump, $b_sv->dump, $b_op->linklist
+
+=item EXPORT
+
+=back
+
+=item AUTHOR
+
+=item MAINTAINERS
+
+=item LICENSE
+
+=item SEE ALSO
 
 =back
 
@@ -13954,6 +14141,22 @@ FCGI_SOCKET_PATH, FCGI_LISTEN_QUEUE
 =item DESCRIPTION
 
 =item AUTHOR INFORMATION
+
+=item SEE ALSO
+
+=back
+
+=head2 CORE - Pseudo-namespace for Perl's core routines
+
+=over 4
+
+=item SYNOPSIS
+
+=item DESCRIPTION
+
+=item OVERRIDING CORE FUNCTIONS
+
+=item AUTHOR
 
 =item SEE ALSO
 
@@ -15117,9 +15320,7 @@ abs_path, realpath, fast_abs_path
 
 =back
 
-=head2 DB - programmatic interface to the Perl debugging API (draft,
-subject to
-change)
+=head2 DB - programmatic interface to the Perl debugging API
 
 =over 4
 
@@ -15693,7 +15894,7 @@ $md5->add_bits($bitstring), $md5->digest, $md5->hexdigest, $md5->b64digest
 
 =over 4
 
-=item SYNOPSIS (SHA)
+=item SYNOPSIS
 
 =item SYNOPSIS (HMAC-SHA)
 
