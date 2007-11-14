@@ -226,10 +226,6 @@ END_EXTERN_C
 #define PL_cop_seqmax		(*Perl_Icop_seqmax_ptr(aTHX))
 #undef  PL_cryptseen
 #define PL_cryptseen		(*Perl_Icryptseen_ptr(aTHX))
-#undef  PL_cshlen
-#define PL_cshlen		(*Perl_Icshlen_ptr(aTHX))
-#undef  PL_cshname
-#define PL_cshname		(*Perl_Icshname_ptr(aTHX))
 #undef  PL_curcop
 #define PL_curcop		(*Perl_Icurcop_ptr(aTHX))
 #undef  PL_curcopdb
@@ -268,8 +264,6 @@ END_EXTERN_C
 #define PL_defoutgv		(*Perl_Idefoutgv_ptr(aTHX))
 #undef  PL_defstash
 #define PL_defstash		(*Perl_Idefstash_ptr(aTHX))
-#undef  PL_delayedisa
-#define PL_delayedisa		(*Perl_Idelayedisa_ptr(aTHX))
 #undef  PL_delaymagic
 #define PL_delaymagic		(*Perl_Idelaymagic_ptr(aTHX))
 #undef  PL_diehook
@@ -502,8 +496,6 @@ END_EXTERN_C
 #define PL_ppid			(*Perl_Ippid_ptr(aTHX))
 #undef  PL_preambleav
 #define PL_preambleav		(*Perl_Ipreambleav_ptr(aTHX))
-#undef  PL_preprocess
-#define PL_preprocess		(*Perl_Ipreprocess_ptr(aTHX))
 #undef  PL_profiledata
 #define PL_profiledata		(*Perl_Iprofiledata_ptr(aTHX))
 #undef  PL_psig_name

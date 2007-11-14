@@ -363,7 +363,7 @@ PP(pp_prototype)
 		char str[ MAX_ARGS_OP * 2 + 2 ]; /* One ';', one '\0' */
 
 		if (code == -KEY_chop || code == -KEY_chomp
-			|| code == -KEY_exec || code == -KEY_system || code == -KEY_err)
+			|| code == -KEY_exec || code == -KEY_system)
 		    goto set;
 		if (code == -KEY_mkdir) {
 		    ret = sv_2mortal(newSVpvs("_;$"));
@@ -2398,13 +2398,13 @@ PP(pp_complement)
 	}
       }
       else {
-	register U8 *tmps;
+	register char *tmps;
 	register I32 anum;
 	STRLEN len;
 
 	(void)SvPV_nomg_const(sv,len); /* force check for uninit var */
 	sv_setsv_nomg(TARG, sv);
-	tmps = (U8*)SvPV_force(TARG, len);
+	tmps = SvPV_force(TARG, len);
 	anum = len;
 #ifdef LIBERAL
 	{
@@ -2414,7 +2414,7 @@ PP(pp_complement)
 	    tmpl = (long*)tmps;
 	    for ( ; anum >= (I32)sizeof(long); anum -= (I32)sizeof(long), tmpl++)
 		*tmpl = ~*tmpl;
-	    tmps = (U8*)tmpl;
+	    tmps = (char*)tmpl;
 	}
 #endif
 	for ( ; anum > 0; anum--, tmps++)
@@ -2753,22 +2753,40 @@ PP(pp_int)
 {
     dVAR; dSP; dTARGET; tryAMAGICun(int);
     {
-      const IV iv = TOPi; /* attempt to convert to IV if possible. */
+      dTOPss;
+      IV iv;
       /* XXX it's arguable that compiler casting to IV might be subtly
 	 different from modf (for numbers inside (IV_MIN,UV_MAX)) in which
 	 else preferring IV has introduced a subtle behaviour change bug. OTOH
 	 relying on floating point to be accurate is a bug.  */
 
-      if (!SvOK(TOPs))
+      while (SvAMAGIC(sv)) {
+	SV *tsv = AMG_CALLun(sv,numer);
+	if (!tsv)
+	    break;
+	if (SvROK(tsv) && SvRV(tsv) == SvRV(sv)) {
+	    SETu(PTR2UV(SvRV(sv)));
+	    RETURN;
+	}
+	else
+	    sv = tsv;
+      }
+      iv = SvIV(sv); /* attempt to convert to IV if possible. */
+
+      if (!SvOK(sv)) {
         SETu(0);
-      else if (SvIOK(TOPs)) {
-	if (SvIsUV(TOPs)) {
-	    const UV uv = TOPu;
-	    SETu(uv);
-	} else
+      }
+      else if (SvIOK(sv)) {
+	if (SvIsUV(sv))
+	    SETu(SvUV(sv));
+	else
 	    SETi(iv);
-      } else {
-	  const NV value = TOPn;
+      }
+      else if (SvROK(sv)) {
+	    SETu(PTR2UV(SvRV(sv)));
+      }
+      else {
+	  const NV value = SvNV(sv);
 	  if (value >= 0.0) {
 	      if (value < (NV)UV_MAX + 0.5) {
 		  SETu(U_V(value));
@@ -2877,7 +2895,7 @@ PP(pp_length)
 	const char *const p = SvPV_const(sv, len);
 
 	if (IN_CODEPOINTS) {
-	    SETi(utf8_length((U8*)p, (U8*)p + len));
+	    SETi(utf8_length(p, p + len));
 	}
 	else
 	    SETi(len);
@@ -3097,8 +3115,8 @@ PP(pp_index)
     else if (offset > (I32)biglen)
 	offset = biglen;
     if (!(little_p = is_index
-	  ? fbm_instr((unsigned char*)big_p + offset,
-		      (unsigned char*)big_p + biglen, little, 0)
+	  ? fbm_instr(big_p + offset,
+		      big_p + biglen, little, 0)
 	  : rninstr(big_p,  big_p  + offset,
 		    little_p, little_p + llen)))
 	retval = -1;
@@ -3131,11 +3149,11 @@ PP(pp_ord)
 
     SV *argsv = POPs;
     STRLEN len;
-    const U8 *s = (U8*)SvPV_const(argsv, len);
+    const char *s = SvPV_const(argsv, len);
 
     XPUSHu(IN_CODEPOINTS ?
 	   utf8n_to_uvchr(s, UTF8_MAXBYTES, 0, UTF8_ALLOW_ANYUV) :
-	   (UV)(*s & 0xff));
+	   (UV)((U8)*s & 0xff));
 
     RETURN;
 }
@@ -3163,7 +3181,7 @@ PP(pp_chr)
 
     if (IN_CODEPOINTS) {
 	SvGROW(TARG, (STRLEN)UNISKIP(value)+1);
-	tmps = (char*)uvchr_to_utf8_flags((U8*)SvPVX(TARG), value, 0);
+	tmps = uvchr_to_utf8_flags(SvPVX(TARG), value, 0);
 	SvCUR_set(TARG, tmps - SvPVX_const(TARG));
 	*tmps = '\0';
 	(void)SvPOK_only(TARG);
@@ -3235,17 +3253,17 @@ PP(pp_ucfirst)
     SV *dest;
     bool inplace = TRUE;
     const int op_type = PL_op->op_type;
-    const U8 *s;
-    U8 *d;
-    U8 tmpbuf[UTF8_MAXBYTES_CASE+1];
+    const char *s;
+    char *d;
+    char tmpbuf[UTF8_MAXBYTES_CASE+1];
     STRLEN ulen;
     STRLEN tculen;
 
     SvGETMAGIC(source);
     if (SvOK(source)) {
-	s = (const U8*)SvPV_nomg_const(source, slen);
+	s = SvPV_nomg_const(source, slen);
     } else {
-	s = (const U8*)"";
+	s = "";
 	slen = 0;
     }
 
@@ -3280,7 +3298,7 @@ PP(pp_ucfirst)
 	dest = TARG;
 
 	SvUPGRADE(dest, SVt_PV);
-	d = (U8*)SvGROW(dest, need);
+	d = SvGROW(dest, need);
 	(void)SvPOK_only(dest);
 
 	SETs(dest);
@@ -3303,7 +3321,7 @@ PP(pp_ucfirst)
 	        sv_catpvn(dest, (char*)(s + ulen), slen - ulen);
 	}
 	else {
-	    Copy(tmpbuf, d, tculen, U8);
+	    Copy(tmpbuf, d, tculen, char);
 	    SvCUR_set(dest, need - 1);
 	}
     }
@@ -3317,7 +3335,7 @@ PP(pp_ucfirst)
 
 	if (!inplace) {
 	    /* This will copy the trailing NUL  */
-	    Copy(s + 1, d + 1, slen, U8);
+	    Copy(s + 1, d + 1, slen, char);
 	    SvCUR_set(dest, need - 1);
 	}
     }
@@ -3336,8 +3354,8 @@ PP(pp_uc)
     STRLEN len;
     STRLEN min;
     SV *dest;
-    const U8 *s;
-    U8 *d;
+    const char *s;
+    char *d;
 
     SvGETMAGIC(source);
 
@@ -3354,23 +3372,23 @@ PP(pp_uc)
 	   little games.  */
 
 	if (SvOK(source)) {
-	    s = (const U8*)SvPV_nomg_const(source, len);
+	    s = SvPV_nomg_const(source, len);
 	} else {
-	    s = (const U8*)"";
+	    s = "";
 	    len = 0;
 	}
 	min = len + 1;
 
 	SvUPGRADE(dest, SVt_PV);
-	d = (U8*)SvGROW(dest, min);
+	d = SvGROW(dest, min);
 	(void)SvPOK_only(dest);
 
 	SETs(dest);
     }
 
     if (IN_CODEPOINTS) {
-	const U8 *const send = s + len;
-	U8 tmpbuf[UTF8_MAXBYTES+1];
+	const char *const send = s + len;
+	char tmpbuf[UTF8_MAXBYTES+1];
 
 	while (s < send) {
 	    const STRLEN u = UTF8SKIP(s);
@@ -3380,29 +3398,29 @@ PP(pp_uc)
 	    if (ulen > u && (SvLEN(dest) < (min += ulen - u))) {
 		/* If the eventually required minimum size outgrows
 		 * the available space, we need to grow. */
-		const UV o = d - (U8*)SvPVX_const(dest);
+		const UV o = d - SvPVX_const(dest);
 
 		/* If someone uppercases one million U+03B0s we SvGROW() one
 		 * million times.  Or we could try guessing how much to
 		 allocate without allocating too much.  Such is life. */
 		SvGROW(dest, min);
-		d = (U8*)SvPVX(dest) + o;
+		d = SvPVX(dest) + o;
 	    }
-	    Copy(tmpbuf, d, ulen, U8);
+	    Copy(tmpbuf, d, ulen, char);
 	    d += ulen;
 	    s += u;
 	}
 	*d = '\0';
-	SvCUR_set(dest, d - (U8*)SvPVX_const(dest));
+	SvCUR_set(dest, d - SvPVX_const(dest));
     } else {
 	if (len) {
-	    const U8 *const send = s + len;
+	    const char *const send = s + len;
 	    for (; s < send; d++, s++)
 		*d = toUPPER(*s);
 	}
 	if (source != dest) {
 	    *d = '\0';
-	    SvCUR_set(dest, d - (U8*)SvPVX_const(dest));
+	    SvCUR_set(dest, d - SvPVX_const(dest));
 	}
     }
     SvSETMAGIC(dest);
@@ -3417,8 +3435,8 @@ PP(pp_lc)
     STRLEN len;
     STRLEN min;
     SV *dest;
-    const U8 *s;
-    U8 *d;
+    const char *s;
+    char *d;
 
     SvGETMAGIC(source);
 
@@ -3435,15 +3453,15 @@ PP(pp_lc)
 	   little games.  */
 
 	if (SvOK(source)) {
-	    s = (const U8*)SvPV_nomg_const(source, len);
+	    s = SvPV_nomg_const(source, len);
 	} else {
-	    s = (const U8*)"";
+	    s = "";
 	    len = 0;
 	}
 	min = len + 1;
 
 	SvUPGRADE(dest, SVt_PV);
-	d = (U8*)SvGROW(dest, min);
+	d = SvGROW(dest, min);
 	(void)SvPOK_only(dest);
 
 	SETs(dest);
@@ -3453,8 +3471,8 @@ PP(pp_lc)
        to check DO_UTF8 again here.  */
 
     if (IN_CODEPOINTS) {
-	const U8 *const send = s + len;
-	U8 tmpbuf[UTF8_MAXBYTES_CASE+1];
+	const char *const send = s + len;
+	char tmpbuf[UTF8_MAXBYTES_CASE+1];
 
 	while (s < send) {
 	    const STRLEN u = UTF8SKIP(s);
@@ -3480,29 +3498,29 @@ PP(pp_lc)
 	    if (ulen > u && (SvLEN(dest) < (min += ulen - u))) {
 		/* If the eventually required minimum size outgrows
 		 * the available space, we need to grow. */
-		const UV o = d - (U8*)SvPVX_const(dest);
+		const UV o = d - SvPVX_const(dest);
 
 		/* If someone lowercases one million U+0130s we SvGROW() one
 		 * million times.  Or we could try guessing how much to
 		 allocate without allocating too much.  Such is life. */
 		SvGROW(dest, min);
-		d = (U8*)SvPVX(dest) + o;
+		d = SvPVX(dest) + o;
 	    }
-	    Copy(tmpbuf, d, ulen, U8);
+	    Copy(tmpbuf, d, ulen, char);
 	    d += ulen;
 	    s += u;
 	}
 	*d = '\0';
-	SvCUR_set(dest, d - (U8*)SvPVX_const(dest));
+	SvCUR_set(dest, d - SvPVX_const(dest));
     } else {
 	if (len) {
-	    const U8 *const send = s + len;
+	    const char *const send = s + len;
 	    for (; s < send; d++, s++)
 		*d = toLOWER(*s);
 	}
 	if (source != dest) {
 	    *d = '\0';
-	    SvCUR_set(dest, d - (U8*)SvPVX_const(dest));
+	    SvCUR_set(dest, d - SvPVX_const(dest));
 	}
     }
     SvSETMAGIC(dest);
@@ -3763,7 +3781,7 @@ PP(pp_hslice)
         }
 
         he = hv_fetch_ent(hv, keysv, lval, 0);
-        svp = he ? &HeVAL(he) : 0;
+        svp = he ? &HeVAL(he) : NULL;
 
         if (lval) {
             if (!svp || *svp == &PL_sv_undef) {
@@ -4109,12 +4127,17 @@ PP(pp_push)
 	PUSHi( AvFILL(ary) + 1 );
     }
     else {
+	PL_delaymagic = DM_DELAY;
 	for (++MARK; MARK <= SP; MARK++) {
 	    SV * const sv = newSV(0);
 	    if (*MARK)
 		sv_setsv(sv, *MARK);
 	    av_store(ary, AvFILLp(ary)+1, sv);
 	}
+	if (PL_delaymagic & DM_ARRAY)
+	    mg_set((SV*)ary);
+
+	PL_delaymagic = 0;
 	SP = ORIGMARK;
 	PUSHi( AvFILLp(ary) + 1 );
     }
@@ -4198,8 +4221,8 @@ PP(pp_reverse)
 	up = SvPV_force(TARG, len);
 	if (len > 1) {
 	    if (DO_UTF8(TARG)) {	/* first reverse each character */
-		U8* s = (U8*)SvPVX(TARG);
-		const U8* send = (U8*)(s + len);
+		char* s = SvPVX(TARG);
+		const char* send = (s + len);
 		while (s < send) {
 		    if (UTF8_IS_INVARIANT(*s)) {
 			s++;
@@ -4273,8 +4296,6 @@ PP(pp_split)
 
     do_utf8 = (rx->extflags & RXf_PMf_UTF8) != 0;
 
-    TAINT_IF((rx->extflags & (RXf_WHITE | RXf_SKIPWHITE)));
-
 #ifdef USE_ITHREADS
     if (pm->op_pmreplrootu.op_pmtargetoff) {
 	ary = GvAVn((GV*)PAD_SVl(pm->op_pmreplrootu.op_pmtargetoff));
@@ -4288,7 +4309,7 @@ PP(pp_split)
 	ary = GvAVn(PL_defgv);
     else
 	ary = NULL;
-    if (ary && (gimme != G_ARRAY || (pm->op_pmflags & PMf_ONCE))) {
+    if (ary && (gimme != G_ARRAY)) {
 	realarray = 1;
 	PUTBACK;
 	av_extend(ary,0);
@@ -4315,7 +4336,7 @@ PP(pp_split)
     orig = s;
     if (rx->extflags & RXf_SKIPWHITE) {
 	if (do_utf8) {
-	    while (*s == ' ' || is_utf8_space((U8*)s))
+	    while (*s == ' ' || is_utf8_space(s))
 		s += UTF8SKIP(s);
 	}
 	else {
@@ -4334,7 +4355,7 @@ PP(pp_split)
 	    m = s;
 	    /* this one uses 'm' and is a negative test */
 	    if (do_utf8) {
-		while (m < strend && !( *m == ' ' || is_utf8_space((U8*)m) )) {
+		while (m < strend && !( *m == ' ' || is_utf8_space(m) )) {
 		    const int t = UTF8SKIP(m);
 		    /* is_utf8_space returns FALSE for malform utf8 */
 		    if (strend - m < t)
@@ -4362,7 +4383,7 @@ PP(pp_split)
 
 	    /* this one uses 's' and is a positive test */
 	    if (do_utf8) {
-		while (s < strend && ( *s == ' ' || is_utf8_space((U8*)s) ))
+		while (s < strend && ( *s == ' ' || is_utf8_space(s) ))
 	            s +=  UTF8SKIP(s);
             } else {
                 while (s < strend && isSPACE(*s))
@@ -4407,7 +4428,7 @@ PP(pp_split)
 	}
 	else {
 	    while (s < strend && --limit &&
-	      (m = fbm_instr((unsigned char*)s, (unsigned char*)strend,
+	      (m = fbm_instr(s, strend,
 			     csv, multiline ? FBMrf_MULTILINE : 0)) )
 	    {
 		dstr = newSVpvn(s, m-s);

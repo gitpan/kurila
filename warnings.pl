@@ -440,9 +440,9 @@ our $VERSION = '1.06';
 
 # Verify that we're called correctly so that warnings will work.
 # see also strict.pm.
-unless ( __FILE__ =~ /(^|[\/\\])\Q@{[__PACKAGE__]}\E\.pm$/ ) {
+unless ( __FILE__ =~ /(^|[\/\\])\Q${\__PACKAGE__}\E\.pmc?$/ ) {
     my (undef, $f, $l) = caller;
-    die("Incorrect use of pragma '@{[__PACKAGE__,]}' at $f line $l.\n");
+    die("Incorrect use of pragma '${\__PACKAGE__}' at $f line $l.\n");
 }
 
 =head1 NAME
@@ -601,9 +601,9 @@ sub bits
 	    $no_fatal = 1;
 	}
 	elsif ($catmask = $Bits{$word}) {
-	    $mask |= $catmask ;
-	    $mask |= $DeadBits{$word} if $fatal ;
-	    $mask &= ~($DeadBits{$word}|$All) if $no_fatal ;
+	    $mask ^|^= $catmask ;
+	    $mask ^|^= $DeadBits{$word} if $fatal ;
+	    $mask ^&^= ^~^($DeadBits{$word}^|^$All) if $no_fatal ;
 	}
 	else
           { Croaker("Unknown warnings category '$word'")}
@@ -623,8 +623,8 @@ sub import
     my $mask = ${^WARNING_BITS} ;
 
     if (vec($mask, $Offsets{'all'}, 1)) {
-        $mask |= $Bits{'all'} ;
-        $mask |= $DeadBits{'all'} if vec($mask, $Offsets{'all'}+1, 1);
+        $mask ^|^= $Bits{'all'} ;
+        $mask ^|^= $DeadBits{'all'} if vec($mask, $Offsets{'all'}+1, 1);
     }
     
     push @_, 'all' unless @_;
@@ -639,9 +639,9 @@ sub import
 	    $no_fatal = 1;
 	}
 	elsif ($catmask = $Bits{$word}) {
-	    $mask |= $catmask ;
-	    $mask |= $DeadBits{$word} if $fatal ;
-	    $mask &= ~($DeadBits{$word}|$All) if $no_fatal ;
+	    $mask ^|^= $catmask ;
+	    $mask ^|^= $DeadBits{$word} if $fatal ;
+	    $mask ^&^= ^~^($DeadBits{$word}^|^$All) if $no_fatal ;
 	}
 	else
           { Croaker("Unknown warnings category '$word'")}
@@ -658,8 +658,8 @@ sub unimport
     my $mask = ${^WARNING_BITS} ;
 
     if (vec($mask, $Offsets{'all'}, 1)) {
-        $mask |= $Bits{'all'} ;
-        $mask |= $DeadBits{'all'} if vec($mask, $Offsets{'all'}+1, 1);
+        $mask ^|^= $Bits{'all'} ;
+        $mask ^|^= $DeadBits{'all'} if vec($mask, $Offsets{'all'}+1, 1);
     }
 
     push @_, 'all' unless @_;
@@ -669,7 +669,7 @@ sub unimport
 	    next; 
 	}
 	elsif ($catmask = $Bits{$word}) {
-	    $mask &= ~($catmask | $DeadBits{$word} | $All);
+	    $mask ^&^= ^~^($catmask ^|^ $DeadBits{$word} ^|^ $All);
 	}
 	else
           { Croaker("Unknown warnings category '$word'")}

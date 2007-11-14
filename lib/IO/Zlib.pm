@@ -6,8 +6,7 @@
 
 package IO::Zlib;
 
-$VERSION = "1.05_01";
-
+$VERSION = "1.07";
 =head1 NAME
 
 IO::Zlib - IO:: style interface to L<Compress::Zlib>
@@ -287,7 +286,6 @@ it and/or modify it under the same terms as Perl itself.
 
 =cut
 
-require 5.004;
 
 use strict;
 use bytes;
@@ -561,7 +559,7 @@ sub AUTOLOAD
     $AUTOLOAD =~ s/.*:://;
     $AUTOLOAD =~ tr/a-z/A-Z/;
 
-    return tied(*{$self})->$AUTOLOAD(@_);
+    return tied(*{$self})->?$AUTOLOAD(@_);
 }
 
 sub gzopen_external {

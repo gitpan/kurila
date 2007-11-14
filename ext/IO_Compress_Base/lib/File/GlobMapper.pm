@@ -269,7 +269,7 @@ sub _parseInputGlob
     $out .= quotemeta $string ;
 
 
-    $self->{InputGlob} =~ s/$noPreBS[\(\)]//g;
+    $self->{InputGlob} =~ s/${noPreBS}[\(\)]//g;
     $self->{InputPattern} = $out ;
 
     #print "# INPUT '$self->{InputGlob}' => '$out'\n";
@@ -285,7 +285,7 @@ sub _parseOutputGlob
     my $string = $self->{OutputGlob} ;
     my $maxwild = $self->{WildCount};
 
-    if ($self->{GlobFlags} & GLOB_TILDE)
+    if ($self->{GlobFlags} ^&^ GLOB_TILDE)
     #if (1)
     {
         $string =~ s{

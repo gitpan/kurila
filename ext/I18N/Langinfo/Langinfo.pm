@@ -1,13 +1,11 @@
 package I18N::Langinfo;
 
-use 5.006;
 use strict;
 use warnings;
 use Carp;
 
 require Exporter;
 require DynaLoader;
-use AutoLoader;
 
 our @ISA = qw(Exporter DynaLoader);
 

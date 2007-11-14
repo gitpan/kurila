@@ -9,7 +9,7 @@ require ExtUtils::Constant::XS;
 use ExtUtils::Constant::Utils qw(C_stringify);
 use ExtUtils::Constant::XS qw(%XS_TypeSet);
 
-$VERSION = '0.03';
+$VERSION = '0.05';
 @ISA = 'ExtUtils::Constant::XS';
 
 %type_to_struct =
@@ -200,25 +200,12 @@ sub WriteConstants {
     print $c_fh $self->header(), <<"EOADD";
 static void
 ${c_subname}_add_symbol($pthx HV *hash, const char *name, I32 namelen, SV *value) {
-    SV **sv = hv_fetch(hash, name, namelen, TRUE);
-    if (!sv) {
-        Perl_croak($athx "Couldn't add key '%s' to %%$package_sprintf_safe\::",
-		   name);
-    }
-    if (SvOK(*sv) || SvTYPE(*sv) == SVt_PVGV) {
-	/* Someone has been here before us - have to make a real sub.  */
 	newCONSTSUB(hash, name, value);
-    } else {
-	SvUPGRADE(*sv, SVt_RV);
-	SvRV_set(*sv, value);
-	SvROK_on(*sv);
-	SvREADONLY_on(value);
-    }
 }
 
 EOADD
 
-    print $c_fh $explosives ? <<"EXPLODE" : <<"DONT";
+    print $c_fh $explosives ? <<"EXPLODE" : "\n";
 
 static int
 Im_sorry_Dave(pTHX_ SV *sv, MAGIC *mg)
@@ -242,11 +229,51 @@ static MGVTBL not_defined_vtbl = {
 
 EXPLODE
 
+{
+    my $key = $symbol_table;
+    # Just seems tidier (and slightly more space efficient) not to have keys
+    # such as Fcntl::
+    $key =~ s/::$//;
+    my $key_len = length $key;
+
+    print $c_fh <<"MISSING";
+
 #ifndef SYMBIAN
-static HV *${c_subname}_missing = NULL;
+
+/* Store a hash of all symbols missing from the package. To avoid trampling on
+   the package namespace (uninvited) put each package's hash in our namespace.
+   To avoid creating lots of typeblogs and symbol tables for sub-packages, put
+   each package's hash into one hash in our namespace.  */
+
+static HV *
+get_missing_hash(pTHX) {
+    HV *const parent
+	= get_hv("ExtUtils::Constant::ProxySubs::Missing", GVf_MULTI);
+    /* We could make a hash of hashes directly, but this would confuse anything
+	at Perl space that looks at us, and as we're visible in Perl space,
+	best to play nice. */
+    SV *const *const ref
+	= hv_fetch(parent, "$key", $key_len, TRUE);
+    HV *new_hv;
+
+    if (!ref)
+	return NULL;
+
+    if (SvROK(*ref))
+	return (HV*) SvRV(*ref);
+
+    new_hv = newHV();
+    SvUPGRADE(*ref, SVt_RV);
+    SvRV_set(*ref, (SV *)new_hv);
+    SvROK_on(*ref);
+    return new_hv;
+}
+
 #endif
 
-DONT
+MISSING
+
+}
 
     print $xs_fh <<"EOBOOT";
 BOOT:
@@ -255,6 +282,9 @@ BOOT:
     dTHX;
 #endif
     HV *symbol_table = get_hv("$symbol_table", TRUE);
+#ifndef SYMBIAN
+    HV *${c_subname}_missing;
+#endif
 EOBOOT
 
     my %iterator;
@@ -308,11 +338,16 @@ EOBOOT
 
 	print $xs_fh <<"EOBOOT";
 	const struct $struct_type *$iterator{$type} = $array_name;
-
 EOBOOT
     }
 
     delete $found->{''};
+
+    print $xs_fh <<"EOBOOT";
+#ifndef SYMBIAN
+	${c_subname}_missing = get_missing_hash(aTHX);
+#endif
+EOBOOT
 
     my $add_symbol_subname = $c_subname . '_add_symbol';
     foreach my $type (sort keys %$found) {
@@ -320,11 +355,6 @@ EOBOOT
 					      'symbol_table',
 					      $add_symbol_subname);
     }
-    print $xs_fh $explosives ? "\n" : <<"EOBOOT";
-#ifndef SYMBIAN
-	${c_subname}_missing = newHV();
-#endif
-EOBOOT
 
     print $xs_fh <<"EOBOOT";
 	while (value_for_notfound->name) {
@@ -463,6 +493,7 @@ $xs_subname(sv)
 #ifdef SYMBIAN
 	sv = newSVpvf("%"SVf" is not a valid $package_sprintf_safe macro", sv);
 #else
+	HV *${c_subname}_missing = get_missing_hash(aTHX);
 	if (hv_exists(${c_subname}_missing, s, (I32)len)) {
 	    sv = newSVpvf("Your vendor has not defined $package_sprintf_safe macro %" SVf
 			  ", used", sv);

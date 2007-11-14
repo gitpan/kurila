@@ -513,6 +513,8 @@ BEGIN {eval 'use IO::Handle'};	# Needed for flush only? breaks under miniperl
 # Debugger for Perl 5.00x; perl5db.pl patch level:
 $VERSION = 1.30;
 
+use Carp::Heavy;
+
 $header = "perl5db.pl version $VERSION";
 
 =head1 DEBUGGER ROUTINES
@@ -1418,7 +1420,7 @@ sub is_safe_file {
     my ( $dev, $ino, $mode, $nlink, $uid, $gid ) = stat('_');
 
     return 0 if $uid != 0 && $uid != $<;
-    return 0 if $mode & 022;
+    return 0 if $mode ^&^ 022;
     return 1;
 } ## end sub is_safe_file
 
@@ -1729,7 +1731,7 @@ and if we can.
         # the debugger itself under the running one). create a new IN and OUT
         # filehandle, and do the necessary mojo to create a new tty if we
         # know how, and we can.
-        create_IN_OUT(4) if $CreateTTY & 4;
+        create_IN_OUT(4) if $CreateTTY ^&^ 4;
         if ($console) {
 
             # If we have a console, check to see if there are separate ins and
@@ -1864,7 +1866,7 @@ sub DB {
                 # If there's any call stack in place, turn off single
                 # stepping into subs throughout the stack.
             for ( $i = 0 ; $i <= $stack_depth ; ) {
-                $stack[ $i++ ] &= ~1;
+                $stack[ $i++ ] ^&^= ^~^1;
             }
 
             # And we are now no longer in single-step mode.
@@ -1926,7 +1928,7 @@ sub DB {
 
         # Stop if the stop criterion says to just stop.
         if ( $stop eq '1' ) {
-            $signal |= 1;
+            $signal ^|^= 1;
         }
 
         # It's a conditional stop; eval it in the user's context and
@@ -1943,7 +1945,7 @@ sub DB {
     my $was_signal = $signal;
 
     # If we have any watch expressions ...
-    if ( $trace & 2 ) {
+    if ( $trace ^&^ 2 ) {
         for ( my $n = 0 ; $n <= $#to_watch ; $n++ ) {
             $evalarg = $to_watch[$n];
             local $onetimeDump;    # Tell DB::eval() to not output results
@@ -2010,12 +2012,12 @@ check for C<watchfunction()>. This can be done with
     # If there's a user-defined DB::watchfunction, call it with the
     # current package, filename, and line. The function executes in
     # the DB:: package.
-    if ( $trace & 4 ) {    # User-installed watch
+    if ( $trace ^&^ 4 ) {    # User-installed watch
         return
           if watchfunction( $package, $filename, $line )
           and not $single
           and not $was_signal
-          and not( $trace & ~4 );
+          and not( $trace ^&^ ^~^4 );
     } ## end if ($trace & 4)
 
     # Pick up any alteration to $signal in the watchfunction, and
@@ -2034,7 +2036,7 @@ won't cause trouble, and we say that the program is over.
 
     # Check to see if we should grab control ($single true,
     # trace set appropriately, or we got a signal).
-    if ( $single || ( $trace & 1 ) || $was_signal ) {
+    if ( $single || ( $trace ^&^ 1 ) || $was_signal ) {
 
         # Yes, grab control.
         if ($slave_editor) {
@@ -2164,7 +2166,7 @@ If there are any preprompt actions, execute those as well.
 
         # Complain about too much recursion if we passed the limit.
         print $OUT $stack_depth . " levels deep in subroutine calls!\n"
-          if $single & 4;
+          if $single ^&^ 4;
 
         # The line we're currently on. Set $incr to -1 to stay here
         # until we get a command that tells us to advance.
@@ -2341,10 +2343,10 @@ Turn tracing on or off. Inverts the appropriate bit in C<$trace> (q.v.).
 =cut
 
                 $cmd =~ /^t$/ && do {
-                    $trace ^= 1;
+                    $trace ^^^= 1;
                     local $\ = '';
                     print $OUT "Trace = "
-                      . ( ( $trace & 1 ) ? "on" : "off" ) . "\n";
+                      . ( ( $trace ^&^ 1 ) ? "on" : "off" ) . "\n";
                     next CMD;
                 };
 
@@ -2369,7 +2371,7 @@ Walks through C<%sub>, checking to see whether or not to print the name.
                     # Otherwise, check it against the pattern. We then use
                     # the XOR trick to reverse the condition as required.
                     foreach $subname ( sort( keys %sub ) ) {
-                        if ( $Snocheck or $Srev ^ ( $subname =~ /$Spatt/ ) ) {
+                        if ( $Snocheck or $Srev ^^^ ( $subname =~ /$Spatt/ ) ) {
                             print $OUT $subname, "\n";
                         }
                     }
@@ -2739,7 +2741,7 @@ in this and all call levels above this one.
                             *dbline   = $main::{ '_<' . $filename };
 
                             # Mark that there's a breakpoint in this file.
-                            $had_breakpoints{$filename} |= 1;
+                            $had_breakpoints{$filename} ^|^= 1;
 
                             # Scan forward to the first executable line
                             # after the 'sub whatever' line.
@@ -2789,7 +2791,7 @@ in this and all call levels above this one.
 
                     # Turn off stack tracing from here up.
                     for ( $i = 0 ; $i <= $stack_depth ; ) {
-                        $stack[ $i++ ] &= ~1;
+                        $stack[ $i++ ] ^&^= ^~^1;
                     }
                     last CMD;
                 };
@@ -2811,7 +2813,7 @@ appropriately, and force us out of the command loop.
                     end_report(), next CMD if $finished and $level <= 1;
 
                     # Turn on stack trace.
-                    $stack[$stack_depth] |= 1;
+                    $stack[$stack_depth] ^|^= 1;
 
                     # Print return value unless the stack is empty.
                     $doret = $option{PrintRet} ? $stack_depth - 1 : -2;
@@ -3428,7 +3430,7 @@ any variables we might want to address in the C<DB> package.
 
             # Make sure the flag that says "the debugger's running" is
             # still on, to make sure we get control again.
-            $evalarg = "\$^D = \$^D | \$DB::db_stop;\n$cmd";
+            $evalarg = "\$^D = \$^D ^|^ \$DB::db_stop;\n$cmd";
 
             # Run *our* eval that executes in the caller's context.
             &eval;
@@ -3479,9 +3481,9 @@ our standard filehandles for input and output.
                             print SAVEOUT "shell returned -1\n";
                         }
                         elsif ( $? >> 8 ) {
-                            print SAVEOUT ( $? & 127 )
-                              ? " (SIG#" . ( $? & 127 ) . ")"
-                              : "", ( $? & 128 ) ? " -- core dumped" : "", "\n";
+                            print SAVEOUT ( $? ^&^ 127 )
+                              ? " (SIG#" . ( $? ^&^ 127 ) . ")"
+                              : "", ( $? ^&^ 128 ) ? " -- core dumped" : "", "\n";
                         }
                         else {
                             print SAVEOUT "status ", ( $? >> 8 ), "\n";
@@ -3637,10 +3639,10 @@ sub sub {
 		print "creating new thread\n"; 
 	}
 
-    # If the last ten characters are C'::AUTOLOAD', note we've traced
+    # If the last ten characters are '::AUTOLOAD', note we've traced
     # into AUTOLOAD for $sub.
     if ( length($sub) > 10 && substr( $sub, -10, 10 ) eq '::AUTOLOAD' ) {
-        $al = " for $$sub";
+        $al = " for $$sub" if defined $$sub;
     }
 
     # We stack the stack pointer and then increment it to protect us
@@ -3656,15 +3658,15 @@ sub sub {
     $stack[-1] = $single;
 
     # Turn off all flags except single-stepping.
-    $single &= 1;
+    $single ^&^= 1;
 
     # If we've gotten really deeply recursed, turn on the flag that will
     # make us stop with the 'deep recursion' message.
-    $single |= 4 if $stack_depth == $deep;
+    $single ^|^= 4 if $stack_depth == $deep;
 
     # If frame messages are on ...
     (
-        $frame & 4    # Extended frame entry message
+        $frame ^&^ 4    # Extended frame entry message
         ? (
             print_lineinfo( ' ' x ( $stack_depth - 1 ), "in  " ),
 
@@ -3689,11 +3691,11 @@ sub sub {
 	@ret = &$sub;
 
         # Pop the single-step value back off the stack.
-        $single |= $stack[ $stack_depth-- ];
+        $single ^|^= $stack[ $stack_depth-- ];
 
         # Check for exit trace messages...
         (
-            $frame & 4    # Extended exit message
+            $frame ^&^ 4    # Extended exit message
             ? (
                 print_lineinfo( ' ' x $stack_depth, "out " ),
                 print_trace( $LINEINFO, -1, 1, 1, "$sub$al" )
@@ -3702,17 +3704,17 @@ sub sub {
 
               # Standard exit message
           )
-          if $frame & 2;
+          if $frame ^&^ 2;
 
         # Print the return info if we need to.
-        if ( $doret eq $stack_depth or $frame & 16 ) {
+        if ( $doret eq $stack_depth or $frame ^&^ 16 ) {
 
             # Turn off output record separator.
             local $\ = '';
             my $fh = ( $doret eq $stack_depth ? $OUT : $LINEINFO );
 
             # Indent if we're printing because of $frame tracing.
-            print $fh ' ' x $stack_depth if $frame & 16;
+            print $fh ' ' x $stack_depth if $frame ^&^ 16;
 
             # Print the return value.
             print $fh "list context return from $sub:\n";
@@ -3740,11 +3742,11 @@ sub sub {
 	}
 
         # Pop the single-step value off the stack.
-        $single |= $stack[ $stack_depth-- ];
+        $single ^|^= $stack[ $stack_depth-- ];
 
         # If we're doing exit messages...
         (
-            $frame & 4    # Extended messsages
+            $frame ^&^ 4    # Extended messsages
             ? (
                 print_lineinfo( ' ' x $stack_depth, "out " ),
                 print_trace( $LINEINFO, -1, 1, 1, "$sub$al" )
@@ -3753,13 +3755,13 @@ sub sub {
 
               # Standard messages
           )
-          if $frame & 2;
+          if $frame ^&^ 2;
 
         # If we are supposed to show the return value... same as before.
-        if ( $doret eq $stack_depth or $frame & 16 and defined wantarray ) {
+        if ( $doret eq $stack_depth or $frame ^&^ 16 and defined wantarray ) {
             local $\ = '';
             my $fh = ( $doret eq $stack_depth ? $OUT : $LINEINFO );
-            print $fh ( ' ' x $stack_depth ) if $frame & 16;
+            print $fh ( ' ' x $stack_depth ) if $frame ^&^ 16;
             print $fh (
                 defined wantarray
                 ? "scalar context return from $sub: "
@@ -3894,7 +3896,7 @@ sub cmd_a {
             else {
 
                 # It's executable. Record that the line has an action.
-                $had_breakpoints{$filename} |= 2;
+                $had_breakpoints{$filename} ^|^= 2;
 
                 # Remove any action, temp breakpoint, etc.
                 $dbline{$lineno} =~ s/\0[^\0]*//;
@@ -3980,7 +3982,7 @@ sub delete_action {
                     $dbline{$i} =~ s/\0[^\0]*//;
                     delete $dbline{$i} if $dbline{$i} eq '';
                 }
-                unless ( $had_breakpoints{$file} &= ~2 ) {
+                unless ( $had_breakpoints{$file} ^&^= ^~^2 ) {
                     delete $had_breakpoints{$file};
                 }
             } ## end for ($i = 1 ; $i <= $max...
@@ -4082,7 +4084,7 @@ C<%had_breakpoints>.
 sub break_on_load {
     my $file = shift;
     $break_on_load{$file} = 1;
-    $had_breakpoints{$file} |= 1;
+    $had_breakpoints{$file} ^|^= 1;
 }
 
 =head3 C<report_break_on_load> (API)
@@ -4307,7 +4309,7 @@ sub break_on_line {
     die "Line $i$filename_error not breakable.\n" if $dbline[$i] == 0;
 
     # Mark this file as having breakpoints in it.
-    $had_breakpoints{$filename} |= 1;
+    $had_breakpoints{$filename} ^|^= 1;
 
     # If there is an action or condition here already ...
     if ( $dbline{$i} ) {
@@ -4595,7 +4597,7 @@ sub delete_breakpoint {
             # If, after we turn off the "there were breakpoints in this file"
             # bit, the entry in %had_breakpoints for this file is zero,
             # we should remove this file from the hash.
-            if ( not $had_breakpoints{$file} &= ~1 ) {
+            if ( not $had_breakpoints{$file} ^&^= ^~^1 ) {
                 delete $had_breakpoints{$file};
             }
         } ## end for my $file (keys %had_breakpoints)
@@ -5099,7 +5101,7 @@ sub cmd_L {
         }
     } ## end if (%break_on_load and...
     if ($watch_wanted) {
-        if ( $trace & 2 ) {
+        if ( $trace ^&^ 2 ) {
             print $OUT "Watch-expressions:\n" if @to_watch;
             for my $expr (@to_watch) {
                 print $OUT " $expr\n";
@@ -5226,7 +5228,7 @@ sub cmd_w {
         push @old_watch, $val;
 
         # We are now watching expressions.
-        $trace |= 2;
+        $trace ^|^= 2;
     } ## end if ($expr =~ /^(\S.*)/)
 
     # You have to give one to get one.
@@ -5259,7 +5261,7 @@ sub cmd_W {
     if ( $expr eq '*' ) {
 
         # Not watching now.
-        $trace &= ~2;
+        $trace ^&^= ^~^2;
 
         print $OUT "Deleting all watch expressions ...\n";
 
@@ -5385,7 +5387,7 @@ sub postponed_sub {
             local $^W = 0;    # != 0 is magical below
 
             # This file's got a breakpoint in it.
-            $had_breakpoints{$file} |= 1;
+            $had_breakpoints{$file} ^|^= 1;
 
             # Last line in file.
             my $max = $#dbline;
@@ -5452,7 +5454,7 @@ sub postponed {
     return unless $postponed_file{$filename};
 
     # Yes. Mark this file as having breakpoints.
-    $had_breakpoints{$filename} |= 1;
+    $had_breakpoints{$filename} ^|^= 1;
 
     # "Cannot be done: unsufficient magic" - we can't just put the
     # breakpoints saved in %postponed_file into %dbline by assigning
@@ -5710,7 +5712,7 @@ sub dump_trace {
     my ( $e, $r, @a, @sub, $args );
 
     # XXX Okay... why'd we do that?
-    my $nothard = not $frame & 8;
+    my $nothard = not $frame ^&^ 8;
     local $frame = 0;
 
     # Do not want to trace this.
@@ -5758,10 +5760,10 @@ sub dump_trace {
                   unless /^(?: -?[\d.]+ | \*[\w:]* )$/x;
 
                 # Turn high-bit characters into meta-whatever.
-                s/([\200-\377])/sprintf("M-%c",ord($1)&0177)/eg;
+                s/([\200-\377])/sprintf("M-%c",ord($1)^&^0177)/eg;
 
                 # Turn control characters into ^-whatever.
-                s/([\0-\37\177])/sprintf("^%c",ord($1)^64)/eg;
+                s/([\0-\37\177])/sprintf("^%c",ord($1)^^^64)/eg;
 
                 push( @a, $_ );
             } ## end else [ if (not defined $arg)
@@ -5917,8 +5919,8 @@ sub system {
     elsif ($?) {
         &warn(
             "(Command died of SIG#",
-            ( $? & 127 ),
-            ( ( $? & 128 ) ? " -- core dumped" : "" ),
+            ( $? ^&^ 127 ),
+            ( ( $? ^&^ 128 ) ? " -- core dumped" : "" ),
             ")", "\n"
         );
     } ## end elsif ($?)
@@ -6293,7 +6295,7 @@ sub resetterm {    # We forked, so we need a different TTY
     $term_pid = $$;
 
     # Just return if we're not supposed to try to create a new TTY.
-    return unless $CreateTTY & $in;
+    return unless $CreateTTY ^&^ $in;
 
     # Try to create a new IN/OUT pair.
     create_IN_OUT($in);
@@ -7601,9 +7603,10 @@ sub dbwarn {
 
     # Load Carp if we can. If $^S is false (current thing being compiled isn't
     # done yet), we may not be able to do a require.
-    eval { require Carp }
-      if defined $^S;    # If error/warning during compilation,
+    if (defined $^S) {    # If error/warning during compilation,
                          # require may be broken.
+        eval { require Carp; };
+    }
 
     # Use the core warn() unless Carp loaded OK.
     CORE::warn( @_,
@@ -7662,6 +7665,7 @@ sub dbdie {
     # The code used to check $^S to see if compiliation of the current thing
     # hadn't finished. We don't do it anymore, figuring eval is pretty stable.
     eval { require Carp };
+    die if $@;
 
     die( @_,
         "\nCannot print stack trace, load with -MCarp option to see stack" )
@@ -8701,7 +8705,7 @@ sub parse_DollarCaretP_flags {
                 return undef;
             }
         }
-        $acu |= $value;
+        $acu ^|^= $value;
     }
     $acu;
 }
@@ -8711,7 +8715,7 @@ sub expand_DollarCaretP_flags {
     my @bits         = (
         map {
             my $n = ( 1 << $_ );
-            ( $DollarCaretP & $n )
+            ( $DollarCaretP ^&^ $n )
               ? ( $DollarCaretP_flags_r{$n}
                   || sprintf( '0x%x', $n ) )
               : ()
@@ -9041,7 +9045,7 @@ sub cmd_pre580_a {
 
                 # ... and the line is breakable:
                 # Mark that there's an action in this file.
-                $had_breakpoints{$filename} |= 2;
+                $had_breakpoints{$filename} ^|^= 2;
 
                 # Delete any current action.
                 $dbline{$i} =~ s/\0[^\0]*//;
@@ -9164,7 +9168,7 @@ sub cmd_pre580_D {
             # If, after we turn off the "there were breakpoints in this file"
             # bit, the entry in %had_breakpoints for this file is zero,
             # we should remove this file from the hash.
-            if ( not $had_breakpoints{$file} &= ~1 ) {
+            if ( not $had_breakpoints{$file} ^&^= ^~^1 ) {
                 delete $had_breakpoints{$file};
             }
         } ## end for $file (keys %had_breakpoints)
@@ -9250,7 +9254,7 @@ sub cmd_pre580_W {
     if ( $cmd =~ /^$/ ) {
 
         # No watching is going on.
-        $trace &= ~2;
+        $trace ^&^= ^~^2;
 
         # Kill all the watch expressions and values.
         @to_watch = @old_watch = ();
@@ -9272,7 +9276,7 @@ sub cmd_pre580_W {
         push @old_watch, $val;
 
         # We're watching stuff.
-        $trace |= 2;
+        $trace ^|^= 2;
 
     } ## end elsif ($cmd =~ /^(.*)/s)
 } ## end sub cmd_pre580_W

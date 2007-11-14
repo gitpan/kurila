@@ -87,6 +87,28 @@ tests that are currently missing.
 
 A full test suite for the B module would be nice.
 
+=head2 Deparse inlined constants
+
+Code such as this
+
+    use constant PI => 4;
+    warn PI
+
+will currently deparse as
+
+    use constant ('PI', 4);
+    warn 4;
+
+because the tokenizer inlines the value of the constant subroutine C<PI>.
+This allows various compile time optimisations, such as constant folding
+and dead code elimination. Where these haven't happened (such as the example
+above) it ought be possible to make B::Deparse work out the name of the
+original constant, because just enough information survives in the symbol
+table to do this. Specifically, the same scalar is used for the constant in
+the optree as is used for the constant subroutine, so by iterating over all
+symbol tables and generating a mapping of SV address to constant name, it
+would be possible to provide B::Deparse with this functionality.
+
 =head2 A decent benchmark
 
 C<perlbench> seems impervious to any recent changes made to the perl core. It
@@ -310,6 +332,12 @@ file/directory copying back and forth.
 These tasks would need a little C knowledge, but don't need any specific
 background or experience with XS, or how the Perl interpreter works
 
+=head2 Modernize the order of directories in @INC
+
+The way @INC is laid out by default, one cannot upgrade core (dual-life)
+modules without overwriting files. This causes problems for binary
+package builders.
+
 =head2 Make it clear from -v if this is the exact official release
 
 Currently perl from C<p4>/C<rsync> ships with a F<patchlevel.h> file that
@@ -358,6 +386,11 @@ custom allocates so it would both use less memory and less CPU to allocate
 the various OP structures from arenas. The SV arena code can probably be
 re-used for this.
 
+Note that Configuring perl with C<-Accflags=-DPL_OP_SLAB_ALLOC> will use
+Perl_Slab_alloc() to pack optrees into a contiguous block, which is
+probably superior to the use of OP arenas, esp. from a cache locality
+standpoint.  See L<Profile Perl - am I hot or not?>.
+
 =head2 Improve win32/wince.c
 
 Currently, numerous functions look virtually, if not completely,
@@ -383,7 +416,7 @@ warning suppressant and actually make use of the new secure CRT functions.
 
 There is also a similar issue with POSIX CRT function names like fileno having
 been deprecated in favour of ISO C++ conformant names like _fileno. These
-warnings are also currently suppressed with the compiler option /wd4996. It
+warnings are also currently suppressed by adding -D_CRT_NONSTDC_NO_DEPRECATE. It
 might be nice to do as Microsoft suggest here too, although, unlike the secure
 functions issue, there is presumably little or no benefit in this case.
 
@@ -520,6 +553,19 @@ calls during startup, and (by implication) a bit of tweaking of that order.
 These tasks would need C knowledge, and knowledge of how the interpreter works,
 or a willingness to learn.
 
+=head2 state variable initialization in list context
+
+Currently this is illegal:
+
+    state ($a, $b) = foo(); 
+
+The current Perl 6 design is that C<state ($a) = foo();> and
+C<(state $a) = foo();> have different semantics, which is tricky to implement
+in Perl 5 as currently the produce the same opcode trees. It would be useful
+to clarify that the Perl 6 design is firm, and then implement the necessary
+code in Perl 5. There are comments in C<Perl_newASSIGNOP()> that show the
+code paths taken by various assignment constructions involving state variables.
+
 =head2 Implement $value ~~ 0 .. $range
 
 It would be nice to extend the syntax of the C<~~> operator to also
@@ -543,6 +589,12 @@ The old perltodo notes "With C<gdb>, you can attach the debugger to a running
 program if you pass the process ID. It would be good to do this with the Perl
 debugger on a running Perl program, although I'm not sure how it would be
 done." ssh and screen do this with named pipes in /tmp. Maybe we can too.
+
+=head2 Optimize away empty destructors
+
+Defining an empty DESTROY method might be useful (notably in
+AUTOLOAD-enabled classes), but it's still a bit expensive to call. That
+could probably be optimized.
 
 =head2 LVALUE functions for lists
 

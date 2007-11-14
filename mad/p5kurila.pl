@@ -5,10 +5,10 @@ use lib "$ENV{madpath}/mad";
 use strict;
 use warnings;
 
-my $filename = shift @ARGV;
-
 use XML::Twig;
 use XML::Twig::XPath;
+use Getopt::Long;
+use Carp::Assert;
 
 sub fst(@) {
     return $_[0];
@@ -31,22 +31,20 @@ sub entersub_handler {
     return if (get_madprop($sub, "bigarrow") || '') eq "-&gt;";
 
     # make indirect object syntax.
-    my $madprops = ($twig->findnodes([$sub], qq|madprops|))[0] || $sub->insert_new_elt("madprops");
-
-    $madprops->insert_new_elt( "mad_sv", { key => "bigarrow", val => "-&gt;" } );
-    $madprops->insert_new_elt( "mad_sv", { key => "round_open", val => "(" } );
-    $madprops->insert_new_elt( "mad_sv", { key => "round_close", val => ")" } );
+    set_madprop($sub, "bigarrow", "-&gt;");
+    set_madprop($sub, "round_open", "(");
+    set_madprop($sub, "round_close", ")");
 
     # move widespace from method to object and visa versa.
-    my ($method_ws) = $twig->findnodes([$method_named],
-                                       qq|madprops/mad_op/op_method/op_const/madprops/mad_sv[\@key="wsbefore-value"]|);
-    my ($obj_ws) = $twig->findnodes([$sub], qq|op_const/madprops/mad_sv[\@key="wsbefore-value"]|);
-    if ($method_ws and $obj_ws) {
-        my $x_method_ws = $method_ws->att('val');
-        my $x_obj_ws = $obj_ws->att('val');
+    my ($method_mad) = $twig->findnodes([$method_named],
+                                       qq|madprops/mad_op/op_method/op_const/madprops/mad_value|);
+    my ($obj_mad) = $twig->findnodes([$sub], qq|op_const/madprops/mad_value|);
+    if ($method_mad and $obj_mad) {
+        my $x_method_ws = $method_mad->att('wsbefore');
+        my $x_obj_ws = $obj_mad->att('wsbefore');
         $x_obj_ws =~ s/\s+$//;
-        $method_ws->set_att("val" => $x_obj_ws);
-        $obj_ws->set_att("val" => $x_method_ws);
+        $method_mad->set_att("wsbefore" => $x_obj_ws);
+        $obj_mad->set_att("wsbefore" => $x_method_ws);
     }
 }
 
@@ -59,7 +57,7 @@ sub const_handler {
     return unless $const->att('private') && ($const->att('private') =~ m/BARE/);
     return unless $const->att('flags') =~ "SCALAR";
 
-    return if $const->findnodes(q|madprops/mad_sv[@key="forcedword"][@val="forced"]|);
+    return if (get_madprop($const, "forcedword") || '') eq "forced";
 
     # no conversion if 'use strict' is active.
     return if $const->att('private') && ($const->att('private') =~ m/STRICT/);
@@ -75,32 +73,37 @@ sub const_handler {
     {
         # keep qq| foo => |
         my $x = ($const->parent->tag eq "op_null" and ! $const->parent->att('was')) ? $const->parent : $const;
-        my ($next) = $x->parent->child($x->pos + 1);
+        my $next = $x->parent->child($x->pos);
         if (get_madprop($const, "value") =~ m/^\w+$/) {
-            return if $next && $twig->findnodes([$next], q|madprops/mad_sv[@key="comma"][@val="=&gt;"]|);
-            return if $twig->findnodes([$const->parent], q|madprops/mad_sv[@key="bigarrow"]|); # [@val="-&gt;"]|);
+            return if $next && (get_madprop($next, "comma") || '') eq "=&gt;";
+            return if get_madprop($const->parent, "bigarrow");
         }
     }
 
     # "-x XX"
     if ($const->parent->tag =~ m/^op_(ft.*|truncate|chdir|stat|lstat)$/ or
-        $const->findnodes(q|madprops/mad_sv[@key="prototyped"][@val="*"]|)
+        (get_madprop($const, "prototyped") || '') eq "*"
        ) {
-        my ($val) = $twig->findnodes([$const], q|madprops/mad_sv[@key="value"]|);
-        $val->att("val") eq "_" and return; # not for -x '_'
+        get_madprop($const, "value") eq "_" and return; # not for -x '_'
 
         # Add '*' to make it a glob
         $const->set_tag("op_rv2gv");
-        $val->set_att( "val", "*" . $val->att("val") );
-        $val->set_att( "key", "star" );
-        my ($wsval) = $twig->findnodes([$const], q|madprops/mad_sv[@key="wsbefore-value"]|);
-        $wsval->set_att( "key", "wsbefore-star" ) if $wsval;
+        set_madprop($const, "star", "*" . get_madprop($const, "value"), wsbefore => get_madprop($const, "value", 'wsbefore'));
+        del_madprop($const, "value");
+#         my ($wsval) = $twig->findnodes([$const], q|madprops/mad_sv[@key="wsbefore-value"]|);
+#         $wsval->set_att( "key", "wsbefore-star" ) if $wsval;
         $const->insert_new_elt( "op_const" );
         return;
     }
 
     # keep Foo::Bar->new()
-    return if $const->parent->tag eq "op_entersub";
+    if ($const->parent->tag eq "op_entersub") {
+        # but change Foo::->new() to Foo->new()
+        if (get_madprop($const, 'value') =~ m/(.*)\:\:$/) {
+            set_madprop($const, 'value', $1);
+        }
+        return;
+    }
 
     # keep qq| $aap{noot} |
     if (($const->parent->tag eq "op_helem" or
@@ -116,12 +119,11 @@ sub const_handler {
     # Make it a string constant
     my ($madprops) = $twig->findnodes([$const], q|madprops|);
     $const->del_att('private');
-    my ($const_ws) = $twig->findnodes([$const], q|madprops/mad_sv[@key="wsbefore-value"]|);
-    my $ws = $const_ws && $const_ws->att('val');
-    $const_ws->delete if $const_ws;
-    $madprops->insert_new_elt( "mad_sv", { key => 'wsbefore-quote_open', val => $ws } );
-    $madprops->insert_new_elt( "mad_sv", { key => 'quote_open', val => q|'| } );
-    $madprops->insert_new_elt( 'last_child', "mad_sv", { key => 'quote_close', val => q|'| } );
+    my ($const_ws) = get_madprop($const, "value", 'wsbefore');
+    #set_madprop($const, "value", get_madprop($const, "value"), ''); # delete ws.
+    #$const_ws->delete if $const_ws;
+    set_madprop($const, "quote_open", q|'|, wsbefore => $const_ws);
+    set_madprop($const, "quote_close", q|'|, wsbefore => '');
     set_madprop($const, "assign" => get_madprop($const, "value"));
     del_madprop($const, "value");
 }
@@ -146,26 +148,31 @@ sub add_encoding_latin1 {
 
 sub del_madprop {
     my ($op, $key) = @_;
-    my ($madsv) = $op->findnodes(qq|madprops/mad_sv[\@key="$key"]|);
+    my ($madsv) = $op->findnodes(qq|madprops/mad_$key|);
     $madsv->delete if $madsv;
 }
 
 sub set_madprop {
-    my ($op, $key, $val) = @_;
+    @_ % 2 or Carp::confess("invalid number of arguments");
+    my ($op, $key, $val, %ws) = @_;
     my ($madprops) = $op->findnodes("madprops");
     $madprops ||= $op->insert_new_elt("madprops");
-    my ($madsv) = $op->findnodes(qq|madprops/mad_sv[\@key="$key"]|);
+    my ($madsv) = $op->findnodes(qq|madprops/mad_$key|);
     if ($madsv) {
         $madsv->set_att("val", $val);
     } else {
-        $madprops->insert_new_elt("mad_sv", { key => $key, val => $val } );
+        $madsv = $madprops->insert_new_elt("mad_$key", { val => $val } );
+    }
+    for (keys %ws) {
+        $madsv->set_att($_, $ws{$_});
     }
 }
 
 sub get_madprop {
-    my ($op, $key) = @_;
-    my ($madsv) = $op->findnodes(qq|madprops/mad_sv[\@key="$key"]|);
-    return $madsv && $madsv->att("val");
+    my ($op, $key, $attr) = @_;
+    assert($op);
+    my ($madsv) = $op->findnodes(qq|madprops/mad_$key|);
+    return $madsv && $madsv->att($attr || "val");
 }
 
 sub rename_madprop {
@@ -180,11 +187,10 @@ sub make_glob_sub {
         next if not get_madprop($op_glob, "quote_open");
         set_madprop($op_glob, "round_open", "(");
         set_madprop($op_glob, "round_close", ")");
-        set_madprop($op_glob, "operator", "glob");
+        set_madprop($op_glob, "operator", "glob", wsbefore => get_madprop($op_glob, 'quote_open', 'wsbefore'));
         del_madprop($op_glob, "assign");
         del_madprop($op_glob, "quote_open");
         del_madprop($op_glob, "quote_close");
-        rename_madprop($op_glob, "wsbefore-quote_open", "wsbefore-operator");
 
         my ($op_c) = $op_glob->findnodes(q|op_entersub/op_null/op_concat|);
         if ($op_c) {
@@ -260,17 +266,15 @@ sub remove_rv2gv {
         my $op_sub = $op_scope->insert_new_elt("op_entersub");
 
         # ()
-        my $madprops = $op_sub->insert_new_elt("madprops");
-        $madprops->insert_new_elt("mad_sv", { key => "round_open", val => "(" });
-        $madprops->insert_new_elt("mad_sv", { key => "round_close", val => ")" });
+        set_madprop($op_sub, "round_open", "(");
+        set_madprop($op_sub, "round_close", ")");
 
         #args
         my $args = $op_sub->insert_new_elt("op_null", { was => "list" });
-        $args->insert_new_elt("op_gv")->insert_new_elt("madprops")
-          ->insert_new_elt("mad_sv", { key => "value", val => "Symbol::stash" });
+        set_madprop($args->insert_new_elt("op_gv"), "value", "Symbol::stash");
         $op_const->move($args);
 
-        $_->set_att('val', '%') for $op_rv2hv->findnodes(q*madprops/mad_sv[@key='hsh']*);
+        set_madprop($op_rv2hv, 'hsh', '%') if get_madprop($op_rv2hv, 'hsh');
         set_madprop($op_const, quote_open => '&#34;');
         my $name = $op_const->att('PV');
         $name =~ s/::$//;
@@ -294,10 +298,14 @@ sub remove_rv2gv {
             next if ($op_rv2gv->att("private") || '') =~ m/STRICT_REFS/;
 
             if (not $op_scope) {
-                $op_scope = $op_rv2gv->insert_new_elt("op_scope");
-                set_madprop($op_scope, "curly_open" => "{");
-                set_madprop($op_scope, "curly_close" => "}");
-                $op_const->move($op_scope);
+                if ($op_rv2gv->name eq "op_null") {
+                    $op_scope = $op_rv2gv;
+                } else {
+                    $op_scope = $op_rv2gv->insert_new_elt("op_scope");
+                    set_madprop($op_scope, "curly_open" => "{");
+                    set_madprop($op_scope, "curly_close" => "}");
+                    $op_const->move($op_scope);
+                }
             }
         } else {
             next if not $op_scope;
@@ -319,21 +327,14 @@ sub remove_rv2gv {
         set_madprop( $op_gv, "value", "Symbol::fetch_glob" );
         $op_const->move($args);
 
-    }
-
-    for my $op_rv2gv (map { $twig->findnodes(qq|//$_|) } (qw|op_rv2sv op_rv2hv op_rv2cv op_rv2av op_null[@was="rv2cv"]|)) {
-        next unless ($op_rv2gv->findnodes(q|op_scope/op_entersub/op_null/op_null/op_gv[@gv="Symbol::fetch_glob"]|)
-                     or $op_rv2gv->findnodes(q|op_scope/op_entersub/op_null/op_gv[@gv="Symbol::fetch_glob"]|));
-
-        my ($op_scope) = $op_rv2gv->findnodes(q|op_scope|);
-        my ($op_sub) = $op_scope->findnodes(q|op_entersub|);
-
-        my $new_gv = $op_scope->insert_new_elt("op_rv2gv");
-        set_madprop($new_gv, "star", '*');
-        my $new_scope = $new_gv->insert_new_elt("op_scope");
-        set_madprop($new_scope, "curly_open", "{");
-        set_madprop($new_scope, "curly_close", "}");
-        $op_sub->move($new_scope);
+        if ($op_rv2gv->name ne "op_rv2gv") {
+            my $new_gv = $op_scope->insert_new_elt("op_rv2gv");
+            set_madprop($new_gv, "star", '*');
+            my $new_scope = $new_gv->insert_new_elt("op_scope");
+            set_madprop($new_scope, "curly_open", "{");
+            set_madprop($new_scope, "curly_close", "}");
+            $op_sub->move($new_scope);
+        }
     }
 }
 
@@ -349,8 +350,7 @@ sub remove_vstring {
         next if $op_const->parent->tag eq "op_require";
         next if $op_const->parent->tag eq "op_concat";
 
-        set_madprop($op_const, "wsbefore-quote_open", get_madprop($op_const, "wsbefore-value"));
-        set_madprop($op_const, "quote_open", "&#34;");
+        set_madprop($op_const, "quote_open", "&#34;", wsbefore => get_madprop($op_const, "value", "wsbefore"));
         set_madprop($op_const, "quote_close", "&#34;");
         my $v = get_madprop($op_const, "value");
         $v =~ s/^v//;
@@ -371,27 +371,176 @@ sub remove_typed_declaration {
     }
 }
 
+sub rename_bit_operators {
+    my $xml = shift;
+    for my $op_bit (map { $xml->findnodes("//$_") } qw{op_bit_or or op_bit_and op_bit_xor op_complement}) {
+        my $mapping = { '|' => '^|^', '|=' => '^|^=', '~' => '^~^', 
+                        '&amp;' => '^&amp;^', '&amp;=' => '^&amp;^=',
+                        '^' => '^^^', '^=' => '^^^=',
+                      };
+        next unless my $newop = $mapping->{get_madprop($op_bit, "operator")};
+        set_madprop($op_bit, "operator", $newop);
+    }
+}
+
+sub remove_useversion {
+    my $xml = shift;
+    for my $op_x ($xml->findnodes(q{//mad_op[@key='use']})) {
+        next if ($op_x->findnodes(q{op_const[@private='BARE']}));
+        # convert to dummy constant.
+        my $op = $op_x->parent->parent;
+        $op_x->delete();
+
+        my ($madprops) = $op->findnodes("madprops");
+
+        my $ws = get_madprop($op, "operator", 'wsbefore');
+        $ws =~ s/\&\#xA$//; # remove newline.
+        #set_madprop($op, "value", "XX");
+        set_madprop($op, "value", $ws);
+
+        set_madprop($op, "null_type", "value");
+        #$madprops->insert_new_elt('first_child', "mad_sv", { key => "value", val => '' } );
+    }
+    for my $op_x ($xml->findnodes(q{//op_require})) {
+        my ($const) = $op_x->findnodes(q{op_const});
+        next unless $const and (get_madprop($const, 'value') || '') =~ m/^v?\d/;
+        set_madprop($op_x, "operator", '');
+        set_madprop($const, "value", '', wsbefore => '');
+        if (my $ons = $op_x->prev_sibling('op_nextstate')) {
+            $ons->delete;
+        }
+    }
+}
+
+sub change_deref_method {
+    my $xml = shift;
+    # '->$...' to '->&$...'
+    for my $op_method ($xml->findnodes(q{//op_method})) {
+        next if $op_method->findnodes(q{op_const[@private='BARE']});
+        set_madprop($op_method->parent, 'bigarrow', "-&gt;?");
+    }
+}
+
+sub change_deref {
+    my $xml = shift;
+    # '@{...}' to '...->@', etc.
+    for (['@', 'ary', 'av'], [qw|$ variable sv|], [qw|% hsh hv|], [qw|* star gv|], [qw|&amp; ampersand cv|]) {
+        my ($sigil, $token, $xv) = @$_;
+        for my $rv2av ($xml->findnodes("//op_rv2$xv"), $xml->findnodes("//op_null[\@was='rv2$xv']")) {
+            next unless (get_madprop($rv2av, $token) || '') eq $sigil or # =~ m/^([\$\@\%*]|&amp;)$/ or
+              (get_madprop($rv2av, 'variable') || '') eq '$' or # sigil change
+              (get_madprop($rv2av, 'ary') || '') eq '@';        # sigil change
+            set_madprop($rv2av, 'variable', '');
+            set_madprop($rv2av, 'ary', '');
+            set_madprop($rv2av, $token, '');
+            set_madprop($rv2av, 'arrow', '-&gt;' . $sigil);
+            if (my ($scope) = $rv2av->findnodes('op_scope')) {
+                set_madprop($rv2av, 'arrow', "-&gt;$sigil", wsafter => get_madprop($scope, 'curly_close', 'wsafter'));
+                my $round = (not map { $scope->findnodes($_) }
+                             qw{op_anonlist op_null[@was="aelem"] op_null[@was="helem"]
+                                op_helem op_aelem op_entersub op_padsv });
+                set_madprop($scope, 'curly_open', $round ? '(' : '');
+                set_madprop($scope, 'curly_close', ($round ? ')' : ''), wsafter => '');
+            }
+        }
+    }
+}
+
+sub intuit_more {
+    my $xml = shift;
+
+    # remove $foo[..] where intuit_more would return false.
+    for my $op_null ($xml->findnodes(q{//op_null})) {
+        next unless (get_madprop($op_null, 'null_type') || '') eq ",";
+        next if $op_null->parent->tag eq "op_subst";
+        my ($const) = $op_null->findnodes(q{op_const});
+        next unless $const and (($const->att('PV') || '') =~ m/^[\[]/) and 
+          $const->att('PV') eq (get_madprop($const, 'value') || '');
+        set_madprop($const, "value", "(?:)" . get_madprop($const, 'value'));
+    }
+}
+
+sub t_parenthesis {
+    my $xml = shift;
+    for my $op ($xml->findnodes(q{//*})) {
+        next unless get_madprop($op, "round_open");
+#         next if (get_madprop($op, "null_type") || '') eq "(";
+#         next if $op->att('flags') =~ m/PARENS/;
+        next unless get_madprop($op, "operator") or $op->tag eq "op_entersub";
+#        set_madprop($op, "round_open", get_madprop($op, "round_open"), wsbefore => '');
+        set_madprop($op, "round_open", get_madprop($op, "round_open", 'wsbefore') ? '' : ' ');
+        set_madprop($op, "round_close", '');
+
+        # only statement.
+        next if $op->prev_sibling('op_nextstate');
+        # rhs of an assignment
+        next if $op->parent->tag eq "op_sassign" and $op->pos() == 2;
+        # rhs of a .= assignment
+        next if (get_madprop($op->parent, 'operator') || '') =~ m/^?\=$/ and $op->pos() == 3;
+
+        my $op_null = XML::Twig::Elt->new("op_null");
+        $op->replace_with($op_null);
+        $op->move($op_null);
+        set_madprop($op_null, "null_type", "(");
+        if ($op->tag eq "op_entersub") {
+            my $func = $op->child(-1)->child(-1);
+            $func = $func->child(-1) if $func->tag eq "op_null";
+            set_madprop($op_null, "round_open", "(", wsbefore => get_madprop($func, "value", 'wsbefore'));
+            set_madprop($func, "value", get_madprop($func, "value"), wsbefore => '');
+        }
+        else {
+            set_madprop($op_null, "round_open", "(", wsbefore => get_madprop($op, "operator", 'wsbefore'));
+            set_madprop($op, "operator", get_madprop($op, "operator"), wsbefore => '');
+        }
+        set_madprop($op_null, "round_close", ")");
+    }
+}
+
+my $from = 0; # floating point number with starting version of kurila.
+GetOptions("from=f" => \$from);
+
+my $filename = shift @ARGV;
+
 # parsing
-my $twig= XML::Twig->new( keep_spaces => 1, keep_encoding => 1 );
+my $twig= XML::Twig->new( # keep_spaces => 1,
+                         discard_spaces => 1,
+ keep_encoding => 1 );
 
 $twig->parsefile( "-" );
 
-# replacing.
-for my $op ($twig->findnodes(q|//op_entersub|)) {
-    entersub_handler($twig, $op);
+if ($from < 1.4 - 0.05) {
+    # replacing.
+    for my $op ($twig->findnodes(q|//op_entersub|)) {
+        entersub_handler($twig, $op);
+    }
+
+    for my $op_const ($twig->findnodes(q|//op_const|)) {
+        const_handler($twig, $op_const);
+    }
+
+    make_glob_sub( $twig );
+    remove_vstring( $twig );
+
+#     # add_encoding_latin1($twig);
+
+    remove_rv2gv($twig);
+    remove_typed_declaration($twig);
+}
+
+if ($from < 1.405) {
+    rename_bit_operators($twig);
+    remove_useversion($twig);
+}
+
+if ($from < 1.415) {
+    change_deref_method($twig);
 }
 
 for my $op_const ($twig->findnodes(q|//op_const|)) {
     const_handler($twig, $op_const);
 }
-
-make_glob_sub( $twig );
-remove_vstring( $twig );
-
-# add_encoding_latin1($twig);
-
-remove_rv2gv($twig);
-remove_typed_declaration($twig);
+intuit_more($twig);
+#t_parenthesis($twig);
 
 # print
 $twig->print;

@@ -1,9 +1,7 @@
 
 package Compress::Raw::Zlib;
 
-require 5.004 ;
 require Exporter;
-use AutoLoader;
 use Carp ;
 
 #use Parse::Parameters;
@@ -13,7 +11,7 @@ use warnings ;
 use bytes ;
 our ($VERSION, $XS_VERSION, @ISA, @EXPORT, $AUTOLOAD);
 
-$VERSION = '2.004_01';
+$VERSION = '2.006';
 $XS_VERSION = $VERSION; 
 $VERSION = eval $VERSION;
 
@@ -255,7 +253,7 @@ sub Compress::Raw::Zlib::Parameters::_checkType
 
     #local $Carp::CarpLevel = $level ;
     #print "PARSE $type $key $value $validate $sub\n" ;
-    if ( $type & Parse_store_ref)
+    if ( $type ^&^ Parse_store_ref)
     {
         #$value = $$value
         #    if ref ${ $value } ;
@@ -266,12 +264,12 @@ sub Compress::Raw::Zlib::Parameters::_checkType
 
     $value = $$value ;
 
-    if ($type & Parse_any)
+    if ($type ^&^ Parse_any)
     {
         $$output = $value ;
         return 1;
     }
-    elsif ($type & Parse_unsigned)
+    elsif ($type ^&^ Parse_unsigned)
     {
         return $self->setError("Parameter '$key' must be an unsigned int, got 'undef'")
             if $validate && ! defined $value ;
@@ -281,7 +279,7 @@ sub Compress::Raw::Zlib::Parameters::_checkType
         $$output = defined $value ? $value : 0 ;    
         return 1;
     }
-    elsif ($type & Parse_signed)
+    elsif ($type ^&^ Parse_signed)
     {
         return $self->setError("Parameter '$key' must be a signed int, got 'undef'")
             if $validate && ! defined $value ;
@@ -291,14 +289,14 @@ sub Compress::Raw::Zlib::Parameters::_checkType
         $$output = defined $value ? $value : 0 ;    
         return 1 ;
     }
-    elsif ($type & Parse_boolean)
+    elsif ($type ^&^ Parse_boolean)
     {
         return $self->setError("Parameter '$key' must be an int, got '$value'")
             if $validate && defined $value && $value !~ /^\d*$/;
         $$output =  defined $value ? $value != 0 : 0 ;    
         return 1;
     }
-    elsif ($type & Parse_string)
+    elsif ($type ^&^ Parse_string)
     {
         $$output = defined $value ? $value : "" ;    
         return 1;
@@ -357,9 +355,9 @@ sub Compress::Raw::Zlib::Deflate::new
         unless $got->value('Bufsize') >= 1;
 
     my $flags = 0 ;
-    $flags |= FLAG_APPEND if $got->value('AppendOutput') ;
-    $flags |= FLAG_CRC    if $got->value('CRC32') ;
-    $flags |= FLAG_ADLER  if $got->value('ADLER32') ;
+    $flags ^|^= FLAG_APPEND if $got->value('AppendOutput') ;
+    $flags ^|^= FLAG_CRC    if $got->value('CRC32') ;
+    $flags ^|^= FLAG_ADLER  if $got->value('ADLER32') ;
 
     _deflateInit($flags,
                 $got->value('Level'), 
@@ -393,10 +391,10 @@ sub Compress::Raw::Zlib::Inflate::new
         unless $got->value('Bufsize') >= 1;
 
     my $flags = 0 ;
-    $flags |= FLAG_APPEND if $got->value('AppendOutput') ;
-    $flags |= FLAG_CRC    if $got->value('CRC32') ;
-    $flags |= FLAG_ADLER  if $got->value('ADLER32') ;
-    $flags |= FLAG_CONSUME_INPUT if $got->value('ConsumeInput') ;
+    $flags ^|^= FLAG_APPEND if $got->value('AppendOutput') ;
+    $flags ^|^= FLAG_CRC    if $got->value('CRC32') ;
+    $flags ^|^= FLAG_ADLER  if $got->value('ADLER32') ;
+    $flags ^|^= FLAG_CONSUME_INPUT if $got->value('ConsumeInput') ;
 
     _inflateInit($flags, $got->value('WindowBits'), $got->value('Bufsize'), 
                  $got->value('Dictionary')) ;
@@ -422,8 +420,8 @@ sub Compress::Raw::Zlib::InflateScan::new
 
     my $flags = 0 ;
     #$flags |= FLAG_APPEND if $got->value('AppendOutput') ;
-    $flags |= FLAG_CRC    if $got->value('CRC32') ;
-    $flags |= FLAG_ADLER  if $got->value('ADLER32') ;
+    $flags ^|^= FLAG_CRC    if $got->value('CRC32') ;
+    $flags ^|^= FLAG_ADLER  if $got->value('ADLER32') ;
     #$flags |= FLAG_CONSUME_INPUT if $got->value('ConsumeInput') ;
 
     _inflateScanInit($flags, $got->value('WindowBits'), $got->value('Bufsize'), 
@@ -452,9 +450,9 @@ sub Compress::Raw::Zlib::inflateScanStream::createDeflateStream
         unless $got->value('Bufsize') >= 1;
 
     my $flags = 0 ;
-    $flags |= FLAG_APPEND if $got->value('AppendOutput') ;
-    $flags |= FLAG_CRC    if $got->value('CRC32') ;
-    $flags |= FLAG_ADLER  if $got->value('ADLER32') ;
+    $flags ^|^= FLAG_APPEND if $got->value('AppendOutput') ;
+    $flags ^|^= FLAG_CRC    if $got->value('CRC32') ;
+    $flags ^|^= FLAG_ADLER  if $got->value('ADLER32') ;
 
     $pkg->_createDeflateStream($flags,
                 $got->value('Level'), 
@@ -503,9 +501,9 @@ sub Compress::Raw::Zlib::deflateStream::deflateParams
         if $got->parsed('Bufsize') && $got->value('Bufsize') <= 1;
 
     my $flags = 0;
-    $flags |= 1 if $got->parsed('Level') ;
-    $flags |= 2 if $got->parsed('Strategy') ;
-    $flags |= 4 if $got->parsed('Bufsize') ;
+    $flags ^|^= 1 if $got->parsed('Level') ;
+    $flags ^|^= 2 if $got->parsed('Strategy') ;
+    $flags ^|^= 4 if $got->parsed('Bufsize') ;
 
     $self->_deflateParams($flags, $got->value('Level'), 
                           $got->value('Strategy'), $got->value('Bufsize'));

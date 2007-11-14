@@ -31,7 +31,7 @@ use overload (
 
 qw(
 ""	stringify
-0+	numify)			# Order of arguments unsignificant
+0+	numify)			# Order of arguments insignificant
 );
 
 sub new {
@@ -47,7 +47,7 @@ sub numify { 0 + "${$_[0]}" }	# Not needed, additional overhead
 package main;
 
 $| = 1;
-use Test::More tests => 521;
+use Test::More tests => 535;
 
 
 $a = Oscalar->new( "087");
@@ -278,7 +278,7 @@ is("b${a}c", "bxxc");
 
 # Negative overloading:
 
-$na = eval { ~$a };
+$na = eval { ^~^$a };
 like($@, qr/no method found/);
 
 # Check AUTOLOADING:
@@ -287,26 +287,26 @@ like($@, qr/no method found/);
   sub { *{Symbol::fetch_glob("Oscalar::$AUTOLOAD")} = sub {"_!_" . shift() . "_!_"} ;
 	goto &{Symbol::fetch_glob("Oscalar::$AUTOLOAD")}};
 
-eval "package Oscalar; sub comple; use overload '~' => 'comple'";
+eval "package Oscalar; sub comple; use overload '^~^' => 'comple'";
 
-$na = eval { ~$a };		# Hash was not updated
+$na = eval { ^~^$a };		# Hash was not updated
 like($@, qr/no method found/);
 
 bless \$x, 'Oscalar';
 
-$na = eval { ~$a };		# Hash updated
+$na = eval { ^~^$a };		# Hash updated
 warn "`$na', $@" if $@;
 ok !$@;
 is($na, '_!_xx_!_');
 
 $na = 0;
 
-$na = eval { ~$aI };		# Hash was not updated
+$na = eval { ^~^$aI };		# Hash was not updated
 like($@, qr/no method found/);
 
 bless \$x, 'OscalarI';
 
-$na = eval { ~$aI };
+$na = eval { ^~^$aI };
 print $@;
 
 ok(!$@);
@@ -344,14 +344,14 @@ is(overload::StrVal(\$aI), "@{[\$aI]}");
   package OscalarII;
   @ISA = 'OscalarI';
   sub Oscalar::lshft {"_<<_" . shift() . "_<<_"}
-  eval "package OscalarI; use overload '<<' => 'lshft', '|' => 'lshft'";
+  eval "package OscalarI; use overload '<<' => 'lshft', '^|^' => 'lshft'";
 }
 
 $aaII = "087";
 $aII = \$aaII;
 bless $aII, 'OscalarII';
 bless \$fake, 'OscalarI';		# update the hash
-is(($aI | 3), '_<<_xx_<<_');
+is(($aI ^|^ 3), '_<<_xx_<<_');
 # warn $aII << 3;
 is(($aII << 3), '_<<_087_<<_');
 
@@ -742,10 +742,10 @@ else {
 		    }, 'deref';
   # Hash:
   my @cont = sort %$deref;
-  if ("\t" eq "\011") { # ascii
+  if ("\t" eq "\011") { # ASCII
       is("@cont", '23 5 fake foo');
   } 
-  else {                # ebcdic alpha-numeric sort order
+  else {                # EBCDIC alpha-numeric sort order
       is("@cont", 'fake foo 23 5');
   }
   my @keys = sort keys %$deref;
@@ -984,7 +984,7 @@ unless ($aaa) {
   main::is("$int_x", 1054);
 }
 
-# make sure that we don't inifinitely recurse
+# make sure that we don't infinitely recurse
 {
   my $c = 0;
   package Recurse;
@@ -1129,7 +1129,7 @@ like ($@, qr/zap/);
     like(overload::StrVal($no),       qr/^no_overload=ARRAY\(0x[0-9a-f]+\)$/);
 }
 
-# These are all check that overloaded values rather than reference addressess
+# These are all check that overloaded values rather than reference addresses
 # are what is getting tested.
 my ($two, $one, $un, $deux) = map {Numify->new( $_)} 2, 1, 1, 2;
 my ($ein, $zwei) = (1, 2);
@@ -1210,7 +1210,7 @@ foreach my $op (qw(<=> == != < <= > >=)) {
     my $obj;
     $obj = bless {name => 'cool'}, 'Sklorsh';
     $obj->delete;
-    ok(eval {if ($obj) {1}; 1}, $@ || 'reblessed into nonexist namespace');
+    ok(eval {if ($obj) {1}; 1}, $@ || 'reblessed into nonexistent namespace');
 
     $obj = bless {name => 'cool'}, 'Sklorsh';
     $obj->delete_with_self;
@@ -1259,9 +1259,9 @@ foreach my $op (qw(<=> == != < <= > >=)) {
     sub new { bless \$_[1], $_[0] }
 
     use overload
-          "&=" => sub { bit->new($_[0]->val . ' & ' . $_[1]->val) }, 
-          "^=" => sub { bit->new($_[0]->val . ' ^ ' . $_[1]->val) },
-          "|"  => sub { bit->new($_[0]->val . ' | ' . $_[1]->val) }, # |= by fallback
+          "^&^=" => sub { bit->new($_[0]->val . ' & ' . $_[1]->val) }, 
+          "^^^=" => sub { bit->new($_[0]->val . ' ^ ' . $_[1]->val) },
+          "^|^"  => sub { bit->new($_[0]->val . ' | ' . $_[1]->val) }, # |= by fallback
           ;
 
     sub val { ${$_[0]} }
@@ -1271,17 +1271,17 @@ foreach my $op (qw(<=> == != < <= > >=)) {
     my $a = bit->new(my $va = 'a');
     my $b = bit->new(my $vb = 'b');
 
-    $a &= $b;
+    $a ^&^= $b;
     is($a->val, 'a & b', "overloaded &= works");
 
     my $c = bit->new(my $vc = 'c');
 
-    $b ^= $c;
+    $b ^^^= $c;
     is($b->val, 'b ^ c', "overloaded ^= works");
 
     my $d = bit->new(my $vd = 'd');
 
-    $c |= $d;
+    $c ^|^= $d;
     is($c->val, 'c | d', "overloaded |= (by fallback) works");
 }
 
@@ -1330,4 +1330,76 @@ foreach my $op (qw(<=> == != < <= > >=)) {
     is($method, 'cmp');
     like($warning, qr/isn't numeric/, 'cmp should return number');
 
+}
+
+{
+    # Subtle bug pre 5.10, as a side effect of the overloading flag being
+    # stored on the reference rather than the referent. Despite the fact that
+    # objects can only be accessed via references (even internally), the
+    # referent actually knows that it's blessed, not the references. So taking
+    # a new, unrelated, reference to it gives an object. However, the
+    # overloading-or-not flag was on the reference prior to 5.10, and taking
+    # a new reference didn't (use to) copy it.
+
+    package kayo;
+
+    use overload '""' => sub {${$_[0]}};
+
+    sub Pie {
+	return "$_[0], $_[1]";
+    }
+
+    package main;
+
+    my $class = 'kayo';
+    my $string = 'bam';
+    my $crunch_eth = bless \$string, $class;
+
+    is("$crunch_eth", $string);
+    is ($crunch_eth->Pie("Meat"), "$string, Meat");
+
+    my $wham_eth = \$string;
+
+    is("$wham_eth", $string,
+       'This reference did not have overloading in 5.8.8 and earlier');
+    is ($crunch_eth->Pie("Apple"), "$string, Apple");
+
+    my $class = ref $wham_eth;
+    $class =~ s/=.*//;
+
+    # Bless it back into its own class!
+    bless $wham_eth, $class;
+
+    is("$wham_eth", $string);
+    is ($crunch_eth->Pie("Blackbird"), "$string, Blackbird");
+}
+
+{
+    package numify_int;
+    use overload "0+" => sub { $_[0][0] += 1; 42 };
+    package numify_self;
+    use overload "0+" => sub { $_[0][0]++; $_[0] };
+    package numify_other;
+    use overload "0+" => sub { $_[0][0]++; $_[0][1] = bless [], 'numify_int' };
+    package numify_by_fallback;
+    use overload "-" => sub { 1 }, fallback => 1;
+
+    package main;
+    my $o = bless [], 'numify_int';
+    is(int($o), 42, 'numifies to integer');
+    is($o->[0], 1, 'int() numifies only once');
+
+    my $aref = [];
+    my $num_val = int($aref);
+    my $r = bless $aref, 'numify_self';
+    is(int($r), $num_val, 'numifies to self');
+    is($r->[0], 1, 'int() numifies once when returning self');
+
+    my $s = bless [], 'numify_other';
+    is(int($s), 42, 'numifies to numification of other object');
+    is($s->[0], 1, 'int() numifies once when returning other object');
+    is($s->[1][0], 1, 'returned object numifies too');
+
+    my $m = bless $aref, 'numify_by_fallback';
+    is(int($m), $num_val, 'numifies to usual reference value');
 }

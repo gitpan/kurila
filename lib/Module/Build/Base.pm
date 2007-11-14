@@ -1,7 +1,6 @@
 package Module::Build::Base;
 
 use strict;
-BEGIN { require 5.00503 }
 
 use Carp;
 use Config;
@@ -134,7 +133,7 @@ sub _construct {
     if (exists $p->{$_}) {
       my $vals = delete $p->{$_};
       while (my ($k, $v) = each %$vals) {
-	$self->$_($k, $v);
+	$self->?$_($k, $v);
       }
     }
   }
@@ -975,7 +974,7 @@ sub _pod_parse {
   require Module::Build::PodParser;
   my $parser = Module::Build::PodParser->new(fh => $fh);
   my $method = "get_$part";
-  return $p->{$member} = $parser->$method();
+  return $p->{$member} = $parser->?$method();
 }
 
 sub version_from_file { # Method provided for backwards compatability
@@ -1039,7 +1038,7 @@ sub write_config {
   -d $self->{properties}{config_dir} or die "Can't mkdir $self->{properties}{config_dir}: $!";
   
   my @items = @{ $self->prereq_action_types };
-  $self->_write_data('prereqs', { map { $_, $self->$_() } @items });
+  $self->_write_data('prereqs', { map { $_, $self->?$_() } @items });
   $self->_write_data('build_params', [$self->{args}, $self->{config}->values_set, $self->{properties}]);
 
   # Set a new magic number and write it to a file
@@ -1091,7 +1090,7 @@ sub prereq_failures {
   my ($self, $info) = @_;
 
   my @types = @{ $self->prereq_action_types };
-  $info ||= {map {$_, $self->$_()} @types};
+  $info ||= {map {$_, $self->?$_()} @types};
 
   my $out;
 
@@ -1127,7 +1126,7 @@ sub _enum_prereqs {
   my %prereqs;
   foreach my $type ( @{ $self->prereq_action_types } ) {
     if ( $self->can( $type ) ) {
-      my $prereq = $self->$type() || {};
+      my $prereq = $self->?$type() || {};
       $prereqs{$type} = $prereq if %$prereq;
     }
   }
@@ -1284,7 +1283,7 @@ sub make_executable {
   my $self = shift;
   foreach (@_) {
     my $current_mode = (stat $_)[2];
-    chmod $current_mode | oct(111), $_;
+    chmod $current_mode ^|^ oct(111), $_;
   }
 }
 
@@ -1332,7 +1331,7 @@ sub print_build_script {
   
   my $closedata="";
 
-  my %q = map {$_, $self->$_()} qw(config_dir base_dir);
+  my %q = map {$_, $self->?$_()} qw(config_dir base_dir);
 
   my $case_tolerant = 0+(File::Spec->can('case_tolerant')
 			 && File::Spec->case_tolerant);
@@ -1417,7 +1416,7 @@ sub create_build_script {
   $self->write_config;
   
   my ($build_script, $dist_name, $dist_version)
-    = map $self->$_(), qw(build_script dist_name dist_version);
+    = map $self->?$_(), qw(build_script dist_name dist_version);
   
   if ( $self->delete_filetree($build_script) ) {
     $self->log_info("Removed previous script '$build_script'\n\n");
@@ -1481,7 +1480,7 @@ sub _call_action {
   local $self->{action} = $action;
   my $method = "ACTION_$action";
   die "No action '$action' defined, try running the 'help' action.\n" unless $self->can($method);
-  return $self->$method();
+  return $self->?$method();
 }
 
 sub cull_options {
@@ -1653,7 +1652,7 @@ sub read_args {
   # De-tilde-ify any path parameters
   for my $key (qw(prefix install_base destdir)) {
     next if !defined $args{$key};
-    $args{$key} = _detildefy($args{$key});
+    $args{$key} = $self->_detildefy($args{$key});
   }
 
   for my $key (qw(install_path)) {
@@ -1661,7 +1660,7 @@ sub read_args {
 
     for my $subkey (keys %{$args{$key}}) {
       next if !defined $args{$key}{$subkey};
-      my $subkey_ext = _detildefy($args{$key}{$subkey});
+      my $subkey_ext = $self->_detildefy($args{$key}{$subkey});
       if ( $subkey eq 'html' ) { # translate for compatability
 	$args{$key}{binhtml} = $subkey_ext;
 	$args{$key}{libhtml} = $subkey_ext;
@@ -1683,7 +1682,7 @@ sub read_args {
 # (bash shell won't expand tildes mid-word: "--foo=~/thing")
 # TODO: handle ~user/foo
 sub _detildefy {
-    my $arg = shift;
+    my ($self, $arg) = @_;
 
     return $arg =~ /^~/ ? (glob $arg)[0] : $arg;
 }
@@ -1940,7 +1939,7 @@ sub ACTION_prereq_report {
 sub prereq_report {
   my $self = shift;
   my @types = @{ $self->prereq_action_types };
-  my $info = { map { $_ => $self->$_() } @types };
+  my $info = { map { $_ => $self->?$_() } @types };
 
   my $output = '';
   foreach my $type (@types) {
@@ -2186,7 +2185,8 @@ sub ACTION_testcover {
   # See whether any of the *.pm files have changed since last time
   # testcover was run.  If so, start over.
   if (-e 'cover_db') {
-    my $pm_files = $self->rscan_dir(File::Spec->catdir($self->blib, 'lib'), qr{\.pm$} );
+    my $pm_files = $self->rscan_dir
+        (File::Spec->catdir($self->blib, 'lib'), file_qr('\.pm$') );
     my $cover_files = $self->rscan_dir('cover_db', sub {-f $_ and not /\.html$/});
     
     $self->do_system(qw(cover -delete))
@@ -2218,7 +2218,7 @@ sub ACTION_code {
   foreach my $element (@{$self->build_elements}) {
     my $method = "process_${element}_files";
     $method = "process_files_by_extension" unless $self->can($method);
-    $self->$method($element);
+    $self->?$method($element);
   }
 
   $self->depends_on('config_data');
@@ -2234,7 +2234,7 @@ sub process_files_by_extension {
   my ($self, $ext) = @_;
   
   my $method = "find_${ext}_files";
-  my $files = $self->can($method) ? $self->$method() : $self->_find_file_by_type($ext,  'lib');
+  my $files = $self->can($method) ? $self->?$method() : $self->_find_file_by_type($ext,  'lib');
   
   while (my ($file, $dest) = each %$files) {
     $self->copy_if_modified(from => $file, to => File::Spec->catfile($self->blib, $dest) );
@@ -2248,7 +2248,7 @@ sub process_support_files {
   
   push @{$p->{include_dirs}}, $p->{c_source};
   
-  my $files = $self->rscan_dir($p->{c_source}, qr{\.c(pp)?$});
+  my $files = $self->rscan_dir($p->{c_source}, file_qr('\.c(pp)?$'));
   foreach my $file (@$files) {
     push @{$p->{objects}}, $self->compile_c($file);
   }
@@ -2320,7 +2320,8 @@ sub find_PL_files {
   }
   
   return unless -d 'lib';
-  return { map {$_, [/^(.*)\.PL$/]} @{ $self->rscan_dir('lib', qr{\.PL$}) } };
+  return { map {$_, [/^(.*)\.PL$/i ]} @{ $self->rscan_dir('lib',
+                                                          file_qr('\.PL$')) } };
 }
 
 sub find_pm_files  { shift->_find_file_by_type('pm',  'lib') }
@@ -2373,7 +2374,7 @@ sub _find_file_by_type {
   return { map {$_, $_}
 	   map $self->localize_file_path($_),
 	   grep !/\.\#/,
-	   @{ $self->rscan_dir($dir, qr{\.$type$}) } };
+	   @{ $self->rscan_dir($dir, file_qr("\\.$type\$")) } };
 }
 
 sub localize_file_path {
@@ -2445,7 +2446,9 @@ sub ACTION_testpod {
     or die "The 'testpod' action requires Test::Pod version 0.95";
 
   my @files = sort keys %{$self->_find_pods($self->libdoc_dirs)},
-                   keys %{$self->_find_pods($self->bindoc_dirs, exclude => [ qr/\.bat$/ ])}
+                   keys %{$self->_find_pods
+                             ($self->bindoc_dirs,
+                              exclude => [ file_qr('\.bat$') ])}
     or die "Couldn't find any POD files to test\n";
 
   { package Module::Build::PodTester;  # Don't want to pollute the main namespace
@@ -2507,16 +2510,16 @@ sub ACTION_manpages {
 
   foreach my $type ( qw(bin lib) ) {
     my $files = $self->_find_pods( $self->{properties}{"${type}doc_dirs"},
-                                   exclude => [ qr/\.bat$/ ] );
+                                   exclude => [ file_qr('\.bat$') ] );
     next unless %$files;
 
     my $sub = $self->can("manify_${type}_pods");
     next unless defined( $sub );
 
     if ( $self->invoked_action eq 'manpages' ) {
-      $self->$sub();
+      $self->?$sub();
     } elsif ( $self->_is_default_installable("${type}doc") ) {
-      $self->$sub();
+      $self->?$sub();
     }
   }
 
@@ -2526,7 +2529,7 @@ sub manify_bin_pods {
   my $self    = shift;
 
   my $files   = $self->_find_pods( $self->{properties}{bindoc_dirs},
-                                   exclude => [ qr/\.bat$/ ] );
+                                   exclude => [ file_qr('\.bat$') ] );
   return unless keys %$files;
 
   my $mandir = File::Spec->catdir( $self->blib, 'bindoc' );
@@ -2609,7 +2612,8 @@ sub ACTION_html {
 
   foreach my $type ( qw(bin lib) ) {
     my $files = $self->_find_pods( $self->{properties}{"${type}doc_dirs"},
-				   exclude => [ qr/\.(?:bat|com|html)$/ ] );
+				   exclude => 
+                                        [ file_qr('\.(?:bat|com|html)$') ] );
     next unless %$files;
 
     if ( $self->invoked_action eq 'html' ) {
@@ -2636,7 +2640,7 @@ sub htmlify_pods {
   $self->add_to_cleanup('pod2htm*');
 
   my $pods = $self->_find_pods( $self->{properties}{"${type}doc_dirs"},
-                                exclude => [ qr/\.(?:bat|com|html)$/ ] );
+                                exclude => [ file_qr('\.(?:bat|com|html)$') ] );
   return unless %$pods;  # nothing to do
 
   unless ( -d $htmldir ) {
@@ -2656,7 +2660,7 @@ sub htmlify_pods {
   foreach my $pod ( keys %$pods ) {
 
     my ($name, $path) = File::Basename::fileparse($pods->{$pod},
-						  qr{\.(?:pm|plx?|pod)$});
+                                                 file_qr('\.(?:pm|plx?|pod)$'));
     my @dirs = File::Spec->splitdir( File::Spec->canonpath( $path ) );
     pop( @dirs ) if $dirs[-1] eq File::Spec->curdir;
 
@@ -2746,7 +2750,7 @@ sub ACTION_diff {
   delete $installmap->{read};
   delete $installmap->{write};
 
-  my $text_suffix = qr{\.(pm|pod)$};
+  my $text_suffix = file_qr('\.(pm|pod)$');
 
   while (my $localdir = each %$installmap) {
     my @localparts = File::Spec->splitdir($localdir);
@@ -2862,7 +2866,7 @@ sub ACTION_ppmdist {
 	File::Spec->abs2rel( File::Spec->rel2abs( $file ),
 			     File::Spec->rel2abs( $dir  ) );
       my $to_file  =
-	File::Spec->catdir( $ppm, 'blib',
+	File::Spec->catfile( $ppm, 'blib',
 			    exists( $types{$type} ) ? $types{$type} : $type,
 			    $rel_file );
       $self->copy_if_modified( from => $file, to => $to_file );
@@ -2945,7 +2949,7 @@ sub _add_to_manifest {
     or return;
 
   my $mode = (stat $manifest)[2];
-  chmod($mode | oct(222), $manifest) or die "Can't make $manifest writable: $!";
+  chmod($mode ^|^ oct(222), $manifest) or die "Can't make $manifest writable: $!";
   
   my $fh = IO::File->new("< $manifest") or die "Can't read $manifest: $!";
   my $last_line = (<$fh>)[-1] || "\n";
@@ -3058,7 +3062,7 @@ EOF
       local *{Symbol::fetch_glob("Pod::Simple::parse_file")} = sub {
 	my $self = shift;
 	$self->output_fh($_[1]) if $_[1];
-	$self->$old_parse_file($_[0]);
+	$self->?$old_parse_file($_[0]);
       }
         if $Pod::Text::VERSION
 	  == 3.01; # Split line to avoid evil version-finder
@@ -3203,6 +3207,11 @@ sub ACTION_manifest {
   require ExtUtils::Manifest;  # ExtUtils::Manifest is not warnings clean.
   local ($^W, $ExtUtils::Manifest::Quiet) = (0,1);
   ExtUtils::Manifest::mkmanifest();
+}
+
+# Case insenstive regex for files
+sub file_qr {
+    return File::Spec->case_tolerant ? qr($_[0])i : qr($_[0]);
 }
 
 sub dist_dir {
@@ -3363,7 +3372,7 @@ sub prepare_metadata {
 
   foreach (qw(dist_name dist_version dist_author dist_abstract license)) {
     (my $name = $_) =~ s/^dist_//;
-    $add_node->($name, $self->$_());
+    $add_node->($name, $self->?$_());
     die "ERROR: Missing required field '$_' for META.yml\n"
       unless defined($node->{$name}) && length($node->{$name});
   }
@@ -3798,7 +3807,7 @@ sub install_map {
   if ($self->create_packlist and my $module_name = $self->module_name) {
     my $archdir = $self->install_destination('arch');
     my @ext = split /::/, $module_name;
-    $map{write} = File::Spec->catdir($archdir, 'auto', @ext, '.packlist');
+    $map{write} = File::Spec->catfile($archdir, 'auto', @ext, '.packlist');
   }
 
   # Handle destdir
@@ -3806,8 +3815,22 @@ sub install_map {
     foreach (keys %map) {
       # Need to remove volume from $map{$_} using splitpath, or else
       # we'll create something crazy like C:\Foo\Bar\E:\Baz\Quux
-      my ($volume, $path) = File::Spec->splitpath( $map{$_}, 1 );
-      $map{$_} = File::Spec->catdir($destdir, $path);
+      # VMS will always have the file separate than the path.
+      my ($volume, $path, $file) = File::Spec->splitpath( $map{$_}, 1 );
+
+      # catdir needs a list of directories, or it will create something
+      # crazy like volume:[Foo.Bar.volume.Baz.Quux]
+      my @dirs = File::Spec->splitdir($path);
+
+      # First merge the directories
+      $path = File::Spec->catdir($destdir, @dirs);
+
+      # Then put the file back on if there is one.
+      if ($file ne '') {
+          $map{$_} = File::Spec->catfile($path, $file)
+      } else {
+          $map{$_} = $path;
+      }
     }
   }
   
@@ -4146,7 +4169,7 @@ sub copy_if_modified {
   }
 
   # mode is read-only + (executable if source is executable)
-  my $mode = oct(444) | ( $self->is_executable($file) ? oct(111) : 0 );
+  my $mode = oct(444) ^|^ ( $self->is_executable($file) ? oct(111) : 0 );
   chmod( $mode, $to_path );
 
   return $to_path;

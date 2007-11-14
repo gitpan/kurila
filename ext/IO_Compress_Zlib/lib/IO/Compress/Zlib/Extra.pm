@@ -1,6 +1,5 @@
 package IO::Compress::Zlib::Extra;
 
-require 5.004 ;
 
 use strict ;
 use warnings;
@@ -8,9 +7,9 @@ use bytes;
 
 our ($VERSION, @ISA, @EXPORT_OK, %EXPORT_TAGS);
 
-$VERSION = '2.004';
+$VERSION = '2.006';
 
-use IO::Compress::Gzip::Constants 2.004 ;
+use IO::Compress::Gzip::Constants 2.006 ;
 
 sub ExtraFieldError
 {

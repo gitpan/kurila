@@ -1,24 +1,22 @@
 
 package Compress::Zlib;
 
-require 5.004 ;
 require Exporter;
-use AutoLoader;
 use Carp ;
 use IO::Handle ;
 use Scalar::Util qw(dualvar);
 
-use IO::Compress::Base::Common 2.004 ;
-use Compress::Raw::Zlib 2.004 ;
-use IO::Compress::Gzip 2.004 ;
-use IO::Uncompress::Gunzip 2.004 ;
+use IO::Compress::Base::Common 2.006 ;
+use Compress::Raw::Zlib 2.006 ;
+use IO::Compress::Gzip 2.006 ;
+use IO::Uncompress::Gunzip 2.006 ;
 
 use strict ;
 use warnings ;
 use bytes ;
 our ($VERSION, $XS_VERSION, @ISA, @EXPORT, $AUTOLOAD);
 
-$VERSION = '2.004';
+$VERSION = '2.007';
 $XS_VERSION = $VERSION; 
 $VERSION = eval $VERSION;
 
@@ -180,7 +178,12 @@ sub Compress::Zlib::gzFile::gzreadline
     my $self = shift ;
 
     my $gz = $self->[0] ;
-    $_[0] = $gz->getline() ; 
+    {
+        # Maintain backward compatibility with 1.x behaviour
+        # It didn't support $/, so this can't either.
+        local $/ = "\n" ;
+        $_[0] = $gz->getline() ; 
+    }
     _save_gzerr($gz, 1);
     return defined $_[0] ? length $_[0] : 0 ;
 }
@@ -234,8 +237,8 @@ sub Compress::Zlib::gzFile::gzflush
 
     my $gz = $self->[0] ;
     my $status = $gz->flush($f) ;
-    _save_gzerr($gz);
-    return $status ;
+    my $err = _save_gzerr($gz);
+    return $status ? 0 : $err;
 }
 
 sub Compress::Zlib::gzFile::gzclose
@@ -244,8 +247,8 @@ sub Compress::Zlib::gzFile::gzclose
     my $gz = $self->[0] ;
 
     my $status = $gz->close() ;
-    _save_gzerr($gz);
-    return ! $status ;
+    my $err = _save_gzerr($gz);
+    return $status ? 0 : $err;
 }
 
 sub Compress::Zlib::gzFile::gzeof
@@ -438,7 +441,7 @@ sub inflate
 
 package Compress::Zlib ;
 
-use IO::Compress::Gzip::Constants 2.004 ;
+use IO::Compress::Gzip::Constants 2.006 ;
 
 sub memGzip($)
 {
@@ -466,11 +469,11 @@ sub _removeGzipHeader($)
 
     return Z_DATA_ERROR()
         unless $magic1 == GZIP_ID1 and $magic2 == GZIP_ID2 and
-           $method == Z_DEFLATED() and !($flags & GZIP_FLG_RESERVED) ;
+           $method == Z_DEFLATED() and !($flags ^&^ GZIP_FLG_RESERVED) ;
     substr($$string, 0, GZIP_MIN_HEADER_SIZE) = '' ;
 
     # skip extra field
-    if ($flags & GZIP_FLG_FEXTRA)
+    if ($flags ^&^ GZIP_FLG_FEXTRA)
     {
         return Z_DATA_ERROR()
             if length($$string) < GZIP_FEXTRA_HEADER_SIZE ;
@@ -484,7 +487,7 @@ sub _removeGzipHeader($)
     }
 
     # skip orig name
-    if ($flags & GZIP_FLG_FNAME)
+    if ($flags ^&^ GZIP_FLG_FNAME)
     {
         my $name_end = index ($$string, GZIP_NULL_BYTE);
         return Z_DATA_ERROR()
@@ -493,7 +496,7 @@ sub _removeGzipHeader($)
     }
 
     # skip comment
-    if ($flags & GZIP_FLG_FCOMMENT)
+    if ($flags ^&^ GZIP_FLG_FCOMMENT)
     {
         my $comment_end = index ($$string, GZIP_NULL_BYTE);
         return Z_DATA_ERROR()
@@ -502,7 +505,7 @@ sub _removeGzipHeader($)
     }
 
     # skip header crc
-    if ($flags & GZIP_FLG_FHCRC)
+    if ($flags ^&^ GZIP_FLG_FHCRC)
     {
         return Z_DATA_ERROR()
             if length ($$string) < GZIP_FHCRC_SIZE ;
@@ -637,12 +640,17 @@ C<IO::Compress::Gzip> and C<IO::Uncompress::Gunzip> modules for
 reading/writing gzip files, and the C<Compress::Raw::Zlib> module for some
 low-level zlib access. 
 
-The interface provided by version 2 should be 100% backward compatible with
-version 1. If you find a difference in the expected behaviour please
-contact the author (See L</AUTHOR>). See L<GZIP INTERFACE> 
+The interface provided by version 2 of this module should be 100% backward
+compatible with version 1. If you find a difference in the expected
+behaviour please contact the author (See L</AUTHOR>). See L<GZIP INTERFACE> 
 
-If you are writing new code, your first port of call should be to use one
-these new modules.
+With the creation of the C<IO::Compress> and C<IO::Uncompress> modules no
+new features are planned for C<Compress::Zlib> - the new modules do
+everything that C<Compress::Zlib> does and then some. Development on
+C<Compress::Zlib> will be limited to bug fixes only.
+
+If you are writing new code, your first port of call should be one of the
+new C<IO::Compress> or C<IO::Uncompress> modules.
 
 =head1 GZIP INTERFACE
 
@@ -755,11 +763,13 @@ the case of an error, -1.
 
 It is legal to intermix calls to C<gzread> and C<gzreadline>.
 
-In addition, C<gzreadline> fully supports the use of of the variable C<$/>
-(C<$INPUT_RECORD_SEPARATOR> or C<$RS> when C<English> is in use) to
-determine what constitutes an end of line. Both paragraph mode and file
-slurp mode are supported. 
+To maintain backward compatibility with version 1.x of this module
+C<gzreadline> ignores the C<$/> variable - it I<always> uses the string
+C<"\n"> as the line delimiter.  
 
+If you want to read a gzip file a line at a time and have it respect the
+C<$/> variable (or C<$INPUT_RECORD_SEPARATOR>, or C<$RS> when C<English> is
+in use) see L<IO::Uncompress::Gunzip|IO::Uncompress::Gunzip>.
 
 =item B<$byteswritten = $gz-E<gt>gzwrite($buffer) ;>
 
@@ -779,7 +789,7 @@ you fully understand the implications of what it does - overuse of C<flush>
 can seriously degrade the level of compression achieved. See the C<zlib>
 documentation for details.
 
-Returns 1 on success, 0 on failure.
+Returns 0 on success.
 
 
 =item B<$offset = $gz-E<gt>gztell() ;>
@@ -804,7 +814,7 @@ Returns 1 on success, 0 on failure.
 Closes the compressed file. Any pending data is flushed to the file
 before it is closed.
 
-Returns 1 on success, 0 on failure.
+Returns 0 on success.
 
 =item B<$gz-E<gt>gzsetparams($level, $strategy>
 

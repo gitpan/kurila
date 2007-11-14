@@ -10,7 +10,6 @@ B<perl>	S<[ B<-sTtuUWX> ]>
 	S<[ B<-pna> ] [ B<-F>I<pattern> ] [ B<-l>[I<octal>] ] [ B<-0>[I<octal/hexadecimal>] ]>
 	S<[ B<-I>I<dir> ] [ B<-m>[B<->]I<module> ] [ B<-M>[B<->]I<'module...'> ] [ B<-f> ]>
 	S<[ B<-C [I<number/list>] >]>
-	S<[ B<-P> ]>
 	S<[ B<-S> ]>
 	S<[ B<-x>[I<dir>] ]>
 	S<[ B<-i>[I<extension>] ]>
@@ -280,7 +279,7 @@ An alternate delimiter may be specified using B<-F>.
 =item B<-C [I<number/list>]>
 X<-C>
 
-The C<-C> flag controls some Unicode of the Perl Unicode features.
+The C<-C> flag controls some of the Perl Unicode features.
 
 As of 5.8.1, the C<-C> can be followed either by a number or a list
 of option letters.  The letters, their numeric values, and effects
@@ -588,9 +587,7 @@ proceeds from STDIN to STDOUT as might be expected.
 X<-I> X<@INC>
 
 Directories specified by B<-I> are prepended to the search path for
-modules (C<@INC>), and also tells the C preprocessor where to search for
-include files.  The C preprocessor is invoked with B<-P>; by default it
-searches /usr/include and /usr/lib/perl.
+modules (C<@INC>).
 
 =item B<-l>[I<octnum>]
 X<-l> X<$/> X<$\>
@@ -698,68 +695,7 @@ the implicit loop, just as in B<awk>.
 =item B<-P>
 X<-P>
 
-B<NOTE: Use of -P is strongly discouraged because of its inherent
-problems, including poor portability.>
-
-This option causes your program to be run through the C preprocessor before
-compilation by Perl.  Because both comments and B<cpp> directives begin
-with the # character, you should avoid starting comments with any words
-recognized by the C preprocessor such as C<"if">, C<"else">, or C<"define">.
-
-If you're considering using C<-P>, you might also want to look at the
-Filter::cpp module from CPAN.
-
-The problems of -P include, but are not limited to:
-
-=over 10
-
-=item *
-
-The C<#!> line is stripped, so any switches there don't apply.
-
-=item *
-
-A C<-P> on a C<#!> line doesn't work.
-
-=item *
-
-B<All> lines that begin with (whitespace and) a C<#> but
-do not look like cpp commands, are stripped, including anything
-inside Perl strings, regular expressions, and here-docs .
-
-=item *
-
-In some platforms the C preprocessor knows too much: it knows about
-the C++ -style until-end-of-line comments starting with C<"//">.
-This will cause problems with common Perl constructs like
-
-    s/foo//;
-
-because after -P this will became illegal code
-
-    s/foo
-
-The workaround is to use some other quoting separator than C<"/">,
-like for example C<"!">:
-
-    s!foo!!;
-
-
-
-=item *
-
-It requires not only a working C preprocessor but also a working
-F<sed>.  If not on UNIX, you are probably out of luck on this.
-
-=item *
-
-Script line numbers are not preserved.
-
-=item *
-
-The C<-x> does not work with C<-P>.
-
-=back
+Has been removed in kurila.
 
 =item B<-s>
 X<-s>
@@ -869,10 +805,6 @@ execute a portion of your program before dumping, use the dump()
 operator instead.  Note: availability of B<undump> is platform
 specific and may not be available for a specific port of Perl.
 
-This switch has been superseded in favor of the new Perl code
-generator backends to the compiler.  See L<B> and L<B::Bytecode>
-for details.
-
 =item B<-U>
 X<-U>
 
@@ -967,7 +899,7 @@ See L<perllexwarn>.
 =item B<-x>
 X<-x>
 
-=item B<-x> I<directory>
+=item B<-x>I<directory>
 
 tells Perl that the program is embedded in a larger chunk of unrelated
 ASCII text, such as in a mail message.  Leading garbage will be
@@ -979,6 +911,9 @@ disposal of leading garbage.  The program must be terminated with
 C<__END__> if there is trailing garbage to be ignored (the program
 can process any or all of the trailing garbage via the DATA filehandle
 if desired).
+
+The directory, if specified, must appear immediately following the B<-x>
+with no intervening whitespace.
 
 =back
 
@@ -1027,7 +962,7 @@ is used. The program should instead say:
 X<PERL5OPT>
 
 Command-line options (switches).  Switches in this variable are taken
-as if they were on every Perl command line.  Only the B<-[CDIMUdmtwA]>
+as if they were on every Perl command line.  Only the B<-[CDIMUdmtw]>
 switches are allowed.  When running taint checks (because the program
 was running setuid or setgid, or the B<-T> switch was used), this
 variable is ignored.  If PERL5OPT begins with B<-T>, tainting will be
@@ -1258,20 +1193,23 @@ PERL_ENCODING environment variable is consulted for an encoding name.
 =item PERL_HASH_SEED
 X<PERL_HASH_SEED>
 
-(Since Perl 5.8.1.)  Used to randomise Perl's internal hash function.
+(Since Perl 5.8.1.)  Used to randomise perl's internal hash function.
 To emulate the pre-5.8.1 behaviour, set to an integer (zero means
 exactly the same order as 5.8.0).  "Pre-5.8.1" means, among other
-things, that hash keys will be ordered the same between different runs
-of Perl.
+things, that hash keys will always have the same ordering between
+different runs of perl.
+
+Most hashes return elements in the same order as Perl 5.8.0 by default.
+On a hash by hash basis, if pathological data is detected during a hash
+key insertion, then that hash will switch to an alternative random hash
+seed.
 
 The default behaviour is to randomise unless the PERL_HASH_SEED is set.
-If Perl has been compiled with C<-DUSE_HASH_SEED_EXPLICIT>, the default
+If perl has been compiled with C<-DUSE_HASH_SEED_EXPLICIT>, the default
 behaviour is B<not> to randomise unless the PERL_HASH_SEED is set.
 
-If PERL_HASH_SEED is unset or set to a non-numeric string, Perl uses
+If PERL_HASH_SEED is unset or set to a non-numeric string, perl uses
 the pseudorandom seed supplied by the operating system and libraries.
-This means that each different run of Perl will have a different
-ordering of the results of keys(), values(), and each().
 
 B<Please note that the hash seed is sensitive information>. Hashes are
 randomized to protect against local and remote attacks against Perl

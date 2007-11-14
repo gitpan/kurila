@@ -45,6 +45,7 @@ while (<DATA>) {
 # Email addresses for we do not have names.
 #
 $map {$_} = "?" for 
+    "agrow\100thegotonerd.com",
     "alexander_bluhm\100genua.de",
     "alexander_gernler\100genua.de",
     "ammon\100rhythm.com",
@@ -90,7 +91,12 @@ $map {$_} = "?" for
 # 
 
 $map {$_} = '!' for
-     # Iain Truskett has passed away.
+     # Nick Ing-Simmons has passed away (2006-09-25).
+     "nick\100ing-simmons.net",
+     "nik\100tiuk.ti.com",
+     "nick.ing-simmons\100elixent.com",
+
+     # Iain Truskett has passed away (2003-12-29).
      "perl\100dellah.anu.edu.au",
      "spoon\100dellah.org",
      "spoon\100cpan.org",
@@ -293,9 +299,6 @@ nicholas                                nick\100unfortu.net
 +                                       nick\100plum.flirble.org
 +                                       nick\100babyhippo.co.uk
 +                                       nick\100bagpuss.unfortu.net
-nick                                    nick\100ing-simmons.net
-+                                       nik\100tiuk.ti.com
-+                                       nick.ing-simmons\100elixent.com
 pudge                                   pudge\100pobox.com
 rgs                                     rgarciasuarez\100free.fr
 +                                       rgarciasuarez\100mandrakesoft.com
@@ -305,7 +308,8 @@ rgs                                     rgarciasuarez\100free.fr
 sky                                     sky\100nanisky.com
 +                                       artur\100contiller.se
 +                                       arthur\100contiller.se
-steveh                                  steve.hay\100uk.radan.com
+steveh                                  stevehay\100planit.com
++                                       steve.hay\100uk.radan.com
 stevep                                  steve\100fisharerojo.org
 +                                       steve.peters\100gmail.com
 
@@ -333,6 +337,7 @@ ash\100cpan.org                         ash_cpan\100firemirror.com
 avarab\100gmail.com                     avar\100cpan.org
 
 bah\100ecnvantage.com                   bholzman\100longitude.com
+bcarter@gumdrop.flyinganvil.org         q.eibcartereio.=~m-b.{6}-cgimosx@gumdrop.flyinganvil.org
 ben_tilly\100operamail.com              btilly\100gmail.com
 
 chromatic\100wgz.org                    chromatic\100rmci.net
@@ -420,6 +425,7 @@ richard.foley\100ubsw.com               richard.foley\100t-online.de
 +                                       richard.foley\100rfi.net
 rick\100consumercontact.com             rick\100bort.ca
 +                                       rick.delaney\100rogers.com
+rjbs\100cpan.org                        rjbs-perl-p5p\100lists.manxome.org
 rjk\100linguist.dartmouth.edu           rjk\100linguist.thayer.dartmouth.edu
 +                                       rjk-perl-p5p\100tamias.net
 rmgiroux\100acm.org                     rmgiroux\100hotmail.com

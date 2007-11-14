@@ -887,21 +887,21 @@ X<pv_pretty>
            |const U32 flags
 
 Converts a string into something presentable, handling escaping via
-pv_escape() and supporting quoting and elipses. 
+pv_escape() and supporting quoting and ellipses.
 
 If the PERL_PV_PRETTY_QUOTE flag is set then the result will be 
 double quoted with any double quotes in the string escaped. Otherwise
 if the PERL_PV_PRETTY_LTGT flag is set then the result be wrapped in
 angle brackets. 
            
-If the PERL_PV_PRETTY_ELIPSES flag is set and not all characters in
-string were output then an elipses C<...> will be appended to the 
+If the PERL_PV_PRETTY_ELLIPSES flag is set and not all characters in
+string were output then an ellipsis C<...> will be appended to the
 string. Note that this happens AFTER it has been quoted.
            
 If start_color is non-null then it will be inserted after the opening
 quote (if there is one) but before the escaped text. If end_color
 is non-null then it will be inserted after the escaped text but before
-any quotes or elipses.
+any quotes or ellipses.
 
 Returns a pointer to the prettified text as held by dsv.
            
@@ -2363,7 +2363,7 @@ C<strend>.  It returns C<NULL> if the string can't be found.  The C<sv>
 does not have to be fbm_compiled, but the search will not be as fast
 then.
 
-	char*	fbm_instr(unsigned char* big, unsigned char* bigend, SV* littlesv, U32 flags)
+	char*	fbm_instr(char* big, char* bigend, SV* littlesv, U32 flags)
 
 =for hackers
 Found in file util.c
@@ -2690,44 +2690,6 @@ out from under you the next time the cache is
 invalidated).
 
 	AV*	mro_get_linear_isa(HV* stash)
-
-=for hackers
-Found in file mro.c
-
-=item mro_get_linear_isa_c3
-X<mro_get_linear_isa_c3>
-
-Returns the C3 linearization of @ISA
-the given stash.  The return value is a read-only AV*.
-C<level> should be 0 (it is used internally in this
-function's recursion).
-
-You are responsible for C<SvREFCNT_inc()> on the
-return value if you plan to store it anywhere
-semi-permanently (otherwise it might be deleted
-out from under you the next time the cache is
-invalidated).
-
-	AV*	mro_get_linear_isa_c3(HV* stash, I32 level)
-
-=for hackers
-Found in file mro.c
-
-=item mro_get_linear_isa_dfs
-X<mro_get_linear_isa_dfs>
-
-Returns the Depth-First Search linearization of @ISA
-the given stash.  The return value is a read-only AV*.
-C<level> should be 0 (it is used internally in this
-function's recursion).
-
-You are responsible for C<SvREFCNT_inc()> on the
-return value if you plan to store it anywhere
-semi-permanently (otherwise it might be deleted
-out from under you the next time the cache is
-invalidated).
-
-	AV*	mro_get_linear_isa_dfs(HV* stash, I32 level)
 
 =for hackers
 Found in file mro.c
@@ -4989,11 +4951,11 @@ X<newSVpvn_share>
 
 Creates a new SV with its SvPVX_const pointing to a shared string in the string
 table. If the string does not already exist in the table, it is created
-first.  Turns on READONLY and FAKE.  The string's hash is stored in the UV
-slot of the SV; if the C<hash> parameter is non-zero, that value is used;
-otherwise the hash is computed.  The idea here is that as the string table
-is used for shared hash keys these strings will have SvPVX_const == HeKEY and
-hash lookup will avoid string compare.
+first.  Turns on READONLY and FAKE. If the C<hash> parameter is non-zero, that
+value is used; otherwise the hash is computed. The string's hash can be later
+be retrieved from the SV with the C<SvSHARED_HASH()> macro. The idea here is
+that as the string table is used for shared hash keys these strings will have
+SvPVX_const == HeKEY and hash lookup will avoid string compare.
 
 	SV*	newSVpvn_share(const char* s, I32 len, U32 hash)
 
@@ -5059,7 +5021,7 @@ Found in file sv.c
 =item newSV_type
 X<newSV_type>
 
-Creates a new SV, of the type specificied.  The reference count for the new SV
+Creates a new SV, of the type specified.  The reference count for the new SV
 is set to 1.
 
 	SV*	newSV_type(svtype type)
@@ -5686,17 +5648,6 @@ time you'll want to use C<sv_setsv> or one of its many macro front-ends.
 =for hackers
 Found in file sv.c
 
-=item sv_reset
-X<sv_reset>
-
-Underlying implementation for the C<reset> Perl function.
-Note that the perl-level function is vaguely deprecated.
-
-	void	sv_reset(const char* s, HV* stash)
-
-=for hackers
-Found in file sv.c
-
 =item sv_rvweaken
 X<sv_rvweaken>
 
@@ -6091,29 +6042,6 @@ C<len>, and already meets the requirements for storing in C<SvPVX>)
 =for hackers
 Found in file sv.c
 
-=item sv_utf8_decode
-X<sv_utf8_decode>
-
-A NOOP
-
-NOTE: this function is experimental and may change or be
-removed without notice.
-
-	bool	sv_utf8_decode(SV *sv)
-
-=for hackers
-Found in file sv.c
-
-=item sv_utf8_encode
-X<sv_utf8_encode>
-
-A NOOP
-
-	void	sv_utf8_encode(SV *sv)
-
-=for hackers
-Found in file sv.c
-
 =item sv_vcatpvf
 X<sv_vcatpvf>
 
@@ -6213,7 +6141,7 @@ is unchanged. Do nothing if C<is_utf8> points to 0. Sets C<is_utf8> to
 NOTE: this function is experimental and may change or be
 removed without notice.
 
-	U8*	bytes_from_utf8(const U8 *s, STRLEN *len, bool *is_utf8)
+	char*	bytes_from_utf8(const char *s, STRLEN *len, bool *is_utf8)
 
 =for hackers
 Found in file utf8.c
@@ -6231,7 +6159,7 @@ see sv_recode_to_utf8().
 NOTE: this function is experimental and may change or be
 removed without notice.
 
-	U8*	bytes_to_utf8(const U8 *s, STRLEN *len)
+	char*	bytes_to_utf8(const char *s, STRLEN *len)
 
 =for hackers
 Found in file utf8.c
@@ -6270,7 +6198,7 @@ character.  Note that an INVARIANT (i.e. ASCII) character is a valid
 UTF-8 character.  The actual number of bytes in the UTF-8 character
 will be returned if it is valid, otherwise 0.
 
-	STRLEN	is_utf8_char(const U8 *p)
+	STRLEN	is_utf8_char(const char *p)
 
 =for hackers
 Found in file utf8.c
@@ -6285,7 +6213,7 @@ because a valid ASCII string is a valid UTF-8 string.
 
 See also is_utf8_string_loclen() and is_utf8_string_loc().
 
-	bool	is_utf8_string(const U8 *s, STRLEN len)
+	bool	is_utf8_string(const char *s, STRLEN len)
 
 =for hackers
 Found in file utf8.c
@@ -6299,7 +6227,7 @@ case of "utf8ness failure") or the location s+len (in the case of
 
 See also is_utf8_string_loclen() and is_utf8_string().
 
-	bool	is_utf8_string_loc(const U8 *s, STRLEN len, const U8 **p)
+	bool	is_utf8_string_loc(const char *s, STRLEN len, const char **p)
 
 =for hackers
 Found in file utf8.c
@@ -6314,7 +6242,7 @@ encoded characters in the C<el>.
 
 See also is_utf8_string_loc() and is_utf8_string().
 
-	bool	is_utf8_string_loclen(const U8 *s, STRLEN len, const U8 **ep, STRLEN *el)
+	bool	is_utf8_string_loclen(const char *s, STRLEN len, const char **ep, STRLEN *el)
 
 =for hackers
 Found in file utf8.c
@@ -6335,7 +6263,7 @@ UNI_DISPLAY_BACKSLASH and UNI_DISPLAY_ISPRINT turned on.
 
 The pointer to the PV of the dsv is returned.
 
-	char*	pv_uni_display(SV *dsv, const U8 *spv, STRLEN len, STRLEN pvlim, UV flags)
+	char*	pv_uni_display(SV *dsv, const char *spv, STRLEN len, STRLEN pvlim, UV flags)
 
 =for hackers
 Found in file utf8.c
@@ -6416,7 +6344,7 @@ Perl_to_utf8_case().
 The "normal" is a string like "ToLower" which means the swash
 %utf8::ToLower.
 
-	UV	to_utf8_case(const U8 *p, U8* ustrp, STRLEN *lenp, SV **swashp, const char *normal, const char *special)
+	UV	to_utf8_case(const char *p, char* ustrp, STRLEN *lenp, SV **swashp, const char *normal, const char *special)
 
 =for hackers
 Found in file utf8.c
@@ -6433,7 +6361,7 @@ three characters).
 The first character of the foldcased version is returned
 (but note, as explained above, that there may be more.)
 
-	UV	to_utf8_fold(const U8 *p, U8* ustrp, STRLEN *lenp)
+	UV	to_utf8_fold(const char *p, char* ustrp, STRLEN *lenp)
 
 =for hackers
 Found in file utf8.c
@@ -6449,7 +6377,7 @@ lowercase version may be longer than the original character.
 The first character of the lowercased version is returned
 (but note, as explained above, that there may be more.)
 
-	UV	to_utf8_lower(const U8 *p, U8* ustrp, STRLEN *lenp)
+	UV	to_utf8_lower(const char *p, char* ustrp, STRLEN *lenp)
 
 =for hackers
 Found in file utf8.c
@@ -6465,7 +6393,7 @@ titlecase version may be longer than the original character.
 The first character of the titlecased version is returned
 (but note, as explained above, that there may be more.)
 
-	UV	to_utf8_title(const U8 *p, U8* ustrp, STRLEN *lenp)
+	UV	to_utf8_title(const char *p, char* ustrp, STRLEN *lenp)
 
 =for hackers
 Found in file utf8.c
@@ -6481,7 +6409,7 @@ the uppercase version may be longer than the original character.
 The first character of the uppercased version is returned
 (but note, as explained above, that there may be more.)
 
-	UV	to_utf8_upper(const U8 *p, U8* ustrp, STRLEN *lenp)
+	UV	to_utf8_upper(const char *p, char* ustrp, STRLEN *lenp)
 
 =for hackers
 Found in file utf8.c
@@ -6498,7 +6426,7 @@ length, in bytes, of that character.
 
 Allows length and flags to be passed to low level routine.
 
-	UV	utf8n_to_uvchr(const U8 *s, STRLEN curlen, STRLEN *retlen, U32 flags)
+	UV	utf8n_to_uvchr(const char *s, STRLEN curlen, STRLEN *retlen, U32 flags)
 
 =for hackers
 Found in file utf8.c
@@ -6524,7 +6452,7 @@ the strict UTF-8 encoding (see F<utf8.h>).
 
 Most code should use utf8_to_uvchr() rather than call this directly.
 
-	UV	utf8n_to_uvuni(const U8 *s, STRLEN curlen, STRLEN *retlen, U32 flags)
+	UV	utf8n_to_uvuni(const char *s, STRLEN curlen, STRLEN *retlen, U32 flags)
 
 =for hackers
 Found in file utf8.c
@@ -6538,7 +6466,7 @@ and C<b>.
 WARNING: use only if you *know* that the pointers point inside the
 same UTF-8 buffer.
 
-	IV	utf8_distance(const U8 *a, const U8 *b)
+	IV	utf8_distance(const char *a, const char *b)
 
 =for hackers
 Found in file utf8.c
@@ -6553,7 +6481,7 @@ WARNING: do not use the following unless you *know* C<off> is within
 the UTF-8 data pointed to by C<s> *and* that on entry C<s> is aligned
 on the first byte of character or just after the last byte of a character.
 
-	U8*	utf8_hop(const U8 *s, I32 off)
+	char*	utf8_hop(const char *s, I32 off)
 
 =for hackers
 Found in file utf8.c
@@ -6565,7 +6493,7 @@ Return the length of the UTF-8 char encoded string C<s> in characters.
 Stops at C<e> (inclusive).  If C<e E<lt> s> or if the scan would end
 up past C<e>, croaks.
 
-	STRLEN	utf8_length(const U8* s, const U8 *e)
+	STRLEN	utf8_length(const char* s, const char *e)
 
 =for hackers
 Found in file utf8.c
@@ -6583,7 +6511,7 @@ If you need a copy of the string, see C<bytes_from_utf8>.
 NOTE: this function is experimental and may change or be
 removed without notice.
 
-	U8*	utf8_to_bytes(U8 *s, STRLEN *len)
+	char*	utf8_to_bytes(char *s, STRLEN *len)
 
 =for hackers
 Found in file utf8.c
@@ -6598,7 +6526,7 @@ length, in bytes, of that character.
 If C<s> does not point to a well-formed UTF-8 character, zero is
 returned and retlen is set, if possible, to -1.
 
-	UV	utf8_to_uvchr(const U8 *s, STRLEN *retlen)
+	UV	utf8_to_uvchr(const char *s, STRLEN *retlen)
 
 =for hackers
 Found in file utf8.c
@@ -6616,7 +6544,7 @@ an index into the Unicode semantic tables (e.g. swashes).
 If C<s> does not point to a well-formed UTF-8 character, zero is
 returned and retlen is set, if possible, to -1.
 
-	UV	utf8_to_uvuni(const U8 *s, STRLEN *retlen)
+	UV	utf8_to_uvuni(const char *s, STRLEN *retlen)
 
 =for hackers
 Found in file utf8.c
@@ -6635,7 +6563,7 @@ is the recommended wide native character-aware way of saying
 
     *(d++) = uv;
 
-	U8*	uvchr_to_utf8(U8 *d, UV uv)
+	char*	uvchr_to_utf8(char *d, UV uv)
 
 =for hackers
 Found in file utf8.c
@@ -6662,7 +6590,7 @@ is the recommended Unicode-aware way of saying
 
     *(d++) = uv;
 
-	U8*	uvuni_to_utf8_flags(U8 *d, UV uv, UV flags)
+	char*	uvuni_to_utf8_flags(char *d, UV uv, UV flags)
 
 =for hackers
 Found in file utf8.c

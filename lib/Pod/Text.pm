@@ -24,7 +24,6 @@
 
 package Pod::Text;
 
-require 5.004;
 
 use strict;
 use utf8;
@@ -168,7 +167,7 @@ sub _handle_element_start {
         push (@{ $$self{PENDING} }, [ $attrs, '' ]);
     } elsif ($self->can ("start_$method")) {
         my $method = 'start_' . $method;
-        $self->$method ($attrs, '');
+        $self->?$method ($attrs, '');
     }
 }
 
@@ -184,7 +183,7 @@ sub _handle_element_end {
     if ($self->can ("cmd_$method")) {
         my $tag = pop @{ $$self{PENDING} };
         my $method = 'cmd_' . $method;
-        my $text = $self->$method (@$tag);
+        my $text = $self->?$method (@$tag);
         if (defined $text) {
             if (@{ $$self{PENDING} } > 1) {
                 $$self{PENDING}[-1][1] .= $text;
@@ -194,7 +193,7 @@ sub _handle_element_end {
         }
     } elsif ($self->can ("end_$method")) {
         my $method = 'end_' . $method;
-        $self->$method ();
+        $self->?$method ();
     }
 }
 

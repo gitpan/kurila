@@ -1,6 +1,5 @@
 package ExtUtils::ParseXS;
 
-use 5.006;  # We use /??{}/ in regexes
 use Cwd;
 use Config;
 use File::Basename;
@@ -203,7 +202,7 @@ sub process_file {
   $size = qr[,\s* (??{ $bal }) ]x; # Third arg (to setpvn)
 
   foreach my $key (keys %output_expr) {
-    BEGIN { $^H |= 0x00200000 }; # Equivalent to: use re 'eval', but hardcoded so we can compile re.xs
+    BEGIN { $^H ^|^= 0x00200000 }; # Equivalent to: use re 'eval', but hardcoded so we can compile re.xs
 
     my ($t, $with_size, $arg, $sarg) =
       ($output_expr{$key} =~
@@ -360,7 +359,7 @@ EOF
 	   ." followed by a statement on column one?)")
       if $line[0] =~ /^\s/;
     
-    my ($class, $externC, $static, $elipsis, $wantRETVAL, $RETVAL_no_return);
+    my ($class, $externC, $static, $ellipsis, $wantRETVAL, $RETVAL_no_return);
     my (@fake_INPUT_pre);	# For length(s) generated variables
     my (@fake_INPUT);
     
@@ -514,7 +513,7 @@ EOF
     my $report_args = '';
     foreach my $i (0 .. $#args) {
       if ($args[$i] =~ s/\.\.\.//) {
-	$elipsis = 1;
+	$ellipsis = 1;
 	if ($args[$i] eq '' && $i == $#args) {
 	  $report_args .= ", ...";
 	  pop(@args);
@@ -578,7 +577,7 @@ EOF
     print Q(<<"EOF") if $INTERFACE ;
 #    dXSFUNCTION($ret_type);
 EOF
-    if ($elipsis) {
+    if ($ellipsis) {
       $cond = ($min_args ? qq(items < $min_args) : 0);
     } elsif ($min_args == $num_args) {
       $cond = qq(items != $min_args);
@@ -843,7 +842,7 @@ EOF
 	  $proto_arg[$min_args] .= ";" ;
 	}
 	push @proto_arg, "$s\@"
-	  if $elipsis ;
+	  if $ellipsis ;
 	
 	$proto = join ("", grep defined, @proto_arg);
       }
@@ -1132,8 +1131,8 @@ sub INPUT_handler {
       if $arg_list{$var_name}++
 	or defined $argtype_seen{$var_name} and not $processing_arg_with_types;
 
-    $thisdone |= $var_name eq "THIS";
-    $retvaldone |= $var_name eq "RETVAL";
+    $thisdone ^|^= $var_name eq "THIS";
+    $retvaldone ^|^= $var_name eq "RETVAL";
     $var_types{$var_name} = $var_type;
     # XXXX This check is a safeguard against the unfinished conversion of
     # generate_init().  When generate_init() is fixed,

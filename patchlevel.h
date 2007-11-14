@@ -13,14 +13,14 @@
 /* do not adjust the whitespace! Configure expects the numbers to be
  * exactly on the third column */
 
-#define KURILA_REVISION kurila
+#define KURILA_REVISION "kurila"
 #define KURILA_VERSION 1
-#define KURILA_SUBVERSION 4
+#define KURILA_SUBVERSION 5
 
-/* Fake Perl version 5.9.5 */
+/* Fake Perl version 5.10.0 */
 #define PERL_REVISION	5		/* age */
-#define PERL_VERSION	9		/* epoch */
-#define PERL_SUBVERSION	5		/* generation */
+#define PERL_VERSION	10		/* epoch */
+#define PERL_SUBVERSION	0		/* generation */
 
 /* The following numbers describe the earliest compatible version of
    Perl ("compatibility" here being defined as sufficient binary/API
@@ -36,8 +36,8 @@
    to include in @INC.  See INSTALL for how this works.
 */
 #define PERL_API_REVISION	5	/* Adjust manually as needed.  */
-#define PERL_API_VERSION	9	/* Adjust manually as needed.  */
-#define PERL_API_SUBVERSION	5	/* Adjust manually as needed.  */
+#define PERL_API_VERSION	10	/* Adjust manually as needed.  */
+#define PERL_API_SUBVERSION	0	/* Adjust manually as needed.  */
 /*
    XXX Note:  The selection of non-default Configure options, such
    as -Duselonglong may invalidate these settings.  Currently, Configure

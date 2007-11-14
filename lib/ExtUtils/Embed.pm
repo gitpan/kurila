@@ -1,5 +1,4 @@
 # $Id: Embed.pm,v 1.1.1.1 2002/01/16 19:27:19 schwern Exp $
-require 5.002;
 
 package ExtUtils::Embed;
 require Exporter;
@@ -18,7 +17,7 @@ use vars qw(@ISA @EXPORT $VERSION
 	    );
 use strict;
 
-$VERSION = 1.26;
+$VERSION = '1.26_01';
 
 @ISA = qw(Exporter);
 @EXPORT = qw(&xsinit &ldopts 
@@ -133,7 +132,9 @@ sub xsi_body {
 
 sub static_ext {
     unless (scalar @Extensions) {
-	@Extensions = sort split /\s+/, $Config{static_ext};
+      my $static_ext = $Config{static_ext};
+      $static_ext =~ s/^\s+//;
+      @Extensions = sort split /\s+/, $static_ext;
 	unshift @Extensions, qw(DynaLoader);
     }
     @Extensions;

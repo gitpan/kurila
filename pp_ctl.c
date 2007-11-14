@@ -38,6 +38,8 @@
 
 #define DOCATCH(o) ((CATCH_GET == TRUE) ? docatch(o) : (o))
 
+#define dopoptosub(plop)	dopoptosub_at(cxstack, (plop))
+
 PP(pp_wantarray)
 {
     dVAR;
@@ -534,10 +536,7 @@ PP(pp_range)
     dVAR;
     if (GIMME == G_ARRAY)
 	return NORMAL;
-    if (SvTRUEx(PAD_SV(PL_op->op_targ)))
-	return cLOGOP->op_other;
-    else
-	return NORMAL;
+    DIE(aTHX_ "range operator .. can only be used in list context.");
 }
 
 PP(pp_flip)
@@ -545,43 +544,8 @@ PP(pp_flip)
     dVAR;
     dSP;
 
-    if (GIMME == G_ARRAY) {
-	RETURNOP(((LOGOP*)cUNOP->op_first)->op_other);
-    }
-    else {
-	dTOPss;
-	SV * const targ = PAD_SV(PL_op->op_targ);
-	int flip = 0;
-
-	if (PL_op->op_private & OPpFLIP_LINENUM) {
-	    if (GvIO(PL_last_in_gv)) {
-		flip = SvIV(sv) == (IV)IoLINES(GvIOp(PL_last_in_gv));
-	    }
-	    else {
-		GV * const gv = gv_fetchpvs(".", GV_ADD|GV_NOTQUAL, SVt_PV);
-		if (gv && GvSV(gv))
-		    flip = SvIV(sv) == SvIV(GvSV(gv));
-	    }
-	} else {
-	    flip = SvTRUE(sv);
-	}
-	if (flip) {
-	    sv_setiv(PAD_SV(cUNOP->op_first->op_targ), 1);
-	    if (PL_op->op_flags & OPf_SPECIAL) {
-		sv_setiv(targ, 1);
-		SETs(targ);
-		RETURN;
-	    }
-	    else {
-		sv_setiv(targ, 0);
-		SP--;
-		RETURNOP(((LOGOP*)cUNOP->op_first)->op_other);
-	    }
-	}
-	sv_setpvn(TARG, "", 0);
-	SETs(targ);
-	RETURN;
-    }
+    assert(GIMME == G_ARRAY);
+    RETURNOP(((LOGOP*)cUNOP->op_first)->op_other);
 }
 
 /* This code tries to decide if "$left .. $right" should use the
@@ -599,72 +563,46 @@ PP(pp_flop)
 {
     dVAR; dSP;
 
-    if (GIMME == G_ARRAY) {
-	dPOPPOPssrl;
+    dPOPPOPssrl;
+    assert(GIMME == G_ARRAY);
 
-	SvGETMAGIC(left);
-	SvGETMAGIC(right);
+    SvGETMAGIC(left);
+    SvGETMAGIC(right);
 
-	if (RANGE_IS_NUMERIC(left,right)) {
-	    register IV i, j;
-	    IV max;
-	    if ((SvOK(left) && SvNV(left) < IV_MIN) ||
-		(SvOK(right) && SvNV(right) > IV_MAX))
-		DIE(aTHX_ "Range iterator outside integer range");
-	    i = SvIV(left);
-	    max = SvIV(right);
-	    if (max >= i) {
-		j = max - i + 1;
-		EXTEND_MORTAL(j);
-		EXTEND(SP, j);
-	    }
-	    else
-		j = 0;
-	    while (j--) {
-		SV * const sv = sv_2mortal(newSViv(i++));
-		PUSHs(sv);
-	    }
+    if (RANGE_IS_NUMERIC(left,right)) {
+	register IV i, j;
+	IV max;
+	if ((SvOK(left) && SvNV(left) < IV_MIN) ||
+	    (SvOK(right) && SvNV(right) > IV_MAX))
+	    DIE(aTHX_ "Range iterator outside integer range");
+	i = SvIV(left);
+	max = SvIV(right);
+	if (max >= i) {
+	    j = max - i + 1;
+	    EXTEND_MORTAL(j);
+	    EXTEND(SP, j);
 	}
-	else {
-	    SV * const final = sv_mortalcopy(right);
-	    STRLEN len;
-	    const char * const tmps = SvPV_const(final, len);
-
-	    SV *sv = sv_mortalcopy(left);
-	    SvPV_force_nolen(sv);
-	    while (!SvNIOKp(sv) && SvCUR(sv) <= len) {
-		XPUSHs(sv);
-	        if (strEQ(SvPVX_const(sv),tmps))
-	            break;
-		sv = sv_2mortal(newSVsv(sv));
-		sv_inc(sv);
-	    }
+	else
+	    j = 0;
+	while (j--) {
+	    SV * const sv = sv_2mortal(newSViv(i++));
+	    PUSHs(sv);
 	}
     }
     else {
-	dTOPss;
-	SV * const targ = PAD_SV(cUNOP->op_first->op_targ);
-	int flop = 0;
-	sv_inc(targ);
+	SV * const final = sv_mortalcopy(right);
+	STRLEN len;
+	const char * const tmps = SvPV_const(final, len);
 
-	if (PL_op->op_private & OPpFLIP_LINENUM) {
-	    if (GvIO(PL_last_in_gv)) {
-		flop = SvIV(sv) == (IV)IoLINES(GvIOp(PL_last_in_gv));
-	    }
-	    else {
-		GV * const gv = gv_fetchpvs(".", GV_ADD|GV_NOTQUAL, SVt_PV);
-		if (gv && GvSV(gv)) flop = SvIV(sv) == SvIV(GvSV(gv));
-	    }
+	SV *sv = sv_mortalcopy(left);
+	SvPV_force_nolen(sv);
+	while (!SvNIOKp(sv) && SvCUR(sv) <= len) {
+	    XPUSHs(sv);
+	    if (strEQ(SvPVX_const(sv),tmps))
+		break;
+	    sv = sv_2mortal(newSVsv(sv));
+	    sv_inc(sv);
 	}
-	else {
-	    flop = SvTRUE(sv);
-	}
-
-	if (flop) {
-	    sv_setiv(PAD_SV(((UNOP*)cUNOP->op_first)->op_first->op_targ), 0);
-	    sv_catpvs(targ, "E0");
-	}
-	SETs(targ);
     }
 
     RETURN;
@@ -761,13 +699,6 @@ Perl_is_lvalue_sub(pTHX)
 	return cxstack[cxix].blk_sub.lval;
     else
 	return 0;
-}
-
-STATIC I32
-S_dopoptosub(pTHX_ I32 startingblock)
-{
-    dVAR;
-    return dopoptosub_at(cxstack, startingblock);
 }
 
 STATIC I32
@@ -1192,16 +1123,6 @@ PP(pp_caller)
     PUSHs(cx->blk_oldcop->cop_hints_hash ?
 	  sv_2mortal(newRV((SV*)cx->blk_oldcop->cop_hints_hash))
 	  : &PL_sv_undef);
-    RETURN;
-}
-
-PP(pp_reset)
-{
-    dVAR;
-    dSP;
-    const char * const tmps = (MAXARG < 1) ? (const char *)"" : POPpconstx;
-    sv_reset(tmps, CopSTASH(PL_curcop));
-    PUSHs(&PL_sv_yes);
     RETURN;
 }
 
@@ -2078,12 +1999,11 @@ PP(pp_exit)
     }
     PL_exit_flags |= PERL_EXIT_EXPECTED;
 #ifdef PERL_MAD
-    /* KLUDGE: disable exit 0 in BEGIN blocks when we're just compiling */
-    if (anum || !(PL_minus_c && PL_madskills))
-	my_exit(anum);
-#else
-    my_exit(anum);
+    /* KLUDGE: When making a MAD dump the exit code is overriden */
+    if (PL_minus_c && PL_madskills)
+	anum = anum ? 3 : 2;
 #endif
+    my_exit(anum);
     PUSHs(&PL_sv_undef);
     RETURN;
 }
@@ -2113,14 +2033,6 @@ S_save_lines(pTHX_ AV *array, SV *sv)
     }
 }
 
-STATIC void
-S_docatch_body(pTHX)
-{
-    dVAR;
-    CALLRUNOPS(aTHX);
-    return;
-}
-
 STATIC OP *
 S_docatch(pTHX_ OP *o)
 {
@@ -2141,7 +2053,7 @@ S_docatch(pTHX_ OP *o)
 	assert(CxTYPE(&cxstack[cxstack_ix]) == CXt_EVAL);
 	cxstack[cxstack_ix].blk_eval.cur_top_env = PL_top_env;
  redo_body:
-	docatch_body();
+	CALLRUNOPS(aTHX);
 	break;
     case 3:
 	/* die caught by an inner eval - continue inner loop */
@@ -2466,7 +2378,7 @@ S_doeval(pTHX_ int gimme, OP** startop, CV* outside, U32 seq)
 }
 
 STATIC PerlIO *
-S_check_type_and_open(pTHX_ const char *name, const char *mode)
+S_check_type_and_open(pTHX_ const char *name)
 {
     Stat_t st;
     const int st_rc = PerlLIO_stat(name, &st);
@@ -2475,36 +2387,40 @@ S_check_type_and_open(pTHX_ const char *name, const char *mode)
 	return NULL;
     }
 
-    return PerlIO_open(name, mode);
+    return PerlIO_open(name, PERL_SCRIPT_MODE);
 }
 
-STATIC PerlIO *
-S_doopen_pm(pTHX_ const char *name, const char *mode)
-{
 #ifndef PERL_DISABLE_PMC
-    const STRLEN namelen = strlen(name);
+STATIC PerlIO *
+S_doopen_pm(pTHX_ const char *name, const STRLEN namelen)
+{
     PerlIO *fp;
 
-    if (namelen > 3 && strEQ(name + namelen - 3, ".pm")) {
-	SV * const pmcsv = Perl_newSVpvf(aTHX_ "%s%c", name, 'c');
-	const char * const pmc = SvPV_nolen_const(pmcsv);
+    if (namelen > 3 && memEQs(name + namelen - 3, 3, ".pm")) {
+	SV *const pmcsv = newSV(namelen + 2);
+	char *const pmc = SvPVX(pmcsv);
 	Stat_t pmcstat;
+
+	memcpy(pmc, name, namelen);
+	pmc[namelen] = 'c';
+	pmc[namelen + 1] = '\0';
+
 	if (PerlLIO_stat(pmc, &pmcstat) < 0) {
-	    fp = check_type_and_open(name, mode);
+	    fp = check_type_and_open(name);
 	}
 	else {
-	    fp = check_type_and_open(pmc, mode);
+	    fp = check_type_and_open(pmc);
 	}
 	SvREFCNT_dec(pmcsv);
     }
     else {
-	fp = check_type_and_open(name, mode);
+	fp = check_type_and_open(name);
     }
     return fp;
-#else
-    return check_type_and_open(name, mode);
-#endif /* !PERL_DISABLE_PMC */
 }
+#else
+#  define doopen_pm(name, namelen) check_type_and_open(name)
+#endif /* !PERL_DISABLE_PMC */
 
 PP(pp_require)
 {
@@ -2513,6 +2429,11 @@ PP(pp_require)
     SV *sv;
     const char *name;
     STRLEN len;
+    char * unixname;
+    STRLEN unixlen;
+#ifdef VMS
+    int vms_unixname = 0;
+#endif
     const char *tryname = NULL;
     SV *namesv = NULL;
     const I32 gimme = GIMME_V;
@@ -2526,49 +2447,41 @@ PP(pp_require)
     OP *op;
 
     sv = POPs;
-    if ( (SvNIOKp(sv) || SvVOK(sv)) && PL_op->op_type != OP_DOFILE) {
-	if ( SvVOK(sv) && ckWARN(WARN_PORTABLE) )	/* require v5.6.1 */
-		Perl_warner(aTHX_ packWARN(WARN_PORTABLE),
-                        "v-string in use/require non-portable");
-
-	sv = new_version(sv);
-	if (!sv_derived_from(PL_patchlevel, "version"))
-	    upg_version(PL_patchlevel, TRUE);
-	if (cUNOP->op_first->op_type == OP_CONST && cUNOP->op_first->op_private & OPpCONST_NOVER) {
-	    if ( vcmp(sv,PL_patchlevel) <= 0 )
-		DIE(aTHX_ "Perls since %"SVf" too modern--this is %"SVf", stopped",
-		    SVfARG(vnormal(sv)), SVfARG(vnormal(PL_patchlevel)));
-	}
-	else {
-	    if ( vcmp(sv,PL_patchlevel) > 0 )
-		DIE(aTHX_ "Perl %"SVf" required--this is only %"SVf", stopped",
-		    SVfARG(vnormal(sv)), SVfARG(vnormal(PL_patchlevel)));
-	}
-
-	/* If we request a version >= 5.9.5, load feature.pm with the
-	 * feature bundle that corresponds to the required version.
-	 * We do this only with use, not require. */
-	if (PL_compcv && vcmp(sv, sv_2mortal(upg_version(newSVnv(5.009005), FALSE))) >= 0) {
-	    SV *const importsv = vnormal(sv);
-	    *SvPVX_mutable(importsv) = ':';
-	    ENTER;
-	    Perl_load_module(aTHX_ 0, newSVpvs("feature"), NULL, importsv, NULL);
-	    LEAVE;
-	}
-
-	RETPUSHYES;
-    }
     name = SvPV_const(sv, len);
     if (!(name && len > 0 && *name))
 	DIE(aTHX_ "Null filename used");
     TAINT_PROPER("require");
+
+
+#ifdef VMS
+    /* The key in the %ENV hash is in the syntax of file passed as the argument
+     * usually this is in UNIX format, but sometimes in VMS format, which
+     * can result in a module being pulled in more than once.
+     * To prevent this, the key must be stored in UNIX format if the VMS
+     * name can be translated to UNIX.
+     */
+    if ((unixname = tounixspec(name, NULL)) != NULL) {
+	unixlen = strlen(unixname);
+	vms_unixname = 1;
+    }
+    else
+#endif
+    {
+        /* if not VMS or VMS name can not be translated to UNIX, pass it
+	 * through.
+	 */
+	unixname = (char *) name;
+	unixlen = len;
+    }
     if (PL_op->op_type == OP_REQUIRE) {
-	SV * const * const svp = hv_fetch(GvHVn(PL_incgv), name, len, 0);
+	SV * const * const svp = hv_fetch(GvHVn(PL_incgv),
+					  unixname, unixlen, 0);
 	if ( svp ) {
 	    if (*svp != &PL_sv_undef)
 		RETPUSHYES;
 	    else
-		DIE(aTHX_ "Compilation failed in require");
+		DIE(aTHX_ "Attempt to reload %s aborted.\n"
+			    "Compilation failed in require", unixname);
 	}
     }
 
@@ -2576,7 +2489,7 @@ PP(pp_require)
 
     if (path_is_absolute(name)) {
 	tryname = name;
-	tryrsfp = doopen_pm(name,PERL_SCRIPT_MODE);
+	tryrsfp = doopen_pm(name, len);
     }
 #ifdef MACOS_TRADITIONAL
     if (!tryrsfp) {
@@ -2585,7 +2498,7 @@ PP(pp_require)
 	MacPerl_CanonDir(name, newname, 1);
 	if (path_is_absolute(newname)) {
 	    tryname = newname;
-	    tryrsfp = doopen_pm(newname,PERL_SCRIPT_MODE);
+	    tryrsfp = doopen_pm(newname, strlen(newname));
 	}
     }
 #endif
@@ -2593,8 +2506,7 @@ PP(pp_require)
 	AV * const ar = GvAVn(PL_incgv);
 	I32 i;
 #ifdef VMS
-	char *unixname;
-	if ((unixname = tounixspec(name, NULL)) != NULL)
+	if (vms_unixname)
 #endif
 	{
 	    namesv = newSV(0);
@@ -2727,7 +2639,7 @@ PP(pp_require)
 			|| (*name == ':' && name[1] != ':' && strchr(name+2, ':'))
 #endif
 		  ) {
-		    const char *dir = SvPV_nolen_const(dirsv);
+		    const char *dir = SvOK(dirsv) ? SvPV_nolen_const(dirsv) : "";
 #ifdef MACOS_TRADITIONAL
 		    char buf1[256];
 		    char buf2[256];
@@ -2761,7 +2673,7 @@ PP(pp_require)
 #endif
 		    TAINT_PROPER("require");
 		    tryname = SvPVX_const(namesv);
-		    tryrsfp = doopen_pm(tryname, PERL_SCRIPT_MODE);
+		    tryrsfp = doopen_pm(tryname, SvCUR(namesv));
 		    if (tryrsfp) {
 			if (tryname[0] == '.' && tryname[1] == '/')
 			    tryname += 2;
@@ -2819,11 +2731,13 @@ PP(pp_require)
     /* name is never assigned to again, so len is still strlen(name)  */
     /* Check whether a hook in @INC has already filled %INC */
     if (!hook_sv) {
-	(void)hv_store(GvHVn(PL_incgv), name, len, newSVpv(CopFILE(&PL_compiling),0),0);
+	(void)hv_store(GvHVn(PL_incgv),
+		       unixname, unixlen, newSVpv(CopFILE(&PL_compiling),0),0);
     } else {
-	SV** const svp = hv_fetch(GvHVn(PL_incgv), name, len, 0);
+	SV** const svp = hv_fetch(GvHVn(PL_incgv), unixname, unixlen, 0);
 	if (!svp)
-	    (void)hv_store(GvHVn(PL_incgv), name, len, SvREFCNT_inc_simple(hook_sv), 0 );
+	    (void)hv_store(GvHVn(PL_incgv),
+			   unixname, unixlen, SvREFCNT_inc_simple(hook_sv), 0 );
     }
 
     ENTER;
@@ -3446,12 +3360,12 @@ S_do_smartmatch(pTHX_ HV *seen_this, HV *seen_other)
 			    RETPUSHNO;
 		    }
 		    else {
-			hv_store_ent(seen_this,
-			    sv_2mortal(newSViv(PTR2IV(*this_elem))),
-			    &PL_sv_undef, 0);
-			hv_store_ent(seen_other,
-			    sv_2mortal(newSViv(PTR2IV(*other_elem))),
-			    &PL_sv_undef, 0);
+			(void)hv_store_ent(seen_this,
+				sv_2mortal(newSViv(PTR2IV(*this_elem))),
+				&PL_sv_undef, 0);
+			(void)hv_store_ent(seen_other,
+				sv_2mortal(newSViv(PTR2IV(*other_elem))),
+				&PL_sv_undef, 0);
 			PUSHs(*this_elem);
 			PUSHs(*other_elem);
 			

@@ -288,10 +288,10 @@ sub _handle_encoding_line {
     DEBUG and print " Putting in HACKRAW (no-op) encoding mode.\n";
     $self->{'_transcoder'} = undef;
 
-  } elsif( Pod::Simple::Transcode::->encoding_is_available($e) ) {
+  } elsif( Pod::Simple::Transcode->encoding_is_available($e) ) {
 
     require Pod::Simple::Transcode;
-    $self->{'_transcoder'} = Pod::Simple::Transcode::->make_transcoder($e);
+    $self->{'_transcoder'} = Pod::Simple::Transcode->make_transcoder($e);
     eval {
       my @x = ('', "abc", "123");
       $self->{'_transcoder'}->(@x);
@@ -301,7 +301,7 @@ sub _handle_encoding_line {
     );
 
   } else {
-    my @supported = Pod::Simple::Transcode::->all_encodings;
+    my @supported = Pod::Simple::Transcode->all_encodings;
 
     # Note unsupported, and complain
     DEBUG and print " Encoding [$e] is unsupported.",
@@ -319,7 +319,7 @@ sub _handle_encoding_line {
       $suggestion = "  (Maybe \"$e\" should be \"$enc\"?)";
       last;
     }
-    my $encmodver = Pod::Simple::Transcode::->encmodver;
+    my $encmodver = Pod::Simple::Transcode->encmodver;
     $enc_error = join '' =>
       "This document probably does not appear as it should, because its ",
       "\"=encoding $e\" line calls for an unsupported encoding.",
@@ -1366,7 +1366,7 @@ sub _ponder_Verbatim {
         # Sort of adapted from Text::Tabs -- yes, it's hardwired in that
         # tabs are at every EIGHTH column.  For portability, it has to be
         # one setting everywhere, and 8th wins.
-        s/^([^\t]*)(\t+)/$1.(" " x ((length($2)<<3)-(length($1)&7)))/e
+        s/^([^\t]*)(\t+)/$1.(" " x ((length($2)<<3)-(length($1)^&^7)))/e
       ) {}
 
       # TODO: whinge about (or otherwise treat) unindented or overlong lines

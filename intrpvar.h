@@ -180,8 +180,6 @@ PERLVAR(Iwatchok,	char *)
 PERLVARI(Iregmatch_slab, regmatch_slab *,	NULL)
 PERLVAR(Iregmatch_state, regmatch_state *)
 
-PERLVARI(Idelayedisa,	HV*,	NULL)   /* stash for PL_delaymagic for magic_setisa */
-
 /* Put anything new that is pointer aligned here. */
 
 PERLVAR(Idelaymagic,	U16)		/* ($<,$>) = ... */
@@ -214,7 +212,6 @@ PERLVAR(Ilocalpatches,	const char * const *)
 PERLVARI(Isplitstr,	const char *, " ")
 
 PERLVAR(Iminus_c,	bool)
-PERLVAR(Ipreprocess,	bool)
 PERLVAR(Iminus_n,	bool)
 PERLVAR(Iminus_p,	bool)
 PERLVAR(Iminus_l,	bool)
@@ -256,11 +253,6 @@ PERLVAR(Istatusvalue,	I32)		/* $? */
 PERLVAR(Istatusvalue_vms,U32)
 #else
 PERLVAR(Istatusvalue_posix,I32)
-#endif
-
-#ifdef CSH
-PERLVARI(Icshlen,	I32,	0)
-PERLVARI(Icshname,	const char *,	CSH)
 #endif
 
 /* shortcuts to various I/O objects */
@@ -351,6 +343,10 @@ PERLVAR(Ilastfd,	int)		/* what to preserve mode on */
 PERLVAR(Ioldname,	char *)		/* what to preserve mode on */
 PERLVAR(IArgv,		char **)	/* stuff to free from do_aexec, vfork safe */
 PERLVAR(ICmd,		char *)		/* stuff to free from do_aexec, vfork safe */
+/* Elements in this array have ';' appended and are injected as a single line
+   into the tokeniser. You can't put any (literal) newlines into any program
+   you stuff in into this array, as the point where it's injected is expecting
+   a single physical line. */
 PERLVAR(Ipreambleav,	AV *)
 PERLVAR(Imess_sv,	SV *)
 PERLVAR(Iors_sv,	SV *)		/* output record separator $\ */
@@ -475,10 +471,10 @@ PERLVARI(Icollation_standard, bool,	TRUE)
 #endif /* USE_LOCALE_COLLATE */
 
 
-#ifdef PERL_UTF8_CACHE_ASSERT
+#if defined (PERL_UTF8_CACHE_ASSERT) || defined (DEBUGGING)
 #  define PERL___I -1
 #else
-#  define PERL___I -1
+#  define PERL___I 1
 #endif
 PERLVARI(Iutf8cache, I8, PERL___I)	/* Is the utf8 caching code enabled? */
 #undef PERL___I

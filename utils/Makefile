@@ -1,18 +1,20 @@
 
 PERL = ../miniperl
 REALPERL = ../perl
+RUN =   # Used mainly cross-compilation setups.
+
 
 # Files to be built with variable substitution after miniperl is
 # available.  Dependencies handled manually below (for now).
 
-pl = c2ph.PL config_data.PL corelist.PL cpan.PL h2ph.PL h2xs.PL instmodsh.PL perlbug.PL perldoc.PL perlivp.PL pl2pm.PL prove.PL ptar.PL ptardiff.PL cpanp-run-perl.PL shasum.PL splain.PL dprofpp.PL libnetcfg.PL piconv.PL enc2xs.PL xsubpp.PL
+pl = c2ph.PL config_data.PL corelist.PL cpan.PL h2ph.PL h2xs.PL instmodsh.PL perlbug.PL perldoc.PL perlivp.PL pl2pm.PL prove.PL ptar.PL ptardiff.PL shasum.PL splain.PL dprofpp.PL libnetcfg.PL piconv.PL enc2xs.PL xsubpp.PL
 plextract = c2ph config_data corelist cpan h2ph h2xs instmodsh perlbug perldoc perlivp pl2pm prove ptar ptardiff shasum splain dprofpp libnetcfg piconv enc2xs xsubpp
 plextractexe = ./c2ph ./config_data ./corelist ./cpan ./h2ph ./h2xs ./instmodsh ./perlbug ./perldoc ./perlivp ./pl2pm ./prove ./ptar ./ptardiff ./shasum ./splain ./dprofpp ./libnetcfg ./piconv ./enc2xs ./xsubpp
 
 all: $(plextract) 
 
 $(plextract):
-	$(PERL) -I../lib $@.PL
+	$(RUN) $(PERL) -I../lib $@.PL
 
 c2ph:		c2ph.PL ../config.sh
 

@@ -52,7 +52,6 @@ my @raw_alias = (
 
 		 Perl_pp_goto => ['dump'],
 		 Perl_pp_require => ['dofile'],
-		 Perl_pp_untie => ['dbmclose'],
 		 Perl_pp_sysread => [qw(read recv)],
 		 Perl_pp_sysseek => ['seek'],
 		 Perl_pp_ioctl => ['fcntl'],
@@ -84,7 +83,6 @@ my @raw_alias = (
 		 Perl_pp_or => ['orassign'],
 		 Perl_pp_ucfirst => ['lcfirst'],
 		 Perl_pp_sle => [qw(slt sgt sge)],
-		 Perl_pp_print => ['say'],
 		 Perl_pp_index => ['rindex'],
 		 Perl_pp_oct => ['hex'],
 		 Perl_pp_shift => ['pop'],
@@ -799,7 +797,6 @@ leavesublv	lvalue subroutine return	ck_null		1
 caller		caller			ck_fun		t%	S?
 warn		warn			ck_fun		imst@	L
 die		die			ck_die		dimst@	L
-reset		symbol reset		ck_fun		is%	S?
 
 lineseq		line sequence		ck_null		@	
 nextstate	next statement		ck_null		s;	
@@ -842,8 +839,6 @@ binmode		binmode			ck_fun		s@	F S?
 tie		tie			ck_fun		idms@	R S L
 untie		untie			ck_fun		is%	R
 tied		tied			ck_fun		s%	R
-dbmopen		dbmopen			ck_fun		is@	H S S
-dbmclose	dbmclose		ck_fun		is%	H
 
 sselect		select system call	ck_select	t@	S S S S
 select		select			ck_select	st@	F?
@@ -853,7 +848,6 @@ read		read			ck_fun		imst@	F R S S?
 
 prtf		printf			ck_listiob	ims@	F? L
 print		print			ck_listiob	ims@	F? L
-say		say			ck_listiob	ims@	F? L
 
 sysopen		sysopen			ck_fun		s@	F S S S?
 sysseek		sysseek			ck_fun		s@	F S S

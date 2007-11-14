@@ -10,7 +10,7 @@ my $no_endianness = $] > 5.009 ? '' :
 my $no_signedness = $] > 5.009 ? '' :
   "Signed/unsigned pack modifiers not available on this perl";
 
-plan tests => 14651;
+plan tests => 14650;
 
 use strict;
 use warnings qw(FATAL all);
@@ -41,7 +41,7 @@ if ($no_signedness) {
 }
 
 for my $size ( 16, 32, 64 ) {
-  if (defined $Config{"u${size}size"} and $Config{"u${size}size"} != ($size >> 3)) {
+  if (defined $Config{"u${size}size"} and ($Config{"u${size}size"}||0) != ($size >> 3)) {
     push @valid_errors, qr/^Perl_my_$maybe_not_avail$size\(\) not available/;
   }
 }
@@ -168,29 +168,23 @@ sub list_eq ($$) {
 
     is(scalar(@y), 2);
     is($y[1], 130);
-    $x = pack('w*', 5000000000); $y = '';
-    eval {
-    use Math::BigInt;
-    $y = pack('w*', 'Math::BigInt'->new(5000000000));
-    };
+
+    $x = pack 'w', ^~^0;
+    $y = pack 'w', (^~^0).'';
     is($x, $y);
+    is(unpack ('w',$x), ^~^0);
+    is(unpack ('w',$y), ^~^0);
 
-    $x = pack 'w', ~0;
-    $y = pack 'w', (~0).'';
-    is($x, $y);
-    is(unpack ('w',$x), ~0);
-    is(unpack ('w',$y), ~0);
+    $x = pack 'w', ^~^0 - 1;
+    $y = pack 'w', (^~^0) - 2;
 
-    $x = pack 'w', ~0 - 1;
-    $y = pack 'w', (~0) - 2;
-
-    if (~0 - 1 == (~0) - 2) {
+    if (^~^0 - 1 == (^~^0) - 2) {
         is($x, $y, "NV arithmetic");
     } else {
         isnt($x, $y, "IV/NV arithmetic");
     }
-    cmp_ok(unpack ('w',$x), '==', ~0 - 1);
-    cmp_ok(unpack ('w',$y), '==', ~0 - 2);
+    cmp_ok(unpack ('w',$x), '==', ^~^0 - 1);
+    cmp_ok(unpack ('w',$y), '==', ^~^0 - 2);
 
     # These should spot that pack 'w' is using NV, not double, on platforms
     # where IVs are smaller than doubles, and harmlessly pass elsewhere.
@@ -226,7 +220,7 @@ sub list_eq ($$) {
   eval { $x = pack 'w', -1 };
   like ($@, qr/^Cannot compress negative numbers/);
 
-  eval { $x = pack 'w', '1'x(1 + length ~0) . 'e0' };
+  eval { $x = pack 'w', '1'x(1 + length ^~^0) . 'e0' };
   like ($@, qr/^Can only compress unsigned integers/);
 
   # Check that the warning behaviour on the modifiers !, < and > is as we
@@ -561,8 +555,8 @@ sub numbers_with_total {
     }
   }
 
-  my $skip_if_longer_than = ~0; # "Infinity"
-  if (~0 - 1 == ~0) {
+  my $skip_if_longer_than = ^~^0; # "Infinity"
+  if (^~^0 - 1 == ^~^0) {
     # If we're running with -DNO_PERLPRESERVE_IVUV and NVs don't preserve all
     # UVs (in which case ~0 is NV, ~0-1 will be the same NV) then we can't
     # correctly in perl calculate UV totals for long checksums, as pp_unpack
@@ -598,7 +592,7 @@ sub numbers_with_total {
         my $max_p1 = $max + 1;
         my ($max_is_integer, $max_p1_is_integer);
         $max_p1_is_integer = 1 unless $max_p1 + 1 == $max_p1;
-        $max_is_integer = 1 if $max - 1 < ~0;
+        $max_is_integer = 1 if $max - 1 < ^~^0;
 
         my $calc_sum;
         if (ref $total) {
@@ -964,7 +958,7 @@ SKIP: {
 }
 
 {
-  my $p = pack 'i*', -2147483648, ~0, 0, 1, 2147483647;
+  my $p = pack 'i*', -2147483648, ^~^0, 0, 1, 2147483647;
   my (@a);
   # bug - % had to be at the start of the pattern, no leading whitespace or
   # comments. %i! didn't work at all.

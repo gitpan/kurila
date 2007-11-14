@@ -1,6 +1,5 @@
 package Test::Builder;
 
-use 5.004;
 
 # $^C was only introduced in 5.005-ish.  We do this to prevent
 # use of uninitialized value warnings in older perls.
@@ -8,7 +7,7 @@ $^C ||= 0;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.70';
+$VERSION = '0.72';
 $VERSION = eval $VERSION;    # make the alpha version come out as a number
 
 # Make Test::Builder thread-safe for ithreads.
@@ -470,7 +469,7 @@ sub _unoverload {
     foreach my $thing (@_) {
         if( $self->_is_object($$thing) ) {
             if( my $string_meth = overload::Method($$thing, $type) ) {
-                $$thing = $$thing->$string_meth();
+                $$thing = $$thing->?$string_meth();
             }
         }
     }
@@ -696,7 +695,7 @@ sub cmp_ok {
     my $unoverload = $numeric_cmps{$type} ? '_unoverload_num'
                                           : '_unoverload_str';
 
-    $self->$unoverload(\$got, \$expect);
+    $self->?$unoverload(\$got, \$expect);
 
 
     my $test;
@@ -1026,8 +1025,8 @@ sub is_fh {
     my $maybe_fh = shift;
     return 0 unless defined $maybe_fh;
 
-    return 1 if ref $maybe_fh  eq 'GLOB'; # its a glob
-    return 1 if ref \$maybe_fh eq 'GLOB'; # its a glob ref
+    return 1 if ref $maybe_fh  eq 'GLOB'; # its a glob ref
+    return 1 if ref \$maybe_fh eq 'GLOB'; # its a glob
 
     return eval { $maybe_fh->isa("IO::Handle") } ||
            # 5.5.4's tied() and can() doesn't like getting undef

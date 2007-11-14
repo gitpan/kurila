@@ -129,8 +129,8 @@ sub mycan {				# Real can would leave stubs.
 	 num_comparison	  => "< <= >  >= == !=",
 	 '3way_comparison'=> "<=> cmp",
 	 str_comparison	  => "lt le gt ge eq ne",
-	 binary		  => '& &= | |= ^ ^=',
-	 unary		  => "neg ! ~",
+	 binary		  => '^&^ ^&^= ^|^ ^|^= ^^^ ^^^=',
+	 unary		  => "neg ! ^~^",
 	 mutators	  => '++ --',
 	 func		  => "atan2 cos sin exp abs log sqrt int",
 	 conversion	  => 'bool "" 0+',
@@ -159,7 +159,7 @@ sub constant {
     }
     else {
         $^H{$_[0]} = $_[1];
-        $^H |= $constants{$_[0]};
+        $^H ^|^= $constants{$_[0]};
     }
     shift, shift;
   }
@@ -169,7 +169,7 @@ sub remove_constant {
   # Arguments: what, sub
   while (@_) {
     delete $^H{$_[0]};
-    $^H &= ~ $constants{$_[0]};
+    $^H ^&^= ^~^ $constants{$_[0]};
     shift, shift;
   }
 }

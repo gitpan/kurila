@@ -1,5 +1,4 @@
 
-require 5.004;
 package Test;
 # Time-stamp: "2004-04-28 21:46:51 ADT"
 
@@ -148,7 +147,7 @@ in a C<BEGIN {...}> block, like so:
 =cut
 
 sub plan {
-    croak "Test::plan(%args): odd number of arguments" if @_ & 1;
+    croak "Test::plan(%args): odd number of arguments" if @_ ^&^ 1;
     croak "Test::plan(): should not be called more than once" if $planned;
 
     local($\, $,);   # guard against -l and other things that screw with

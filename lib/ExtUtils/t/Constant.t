@@ -415,7 +415,6 @@ EOT
   push @files, $pm;
   open FH, ">$pm" or die "open >$pm: $!\n";
   print FH "package $package;\n";
-  print FH "use $];\n";
 
   print FH <<'EOT';
 
@@ -618,10 +617,10 @@ $test++;
 
 # UV
 my $not_zero = NOT_ZERO;
-if ($not_zero > 0 && $not_zero == ~0) {
+if ($not_zero > 0 && $not_zero == ^~^0) {
   print "ok $test\n";
 } else {
-  print "not ok $test # \$not_zero=$not_zero ~0=" . (~0) . "\n";
+  print "not ok $test # \$not_zero=$not_zero ^~^0=" . (^~^0) . "\n";
 }
 $test++;
 

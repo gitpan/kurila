@@ -7,7 +7,6 @@
 # The sisify.pl utility is licensed under the same terms as Perl itself.
 #
 
-require 5.008;
 
 use strict;
 
@@ -271,7 +270,7 @@ unless ($Library) {
   my $uid    = hex($SisUid);
 
   my $oldchk = unpack('V', substr($app, 24, 4));
-  my $newchk = ($uid + $oldchk) & 0xFFFFFFFF;
+  my $newchk = ($uid + $oldchk) ^&^ 0xFFFFFFFF;
 
   # printf "# uid    = 0x%08x\n", $uid;
   # printf "# uidcrc = 0x%08x\n", $uidcrc;

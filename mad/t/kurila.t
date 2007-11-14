@@ -18,10 +18,22 @@ use Convert;
 
 sub p5convert {
     my ($input, $expected) = @_;
+
+    local $Test::Builder::Level = $Test::Builder::Level + 1;
+
     local $TODO = $TODO || ($input =~ m/^[#]\s*TODO/);
-    my $output = Convert::convert($input, "/usr/bin/env perl ../mad/p5kurila.pl");
+    my $output = Convert::convert($input, "/usr/bin/env perl ../mad/p5kurila.pl",
+                                  dumpcommand => "$ENV{madpath}/perl");
     is($output, $expected) or $TODO or die;
 }
+
+#t_parenthesis();
+#t_change_deref();
+t_intuit_more();
+t_change_deref_method();
+t_remove_useversion();
+t_rename_bit_operators();
+t_typed_declaration();
 
 t_strict_refs();
 t_indirect_object_syntax();
@@ -29,7 +41,6 @@ t_barewords();
 t_glob_pattr();
 t_vstring();
 # t_encoding();
-t_typed_declaration();
 
 sub t_indirect_object_syntax {
     p5convert( split(m/^\-{10}\n/m, $_, 2)) for split(m/^={10}\n/m, <<'END');
@@ -132,6 +143,9 @@ foo
 use strict;
 foo
 ==========
+Foo::->bar();
+----------
+Foo->bar();
 END
 
 }
@@ -172,14 +186,6 @@ sub t_strict_refs {
 
     # Fix conversion of addition of additional ref
     p5convert( split(m/^\-{3}\n/m, $_, 2)) for split(m/^={3}\n/m, <<'END');
-@{Symbol::fetch_glob("bar")}
----
-@{*{Symbol::fetch_glob("bar")}}
-===
-&{Symbol::fetch_glob("bar")}
----
-&{*{Symbol::fetch_glob("bar")}}
-===
 # finding strings
 my $string = "s";
 @$string = sub { 1 };
@@ -217,22 +223,22 @@ sub foo {
 # not if 'use strict'
 use strict;
 my $string = "s";
-@$string= sub { 1 };
+@$string = sub { 1 };
 ---
 # not if 'use strict'
 use strict;
 my $string = "s";
-@$string= sub { 1 };
+@$string = sub { 1 };
 ===
 # variable is a hard ref
 my $ref = "s";
 $ref = [];
-@$ref= sub { 1 };
+@$ref = sub { 1 };
 ---
 # variable is a hard ref
 my $ref = "s";
 $ref = [];
-@$ref= sub { 1 };
+@$ref = sub { 1 };
 ===
 my $subname = "bla";
 $subname->();
@@ -292,13 +298,9 @@ is($vs,"\x{1}\x{14}\x{12c}\x{fa0}","v-string ne \\x{}");
 ----------
 1 if /vt100/;
 ==========
-require v5.6;
+use version v0.2;
 ----------
-require v5.6;
-==========
-use v5.6;
-----------
-use v5.6;
+use version v0.2;
 ==========
 "foo$\value"
 ----------
@@ -319,5 +321,226 @@ my Test $x2 :Dokay(1,5);
 ----------
 package Test;
 my $x2 :Dokay(1,5);
+END
+}
+
+sub t_remove_useversion {
+    p5convert( split(m/^\-{10}.*\n/m, $_, 2)) for split(m/^={10}\n/m, <<'END');
+#bla
+use v5.6.0;
+#arg
+----------
+#bla
+#arg
+==========
+use version;
+----------
+use version;
+==========
+#foo
+require 5.6;
+#bar
+require version;
+----------
+#foo
+#bar
+require version;
+==========
+require 5.6;
+use version;
+----------
+use version;
+==========
+require 5;
+----------
+==========
+BEGIN { require 5; }
+----------
+BEGIN {  }
+==========
+require 5.6.0;
+----------
+END
+}
+
+sub t_rename_bit_operators {
+    p5convert( split(m/^\-{10}.*\n/m, $_, 2)) for split(m/^={10}\n/m, <<'END');
+$a | $b;
+----------
+$a ^|^ $b;
+==========
+$a |= $b;
+----------
+$a ^|^= $b;
+==========
+$a || $b;
+----------
+$a || $b;
+==========
+~$a;
+----------
+^~^$a;
+==========
+$a & $b;
+----------
+$a ^&^ $b;
+==========
+$a ^ $b;
+----------
+$a ^^^ $b;
+END
+}
+
+sub t_change_deref_method {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+Foo->$bar();
+----
+Foo->?$bar();
+END
+}
+
+sub t_change_deref {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+Foo->$bar();
+----
+Foo->&$bar ;
+====
+my $x;
+Foo->$x()
+----
+my $x;
+Foo->&$x 
+====
+Foo->bar()
+----
+Foo->bar 
+====
+#ABC
+@$foo;
+#DEF
+----
+#ABC
+$foo->@;
+#DEF
+====
+@{[1,2,3]}
+----
+[1,2,3]->@
+====
+my ($x) = @_
+----
+my ($x) = @_
+====
+@{$foo||[]}
+----
+($foo||[])->@
+====
+@{$foo[1]}
+----
+$foo[1]->@
+====
+@{$foo{bar}}
+----
+$foo{bar}->@
+====
+$$foo
+----
+$foo->$
+====
+%$foo
+----
+$foo->%
+====
+*$foo
+----
+$foo->*
+====
+&$foo
+----
+$foo->&
+====
+sub foo { [2, 4] }
+@{foo(1,2)}
+----
+sub foo { [2, 4] }
+(foo 1,2)->@
+====
+$$foo[1]
+----
+$foo->@[1]
+END
+}
+
+sub t_intuit_more {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+m/$foo[:]/
+----
+m/$foo(?:)[:]/
+====
+s/abc/[/;
+----
+s/abc/[/;
+====
+my $ldel1;
+m/\G$ldel1(?:)[^\\$ldel1]*(\\.[^\\$ldel1]*)*$ldel1/gcs
+----
+my $ldel1;
+m/\G$ldel1(?:)[^\\$ldel1]*(\\.[^\\$ldel1]*)*$ldel1/gcs
+END
+}
+
+sub t_parenthesis {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+sub foo { }
+foo(1, 2);
+----
+sub foo { }
+foo 1, 2;
+====
+sub foo { }
+#ABC
+foo(1, 2)  +5
+#DEF
+----
+sub foo { }
+#ABC
+(foo 1, 2)  +5
+#DEF
+====
+sub foo { }
+5+foo(1,2)
+----
+sub foo { }
+5+(foo 1,2)
+====
+print ( (1,2,3));
+----
+print  (1,2,3);
+====
+#ABC
+print(1) + 2;
+----
+#ABC
+(print 1) + 2;
+====
+$a = lc($a);
+----
+$a = lc $a;
+====
+$a .= lc($a);
+----
+$a .= lc $a;
+====
+lc $a and uc $a
+----
+lc $a and uc $a
+====
+for (1..2) { }
+----
+for (1..2) { }
+====
+(@a)[1]
+----
+(@a)[1]
 END
 }

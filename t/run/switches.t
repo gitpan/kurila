@@ -1,7 +1,7 @@
 #!./perl -w
 
 # Tests for the command-line switches:
-# -0, -c, -l, -s, -m, -M, -V, -v, -h, -z, -i, -E
+# -0, -c, -l, -s, -m, -M, -V, -v, -h, -i, -E and all unknown
 # Some switches have their own tests, see MANIFEST.
 
 BEGIN {
@@ -11,7 +11,7 @@ BEGIN {
 
 BEGIN { require "./test.pl"; }
 
-plan(tests => 31);
+plan(tests => 60);
 
 use Config;
 
@@ -235,7 +235,7 @@ SWTESTPM
 {
     local $TODO = '';   # these ones should work on VMS
 
-    my $v = sprintf "%vd", $^V;
+    my (undef, $v) = split m/-/, $^V;
     like( runperl( switches => ['-v'] ),
 	  qr/This is kurila, v$v (?:DEVEL\w+ )?built for \Q$Config{archname}\E.+Copyright.+Gerard Goossen.+Artistic License.+GNU General Public License/s,
           '-v looks okay' );
@@ -253,14 +253,16 @@ SWTESTPM
 
 }
 
-# Tests for -z (which does not exist)
+# Tests for switches which do not exist
 
+foreach my $switch (split //, "ABbGgHJjKkLNOoQqRrYyZz123456789_")
 {
     local $TODO = '';   # these ones should work on VMS
 
-    like( runperl( switches => ['-z'], stderr => 1 ),
-	  qr/\QUnrecognized switch: -z  (-h will show valid options)./,
-          '-z correctly unknown' );
+    like( runperl( switches => ["-$switch"], stderr => 1,
+		   prog => 'die "oops"' ),
+	  qr/\QUnrecognized switch: -$switch  (-h will show valid options)./,
+          "-$switch correctly unknown" );
 
 }
 
@@ -302,22 +304,11 @@ __EOF__
 # Tests for -E
 
 $r = runperl(
-    switches	=> [ '-E', '"say q(Hello, world!)"']
-);
-is( $r, "Hello, world!\n", "-E say" );
-
-
-$r = runperl(
-    switches	=> [ '-E', '"undef err say q(Hello, world!)"']
-);
-is( $r, "Hello, world!\n", "-E err" );
-
-$r = runperl(
-    switches	=> [ '-E', '"undef ~~ undef and say q(Hello, world!)"']
+    switches	=> [ '-E', '"undef ~~ undef and print qq(Hello, world!\n)"']
 );
 is( $r, "Hello, world!\n", "-E ~~" );
 
 $r = runperl(
-    switches	=> [ '-E', '"given(undef) {when(undef) { say q(Hello, world!)"}}']
+    switches	=> [ '-E', '"given(undef) {when(undef) { print qq(Hello, world!\n)"}}']
 );
 is( $r, "Hello, world!\n", "-E given" );

@@ -9,14 +9,12 @@ $DOWARN = 1; # enable run-time warnings now
 use Config;
 
 require "./test.pl";
-plan( tests => 51 );
+plan( tests => 47 );
 
 use utf8;
 
 eval 'use v5.5.640';
-is( $@, '', "use v5.5.640; $@");
-
-require_ok('v5.5.640');
+like( $@, qr/use VERSION is not valid in Perl Kurila/, "use v5.5.640;");
 
 # printing characters should work
 if (ord("\t") == 9) { # ASCII
@@ -53,9 +51,7 @@ is(v1.20.300.4000, "\x{1}\x{14}\x{12c}\x{fa0}",'compare embedded \x{} string');
 #
 # now do the same without the "v"
 eval 'use 5.5.640';
-is( $@, '', "use 5.5.640; $@");
-
-require_ok('5.5.640');
+like( $@, qr/use VERSION is not valid in Perl Kurila/, "use 5.5.640;");
 
 # hash keys too
 if (ord("\t") == 9) { # ASCII
@@ -195,7 +191,7 @@ is(v200, eval( "v200"), 'v200 eq "v200"'        );
 is(v200, eval("+v200"), 'v200 eq eval("+v200")' );
 
 # Tests for string/numeric value of $] itself
-my ($revision,$version,$subversion) = split '\.', sprintf("%vd",$^V);
+my ($revision,$version,$subversion) = split /\./, sprintf("%vd",$^V);
 
 # $^V always displays the leading 'v' but we don't want that here
 $revision =~ s/^v//;
@@ -209,15 +205,7 @@ my $v = sprintf("%d.%.3d%.3d",$revision,$version,$subversion);
 print "# v = '$v'\n";
 print "# ] = '$]'\n";
 
-$v =~ s/000$// if $subversion == 0;
-
-print "# v = '$v'\n";
-
-ok( $v eq "$]", qq{\$^V eq "\$]"});
-
 $v = $revision + $version/1000 + $subversion/1000000;
-
-ok( abs($v - $]) < 10**-8 , "\$^V == \$] (numeric)" );
 
 SKIP: {
   skip("In EBCDIC the v-string components cannot exceed 2147483647", 6)

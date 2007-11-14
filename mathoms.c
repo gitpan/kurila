@@ -57,8 +57,8 @@ PERL_CALLCONV void Perl_hv_magic(pTHX_ HV *hv, GV *gv, int how);
 PERL_CALLCONV bool Perl_do_open(pTHX_ GV *gv, register const char *name, I32 len, int as_raw, int rawmode, int rawperm, PerlIO *supplied_fp);
 PERL_CALLCONV bool Perl_do_aexec(pTHX_ SV *really, register SV **mark, register SV **sp);
 PERL_CALLCONV bool Perl_do_exec(pTHX_ const char *cmd);
-PERL_CALLCONV U8 * Perl_uvuni_to_utf8(pTHX_ U8 *d, UV uv);
-PERL_CALLCONV bool Perl_is_utf8_string_loc(pTHX_ const U8 *s, STRLEN len, const U8 **ep);
+PERL_CALLCONV char * Perl_uvuni_to_utf8(pTHX_ char *d, UV uv);
+PERL_CALLCONV bool Perl_is_utf8_string_loc(pTHX_ const char *s, STRLEN len, const char **ep);
 PERL_CALLCONV void Perl_sv_nolocking(pTHX_ SV *sv);
 PERL_CALLCONV void Perl_sv_usepvn_mg(pTHX_ SV *sv, char *ptr, STRLEN len);
 PERL_CALLCONV void Perl_sv_usepvn(pTHX_ SV *sv, char *ptr, STRLEN len);
@@ -484,16 +484,6 @@ Perl_hv_magic(pTHX_ HV *hv, GV *gv, int how)
     sv_magic((SV*)hv, (SV*)gv, how, NULL, 0);
 }
 
-#if 0 /* use the macro from hv.h instead */
-
-char*	
-Perl_sharepvn(pTHX_ const char *sv, I32 len, U32 hash)
-{
-    return HEK_KEY(share_hek(sv, len, hash));
-}
-
-#endif
-
 AV *
 Perl_av_fake(pTHX_ register I32 size, register SV **strp)
 {
@@ -563,63 +553,6 @@ Perl_do_exec(pTHX_ const char *cmd)
 }
 #endif
 
-#ifdef HAS_PIPE
-void
-Perl_do_pipe(pTHX_ SV *sv, GV *rgv, GV *wgv)
-{
-    dVAR;
-    register IO *rstio;
-    register IO *wstio;
-    int fd[2];
-
-    if (!rgv)
-	goto badexit;
-    if (!wgv)
-	goto badexit;
-
-    rstio = GvIOn(rgv);
-    wstio = GvIOn(wgv);
-
-    if (IoIFP(rstio))
-	do_close(rgv,FALSE);
-    if (IoIFP(wstio))
-	do_close(wgv,FALSE);
-
-    if (PerlProc_pipe(fd) < 0)
-	goto badexit;
-    IoIFP(rstio) = PerlIO_fdopen(fd[0], "r"PIPE_OPEN_MODE);
-    IoOFP(wstio) = PerlIO_fdopen(fd[1], "w"PIPE_OPEN_MODE);
-    IoOFP(rstio) = IoIFP(rstio);
-    IoIFP(wstio) = IoOFP(wstio);
-    IoTYPE(rstio) = IoTYPE_RDONLY;
-    IoTYPE(wstio) = IoTYPE_WRONLY;
-    if (!IoIFP(rstio) || !IoOFP(wstio)) {
-	if (IoIFP(rstio)) PerlIO_close(IoIFP(rstio));
-	else PerlLIO_close(fd[0]);
-	if (IoOFP(wstio)) PerlIO_close(IoOFP(wstio));
-	else PerlLIO_close(fd[1]);
-	goto badexit;
-    }
-
-    sv_setsv(sv,&PL_sv_yes);
-    return;
-
-badexit:
-    sv_setsv(sv,&PL_sv_undef);
-    return;
-}
-#endif
-
-#if 0
-OP *
-Perl_ck_retarget(pTHX_ OP *o)
-{
-    Perl_croak(aTHX_ "NOT IMPL LINE %d",__LINE__);
-    /* STUB */
-    return o;
-}
-#endif
-
 OP *
 Perl_oopsCV(pTHX_ OP *o)
 {
@@ -632,11 +565,6 @@ Perl_oopsCV(pTHX_ OP *o)
 PP(pp_padany)
 {
     DIE(aTHX_ "NOT IMPL LINE %d",__LINE__);
-}
-
-PP(pp_threadsv)
-{
-    DIE(aTHX_ "tried to access per-thread data in non-threaded perl");
 }
 
 PP(pp_mapstart)
@@ -690,11 +618,6 @@ PP(pp_dump)
 PP(pp_dofile)
 {
     return pp_require();
-}
-
-PP(pp_dbmclose)
-{
-    return pp_untie();
 }
 
 PP(pp_read)
@@ -1057,14 +980,14 @@ PP(pp_rv2hv)
     return Perl_pp_rv2av(aTHX);
 }
 
-U8 *
-Perl_uvuni_to_utf8(pTHX_ U8 *d, UV uv)
+char *
+Perl_uvuni_to_utf8(pTHX_ char *d, UV uv)
 {
     return Perl_uvuni_to_utf8_flags(aTHX_ d, uv, 0);
 }
 
 bool
-Perl_is_utf8_string_loc(pTHX_ const U8 *s, STRLEN len, const U8 **ep)
+Perl_is_utf8_string_loc(pTHX_ const char *s, STRLEN len, const char **ep)
 {
     return is_utf8_string_loclen(s, len, ep, 0);
 }
@@ -1226,6 +1149,91 @@ Perl_pack_cat(pTHX_ SV *cat, const char *pat, const char *patend, register SV **
 
     packlist(cat, pat, patend, beglist, endlist);
 }
+
+HE *
+Perl_hv_store_ent(pTHX_ HV *hv, SV *keysv, SV *val, U32 hash)
+{
+  return (HE *)hv_common(hv, keysv, NULL, 0, 0, HV_FETCH_ISSTORE, val, hash);
+}
+
+bool
+Perl_hv_exists_ent(pTHX_ HV *hv, SV *keysv, U32 hash)
+{
+    return hv_common(hv, keysv, NULL, 0, 0, HV_FETCH_ISEXISTS, 0, hash)
+	? TRUE : FALSE;
+}
+
+HE *
+Perl_hv_fetch_ent(pTHX_ HV *hv, SV *keysv, I32 lval, U32 hash)
+{
+    return (HE *)hv_common(hv, keysv, NULL, 0, 0, 
+		     (lval ? HV_FETCH_LVALUE : 0), NULL, hash);
+}
+
+SV *
+Perl_hv_delete_ent(pTHX_ HV *hv, SV *keysv, I32 flags, U32 hash)
+{
+    return (SV *) hv_common(hv, keysv, NULL, 0, 0, flags | HV_DELETE, NULL,
+			    hash);
+}
+
+SV**
+Perl_hv_store_flags(pTHX_ HV *hv, const char *key, I32 klen, SV *val, U32 hash,
+		    int flags)
+{
+    return (SV**) hv_common(hv, NULL, key, klen, flags,
+			    (HV_FETCH_ISSTORE|HV_FETCH_JUST_SV), val, hash);
+}
+
+SV**
+Perl_hv_store(pTHX_ HV *hv, const char *key, I32 klen_i32, SV *val, U32 hash)
+{
+    STRLEN klen;
+    int flags;
+
+    klen = klen_i32;
+    flags = 0;
+    return (SV **) hv_common(hv, NULL, key, klen, flags,
+			     (HV_FETCH_ISSTORE|HV_FETCH_JUST_SV), val, hash);
+}
+
+bool
+Perl_hv_exists(pTHX_ HV *hv, const char *key, I32 klen_i32)
+{
+    STRLEN klen;
+    int flags;
+
+    klen = klen_i32;
+    flags = 0;
+    return hv_common(hv, NULL, key, klen, flags, HV_FETCH_ISEXISTS, 0, 0)
+	? TRUE : FALSE;
+}
+
+SV**
+Perl_hv_fetch(pTHX_ HV *hv, const char *key, I32 klen_i32, I32 lval)
+{
+    STRLEN klen;
+    int flags;
+
+    klen = klen_i32;
+    flags = 0;
+    return (SV **) hv_common(hv, NULL, key, klen, flags,
+			     lval ? (HV_FETCH_JUST_SV | HV_FETCH_LVALUE)
+			     : HV_FETCH_JUST_SV, NULL, 0);
+}
+
+SV *
+Perl_hv_delete(pTHX_ HV *hv, const char *key, I32 klen_i32, I32 flags)
+{
+    STRLEN klen;
+    int k_flags;
+
+    klen = klen_i32;
+    k_flags = 0;
+    return (SV *) hv_common(hv, NULL, key, klen, k_flags, flags | HV_DELETE,
+			    NULL, 0);
+}
+
 #endif /* NO_MATHOMS */
 
 /*

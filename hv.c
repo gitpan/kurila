@@ -233,35 +233,6 @@ hv_store_ent.
 See L<perlguts/"Understanding the Magic of Tied Hashes and Arrays"> for more
 information on how to use this function on tied hashes.
 
-=cut
-*/
-
-SV**
-Perl_hv_store(pTHX_ HV *hv, const char *key, I32 klen_i32, SV *val, U32 hash)
-{
-    HE *hek;
-    STRLEN klen;
-    int flags;
-
-    klen = klen_i32;
-    flags = 0;
-
-    hek = hv_fetch_common (hv, NULL, key, klen, flags,
-			   (HV_FETCH_ISSTORE|HV_FETCH_JUST_SV), val, hash);
-    return hek ? &HeVAL(hek) : NULL;
-}
-
-/* XXX This looks like an ideal candidate to inline */
-SV**
-Perl_hv_store_flags(pTHX_ HV *hv, const char *key, I32 klen, SV *val,
-                 register U32 hash, int flags)
-{
-    HE * const hek = hv_fetch_common (hv, NULL, key, klen, flags,
-			       (HV_FETCH_ISSTORE|HV_FETCH_JUST_SV), val, hash);
-    return hek ? &HeVAL(hek) : NULL;
-}
-
-/*
 =for apidoc hv_store_ent
 
 Stores C<val> in a hash.  The hash key is specified as C<key>.  The C<hash>
@@ -287,39 +258,11 @@ hv_store in preference to hv_store_ent.
 See L<perlguts/"Understanding the Magic of Tied Hashes and Arrays"> for more
 information on how to use this function on tied hashes.
 
-=cut
-*/
-
-/* XXX This looks like an ideal candidate to inline */
-HE *
-Perl_hv_store_ent(pTHX_ HV *hv, SV *keysv, SV *val, U32 hash)
-{
-  return hv_fetch_common(hv, keysv, NULL, 0, 0, HV_FETCH_ISSTORE, val, hash);
-}
-
-/*
 =for apidoc hv_exists
 
 Returns a boolean indicating whether the specified hash key exists.  The
 C<klen> is the length of the key.
 
-=cut
-*/
-
-bool
-Perl_hv_exists(pTHX_ HV *hv, const char *key, I32 klen_i32)
-{
-    STRLEN klen;
-    int flags;
-
-    klen = klen_i32;
-    flags = 0;
-
-    return hv_fetch_common(hv, NULL, key, klen, flags, HV_FETCH_ISEXISTS, 0, 0)
-	? TRUE : FALSE;
-}
-
-/*
 =for apidoc hv_fetch
 
 Returns the SV which corresponds to the specified key in the hash.  The
@@ -330,26 +273,6 @@ dereferencing it to an C<SV*>.
 See L<perlguts/"Understanding the Magic of Tied Hashes and Arrays"> for more
 information on how to use this function on tied hashes.
 
-=cut
-*/
-
-SV**
-Perl_hv_fetch(pTHX_ HV *hv, const char *key, I32 klen_i32, I32 lval)
-{
-    HE *hek;
-    STRLEN klen;
-    int flags;
-
-    klen = klen_i32;
-    flags = 0;
-
-    hek = hv_fetch_common (hv, NULL, key, klen, flags,
-			   lval ? (HV_FETCH_JUST_SV | HV_FETCH_LVALUE) : HV_FETCH_JUST_SV,
-			   NULL, 0);
-    return hek ? &HeVAL(hek) : NULL;
-}
-
-/*
 =for apidoc hv_exists_ent
 
 Returns a boolean indicating whether the specified hash key exists. C<hash>
@@ -358,14 +281,6 @@ computed.
 
 =cut
 */
-
-/* XXX This looks like an ideal candidate to inline */
-bool
-Perl_hv_exists_ent(pTHX_ HV *hv, SV *keysv, U32 hash)
-{
-    return hv_fetch_common(hv, keysv, NULL, 0, 0, HV_FETCH_ISEXISTS, 0, hash)
-	? TRUE : FALSE;
-}
 
 /* returns an HE * structure with the all fields set */
 /* note that hent_val will be a mortal sv for MAGICAL hashes */
@@ -386,16 +301,23 @@ information on how to use this function on tied hashes.
 =cut
 */
 
-HE *
-Perl_hv_fetch_ent(pTHX_ HV *hv, SV *keysv, I32 lval, register U32 hash)
+/* Common code for hv_delete()/hv_exists()/hv_fetch()/hv_store()  */
+void *
+Perl_hv_common_key_len(pTHX_ HV *hv, const char *key, I32 klen_i32,
+		       const int action, SV *val, const U32 hash)
 {
-    return hv_fetch_common(hv, keysv, NULL, 0, 0, 
-			   (lval ? HV_FETCH_LVALUE : 0), NULL, hash);
+    STRLEN klen;
+    int flags;
+
+    klen = klen_i32;
+    flags = 0;
+
+    return hv_common(hv, NULL, key, klen, flags, action, val, hash);
 }
 
-STATIC HE *
-S_hv_fetch_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
-		  int flags, int action, SV *val, register U32 hash)
+void *
+Perl_hv_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
+	       int flags, int action, SV *val, register U32 hash)
 {
     dVAR;
     XPVHV* xhv;
@@ -403,17 +325,49 @@ S_hv_fetch_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
     HE **oentry;
     SV *sv;
     int masked_flags;
+    const int return_svp = action & HV_FETCH_JUST_SV;
 
     if (!hv)
 	return NULL;
+    if (SvTYPE(hv) == SVTYPEMASK)
+	return NULL;
 
+    assert(SvTYPE(hv) == SVt_PVHV);
+
+    if (SvSMAGICAL(hv) && SvGMAGICAL(hv) && !(action & HV_DISABLE_UVAR_XKEY)) {
+	MAGIC* mg;
+	if ((mg = mg_find((SV*)hv, PERL_MAGIC_uvar))) {
+	    struct ufuncs * const uf = (struct ufuncs *)mg->mg_ptr;
+	    if (uf->uf_set == NULL) {
+		SV* obj = mg->mg_obj;
+
+		if (!keysv) {
+		    keysv = sv_2mortal(newSVpvn(key, klen));
+		}
+		
+		mg->mg_obj = keysv;         /* pass key */
+		uf->uf_index = action;      /* pass action */
+		magic_getuvar((SV*)hv, mg);
+		keysv = mg->mg_obj;         /* may have changed */
+		mg->mg_obj = obj;
+
+		/* If the key may have changed, then we need to invalidate
+		   any passed-in computed hash value.  */
+		hash = 0;
+	    }
+	}
+    }
     if (keysv) {
-	if (SvSMAGICAL(hv) && SvGMAGICAL(hv))
-	    keysv = hv_magic_uvar_xkey(hv, keysv, action);
 	if (flags & HVhek_FREEKEY)
 	    Safefree(key);
 	key = SvPV_const(keysv, klen);
 	flags = 0;
+    }
+
+    if (action & HV_DELETE) {
+	return (void *) hv_delete_common(hv, keysv, key, klen,
+					 flags,
+					 action, hash);
     }
 
     xhv = (XPVHV*)SvANY(hv);
@@ -421,7 +375,7 @@ S_hv_fetch_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
 	if (SvRMAGICAL(hv) && !(action & (HV_FETCH_ISSTORE|HV_FETCH_ISEXISTS))) {
 	    if ( mg_find((SV*)hv, PERL_MAGIC_tied) || SvGMAGICAL((SV*)hv))
 	    {
-		/* XXX should be able to skimp on the HE/HEK here when
+		/* FIXME should be able to skimp on the HE/HEK here when
 		   HV_FETCH_JUST_SV is true.  */
 		if (!keysv) {
 		    keysv = newSVpvn(key, klen);
@@ -453,7 +407,10 @@ S_hv_fetch_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
 		if (flags & HVhek_FREEKEY)
 		    Safefree(key);
 
-		return entry;
+		if (return_svp) {
+		    return entry ? (void *) &HeVAL(entry) : NULL;
+		}
+		return (void *) entry;
 	    }
 #ifdef ENV_IS_CASELESS
 	    else if (mg_find((SV*)hv, PERL_MAGIC_env)) {
@@ -465,23 +422,27 @@ S_hv_fetch_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
 			const char * const nkey = strupr(savepvn(key,klen));
 			/* Note that this fetch is for nkey (the uppercased
 			   key) whereas the store is for key (the original)  */
-			entry = hv_fetch_common(hv, NULL, nkey, klen,
-						HVhek_FREEKEY, /* free nkey */
-						0 /* non-LVAL fetch */,
-						NULL /* no value */,
-						0 /* compute hash */);
-			if (!entry && (action & HV_FETCH_LVALUE)) {
+			void *result = hv_common(hv, NULL, nkey, klen,
+						 HVhek_FREEKEY, /* free nkey */
+						 0 /* non-LVAL fetch */
+						 | HV_DISABLE_UVAR_XKEY
+						 | return_svp,
+						 NULL /* no value */,
+						 0 /* compute hash */);
+			if (!result && (action & HV_FETCH_LVALUE)) {
 			    /* This call will free key if necessary.
 			       Do it this way to encourage compiler to tail
 			       call optimise.  */
-			    entry = hv_fetch_common(hv, keysv, key, klen,
-						    flags, HV_FETCH_ISSTORE,
-						    newSV(0), hash);
+			    result = hv_common(hv, keysv, key, klen, flags,
+					       HV_FETCH_ISSTORE
+					       | HV_DISABLE_UVAR_XKEY
+					       | return_svp,
+					       newSV(0), hash);
 			} else {
 			    if (flags & HVhek_FREEKEY)
 				Safefree(key);
 			}
-			return entry;
+			return result;
 		    }
 	    }
 #endif
@@ -505,7 +466,7 @@ S_hv_fetch_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
 		/* This cast somewhat evil, but I'm merely using NULL/
 		   not NULL to return the boolean exists.
 		   And I know hv is not NULL.  */
-		return SvTRUE(svret) ? (HE *)hv : NULL;
+		return SvTRUE(svret) ? (void *)hv : NULL;
 		}
 #ifdef ENV_IS_CASELESS
 	    else if (mg_find((SV*)hv, PERL_MAGIC_env)) {
@@ -588,7 +549,7 @@ S_hv_fetch_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
             if (flags & HVhek_FREEKEY)
                 Safefree(key);
 
-	    return 0;
+	    return NULL;
 	}
     }
 
@@ -627,10 +588,6 @@ S_hv_fetch_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
 
         if (action & (HV_FETCH_LVALUE|HV_FETCH_ISSTORE)) {
 	    if (HeKFLAGS(entry) != masked_flags) {
-		/* We match if HVhek_UTF8 bit in our flags and hash key's
-		   match.  But if entry was set previously with HVhek_WASUTF8
-		   and key now doesn't (or vice versa) then we should change
-		   the key's flag, as this is assignment.  */
 		if (HvSHAREKEYS(hv)) {
 		    /* Need to swap the key we have for a key with the flags we
 		       need. As keys are shared we can't just write to the
@@ -686,6 +643,9 @@ S_hv_fetch_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
 	}
 	if (flags & HVhek_FREEKEY)
 	    Safefree(key);
+	if (return_svp) {
+	    return entry ? (void *) &HeVAL(entry) : NULL;
+	}
 	return entry;
     }
 #ifdef DYNAMIC_ENV_FETCH  /* %ENV lookup?  If so, try to fetch the value now */
@@ -696,8 +656,9 @@ S_hv_fetch_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
 	if (env) {
 	    sv = newSVpvn(env,len);
 	    SvTAINTED_on(sv);
-	    return hv_fetch_common(hv,keysv,key,klen,flags,HV_FETCH_ISSTORE,sv,
-				   hash);
+	    return hv_common(hv, keysv, key, klen, flags,
+			     HV_FETCH_ISSTORE|HV_DISABLE_UVAR_XKEY|return_svp,
+			     sv, hash);
 	}
     }
 #endif
@@ -711,7 +672,7 @@ S_hv_fetch_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
 	/* Not doing some form of store, so return failure.  */
 	if (flags & HVhek_FREEKEY)
 	    Safefree(key);
-	return 0;
+	return NULL;
     }
     if (action & HV_FETCH_LVALUE) {
 	val = newSV(0);
@@ -720,8 +681,15 @@ S_hv_fetch_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
 	       which in turn might do some tied magic. So we need to make that
 	       magic check happen.  */
 	    /* gonna assign to this, so it better be there */
-	    return hv_fetch_common(hv, keysv, key, klen, flags,
-				   HV_FETCH_ISSTORE, val, hash);
+	    /* If a fetch-as-store fails on the fetch, then the action is to
+	       recurse once into "hv_store". If we didn't do this, then that
+	       recursive call would call the key conversion routine again.
+	       However, as we replace the original key with the converted
+	       key, this would result in a double conversion, which would show
+	       up as a bug if the conversion routine is not idempotent.  */
+	    return hv_common(hv, keysv, key, klen, flags,
+			     HV_FETCH_ISSTORE|HV_DISABLE_UVAR_XKEY|return_svp,
+			     val, hash);
 	    /* XXX Surely that could leak if the fetch-was-store fails?
 	       Just like the hv_fetch.  */
 	}
@@ -790,7 +758,10 @@ S_hv_fetch_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
 	}
     }
 
-    return entry;
+    if (return_svp) {
+	return entry ? (void *) &HeVAL(entry) : NULL;
+    }
+    return (void *) entry;
 }
 
 STATIC void
@@ -848,22 +819,6 @@ hash and returned to the caller.  The C<klen> is the length of the key.
 The C<flags> value will normally be zero; if set to G_DISCARD then NULL
 will be returned.
 
-=cut
-*/
-
-SV *
-Perl_hv_delete(pTHX_ HV *hv, const char *key, I32 klen_i32, I32 flags)
-{
-    STRLEN klen;
-    int k_flags;
-
-    klen = klen_i32;
-    k_flags = 0;
-
-    return hv_delete_common(hv, NULL, key, klen, k_flags, flags, 0);
-}
-
-/*
 =for apidoc hv_delete_ent
 
 Deletes a key/value pair in the hash.  The value SV is removed from the
@@ -873,13 +828,6 @@ precomputed hash value, or 0 to ask for it to be computed.
 
 =cut
 */
-
-/* XXX This looks like an ideal candidate to inline */
-SV *
-Perl_hv_delete_ent(pTHX_ HV *hv, SV *keysv, I32 flags, U32 hash)
-{
-    return hv_delete_common(hv, keysv, NULL, 0, 0, flags, hash);
-}
 
 STATIC SV *
 S_hv_delete_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
@@ -892,18 +840,6 @@ S_hv_delete_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
     HE *const *first_entry;
     int masked_flags;
 
-    if (!hv)
-	return NULL;
-
-    if (keysv) {
-	if (SvSMAGICAL(hv) && SvGMAGICAL(hv))
-	    keysv = hv_magic_uvar_xkey(hv, keysv, HV_DELETE);
-	if (k_flags & HVhek_FREEKEY)
-	    Safefree(key);
-	key = SvPV_const(keysv, klen);
-	k_flags = 0;
-    }
-
     if (SvRMAGICAL(hv)) {
 	bool needs_copy;
 	bool needs_store;
@@ -911,9 +847,10 @@ S_hv_delete_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
 
 	if (needs_copy) {
 	    SV *sv;
-	    entry = hv_fetch_common(hv, keysv, key, klen,
-				    k_flags & ~HVhek_FREEKEY, HV_FETCH_LVALUE,
-				    NULL, hash);
+	    entry = (HE *) hv_common(hv, keysv, key, klen,
+				     k_flags & ~HVhek_FREEKEY,
+				     HV_FETCH_LVALUE|HV_DISABLE_UVAR_XKEY,
+				     NULL, hash);
 	    sv = entry ? HeVAL(entry) : NULL;
 	    if (sv) {
 		if (SvMAGICAL(sv)) {
@@ -1384,9 +1321,9 @@ Perl_newHVhv(pTHX_ HV *ohv)
 
 	hv_iterinit(ohv);
 	while ((entry = hv_iternext_flags(ohv, 0))) {
-	    hv_store_flags(hv, HeKEY(entry), HeKLEN(entry),
-                           newSVsv(HeVAL(entry)), HeHASH(entry),
-                           HeKFLAGS(entry));
+	    (void)hv_store_flags(hv, HeKEY(entry), HeKLEN(entry),
+			         newSVsv(HeVAL(entry)), HeHASH(entry),
+			         HeKFLAGS(entry));
 	}
 	HvRITER_set(ohv, riter);
 	HvEITER_set(ohv, eiter);
@@ -1418,8 +1355,8 @@ Perl_hv_copy_hints_hv(pTHX_ HV *const ohv)
 	    SV *const sv = newSVsv(HeVAL(entry));
 	    sv_magic(sv, NULL, PERL_MAGIC_hintselem,
 		     (char *)newSVhek (HeKEY_hek(entry)), HEf_SVKEY);
-	    hv_store_flags(hv, HeKEY(entry), HeKLEN(entry),
-			   sv, HeHASH(entry), HeKFLAGS(entry));
+	    (void)hv_store_flags(hv, HeKEY(entry), HeKLEN(entry),
+				 sv, HeHASH(entry), HeKFLAGS(entry));
 	}
 	HvRITER_set(ohv, riter);
 	HvEITER_set(ohv, eiter);
@@ -1437,7 +1374,7 @@ Perl_hv_free_ent(pTHX_ HV *hv, register HE *entry)
     if (!entry)
 	return;
     val = HeVAL(entry);
-    if (val && isGV(val) && GvCVu(val) && HvNAME_get(hv))
+    if (val && isGV(val) && isGV_with_GP(val) && GvCVu(val) && HvNAME_get(hv))
         mro_method_changed_in(hv);	/* deletion of method from stash */
     SvREFCNT_dec(val);
     if (HeKLEN(entry) == HEf_SVKEY) {
@@ -1761,8 +1698,8 @@ Perl_hv_undef(pTHX_ HV *hv)
 
     hfreeentries(hv);
     if (name) {
-        if(PL_stashcache)
-	    hv_delete(PL_stashcache, name, HvNAMELEN_get(hv), G_DISCARD);
+        if (PL_stashcache)
+	    (void)hv_delete(PL_stashcache, name, HvNAMELEN_get(hv), G_DISCARD);
 	hv_name_set(hv, NULL, 0, 0);
     }
     SvFLAGS(hv) &= ~SVf_OOK;
@@ -2396,24 +2333,6 @@ S_share_hek_flags(pTHX_ const char *str, I32 len, register U32 hash, int flags)
 	Safefree(str);
 
     return HeKEY_hek(entry);
-}
-
-STATIC SV *
-S_hv_magic_uvar_xkey(pTHX_ HV* hv, SV* keysv, int action)
-{
-    MAGIC* mg;
-    if ((mg = mg_find((SV*)hv, PERL_MAGIC_uvar))) {
-	struct ufuncs * const uf = (struct ufuncs *)mg->mg_ptr;
-	if (uf->uf_set == NULL) {
-	    SV* obj = mg->mg_obj;
-	    mg->mg_obj = keysv;         /* pass key */
-	    uf->uf_index = action;      /* pass action */
-	    magic_getuvar((SV*)hv, mg);
-	    keysv = mg->mg_obj;         /* may have changed */
-	    mg->mg_obj = obj;
-	}
-    }
-    return keysv;
 }
 
 I32 *

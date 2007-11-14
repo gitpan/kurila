@@ -1,9 +1,8 @@
 #! perl -w
 
 use strict ;
-require 5.004 ;
 
-$::VERSION = '2.004' ;
+$::VERSION = '2.006' ;
 
 use private::MakeUtil;
 use ExtUtils::MakeMaker 5.16 ;
@@ -41,6 +40,8 @@ WriteMakefile(
             AUTHOR       => 'Paul Marquess <pmqs@cpan.org>')
         : ()
     ),
+
+    INSTALLDIRS => ($] >= 5.009 ? 'perl' : 'site'),
 
     ((ExtUtils::MakeMaker->VERSION() gt '6.30') ?
         ('LICENSE'  => 'perl')         : ()),    

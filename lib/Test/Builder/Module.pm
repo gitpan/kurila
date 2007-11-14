@@ -7,7 +7,7 @@ use Test::Builder;
 require Exporter;
 our @ISA = qw(Exporter);
 
-our $VERSION = '0.68';
+our $VERSION = '0.72';
 
 use strict;
 
@@ -97,7 +97,7 @@ sub import {
 
     $test->plan(@_);
 
-    $class->$_export_to_level(1, $class, @imports);
+    $class->?$_export_to_level(1, $class, @imports);
 }
 
 

@@ -354,9 +354,9 @@ struct regnode_charclass_class {	/* has [[:blah:]] classes */
 
 #define ANYOF_FLAGS(p)		((p)->flags)
 
-#define ANYOF_BIT(c)		(1 << ((c) & 7))
+#define ANYOF_BIT(c)		(1 << ((U8)(c) & 7))
 
-#define ANYOF_CLASS_BYTE(p, c)	(((struct regnode_charclass_class*)(p))->classflags[((c) >> 3) & 3])
+#define ANYOF_CLASS_BYTE(p, c)	(((struct regnode_charclass_class*)(p))->classflags[((U8)(c) >> 3) & 3])
 #define ANYOF_CLASS_SET(p, c)	(ANYOF_CLASS_BYTE(p, c) |=  ANYOF_BIT(c))
 #define ANYOF_CLASS_CLEAR(p, c)	(ANYOF_CLASS_BYTE(p, c) &= ~ANYOF_BIT(c))
 #define ANYOF_CLASS_TEST(p, c)	(ANYOF_CLASS_BYTE(p, c) &   ANYOF_BIT(c))
@@ -386,11 +386,7 @@ struct regnode_charclass_class {	/* has [[:blah:]] classes */
 /*
  * Utility definitions.
  */
-#ifndef CHARMASK
-#  define UCHARAT(p)	((int)*(const U8*)(p))
-#else
-#  define UCHARAT(p)	((int)*(p)&CHARMASK)
-#endif
+static __inline__ UV UCHARAT(const char *p) {	return *(U8*)p; }
 
 #define EXTRA_SIZE(guy) ((sizeof(guy)-1)/sizeof(struct regnode))
 
@@ -485,7 +481,7 @@ END_EXTERN_C
  */
 struct reg_data {
     U32 count;
-    U8 *what;
+    char *what;
     void* data[1];
 };
 
@@ -771,7 +767,7 @@ re.pm, especially to the documentation.
     const char * const rpv =                                       \
         pv_pretty((dsv), (pv), (l), (m), \
             PL_colors[0], PL_colors[1], \
-            ( PERL_PV_PRETTY_QUOTE | PERL_PV_PRETTY_ELIPSES |      \
+            ( PERL_PV_PRETTY_QUOTE | PERL_PV_PRETTY_ELLIPSES |      \
               ((isuni) ? PERL_PV_ESCAPE_UNI : 0))                  \
         )                                                  
 

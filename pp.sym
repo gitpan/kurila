@@ -219,7 +219,6 @@ Perl_pp_leavesublv
 Perl_pp_caller
 Perl_pp_warn
 Perl_pp_die
-Perl_pp_reset
 Perl_pp_lineseq
 Perl_pp_nextstate
 Perl_pp_dbstate
@@ -255,15 +254,12 @@ Perl_pp_binmode
 Perl_pp_tie
 Perl_pp_untie
 Perl_pp_tied
-Perl_pp_dbmopen
-Perl_pp_dbmclose
 Perl_pp_sselect
 Perl_pp_select
 Perl_pp_getc
 Perl_pp_read
 Perl_pp_prtf
 Perl_pp_print
-Perl_pp_say
 Perl_pp_sysopen
 Perl_pp_sysseek
 Perl_pp_sysread

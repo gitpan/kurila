@@ -26,7 +26,7 @@ sub subb {"in s"}
 
 @INPUT = <DATA>;
 @simple_input = grep /^\s*\w+\s*\$\w+\s*[#\n]/, @INPUT;
-print "1..", (10 + @INPUT + @simple_input), "\n";
+print "1..", (11 + @INPUT + @simple_input), "\n";
 $ord = 0;
 
 sub wrn {"@_"}
@@ -172,6 +172,25 @@ EOE
     }
   }
 }
+
+$ord++;
+eval {
+    sub PVBM () { 'foo' }
+    index 'foo', PVBM;
+    my $x = PVBM;
+
+    my $str = 'foo';
+    my $pvlv = \substr $str, 0, 1;
+    $x = $pvlv;
+
+    1;
+};
+if ($@) {
+    warn "# $@";
+    print 'not ';
+}
+print "ok $ord\n";
+
 __END__
 ref $xref			# ref
 ref $cstr			# ref nonref
@@ -211,12 +230,12 @@ $n >> $n			# right_shift
 $n <=> $n			# ncmp
 $n <=> $n			# i_ncmp
 $n cmp $n			# scmp
-$n & $n				# bit_and
-$n ^ $n				# bit_xor
-$n | $n				# bit_or
+$n ^&^ $n				# bit_and
+$n ^^^ $n				# bit_xor
+$n ^|^ $n				# bit_or
 -$n				# negate
 -$n				# i_negate
-~$n				# complement
+^~^$n				# complement
 atan2 $n,$n			# atan2
 sin $n				# sin
 cos $n				# cos

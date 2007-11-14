@@ -12,7 +12,7 @@ stuff:
     gethostbyaddr getnetbyname getnetbyaddr getprotobyname getprotobynumber
     getservbyname getservbyport sethostent setnetent setprotoent setservent
     getpwnam getpwuid getgrnam getgrgid waitpid setpgrp setpriority
-    getpriority syscall dbmopen ioctl fcntl truncate getsockopt setsockopt
+    getpriority syscall ioctl fcntl truncate getsockopt setsockopt
     semctl semop semget msgget msgctl msgsnd msgrcv shmget shmctl shmread
     shmwrite
 
@@ -303,15 +303,15 @@ use warnings 'uninitialized';
 my ($m1, $v);
 our ($g1);
 
-$v = $m1 | $m2;
-$v = $m1 & $m2;
-$v = $m1 ^ $m2;
-$v = ~$m1;
+$v = $m1 ^|^ $m2;
+$v = $m1 ^&^ $m2;
+$v = $m1 ^^^ $m2;
+$v = ^~^$m1;
 
-$v = $g1 | $g2;
-$v = $g1 & $g2;
-$v = $g1 ^ $g2;
-$v = ~$g1;
+$v = $g1 ^|^ $g2;
+$v = $g1 ^&^ $g2;
+$v = $g1 ^^^ $g2;
+$v = ^~^$g1;
 EXPECT
 Use of uninitialized value $m1 in bitwise or (|) at - line 5.
 Use of uninitialized value $m2 in bitwise or (|) at - line 5.
@@ -730,6 +730,22 @@ Use of uninitialized value $m1 in scalar assignment at - line 5.
 ########
 use warnings 'uninitialized';
 my ($m1);
+our ($g1);
+
+$v = pos($m1) + 1;
+$v = pos($g1) + 1;
+$m1 = 0;
+$g1 = "";
+$v = pos($m1) + 1;
+$v = pos($g1) + 1;
+EXPECT
+Use of uninitialized value in addition (+) at - line 5.
+Use of uninitialized value in addition (+) at - line 6.
+Use of uninitialized value in addition (+) at - line 9.
+Use of uninitialized value in addition (+) at - line 10.
+########
+use warnings 'uninitialized';
+my ($m1);
 
 { my $x = "a" x $m1 }		# NB LHS of repeat does not warn
 { my @x = ("a") x $m1 }
@@ -982,7 +998,7 @@ my @a;
 $v = 1 + splice @a, $m1, $g1;
 
 my $x = bless [], 'Z';
-eval { $x->$m1() };
+eval { $x->?$m1() };
 
 eval { &$m1() };
 eval { &$g1() };
@@ -990,9 +1006,6 @@ eval { &$g1() };
 warn $m1,$g1,"foo";
 
 eval { die $m1, $g1 };
-
-reset $m1;
-reset $g1;
 EXPECT
 Use of uninitialized value $m1 in subroutine dereference at - line 5.
 Use of uninitialized value $m1 in subroutine dereference at - line 5.
@@ -1011,8 +1024,6 @@ Use of uninitialized value $g1 in warn at - line 18.
 foo at - line 18.
 Use of uninitialized value $m1 in die at - line 20.
 Use of uninitialized value $g1 in die at - line 20.
-Use of uninitialized value $m1 in symbol reset at - line 22.
-Use of uninitialized value $g1 in symbol reset at - line 23.
 ########
 use warnings 'uninitialized';
 my ($m1);

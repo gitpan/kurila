@@ -132,9 +132,9 @@ C<delete>, C<each>, C<exists>, C<keys>, C<values>
 =item Input and output functions
 X<I/O> X<input> X<output> X<dbm>
 
-C<binmode>, C<close>, C<closedir>, C<dbmclose>, C<dbmopen>, C<die>, C<eof>,
+C<binmode>, C<close>, C<closedir>, C<die>, C<eof>,
 C<fileno>, C<flock>, C<format>, C<getc>, C<print>, C<printf>, C<read>,
-C<readdir>, C<rewinddir>, C<say>, C<seek>, C<seekdir>, C<select>, C<syscall>,
+C<readdir>, C<rewinddir>, C<seek>, C<seekdir>, C<select>, C<syscall>,
 C<sysread>, C<sysseek>, C<syswrite>, C<tell>, C<telldir>, C<truncate>,
 C<warn>, C<write>
 
@@ -174,7 +174,7 @@ L<feature>.)
 =item Miscellaneous functions
 
 C<defined>, C<dump>, C<eval>, C<formline>, C<local>, C<my>, C<our>,
-C<reset>, C<scalar>, C<state>, C<undef>, C<wantarray>
+C<scalar>, C<state>, C<undef>, C<wantarray>
 
 =item Functions for processes and process groups
 X<process> X<pid> X<process id>
@@ -188,10 +188,10 @@ X<module>
 
 C<do>, C<import>, C<no>, C<package>, C<require>, C<use>
 
-=item Keywords related to classes and object-orientedness
+=item Keywords related to classes and object-orientation
 X<object> X<class> X<package>
 
-C<bless>, C<dbmclose>, C<dbmopen>, C<package>, C<ref>, C<tie>, C<tied>,
+C<bless>, C<package>, C<ref>, C<tie>, C<tied>,
 C<untie>, C<use>
 
 =item Low-level socket functions
@@ -240,10 +240,6 @@ C<ucfirst>, C<untie>, C<use>, C<when>
 * - C<sub> was a keyword in perl4, but in perl5 it is an
 operator, which can be used in expressions.
 
-=item Functions obsoleted in perl5
-
-C<dbmclose>, C<dbmopen>
-
 =back
 
 =head2 Portability
@@ -256,7 +252,7 @@ functionality may differ slightly.  The Perl functions affected
 by this are:
 
 C<-X>, C<binmode>, C<chmod>, C<chown>, C<chroot>, C<crypt>,
-C<dbmclose>, C<dbmopen>, C<dump>, C<endgrent>, C<endhostent>,
+C<dump>, C<endgrent>, C<endhostent>,
 C<endnetent>, C<endprotoent>, C<endpwent>, C<endservent>, C<exec>,
 C<fcntl>, C<flock>, C<fork>, C<getgrent>, C<getgrgid>, C<gethostbyname>,
 C<gethostent>, C<getlogin>, C<getnetbyaddr>, C<getnetbyname>, C<getnetent>,
@@ -445,12 +441,12 @@ previous timer, and an argument of C<0> may be supplied to cancel the
 previous timer without starting a new one.  The returned value is the
 amount of time remaining on the previous timer.
 
-For delays of finer granularity than one second, you may use Perl's
-four-argument version of select() leaving the first three arguments
-undefined, or you might be able to use the C<syscall> interface to
-access setitimer(2) if your system supports it.  The Time::HiRes
-module (from CPAN, and starting from Perl 5.8 part of the standard
-distribution) may also prove useful.
+For delays of finer granularity than one second, the Time::HiRes module
+(from CPAN, and starting from Perl 5.8 part of the standard
+distribution) provides ualarm().  You may also use Perl's four-argument
+version of select() leaving the first three arguments undefined, or you
+might be able to use the C<syscall> interface to access setitimer(2) if
+your system supports it. See L<perlfaq8> for details.
 
 It is usually a mistake to intermix C<alarm> and C<sleep> calls.
 (C<sleep> may be internally implemented in your system with C<alarm>)
@@ -1048,56 +1044,6 @@ of the situation by trying to downgrade (a copy of the string)
 the string back to an eight-bit byte string before calling crypt()
 (on that copy).  If that works, good.  If not, crypt() dies with
 C<Wide character in crypt>.
-
-=item dbmclose HASH
-X<dbmclose>
-
-[This function has been largely superseded by the C<untie> function.]
-
-Breaks the binding between a DBM file and a hash.
-
-=item dbmopen HASH,DBNAME,MASK
-X<dbmopen> X<dbm> X<ndbm> X<sdbm> X<gdbm>
-
-[This function has been largely superseded by the C<tie> function.]
-
-This binds a dbm(3), ndbm(3), sdbm(3), gdbm(3), or Berkeley DB file to a
-hash.  HASH is the name of the hash.  (Unlike normal C<open>, the first
-argument is I<not> a filehandle, even though it looks like one).  DBNAME
-is the name of the database (without the F<.dir> or F<.pag> extension if
-any).  If the database does not exist, it is created with protection
-specified by MASK (as modified by the C<umask>).  If your system supports
-only the older DBM functions, you may perform only one C<dbmopen> in your
-program.  In older versions of Perl, if your system had neither DBM nor
-ndbm, calling C<dbmopen> produced a fatal error; it now falls back to
-sdbm(3).
-
-If you don't have write access to the DBM file, you can only read hash
-variables, not set them.  If you want to test whether you can write,
-either use file tests or try setting a dummy hash entry inside an C<eval>,
-which will trap the error.
-
-Note that functions such as C<keys> and C<values> may return huge lists
-when used on large DBM files.  You may prefer to use the C<each>
-function to iterate over large DBM files.  Example:
-
-    # print out history file offsets
-    dbmopen(%HIST,'/usr/lib/news/history',0666);
-    while (($key,$val) = each %HIST) {
-	print $key, ' = ', unpack('L',$val), "\n";
-    }
-    dbmclose(%HIST);
-
-See also L<AnyDBM_File> for a more general description of the pros and
-cons of the various dbm approaches, as well as L<DB_File> for a particularly
-rich implementation.
-
-You can control which DBM library you use by loading that library
-before you call dbmopen():
-
-    use DB_File;
-    dbmopen(%NS_Hist, "$ENV{HOME}/.netscape/history.db")
-	or die "Can't open netscape history file: $!";
 
 =item defined EXPR
 X<defined> X<undef> X<undefined>
@@ -2229,6 +2175,18 @@ The Socket library makes this slightly easier:
 
     # or going the other way
     $straddr = inet_ntoa($iaddr);
+
+In the opposite way, to resolve a hostname to the IP address
+you can write this:
+
+    use Socket;
+    $packed_ip = gethostbyname("www.perl.org");
+    if (defined $packed_ip) {
+        $ip_address = inet_ntoa($packed_ip);
+    }
+
+Make sure <gethostbyname()> is called in SCALAR context and that
+its return value is checked for definedness.
 
 If you get tired of remembering which element of the return list
 contains which return value, by-name interfaces are provided
@@ -4140,10 +4098,10 @@ the function whose prototype you want to retrieve.
 
 If FUNCTION is a string starting with C<CORE::>, the rest is taken as a
 name for Perl builtin.  If the builtin is not I<overridable> (such as
-C<qw//>) or its arguments cannot be expressed by a prototype (such as
-C<system>) returns C<undef> because the builtin does not really behave
-like a Perl function.  Otherwise, the string describing the equivalent
-prototype is returned.
+C<qw//>) or if its arguments cannot be adequately expressed by a prototype
+(such as C<system>), prototype() returns C<undef>, because the builtin
+does not really behave like a Perl function.  Otherwise, the string
+describing the equivalent prototype is returned.
 
 =item push ARRAY,LIST
 X<push> X<stack>
@@ -4436,32 +4394,13 @@ rename(2) manpage or equivalent system documentation for details.
 For a platform independent C<move> function look at the L<File::Copy>
 module.
 
-=item require VERSION
-X<require>
-
 =item require EXPR
 
 =item require
 
-Demands a version of Perl specified by VERSION, or demands some semantics
-specified by EXPR or by C<$_> if EXPR is not supplied.
+Demands some semantics specified by EXPR or by C<$_> if EXPR is not supplied.
 
-VERSION may be either a numeric argument such as 5.006, which will be
-compared to C<$]>, or a literal of the form v5.6.1, which will be compared
-to C<$^V> (aka $PERL_VERSION).  A fatal error is produced at run time if
-VERSION is greater than the version of the current Perl interpreter.
-Compare with L</use>, which can do a similar check at compile time.
-
-Specifying VERSION as a literal of the form v5.6.1 should generally be
-avoided, because it leads to misleading error messages under earlier
-versions of Perl that do not support this syntax.  The equivalent numeric
-version should be used instead.
-
-    require v5.6.1;	# run time version check
-    require 5.6.1;	# ditto
-    require 5.006_001;	# ditto; preferred for backwards compatibility
-
-Otherwise, C<require> demands that a library file be included if it
+C<require> demands that a library file be included if it
 hasn't already been included.  The file is included via the do-FILE
 mechanism, which is essentially just a variety of C<eval> with the
 caveat that lexical variables in the invoking script will be invisible
@@ -4620,30 +4559,6 @@ corresponding to the files they have loaded. See L<perlvar/%INC>.
 
 For a yet-more-powerful import facility, see L</use> and L<perlmod>.
 
-=item reset EXPR
-X<reset>
-
-=item reset
-
-Generally used in a C<continue> block at the end of a loop to clear
-variables and reset C<??> searches so that they work again.  The
-expression is interpreted as a list of single characters (hyphens
-allowed for ranges).  All variables and arrays beginning with one of
-those letters are reset to their pristine state.  If the expression is
-omitted, one-match searches (C<?pattern?>) are reset to match again.  Resets
-only variables or searches in the current package.  Always returns
-1.  Examples:
-
-    reset 'X';		# reset all X variables
-    reset 'a-z';	# reset lower case variables
-    reset;		# just reset ?one-time? searches
-
-Resetting C<"A-Z"> is not recommended because you'll wipe out your
-C<@ARGV> and C<@INC> arrays and your C<%ENV> hash.  Resets only package
-variables--lexical variables are unaffected, but they clean themselves
-up on scope exit anyway, so you'll probably want to use them instead.
-See L</my>.
-
 =item return EXPR
 X<return>
 
@@ -4713,20 +4628,6 @@ the C<rmtree> function of the L<File::Path> module.
 =item s///
 
 The substitution operator.  See L<perlop>.
-
-=item say FILEHANDLE LIST
-X<say>
-
-=item say LIST
-
-=item say
-
-Just like C<print>, but implicitly appends a newline.
-C<say LIST> is simply an abbreviation for C<{ local $\ = "\n"; print
-LIST }>.
-
-This keyword is only available when the "say" feature is
-enabled: see L<feature>.
 
 =item scalar EXPR
 X<scalar> X<context>
@@ -5096,11 +4997,12 @@ always sleep the full amount.  They may appear to sleep longer than that,
 however, because your process might not be scheduled right away in a
 busy multitasking system.
 
-For delays of finer granularity than one second, you may use Perl's
-C<syscall> interface to access setitimer(2) if your system supports
-it, or else see L</select> above.  The Time::HiRes module (from CPAN,
-and starting from Perl 5.8 part of the standard distribution) may also
-help.
+For delays of finer granularity than one second, the Time::HiRes module
+(from CPAN, and starting from Perl 5.8 part of the standard
+distribution) provides usleep().  You may also use Perl's four-argument
+version of select() leaving the first three arguments undefined, or you
+might be able to use the C<syscall> interface to access setitimer(2) if
+your system supports it. See L<perlfaq8> for details.
 
 See also the POSIX module's C<pause> function.
 
@@ -5405,14 +5307,22 @@ the following:
 
 produces the output 'h:i: :t:h:e:r:e'.
 
-Empty leading (or trailing) fields are produced when there are positive
-width matches at the beginning (or end) of the string; a zero-width match
-at the beginning (or end) of the string does not produce an empty field.
-For example:
+Empty leading fields are produced when there are positive-width matches at
+the beginning of the string; a zero-width match at the beginning of
+the string does not produce an empty field. For example:
 
    print join(':', split(/(?=\w)/, 'hi there!'));
 
-produces the output 'h:i :t:h:e:r:e!'.
+produces the output 'h:i :t:h:e:r:e!'. Empty trailing fields, on the other
+hand, are produced when there is a match at the end of the string (and
+when LIMIT is given and is not 0), regardless of the length of the match.
+For example:
+
+   print join(':', split(//,   'hi there!', -1));
+   print join(':', split(/\W/, 'hi there!', -1));
+
+produce the output 'h:i: :t:h:e:r:e:!:' and 'hi:there:', respectively,
+both with an empty trailing field.
 
 The LIMIT parameter can be used to split a line partially
 
@@ -5849,7 +5759,7 @@ than the default seed.  Checksumming the compressed output of one or more
 rapidly changing operating system status programs is the usual method.  For
 example:
 
-    srand (time ^ $$ ^ unpack "%L*", `ps axww | gzip`);
+    srand (time ^ $$ ^ unpack "%L*", `ps axww | gzip -f`);
 
 If you're particularly concerned with this, see the C<Math::TrulyRandom>
 module in CPAN.
@@ -6808,8 +6718,6 @@ X<use> X<module> X<import>
 
 =item use Module
 
-=item use VERSION
-
 Imports some semantics into the current package from the named module,
 generally by aliasing certain subroutine or variable names into your
 package.  It is exactly equivalent to
@@ -6817,32 +6725,6 @@ package.  It is exactly equivalent to
     BEGIN { require Module; Module->import( LIST ); }
 
 except that Module I<must> be a bareword.
-
-In the peculiar C<use VERSION> form, VERSION may be either a numeric
-argument such as 5.006, which will be compared to C<$]>, or a literal of
-the form v5.6.1, which will be compared to C<$^V> (aka $PERL_VERSION).  A
-fatal error is produced if VERSION is greater than the version of the
-current Perl interpreter; Perl will not attempt to parse the rest of the
-file.  Compare with L</require>, which can do a similar check at run time.
-Symmetrically, C<no VERSION> allows you to specify that you want a version
-of perl older than the specified one.
-
-Specifying VERSION as a literal of the form v5.6.1 should generally be
-avoided, because it leads to misleading error messages under earlier
-versions of Perl that do not support this syntax.  The equivalent numeric
-version should be used instead.
-
-    use v5.6.1;		# compile time version check
-    use 5.6.1;		# ditto
-    use 5.006_001;	# ditto; preferred for backwards compatibility
-
-This is often useful if you need to check the current Perl version before
-C<use>ing library modules that have changed in incompatible ways from
-older versions of Perl.  (We try not to do this more than we have to.)
-
-Also, if the specified perl version is greater than or equal to 5.9.5,
-C<use VERSION> will also load the C<feature> pragma and enable all
-features available in the requested version.  See L<feature>.
 
 The C<BEGIN> forces the C<require> and C<import> to happen at compile time.  The
 C<require> makes sure the module is loaded into memory if it hasn't been

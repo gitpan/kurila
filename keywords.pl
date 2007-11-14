@@ -86,8 +86,6 @@ connect
 continue
 cos
 crypt
-dbmclose
-dbmopen
 default
 defined
 delete
@@ -105,7 +103,6 @@ endpwent
 endservent
 eof
 eq
-err
 eval
 exec
 exists
@@ -215,14 +212,12 @@ redo
 ref
 rename
 require
-reset
 return
 reverse
 rewinddir
 rindex
 rmdir
 s
-say
 scalar
 seek
 seekdir

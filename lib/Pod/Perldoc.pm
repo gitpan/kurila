@@ -1,6 +1,4 @@
 
-require 5;
-use 5.006;  # we use some open(X, "<", $y) syntax 
 package Pod::Perldoc;
 use strict;
 use warnings;
@@ -12,7 +10,7 @@ use File::Spec::Functions qw(catfile catdir splitdir);
 use vars qw($VERSION @Pagers $Bindir $Pod2man
   $Temp_Files_Created $Temp_File_Lifetime
 );
-$VERSION = '3.14_01';
+$VERSION = '3.14_02';
 #..........................................................................
 
 BEGIN {  # Make a DEBUG constant very first thing...
@@ -350,6 +348,9 @@ sub init {
   DEBUG > 3 and printf "Formatter switches now: [%s]\n",
    join ' ', map "[@$_]", @{ $self->{'formatter_switches'} };
 
+  $self->{'translators'} = [];
+  $self->{'extra_search_dirs'} = [];
+
   return;
 }
 
@@ -418,12 +419,6 @@ sub process {
                          }
 
     return $self->usage_brief  unless  @pages;
-
-    # Adjusts pages for translation packages
-    if ( $self->opt_L ) {
-        eval "require POD2::" . uc($self->opt_L);
-        @pages = map { 'POD2::' . uc($self->opt_L) . '::' . $_ } @pages if ! $@;
-    }
 
     $self->find_good_formatter_class();
     $self->formatter_sanity_check();
@@ -654,6 +649,9 @@ sub options_processing {
     $self->opt_n("nroff") unless $self->opt_n;
     $self->add_formatter_option( '__nroffer' => $self->opt_n );
 
+    # Adjust for using translation packages
+    $self->add_translator($self->opt_L) if $self->opt_L;
+
     return;
 }
 
@@ -715,10 +713,14 @@ sub grand_search_init {
             next;
         }
 
+        my @searchdirs;
+
+        # prepend extra search directories (including language specific)
+        push @searchdirs, @{ $self->{'extra_search_dirs'} };
+
         # We must look both in @INC for library modules and in $bindir
         # for executables, like h2xs or perldoc itself.
-
-        my @searchdirs = ($self->{'bindir'}, @INC);
+        push @searchdirs, ($self->{'bindir'}, @INC);
         unless ($self->opt_m) {
             if (IS_VMS) {
                 my($i,$trn);
@@ -818,6 +820,39 @@ sub add_formatter_option { # $self->add_formatter_option('key' => 'value');
   return;
 }
 
+#.........................................................................
+
+sub pod_dirs { # @dirs = pod_dirs($translator);
+    my $tr = shift;
+    return $tr->pod_dirs if $tr->can('pod_dirs');
+    
+    my $mod = ref $tr || $tr;
+    $mod =~ s|::|/|g;
+    $mod .= '.pm';
+
+    my $dir = $INC{$mod};
+    $dir =~ s/\.pm\z//;
+    return $dir;
+}
+
+#.........................................................................
+
+sub add_translator { # $self->add_translator($lang);
+    my $self = shift;
+    for my $lang (@_) {
+        my $pack = 'POD2::' . uc($lang);
+        eval "require $pack";
+        if ( $@ ) {
+            # XXX warn: non-installed translator package
+        } else {
+            push @{ $self->{'translators'} }, $pack;
+            push @{ $self->{'extra_search_dirs'} }, pod_dirs($pack);
+            # XXX DEBUG
+        }
+    }
+    return;
+}
+
 #..........................................................................
 
 sub search_perlfunc {
@@ -838,8 +873,8 @@ sub search_perlfunc {
 
     my $re = 'Alphabetical Listing of Perl Functions';
     if ( $self->opt_L ) {
-        my $code = 'POD2::' . uc($self->opt_L);
-        $re =  $code->search_perlfunc_re if $code->can('search_perlfunc_re');
+        my $tr = $self->{'translators'}->[0];
+        $re =  $tr->search_perlfunc_re if $tr->can('search_perlfunc_re');
     }
 
     # Skip introduction
@@ -956,7 +991,7 @@ sub render_findings {
     foreach my $f (@{ $self->{'formatter_switches'} || [] }) {
       my($switch, $value, $silent_fail) = @$f;
       if( $formatter->can($switch) ) {
-        eval { $formatter->$switch( defined($value) ? $value : () ) };
+        eval { $formatter->?$switch( defined($value) ? $value : () ) };
         warn "Got an error when setting $formatter_class\->$switch:\n$@\n"
          if $@;
       } else {
@@ -1110,7 +1145,7 @@ sub MSWin_perldoc_tempfile {
       time(),
       $$,
       defined( &Win32::GetTickCount )
-        ? (Win32::GetTickCount() & 0xff)
+        ? (Win32::GetTickCount() ^&^ 0xff)
         : int(rand 256)
        # Under MSWin, $$ values get reused quickly!  So if we ran
        # perldoc foo and then perldoc bar before there was time for
@@ -1557,6 +1592,7 @@ sub searchfor {
     $self->{'target'} = (splitdir $s)[-1];  # XXX: why not use File::Basename?
     for ($i=0; $i<@dirs; $i++) {
 	$dir = $dirs[$i];
+	next unless -d $dir;
 	($dir = VMS::Filespec::unixpath($dir)) =~ s!/\z!! if IS_VMS;
 	if (       (! $self->opt_m && ( $ret = $self->check_file($dir,"$s.pod")))
 		or ( $ret = $self->check_file($dir,"$s.pm"))

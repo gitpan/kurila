@@ -2323,9 +2323,9 @@ struct _reg_trie_data;
 typedef MEM_SIZE STRLEN;
 
 #ifdef PERL_MAD
-typedef struct token TOKEN;
+typedef struct madtoken MADTOKEN;
 typedef struct madprop MADPROP;
-typedef struct nexttoken NEXTTOKE;
+typedef struct nextmadtoken NEXTMADTOKE;
 #endif
 typedef struct op OP;
 typedef struct cop COP;
@@ -2647,9 +2647,13 @@ typedef struct clone_params CLONE_PARAMS;
 #  define PERL_FPU_POST_EXEC  }
 #endif
 
-#ifndef PERL_SYS_INIT3
-#  define PERL_SYS_INIT3(argvp,argcp,envp) PERL_SYS_INIT(argvp,argcp)
+#ifndef PERL_SYS_INIT3_BODY
+#  define PERL_SYS_INIT3_BODY(argvp,argcp,envp) PERL_SYS_INIT_BODY(argvp,argcp)
 #endif
+
+#define PERL_SYS_INIT(argc, argv)	Perl_sys_init(argc, argv)
+#define PERL_SYS_INIT3(argc, argv, env)	Perl_sys_init3(argc, argv, env)
+#define PERL_SYS_TERM()			Perl_sys_term(aTHX)
 
 #ifndef PERL_WRITE_MSG_TO_CONSOLE
 #  define PERL_WRITE_MSG_TO_CONSOLE(io, msg, len) PerlIO_write(io, msg, len)
@@ -3300,7 +3304,7 @@ typedef        struct crypt_data {     /* straight from /usr/include/crypt.h */
 #include "perly.h"
 
 #ifdef PERL_MAD
-struct nexttoken {
+struct nextmadtoken {
     YYSTYPE next_val;	/* value of next token, if any */
     I32 next_type;	/* type of next token */
     MADPROP *next_mad;	/* everything else about that token */
@@ -4109,6 +4113,12 @@ EXTCONST char PL_no_localize_ref[]
 EXTCONST char PL_memory_wrap[]
   INIT("panic: memory wrap");
 
+#ifdef CSH
+EXTCONST char PL_cshname[]
+  INIT(CSH);
+#  define PL_cshlen	(sizeof(CSH "") - 1)
+#endif
+
 EXTCONST char PL_uuemap[65]
   INIT("`!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_");
 
@@ -4335,6 +4345,111 @@ EXTCONST char* const PL_block_type[] = {
 #else
 EXTCONST char* PL_block_type[];
 #endif
+#endif
+
+/* These are all the compile time options that affect binary compatibility.
+   Other compile time options that are binary compatible are in perl.c
+   Both are combined for the output of perl -V
+   However, this string will be embedded in any shared perl library, which will
+   allow us add a comparison check in perlmain.c in the near future.  */
+#ifdef DOINIT
+EXTCONST char PL_bincompat_options[] =
+#  ifdef DEBUG_LEAKING_SCALARS
+			     " DEBUG_LEAKING_SCALARS"
+#  endif
+#  ifdef DEBUG_LEAKING_SCALARS_FORK_DUMP
+			     " DEBUG_LEAKING_SCALARS_FORK_DUMP"
+#  endif
+#  ifdef FAKE_THREADS
+			     " FAKE_THREADS"
+#  endif
+#  ifdef MULTIPLICITY
+			     " MULTIPLICITY"
+#  endif
+#  ifdef MYMALLOC
+			     " MYMALLOC"
+#  endif
+#  ifdef PERL_DEBUG_READONLY_OPS
+			     " PERL_DEBUG_READONLY_OPS"
+#  endif
+#  ifdef PERL_GLOBAL_STRUCT
+			     " PERL_GLOBAL_STRUCT"
+#  endif
+#  ifdef PERL_IMPLICIT_CONTEXT
+			     " PERL_IMPLICIT_CONTEXT"
+#  endif
+#  ifdef PERL_IMPLICIT_SYS
+			     " PERL_IMPLICIT_SYS"
+#  endif
+#  ifdef PERL_MAD
+			     " PERL_MAD"
+#  endif
+#  ifdef PERL_NEED_APPCTX
+			     " PERL_NEED_APPCTX"
+#  endif
+#  ifdef PERL_NEED_TIMESBASE
+			     " PERL_NEED_TIMESBASE"
+#  endif
+#  ifdef PERL_OLD_COPY_ON_WRITE
+			     " PERL_OLD_COPY_ON_WRITE"
+#  endif
+#  ifdef PERL_POISON
+			     " PERL_POISON"
+#  endif
+#  ifdef PERL_TRACK_MEMPOOL
+			     " PERL_TRACK_MEMPOOL"
+#  endif
+#  ifdef PERL_USES_PL_PIDSTATUS
+			     " PERL_USES_PL_PIDSTATUS"
+#  endif
+#  ifdef PL_OP_SLAB_ALLOC
+			     " PL_OP_SLAB_ALLOC"
+#  endif
+#  ifdef THREADS_HAVE_PIDS
+			     " THREADS_HAVE_PIDS"
+#  endif
+#  ifdef USE_64_BIT_ALL
+			     " USE_64_BIT_ALL"
+#  endif
+#  ifdef USE_64_BIT_INT
+			     " USE_64_BIT_INT"
+#  endif
+#  ifdef USE_IEEE
+			     " USE_IEEE"
+#  endif
+#  ifdef USE_ITHREADS
+			     " USE_ITHREADS"
+#  endif
+#  ifdef USE_LARGE_FILES
+			     " USE_LARGE_FILES"
+#  endif
+#  ifdef USE_LONG_DOUBLE
+			     " USE_LONG_DOUBLE"
+#  endif
+#  ifdef USE_PERLIO
+			     " USE_PERLIO"
+#  endif
+#  ifdef USE_REENTRANT_API
+			     " USE_REENTRANT_API"
+#  endif
+#  ifdef USE_SFIO
+			     " USE_SFIO"
+#  endif
+#  ifdef USE_SOCKS
+			     " USE_SOCKS"
+#  endif
+#  ifdef VMS_DO_SOCKETS
+			     " VMS_DO_SOCKETS"
+#    ifdef DECCRTL_SOCKETS
+			     " DECCRTL_SOCKETS"
+#    endif
+#  endif
+#  ifdef VMS_WE_ARE_CASE_SENSITIVE
+			     " VMS_SYMBOL_CASE_AS_IS"
+#  endif
+  "";
+#else
+EXTCONST char PL_bincompat_options[];
 #endif
 
 END_EXTERN_C
@@ -5630,7 +5745,7 @@ extern void moncontrol(int);
 #define PERL_UNICODE_OUT_FLAG			0x0010
 #define PERL_UNICODE_ARGV_FLAG			0x0020
 #define PERL_UNICODE_LOCALE_FLAG		0x0040
-#define PERL_UNICODE_WIDESYSCALLS_FLAG		0x0080 /* for Sarathy */
+#define PERL_UNICODE_NOTUSED		0x0080
 #define PERL_UNICODE_UTF8CACHEASSERT_FLAG	0x0100
 
 #define PERL_UNICODE_STD_FLAG		\
@@ -5731,8 +5846,7 @@ extern void moncontrol(int);
 #define PERL_PV_ESCAPE_QUOTE        0x0001
 #define PERL_PV_PRETTY_QUOTE        PERL_PV_ESCAPE_QUOTE
 
-
-#define PERL_PV_PRETTY_ELIPSES      0x0002
+#define PERL_PV_PRETTY_ELLIPSES     0x0002
 #define PERL_PV_PRETTY_LTGT         0x0004
 
 #define PERL_PV_ESCAPE_FIRSTCHAR    0x0008
@@ -5745,9 +5859,11 @@ extern void moncontrol(int);
 #define PERL_PV_ESCAPE_NOCLEAR      0x4000
 #define PERL_PV_ESCAPE_RE           0x8000
 
+#define PERL_PV_PRETTY_NOCLEAR      PERL_PV_ESCAPE_NOCLEAR
+
 /* used by pv_display in dump.c*/
-#define PERL_PV_PRETTY_DUMP  PERL_PV_PRETTY_ELIPSES|PERL_PV_PRETTY_QUOTE
-#define PERL_PV_PRETTY_REGPROP PERL_PV_PRETTY_ELIPSES|PERL_PV_PRETTY_LTGT|PERL_PV_ESCAPE_RE
+#define PERL_PV_PRETTY_DUMP  PERL_PV_PRETTY_ELLIPSES|PERL_PV_PRETTY_QUOTE
+#define PERL_PV_PRETTY_REGPROP PERL_PV_PRETTY_ELLIPSES|PERL_PV_PRETTY_LTGT|PERL_PV_ESCAPE_RE
 
 /*
 

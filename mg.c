@@ -56,7 +56,7 @@ tie.
 #endif
 
 #if defined(HAS_SIGACTION) && defined(SA_SIGINFO)
-Signal_t Perl_csighandler(int sig, ...);
+Signal_t Perl_csighandler(int sig, siginfo_t *, void *);
 #else
 Signal_t Perl_csighandler(int sig);
 #endif
@@ -309,7 +309,7 @@ Perl_mg_length(pTHX_ SV *sv)
     }
 
     if (DO_UTF8(sv)) {
-        const U8 *s = (U8*)SvPV_const(sv, len);
+        const char *s = SvPV_const(sv, len);
 	len = utf8_length(s, s + len);
     }
     else
@@ -557,7 +557,7 @@ Perl_magic_regdatum_get(pTHX_ SV *sv, MAGIC *mg)
 		    if (i > 0 && IN_CODEPOINTS) {
 			const char * const b = rx->subbeg;
 			if (b)
-			    i = utf8_length((U8*)b, (U8*)(b+i));
+			    i = utf8_length(b, (b+i));
 		    }
 
 		    sv_setiv(sv, i);
@@ -1266,7 +1266,7 @@ S_raise_signal(pTHX_ int sig)
 
 Signal_t
 #if defined(HAS_SIGACTION) && defined(SA_SIGINFO)
-Perl_csighandler(int sig, ...)
+Perl_csighandler(int sig, siginfo_t *sip PERL_UNUSED_DECL, void *uap PERL_UNUSED_DECL)
 #else
 Perl_csighandler(int sig)
 #endif
@@ -1275,6 +1275,8 @@ Perl_csighandler(int sig)
     dTHXa(PERL_GET_SIG_CONTEXT);
 #else
     dTHX;
+#endif
+#if defined(HAS_SIGACTION) && defined(SA_SIGINFO)
 #endif
 #ifdef FAKE_PERSISTENT_SIGNAL_HANDLERS
     (void) rsignal(sig, PL_csighandlerp);
@@ -1287,6 +1289,8 @@ Perl_csighandler(int sig)
 #else
             exit(1);
 #endif
+#endif
+#if defined(HAS_SIGACTION) && defined(SA_SIGINFO)
 #endif
    if (
 #ifdef SIGILL
@@ -1301,7 +1305,11 @@ Perl_csighandler(int sig)
 	   (PL_signals & PERL_SIGNALS_UNSAFE_FLAG))
 	/* Call the perl level handler now--
 	 * with risk we may be in malloc() etc. */
+#if defined(HAS_SIGACTION) && defined(SA_SIGINFO)
+	(*PL_sighandlerp)(sig, NULL, NULL);
+#else
 	(*PL_sighandlerp)(sig);
+#endif
    else
 	S_raise_signal(aTHX_ sig);
 }
@@ -1338,7 +1346,11 @@ Perl_despatch_signals(pTHX)
 	    PERL_BLOCKSIG_ADD(set, sig);
  	    PL_psig_pend[sig] = 0;
 	    PERL_BLOCKSIG_BLOCK(set);
+#if defined(HAS_SIGACTION) && defined(SA_SIGINFO)
+	    (*PL_sighandlerp)(sig, NULL, NULL);
+#else
 	    (*PL_sighandlerp)(sig);
+#endif
 	    PERL_BLOCKSIG_UNBLOCK(set);
 	}
     }
@@ -1356,12 +1368,20 @@ Perl_magic_setsig(pTHX_ SV *sv, MAGIC *mg)
      */
     SV* to_dec = NULL;
     STRLEN len;
+    const char *s;
 #ifdef HAS_SIGPROCMASK
     sigset_t set, save;
     SV* save_sv;
 #endif
 
-    register const char *s = MgPV_const(mg,len);
+    if ( ! (SvTYPE(sv) == SVt_PVGV || SvROK(sv)) ) {
+	const char *s = SvOK(sv) ? SvPV_force(sv,len) : "DEFAULT";
+	if ( ! (strEQ(s,"IGNORE") || strEQ(s,"DEFAULT") || !*s)) {
+	    Perl_croak(aTHX_  "signal handler should be glob or reference or 'DEFAULT or 'IGNORE'");
+	}
+    }
+
+    s = MgPV_const(mg,len);
     if (*s == '_') {
 	if (strEQ(s,"__DIE__"))
 	    svp = &PL_diehook;
@@ -1434,7 +1454,7 @@ Perl_magic_setsig(pTHX_ SV *sv, MAGIC *mg)
 #endif
 	}
     }
-    else if (strEQ(s,"DEFAULT") || !*s) {
+    else {
 	if (i)
 #ifdef FAKE_DEFAULT_SIGNAL_HANDLERS
 	  {
@@ -1444,16 +1464,6 @@ Perl_magic_setsig(pTHX_ SV *sv, MAGIC *mg)
 #else
 	    (void)rsignal(i, (Sighandler_t) SIG_DFL);
 #endif
-    }
-    else {
-	if (ckWARN(WARN_SIGNAL))
-	    Perl_warner(aTHX_ packWARN(WARN_SIGNAL), "signal handler set to string");
-	if (!strchr(s,':') && !strchr(s,'\''))
-	    Perl_sv_insert(aTHX_ sv, 0, 0, STR_WITH_LEN("main::"));
-	if (i)
-	    (void)rsignal(i, PL_csighandlerp);
-	else
-	    *svp = SvREFCNT_inc_simple_NN(sv);
     }
 #ifdef HAS_SIGPROCMASK
     if(i)
@@ -1475,6 +1485,10 @@ Perl_magic_setisa(pTHX_ SV *sv, MAGIC *mg)
     /* Bail out if destruction is going on */
     if(PL_dirty) return 0;
 
+    /* Skip _isaelem because _isa will handle it shortly */
+    if (PL_delaymagic & DM_ARRAY && mg->mg_type == PERL_MAGIC_isaelem)
+	return 0;
+
     /* XXX Once it's possible, we need to
        detect that our @ISA is aliased in
        other stashes, and act on the stashes
@@ -1489,10 +1503,7 @@ Perl_magic_setisa(pTHX_ SV *sv, MAGIC *mg)
             : (GV*)SvMAGIC(mg->mg_obj)->mg_obj
     );
 
-    if(PL_delaymagic)
-        PL_delayedisa = stash;
-    else
-        mro_isa_changed_in(stash);
+    mro_isa_changed_in(stash);
 
     return 0;
 }
@@ -2264,6 +2275,7 @@ Perl_magic_set(pTHX_ SV *sv, MAGIC *mg)
 	    const char *const start = SvPV(sv, len);
 	    const char *out = (const char*)memchr(start, '\0', len);
 	    SV *tmp;
+	    HV* old_cop_hints_hash;
 
 
 	    PL_compiling.cop_hints |= HINT_LEXICAL_IO_IN | HINT_LEXICAL_IO_OUT;
@@ -2273,17 +2285,17 @@ Perl_magic_set(pTHX_ SV *sv, MAGIC *mg)
 	    /* Opening for input is more common than opening for output, so
 	       ensure that hints for input are sooner on linked list.  */
 
-	    HV* old_cop_hints_hash = PL_compiling.cop_hints_hash;
+	    old_cop_hints_hash = PL_compiling.cop_hints_hash;
 	    PL_compiling.cop_hints_hash = newHVhv(PL_compiling.cop_hints_hash);
 	    SvREFCNT_dec(old_cop_hints_hash);
 
 	    tmp = out ? newSVpvn(out + 1, start + len - out - 1) : newSVpvs("");
-	    hv_store_ent(PL_compiling.cop_hints_hash, 
-			 sv_2mortal(newSVpvs("open>")), tmp, 0);
+	    (void)hv_store_ent(PL_compiling.cop_hints_hash, 
+			       sv_2mortal(newSVpvs("open>")), tmp, 0);
 
 	    tmp = newSVpvn(start, out ? (STRLEN)(out - start) : len);
-	    hv_store_ent(PL_compiling.cop_hints_hash,
-			 sv_2mortal(newSVpvs("open<")), tmp, 0);
+	    (void)hv_store_ent(PL_compiling.cop_hints_hash,
+			       sv_2mortal(newSVpvs("open<")), tmp, 0);
 	}
 	break;
     case '\020':	/* ^P */
@@ -2673,7 +2685,7 @@ Perl_whichsig(pTHX_ const char *sig)
 
 Signal_t
 #if defined(HAS_SIGACTION) && defined(SA_SIGINFO)
-Perl_sighandler(int sig, ...)
+Perl_sighandler(int sig, siginfo_t *sip, void *uap PERL_UNUSED_DECL)
 #else
 Perl_sighandler(int sig)
 #endif
@@ -2751,32 +2763,26 @@ Perl_sighandler(int sig)
 	 struct sigaction oact;
 
 	 if (sigaction(sig, 0, &oact) == 0 && oact.sa_flags & SA_SIGINFO) {
-	      siginfo_t *sip;
-	      va_list args;
-
-	      va_start(args, sig);
-	      sip = (siginfo_t*)va_arg(args, siginfo_t*);
 	      if (sip) {
 		   HV *sih = newHV();
 		   SV *rv  = newRV_noinc((SV*)sih);
 		   /* The siginfo fields signo, code, errno, pid, uid,
 		    * addr, status, and band are defined by POSIX/SUSv3. */
-		   hv_store(sih, "signo",   5, newSViv(sip->si_signo),  0);
-		   hv_store(sih, "code",    4, newSViv(sip->si_code),   0);
+		   (void)hv_stores(sih, "signo", newSViv(sip->si_signo));
+		   (void)hv_stores(sih, "code", newSViv(sip->si_code));
 #if 0 /* XXX TODO: Configure scan for the existence of these, but even that does not help if the SA_SIGINFO is not implemented according to the spec. */
-		   hv_store(sih, "errno",   5, newSViv(sip->si_errno),  0);
-		   hv_store(sih, "status",  6, newSViv(sip->si_status), 0);
-		   hv_store(sih, "uid",     3, newSViv(sip->si_uid),    0);
-		   hv_store(sih, "pid",     3, newSViv(sip->si_pid),    0);
-		   hv_store(sih, "addr",    4, newSVuv(PTR2UV(sip->si_addr)),   0);
-		   hv_store(sih, "band",    4, newSViv(sip->si_band),   0);
+		   hv_stores(sih, "errno",      newSViv(sip->si_errno));
+		   hv_stores(sih, "status",     newSViv(sip->si_status));
+		   hv_stores(sih, "uid",        newSViv(sip->si_uid));
+		   hv_stores(sih, "pid",        newSViv(sip->si_pid));
+		   hv_stores(sih, "addr",       newSVuv(PTR2UV(sip->si_addr)));
+		   hv_stores(sih, "band",       newSViv(sip->si_band));
 #endif
 		   EXTEND(SP, 2);
 		   PUSHs((SV*)rv);
 		   PUSHs(newSVpv((char *)sip, sizeof(*sip)));
 	      }
 
-              va_end(args);
 	 }
     }
 #endif
@@ -2906,7 +2912,9 @@ int
 Perl_magic_sethint(pTHX_ SV *sv, MAGIC *mg)
 {
     dVAR;
-    assert(mg->mg_len == HEf_SVKEY);
+    HV * new_hinthash;
+    if(!(mg->mg_len == HEf_SVKEY))
+	assert(mg->mg_len == HEf_SVKEY);
 
     /* mg->mg_obj isn't being used.  If needed, it would be possible to store
        an alternative leaf in there, with PL_compiling.cop_hints being used if
@@ -2919,11 +2927,11 @@ Perl_magic_sethint(pTHX_ SV *sv, MAGIC *mg)
     PL_hints |= HINT_LOCALIZE_HH;
 
     /* copy the hash, to preserve the old one */
-    HV * new_hinthash = newHVhv(PL_compiling.cop_hints_hash);
+    new_hinthash = newHVhv(PL_compiling.cop_hints_hash);
     SvREFCNT_dec(PL_compiling.cop_hints_hash);
     PL_compiling.cop_hints_hash = new_hinthash;
 
-    hv_store_ent(PL_compiling.cop_hints_hash, (SV *)mg->mg_ptr, newSVsv(sv), 0);
+    (void)hv_store_ent(PL_compiling.cop_hints_hash, (SV *)mg->mg_ptr, newSVsv(sv), 0);
     return 0;
 }
 
@@ -2939,6 +2947,7 @@ int
 Perl_magic_clearhint(pTHX_ SV *sv, MAGIC *mg)
 {
     dVAR;
+    HV * new_hinthash;
     PERL_UNUSED_ARG(sv);
 
     assert(mg->mg_len == HEf_SVKEY);
@@ -2948,11 +2957,11 @@ Perl_magic_clearhint(pTHX_ SV *sv, MAGIC *mg)
     PL_hints |= HINT_LOCALIZE_HH;
 
     /* copy the hash, to preserve the old one */
-    HV * new_hinthash = newHVhv(PL_compiling.cop_hints_hash);
+    new_hinthash = newHVhv(PL_compiling.cop_hints_hash);
     SvREFCNT_dec(PL_compiling.cop_hints_hash);
     PL_compiling.cop_hints_hash = new_hinthash;
 
-    hv_delete_ent(PL_compiling.cop_hints_hash, (SV *)mg->mg_ptr, 0, 0);
+    (void)hv_delete_ent(PL_compiling.cop_hints_hash, (SV *)mg->mg_ptr, 0, 0);
     return 0;
 }
 

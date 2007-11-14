@@ -1,5 +1,4 @@
 
-require 5.005;
 package Pod::Simple::Search;
 use strict;
 
@@ -128,7 +127,7 @@ sub _make_search_callback {
 
   # Put the options in variables, for easy access
   my(  $laborious, $verbose, $shadows, $limit_re, $callback, $progress,$path2name,$name2path) =
-    map scalar($self->$_()),
+    map scalar($self->?$_()),
      qw(laborious   verbose   shadows   limit_re   callback   progress  path2name  name2path);
 
   my($file, $shortname, $isdir, $modname_bits);

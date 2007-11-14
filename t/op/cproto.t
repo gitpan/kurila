@@ -2,7 +2,7 @@
 # Tests to ensure that we don't unexpectedly change prototypes of builtins
 
 BEGIN { require './test.pl'; }
-plan tests => 237;
+plan tests => 232;
 
 while (<DATA>) {
     chomp;
@@ -45,8 +45,6 @@ connect (*$)
 continue ()
 cos (_)
 crypt ($$)
-dbmclose (\%)
-dbmopen (\%$$)
 defined undef
 delete undef
 die (@)
@@ -63,7 +61,6 @@ endpwent ()
 endservent ()
 eof (;*)
 eq ($$)
-err ()
 eval undef
 exec undef
 exists undef
@@ -175,14 +172,12 @@ redo undef
 ref (_)
 rename ($$)
 require undef
-reset (;$)
 return undef
 reverse (@)
 rewinddir (*)
 rindex ($$;$)
 rmdir (_)
 s undef
-say undef
 scalar undef
 seek (*$$)
 seekdir (*$)

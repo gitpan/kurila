@@ -25,7 +25,6 @@
 
 package Pod::Man;
 
-require 5.005;
 
 use strict;
 use utf8;
@@ -41,7 +40,7 @@ use POSIX qw(strftime);
 # Don't use the CVS revision as the version, since this module is also in Perl
 # core and too many things could munge CVS magic revision strings.  This
 # number should ideally be the same as the CVS revision in podlators, however.
-$VERSION = '2.12';
+$VERSION = '2.12_01';
 
 # Set the debugging level.  If someone has inserted a debug function into this
 # class already, use that.  Otherwise, use any Pod::Simple debug function
@@ -269,7 +268,7 @@ sub _handle_element_start {
         DEBUG > 4 and print "Pending: [", pretty ($$self{PENDING}), "]\n";
     } elsif ($self->can ("start_$method")) {
         my $method = 'start_' . $method;
-        $self->$method ($attrs, '');
+        $self->?$method ($attrs, '');
     } else {
         DEBUG > 2 and print "No $method start method, skipping\n";
     }
@@ -291,7 +290,7 @@ sub _handle_element_end {
         DEBUG > 4 and print "Popped: [", pretty ($tag), "]\n";
         DEBUG > 4 and print "Pending: [", pretty ($$self{PENDING}), "]\n";
         my $method = 'cmd_' . $method;
-        my $text = $self->$method ($$tag[0], $$tag[2]);
+        my $text = $self->?$method ($$tag[0], $$tag[2]);
         if (defined $text) {
             if (@{ $$self{PENDING} } > 1) {
                 $$self{PENDING}[-1][2] .= $text;
@@ -301,7 +300,7 @@ sub _handle_element_end {
         }
     } elsif ($self->can ("end_$method")) {
         my $method = 'end_' . $method;
-        $self->$method ();
+        $self->?$method ();
     } else {
         DEBUG > 2 and print "No $method end method, skipping\n";
     }
@@ -793,7 +792,7 @@ sub devise_title {
         my $cut = 0;
         my $i;
         for ($i = 0; $i < scalar @dirs; $i++) {
-            if ($dirs[$i] eq 'lib' && $dirs[$i + 1] =~ /perl/) {
+            if ($dirs[$i] eq 'lib' && $i+1 < scalar(@dirs) && $dirs[$i + 1] =~ /perl/) {
                 $cut = $i + 2;
                 last;
             } elsif ($dirs[$i] =~ /perl/) {

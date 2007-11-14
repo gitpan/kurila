@@ -35,7 +35,6 @@ Albert Dvornik			<bert@genscan.com>
 Alessandro Forghieri		<alf@orion.it>
 Alexei Alexandrov		<alexei.alexandrov@gmail.com>
 Alex Davies			<adavies@ptc.com>
-Alex Gough			<alex@rcon.rog>
 Alex Vandiver			<alexmv@mit.edu>
 Alex Waugh			<alex@alexwaugh.com>
 Alexander Gough			<alex-p5p@earth.li>
@@ -91,6 +90,7 @@ Ben Tilly			<ben_tilly@operamail.com>
 Benjamin Goldberg		<goldbb2@earthlink.net>
 Benjamin Holzman		<bah@ecnvantage.com>
 Benjamin Low			<b.d.low@unsw.edu.au>
+Benjamin Smith			<bsmith@cabbage.org.uk>
 Benjamin Stuhl			<sho_pi@hotmail.com>
 Benjamin Sugars			<bsugars@canoe.ca>
 Bernard Quatermass		<bernard@quatermass.co.uk>
@@ -147,6 +147,7 @@ Chaskiel M Grundman
 Chia-liang Kao			<clkao@clkao.org>
 Chip Salzenberg			<chip@pobox.com>
 Chip Turner			<cturner@redhat.com>
+Chun Bing Ge			<gecb@cn.ibm.com>
 chocolateboy			<chocolateboy@chocolatey.com>
 Chris Ball			<chris@cpan.org>
 Chris Bongaarts			<cab@tc.umn.edu>
@@ -243,6 +244,7 @@ Devin Heitmueller               <devin.heitmueller@gmail.com>
 DH				<crazyinsomniac@yahoo.com>
 Diab Jerius			<dj@head-cfa.harvard.edu>
 dLux				<dlux@spam.sch.bme.hu>
+Dmitry Karasik			<dk@tetsuo.karasik.eu.org>
 Dominic Dunlop			<domo@computer.org>
 Dominique Dumont		<Dominique_Dumont@grenoble.hp.com>
 Dominique Quatravaux
@@ -258,6 +260,7 @@ Duncan Findlay			<duncf@debian.org>
 Ed Mooring			<mooring@Lynx.COM>
 Ed Peschko			<epeschko@den-mdev1>
 Ed Santiago                     <esm@pobox.com>
+Edgar Bering                    <trizor@gmail.com>
 Edmund Bacon
 Edward Avis			<ed@membled.com>
 Edward Moy			<emoy@apple.com>
@@ -637,7 +640,7 @@ Nicholas Clark			<nick@ccl4.org>
 Nicholas Oxhøj
 Nick Duffek
 Nick Gianniotis
-Nick Ing-Simmons		<nick@ing-simmons.net>
+Nick Ing-Simmons
 Nick Williams			<Nick.Williams@morganstanley.com>
 Nigel Sandever			<njsandever@hotmail.com>
 Nikola Knezevic			<indy@tesla.rcub.bg.ac.yu>
@@ -718,6 +721,7 @@ Raymund Will			<ray@caldera.de>
 Redvers Davies			<red@criticalintegration.com>
 Reini Urban			<rurban@x-ray.at>
 Rex Dieter			<rdieter@math.unl.edu>
+Ricardo SIGNES			<rjbs@cpan.org>
 Rich Morin			<rdm@cfcl.com>
 Rich Salz			<rsalz@bbn.com>
 Richard A. Wells		<Rwells@uhs.harvard.edu>
@@ -730,13 +734,13 @@ Richard L. England		<richard_england@mentorg.com>
 Richard L. Maus, Jr.		<rmaus@monmouth.com>
 Richard Soderberg		<p5-authors@crystalflame.net>
 Richard Yeh			<rcyeh@cco.caltech.edu>
-Richardo Signes                 <rjbs-perl-p5p@lists.manxome.org>
 Rick Delaney			<rick@consumercontact.com>
 Rick Pluta
 Rickard Westman
 Rob Brown			<bbb@cpan.org>
 Rob Henderson			<robh@cs.indiana.edu>
 Rob Napier			<rnapier@employees.org>
+Robert May			<robertmay@cpan.org>
 Robert Millan			<rmh@debian.org>
 Robert Partington		<rjp@riffraff.plig.net>
 Robert Sanders			<Robert.Sanders@linux.org>
@@ -790,6 +794,7 @@ Sisyphus			<sisyphus1@optusnet.com.au>
 Slaven Rezic			<slaven@rezic.de>
 Solar Designer			<solar@openwall.com>
 Spider Boardman			<spider@orb.nashua.nh.us>
+Spiros Denaxas			<spiros@lokku.com>
 Sreeji K Das                    <sreeji_k@yahoo.com>
 Stas Bekman			<stas@stason.org>
 Steffen Müller			<7k8lrvf02@sneakemail.com>
@@ -803,7 +808,7 @@ Stephen P. Potter		<spp@ds.net>
 Stephen Zander			<gibreel@pobox.com>
 Steve A Fink			<sfink@cs.berkeley.edu>
 Steve Grazzini			<grazz@pobox.com>
-Steve Hay			<Steve.Hay@uk.radan.com>
+Steve Hay			<SteveHay@planit.com>
 Steve Kelem			<steve.kelem@xilinx.com>
 Steve McDougall			<swmcd@world.std.com>
 Steve Nielsen			<spn@enteract.com>
@@ -874,6 +879,7 @@ Ulrich Pfeifer			<pfeifer@wait.de>
 Vadim Konovalov			<vkonovalov@lucent.com>
 Valeriy E. Ushakov		<uwe@ptc.spbu.ru>
 Ville Skyttä			<scop@cs132170.pp.htv.fi>
+Vincent Pit			<perl@profvince.com>
 Vishal Bhatia			<vishal@deja.com>
 Vlad Harchev			<hvv@hippo.ru>
 Vladimir Alexiev		<vladimir@cs.ualberta.ca>

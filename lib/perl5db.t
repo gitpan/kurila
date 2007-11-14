@@ -1,8 +1,6 @@
 #!/usr/bin/perl
 
 BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
     require './test.pl';
 }
 
@@ -53,7 +51,10 @@ rc(
     }\n|,
 );
 
-runperl(switches => [ '-d' ], progfile => $target);
+{
+    local $ENV{PERLDB_OPTS} = "ReadLine=0";
+    runperl(switches => [ '-d' ], progfile => $target);
+}
 
 my $contents;
 {

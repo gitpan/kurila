@@ -95,8 +95,6 @@
 #define PL_comppad_name_floor	(vTHX->Icomppad_name_floor)
 #define PL_cop_seqmax		(vTHX->Icop_seqmax)
 #define PL_cryptseen		(vTHX->Icryptseen)
-#define PL_cshlen		(vTHX->Icshlen)
-#define PL_cshname		(vTHX->Icshname)
 #define PL_curcop		(vTHX->Icurcop)
 #define PL_curcopdb		(vTHX->Icurcopdb)
 #define PL_curpad		(vTHX->Icurpad)
@@ -116,7 +114,6 @@
 #define PL_defgv		(vTHX->Idefgv)
 #define PL_defoutgv		(vTHX->Idefoutgv)
 #define PL_defstash		(vTHX->Idefstash)
-#define PL_delayedisa		(vTHX->Idelayedisa)
 #define PL_delaymagic		(vTHX->Idelaymagic)
 #define PL_diehook		(vTHX->Idiehook)
 #define PL_dirty		(vTHX->Idirty)
@@ -233,7 +230,6 @@
 #define PL_pidstatus		(vTHX->Ipidstatus)
 #define PL_ppid			(vTHX->Ippid)
 #define PL_preambleav		(vTHX->Ipreambleav)
-#define PL_preprocess		(vTHX->Ipreprocess)
 #define PL_profiledata		(vTHX->Iprofiledata)
 #define PL_psig_name		(vTHX->Ipsig_name)
 #define PL_psig_pend		(vTHX->Ipsig_pend)
@@ -405,8 +401,6 @@
 #define PL_Icomppad_name_floor	PL_comppad_name_floor
 #define PL_Icop_seqmax		PL_cop_seqmax
 #define PL_Icryptseen		PL_cryptseen
-#define PL_Icshlen		PL_cshlen
-#define PL_Icshname		PL_cshname
 #define PL_Icurcop		PL_curcop
 #define PL_Icurcopdb		PL_curcopdb
 #define PL_Icurpad		PL_curpad
@@ -426,7 +420,6 @@
 #define PL_Idefgv		PL_defgv
 #define PL_Idefoutgv		PL_defoutgv
 #define PL_Idefstash		PL_defstash
-#define PL_Idelayedisa		PL_delayedisa
 #define PL_Idelaymagic		PL_delaymagic
 #define PL_Idiehook		PL_diehook
 #define PL_Idirty		PL_dirty
@@ -543,7 +536,6 @@
 #define PL_Ipidstatus		PL_pidstatus
 #define PL_Ippid		PL_ppid
 #define PL_Ipreambleav		PL_preambleav
-#define PL_Ipreprocess		PL_preprocess
 #define PL_Iprofiledata		PL_profiledata
 #define PL_Ipsig_name		PL_psig_name
 #define PL_Ipsig_pend		PL_psig_pend

@@ -4,7 +4,7 @@ BEGIN {
     require './test.pl';
 }
 
-plan tests => 26;
+plan tests => 23;
 
 #
 # This file tries to test builtin override using CORE::GLOBAL
@@ -35,20 +35,11 @@ is( $r, join($dirsep, "Foo", "Bar.pm") );
 require 'Foo';
 is( $r, "Foo" );
 
-require 5.6;
-is( $r, "5.6" );
-
-require v5.6;
-ok( abs($r - 5.006) < 0.001 && $r eq "\x05\x06" );
-
 eval "use Foo";
 is( $r, "Foo.pm" );
 
 eval "use Foo::Bar";
 is( $r, join($dirsep, "Foo", "Bar.pm") );
-
-eval "use 5.6";
-is( $r, "5.6" );
 
 # localizing *CORE::GLOBAL::foo should revert to finding CORE::foo
 {
@@ -117,8 +108,7 @@ BEGIN { *OverridenPop::pop = sub { ::is( $_[0][0], "ok" ) }; }
     eval {
         local *CORE::GLOBAL::require = sub {
             CORE::require($_[0]);
-        };
-        require 5;
+        }        ;
         require Text::ParseWords;
     };
     is $@, '';

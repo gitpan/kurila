@@ -1,6 +1,5 @@
 package Tie::Array;
 
-use 5.006_001;
 use strict;
 use Carp;
 our $VERSION = '1.03';
@@ -184,7 +183,7 @@ descriptive, as well as example code:
 
 The class method is invoked by the command C<tie @array, classname>. Associates
 an array instance with the specified class. C<LIST> would represent
-additional arguments (along the lines of L<AnyDBM_File> and compatriots) needed
+additional arguments needed
 to complete the association. The method should return an object of a class which
 provides the methods below.
 

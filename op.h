@@ -37,11 +37,7 @@
  *			which may or may not check number of children).
  */
 
-#ifdef DEBUGGING_OPS
-#define OPCODE opcode
-#else
 #define OPCODE U16
-#endif
 
 #ifdef PERL_MAD
 #  define MADPROP_IN_BASEOP	MADPROP*	op_madprop;
@@ -326,11 +322,6 @@ struct pmop {
     }	op_pmreplrootu;
     union {
 	OP *	op_pmreplstart;	/* Only used in OP_SUBST */
-#ifdef USE_ITHREADS
-	char *	op_pmstashpv;	/* Only used in OP_MATCH, with PMf_ONCE set */
-#else
-	HV *	op_pmstash;
-#endif
     }		op_pmstashstartu;
 };
 
@@ -351,17 +342,12 @@ struct pmop {
 
 
 #define PMf_RETAINT	0x0001		/* taint $1 etc. if target tainted */
-#define PMf_ONCE	0x0002		/* match successfully only once per
-                                           reset, with related flag RXf_USED
-                                           in re->extflags holding state.
-					   This is used only for ?? matches,
-					   and only on OP_MATCH and OP_QR */
+#define PMf_UNSED	0x0002		/* was PMf_ONCE */
 
-#define PMf_UNUSED	0x0004		/* free for use */
+#define PMf_NOTUSED2	0x0004		/* free for use */
 #define PMf_MAYBE_CONST	0x0008		/* replacement contains variables */
 
-#define PMf_USED        0x0010          /* PMf_ONCE has matched successfully.
-                                           Not used under threading. */
+#define PMf_NOTUSED3    0x0010          /* was PMf_USED */
 
 #define PMf_CONST	0x0040		/* subst replacement is constant */
 #define PMf_KEEP	0x0080		/* keep 1st runtime pattern forever */
@@ -382,43 +368,6 @@ struct pmop {
 
 /* mask of bits that need to be transfered to re->extflags */
 #define PMf_COMPILETIME	(PMf_MULTILINE|PMf_SINGLELINE|PMf_FOLD|PMf_EXTENDED|PMf_KEEPCOPY|PMf_UTF8)
-
-#ifdef USE_ITHREADS
-
-#  define PmopSTASHPV(o)						\
-    (((o)->op_pmflags & PMf_ONCE) ? (o)->op_pmstashstartu.op_pmstashpv : NULL)
-#  if defined (DEBUGGING) && defined(__GNUC__) && !defined(PERL_GCC_BRACE_GROUPS_FORBIDDEN)
-#    define PmopSTASHPV_set(o,pv)	({				\
-	assert((o)->op_pmflags & PMf_ONCE);				\
-	((o)->op_pmstashstartu.op_pmstashpv = savesharedpv(pv));	\
-    })
-#  else
-#    define PmopSTASHPV_set(o,pv)					\
-    ((o)->op_pmstashstartu.op_pmstashpv = savesharedpv(pv))
-#  endif
-#  define PmopSTASH(o)		(PmopSTASHPV(o) \
-				 ? gv_stashpv((o)->op_pmstashstartu.op_pmstashpv,GV_ADD) : NULL)
-#  define PmopSTASH_set(o,hv)	PmopSTASHPV_set(o, ((hv) ? HvNAME_get(hv) : NULL))
-#  define PmopSTASH_free(o)	PerlMemShared_free(PmopSTASHPV(o))
-
-#else
-#  define PmopSTASH(o)							\
-    (((o)->op_pmflags & PMf_ONCE) ? (o)->op_pmstashstartu.op_pmstash : NULL)
-#  if defined (DEBUGGING) && defined(__GNUC__) && !defined(PERL_GCC_BRACE_GROUPS_FORBIDDEN)
-#    define PmopSTASH_set(o,hv)		({				\
-	assert((o)->op_pmflags & PMf_ONCE);				\
-	((o)->op_pmstashstartu.op_pmstash = (hv));			\
-    })
-#  else
-#    define PmopSTASH_set(o,hv)	((o)->op_pmstashstartu.op_pmstash = (hv))
-#  endif
-#  define PmopSTASHPV(o)	(PmopSTASH(o) ? HvNAME_get(PmopSTASH(o)) : NULL)
-   /* op_pmstashstartu.op_pmstash is not refcounted */
-#  define PmopSTASHPV_set(o,pv)	PmopSTASH_set((o), gv_stashpv(pv,GV_ADD))
-/* Note that if this becomes non-empty, then S_forget_pmop in op.c will need
-   changing */
-#  define PmopSTASH_free(o)    
-#endif
 
 struct svop {
     BASEOP
@@ -628,21 +577,19 @@ struct loop {
 #endif
 
 #ifdef PERL_MAD
-#  define MAD_NULL 1
-#  define MAD_PV 2
-#  define MAD_OP 3
-#  define MAD_SV 4
+#  define MAD_OP 1
+#  define MAD_SV 2
 
 struct madprop {
     MADPROP* mad_next;
-    void *mad_val;
+    const void *mad_val;
     U32 mad_vlen;
 /*    short mad_count; */
     char mad_key;
     char mad_type;
 };
 
-struct token {
+struct madtoken {
     I32 tk_type;
     YYSTYPE tk_lval;
     MADPROP* tk_mad;
@@ -650,7 +597,7 @@ struct token {
 #endif
 
 /*
- * Values that can be hold by mad_key :
+ * Values that can be held by mad_key :
  * ^       unfilled head spot
  * ,       literal ,
  * ;       literal ; (blank if implicit ; at end of block)
@@ -681,12 +628,12 @@ struct token {
  * A       use import args
  * b       format block
  * B       retired stub block
+ * c       the type the opcode is prototyped to
  * C       constant conditional op
  * d       declarator
  * D       do block
  * e       unreached "else" (see C)
  * e       expression producing E
- * E       tr/E/R/, /E/
  * f       folded constant op
  * F       peg op for format
  * g       op was forced to be a word
@@ -723,6 +670,8 @@ struct token {
  * X       random thing
  * _       whitespace/comments preceding anything else
  * ~       =~ operator
+ * >       op_null type (not a token)
+ * <       op_null type first (not a token)
  */
 
 /*

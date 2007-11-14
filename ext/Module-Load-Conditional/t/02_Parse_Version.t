@@ -12,7 +12,7 @@ use_ok( $Class );
 
 ### versions that should parse
 {   for my $str ( __PACKAGE__->_succeed ) {
-        my $res = $Class->$Meth( $str, $Verbose );
+        my $res = $Class->?$Meth( $str, $Verbose );
         ok( defined $res,       "String '$str' identified as version string" );
         
         ### XXX version.pm 0.69 pure perl fails tests under 5.6.2.
@@ -40,7 +40,7 @@ use_ok( $Class );
 
 ### version that should fail
 {   for my $str ( __PACKAGE__->_fail ) {
-        my $res = $Class->$Meth( $str, $Verbose );
+        my $res = $Class->?$Meth( $str, $Verbose );
         ok( ! defined $res,     "String '$str' is not a version string" );
     }
 }    
@@ -72,6 +72,8 @@ sub _succeed {
         ( $VERSION = q($Id: Tidy.pm,v 1.56 2006/07/19 23:13:33 perltidy Exp $) ) =~ s/^.*\s+(\d+)\/(\d+)\/(\d+).*$/$1$2$3/; # all one line for MakeMaker
         ($VERSION) = q $Revision: 2.120 $ =~ /([\d.]+)/;
         ($VERSION) = q$Revision: 1.00 $ =~ /([\d.]+)/;
+        $VERSION = "3.0.8";
+        $VERSION = '1.0.5';
     ];
 }
 

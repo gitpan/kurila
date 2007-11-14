@@ -23,6 +23,8 @@ sub xml_to_p5 {
     $deinterpolate = $options{'deinterpolate'};
     my $YAML = $options{'YAML'};
 
+    $::curenc = 0;		# start in utf8.
+
     local $SIG{__DIE__} = sub {
         my $e = shift;
         $e =~ s/\n$/\n    [NODE $filename line $::prevstate->{line}]/ if $::prevstate;
@@ -57,19 +59,19 @@ sub xml_to_p5 {
 
 $::curstate = 0;
 $::prevstate = 0;
-$::curenc = 1;		# start in iso-8859-1, sigh...
+$::curenc = 0;		# start in utf8.
 
 $::H = "HeredocHere000";
 %::H = ();
 
 my @enc = (
     'utf-8',
-    'iso-8859-1',
+    #'iso-8859-1',
 );
 
 my %enc = (
     'utf-8' => 0,
-    'iso-8859-1' => 1,
+    #'iso-8859-1' => 1,
 );
 
 my %madtype = (
@@ -370,7 +372,12 @@ sub uni { my $self = shift; $$self{uni}; }	# internal stuff all in utf8
 sub enc {
     my $self = shift;
     my $enc = $enc[$$self{enc} || 0];
-    return encode($enc, $$self{uni});
+
+    if ( ! $self->{enc} ) {
+        # use encode_utf8 to keep malformed utf8 data intact.
+        return Encode::encode_utf8($self->{uni});
+    }
+    return encode($enc, $self->{uni});
 }
 
 package p5::closequote;	BEGIN { @p5::closequote::ISA = 'p5::punct'; }
@@ -439,9 +446,7 @@ sub newtype {
 sub madness {
     my $self = shift;
     my @keys = split(' ', shift);
-    @keys = map { $_ eq 'd' ? ('k', 'd') : $_ } @keys;
     my @vals = ();
-
     @keys = map { $_ eq 'd' ? ('local', 'd') : $_ } @keys; # always 'local' before 'defintion'
     for my $key (@keys) {
 	my $madprop = $self->{mp}{$key};
@@ -512,10 +517,6 @@ sub ast {
 
 sub hash {
     my $self = shift;
-    my @pairs;
-    my %hash = ();
-    my $firstthing = '';
-    my $lastthing = '';
     
     my %mapping = map { reverse(%$_) } (
     { 'd', "defintion" },
@@ -524,8 +525,8 @@ sub hash {
     { 'q', "quote_open" },
     { 'Q', "quote_close" },
     { '=', "assign" },
+    { 'c', "prototyped" },
     { 'X', "value" },
-    { 'G', "endsection" },
     { 'g', "forcedword" },
     { '^', "hat" },
     { ';', "semicolon" },
@@ -534,8 +535,6 @@ sub hash {
     { '(', "round_open" },
     { ')', "round_close" },
     { 'U', "use" },
-    { '_', "wsbefore" },
-    { '#', "wsafter" },
     { 'O', "replacedoperator" },
     { 'A', "bigarrow" },
     { 'a', "arrow" },
@@ -544,11 +543,9 @@ sub hash {
     { 's', "sub" },
     { ',', "comma" },
     { 'p', "peg" },
-    { 'E', "evaluated" },
     { 'z', "subst_open" },
     { 'R', "subst_replacement" },
     { 'Z', "subst_close" },
-    { 'e', "trans_something_e" },
     { 'r', "trans_something_r" },
     { '3', "arg_3" },
     { '2', "arg_2" },
@@ -581,24 +578,41 @@ sub hash {
     { '~', "tilde" },
     { 't', "something_t" },
     { 'F', "format" },
+    { 'h', "constsub_args" },
     );
 
+    my %hash = ();
     # We need to guarantee key uniqueness at this point.
     for my $kid (@{$$self{Kids}}) {
-	my ($k,$v) = $kid->pair($self, @_);
-        if ($k =~ m/^ws(before|after)-(.*)$/) {
-            $k = ($1 eq "before" ? '_' : '#') . ($mapping{$2} || $2);
+        if ((ref $kid) =~ m/mad_op$/) {
+            my $name = $kid->{key};
+            my $k = $mapping{$name} || $name;
+            die "duplicate key $k - '$hash{$k}'" if exists $hash{$k};
+            $hash{$k} = $kid;
+        } else {
+            (ref $kid) =~ m/\:\:mad_(.*)$/;
+            my $name = $1;
+            my $k = $mapping{$name} || $name;
+            my $val = $kid->{val};
+            sub my_decode_utf8 { my $x = shift; Encode::_utf8_on($x); return $x; }
+            $val =~ s/STUPIDXML\(#x(\w+)\)/chr(hex $1)/eg;
+            $val =~ s/STUPIDXML\(#x\[(\w+)\]\)/my_decode_utf8(bytes::chr(hex $1))/eg;
+            die "duplicate key $k - '$hash{$k}' - '$val'" if exists $hash{$k} and $hash{$k} ne $val;
+            $hash{$k} = $val;
+            if ($kid->{wsbefore}) {
+                $val = $kid->{wsbefore};
+                $val =~ s/STUPIDXML\(#x(\w+)\)/chr(hex $1)/eg;
+                $val =~ s/STUPIDXML\(#x\[(\w+)\]\)/my_decode_utf8(bytes::chr(hex $1))/eg;
+                $hash{'_' . $k} = $val;
+            }
+            if ($kid->{wsafter}) {
+                $val = $kid->{wsafter};
+                $val =~ s/STUPIDXML\(#x(\w+)\)/chr(hex $1)/eg;
+                $val =~ s/STUPIDXML\(#x\[(\w+)\]\)/my_decode_utf8(bytes::chr(hex $1))/eg;
+                $hash{'#' . $k} = $val;
+            }
         }
-        else {
-            $k = $mapping{$k} || $k;
-        }
-	$firstthing ||= $k;
-        die "duplicate key $k - '$hash{$k}' - '$v'" if exists $hash{$k} and $hash{$k} ne $v;
-        $lastthing = $k;
-	$hash{$k} = $v;
     }
-    $hash{FIRST} = $firstthing;
-    $hash{LAST} = $lastthing;
     return \%hash;
 }
 
@@ -638,26 +652,6 @@ sub blockast {
     else {
 	return P5AST::op_lineseq->new(Kids => [@vals]);
     }
-}
-
-package PLXML::mad_pv;
-
-sub pair {
-    my $self = shift;
-    my $key = $$self{key};
-    my $val = $$self{val};
-    $val =~ s/STUPIDXML\(#x(\w+)\)/chr(hex $1)/eg;
-    return $key,$val;
-}
-
-package PLXML::mad_sv;
-
-sub pair {
-    my $self = shift;
-    my $key = $$self{key};
-    my $val = $$self{val};
-    $val =~ s/STUPIDXML\(#x(\w+)\)/chr(hex $1)/eg;
-    return $key,$val;
 }
 
 package PLXML::baseop;
@@ -833,6 +827,9 @@ sub ast {
     elsif ($$self{mp}{q}) {
 	push @newkids, $self->madness('q = Q m');
     }
+    elsif ($$self{mp}{trans_something_e}) {
+	push @newkids, $self->madness('trans_something_e');
+    }
     elsif ($$self{mp}{X}) {
 	push @newkids, $self->madness('X m');
     }
@@ -939,7 +936,6 @@ package PLXML;
 package PLXML::Characters;
 package PLXML::madprops;
 package PLXML::mad_op;
-package PLXML::mad_pv;
 package PLXML::baseop;
 package PLXML::baseop_unop;
 package PLXML::binop;
@@ -962,10 +958,17 @@ my %astmad;
 
 BEGIN {
     %astmad = (
-	'p' => sub {		# peg for #! line, etc.
+	'peg' => sub {		# peg for #! line, etc.
 	    my $self = shift;
 	    my @newkids;
-	    push @newkids, $self->madness('p G');
+	    push @newkids, $self->madness('p');
+
+            # endsection is unencoded.
+            {
+                local $::curenc = 0;
+                push @newkids, $self->madness('endsection');
+            }
+
 	    $::curstate = 0;
 	    return P5AST::peg->new(Kids => [@newkids])
 	},
@@ -979,7 +982,7 @@ BEGIN {
 	    push @newkids, $self->madness(')');
 	    return P5AST::parens->new(Kids => [@newkids])
 	},
-	'~' => sub {				# binding operator
+	'bind_match' => sub {				# binding operator
 	    my $self = shift;
 	    my @newkids;
 	    push @newkids, $$self{Kids}[0]->ast($self,@_);
@@ -987,14 +990,14 @@ BEGIN {
 	    push @newkids, $$self{Kids}[1]->ast($self,@_);
 	    return P5AST::bindop->new(Kids => [@newkids])
 	},
-	';' => sub {		# null statements/blocks
+	'nullstatement' => sub {		# null statements/blocks
 	    my $self = shift;
 	    my @newkids;
 	    push @newkids, $self->madness('{ ; }');
 	    $::curstate = 0;
 	    return P5AST::nothing->new(Kids => [@newkids])
 	},
-	'I' => sub {		# if or unless statement keyword
+	'if' => sub {		# if or unless statement keyword
 	    my $self = shift;
 	    my @newkids;
 	    push @newkids, $self->madness('L I (');
@@ -1010,10 +1013,10 @@ BEGIN {
 	    push @{$subkids[0]{Kids}}, $self->madness(')');
 	    return bless($newself, 'P5AST::condstate');
 	},
-	'U' => sub {			# use
+	'use' => sub {			# use
 	    my $self = shift;
 	    my @newkids;
-	    my @module = $self->madness('U');
+	    my @module = $self->madness('U') or die "use should have 'U' madness";
 	    my @args = $self->madness('A');
 	    my $module = $module[-1]{Kids}[-1];
 	    if ($module->uni eq 'bytes') {
@@ -1021,7 +1024,7 @@ BEGIN {
 	    }
 	    elsif ($module->uni eq 'utf8') {
 		if ($$self{mp}{o} eq 'no') {
-		    $::curenc = Nomad::encnum('iso-8859-1');
+		    $::curenc = 0;
 		}
 		else {
 		    $::curenc = Nomad::encnum('utf-8');
@@ -1055,14 +1058,14 @@ BEGIN {
 	    push @newkids, $condkids[2]->ast($self,@_);
 	    return P5AST::ternary->new(Kids => [@newkids])
 	},
-	'&' => sub {			# subroutine
+	'sub' => sub {			# subroutine
 	    my $self = shift;
 	    my @newkids;
 	    push @newkids, $self->madness('d n s a : { & } ;');
 	    $::curstate = 0;
 	    return P5AST::sub->new(Kids => [@newkids])
 	},
-	'i' => sub {			# modifier if
+	'modif' => sub {			# modifier if
 	    my $self = shift;
 	    my @newkids;
 	    push @newkids, $self->madness('i');
@@ -1075,7 +1078,7 @@ BEGIN {
 	    unshift @newkids, @subkids;
 	    return P5AST::condmod->new(Kids => [@newkids])
 	},
-	'P' => sub {				# package declaration
+	'package' => sub {				# package declaration
 	    my $self = shift;
 	    my @newkids;
 	    push @newkids, $self->madness('o');
@@ -1094,15 +1097,20 @@ BEGIN {
 	    my $self = shift;
 	    return P5AST::qwliteral->new(Kids => [$self->madness('x')])
 	},
-	'q' => sub {				# random quote
+	'quote' => sub {				# random quote
 	    my $self = shift;
-	    return P5AST::quote->new(Kids => [$self->madness('q = Q')])
+            my @kids;
+            {
+                local $::curenc = 0;
+                push @kids, $self->madness('=');
+            }
+	    return P5AST::quote->new(Kids => [$self->madness('q'), @kids, $self->madness('Q')])
 	},
-	'X' => sub {				# random literal
+	'value' => sub {				# random literal
 	    my $self = shift;
 	    return P5AST::token->new(Kids => [$self->madness('X')])
 	},
-	':' => sub {				# attr list
+	'attrlist' => sub {				# attr list
 	    my $self = shift;
 	    return P5AST::attrlist->new(Kids => [$self->madness(':')])
 	},
@@ -1113,14 +1121,14 @@ BEGIN {
 	    push @newkids, $$self{Kids}[0]->ast($self,@_);
 	    return P5AST::listelem->new(Kids => [@newkids])
 	},
-	'C' => sub {				# constant conditional
+	'const_cond' => sub {				# constant conditional
 	    my $self = shift;
 	    my @newkids;
 	    push @newkids, $$self{Kids}[0]->ast($self,@_);
 	    my @folded = $self->madness('C');
 	    if (@folded) {
 		my @t = $self->madness('t');
-		my @e = $self->madness('e');
+		my @e = $self->madness('trans_something_e');
 		if (@e) {
 		    return P5AST::op_cond_expr->new(
 			Kids => [
@@ -1146,21 +1154,21 @@ BEGIN {
 	    }
 	    return P5AST::op_null->new(Kids => [@newkids])
 	},
-	'+' => sub {				# unary +
+	'unary+' => sub {				# unary +
 	    my $self = shift;
 	    my @newkids;
 	    push @newkids, $self->madness('+');
 	    push @newkids, $$self{Kids}[0]->ast($self,@_);
 	    return P5AST::preplus->new(Kids => [@newkids])
 	},
-	'D' => sub {				# do block
+	'do' => sub {				# do block
 	    my $self = shift;
 	    my @newkids;
 	    push @newkids, $self->madness('D');
 	    push @newkids, $$self{Kids}[0]->ast($self,@_);
 	    return P5AST::doblock->new(Kids => [@newkids])
 	},
-	'3' => sub {				# C-style for loop
+	'cfor' => sub {				# C-style for loop
 	    my $self = shift;
 	    my @newkids;
 
@@ -1205,7 +1213,7 @@ BEGIN {
 	    $::curstate = 0;
 	    return P5AST::cfor->new(Kids => [@newkids])
 	},
-	'o' => sub {			# random useless operator
+	'operator' => sub {			# random useless operator
 	    my $self = shift;
 	    my @newkids;
 	    push @newkids, $self->madness('o');
@@ -1240,7 +1248,6 @@ BEGIN {
 sub ast {
     my $self = shift;
     my $was = $$self{was} || 'peg';
-    my $mad = $$self{mp}{FIRST} || "unknown";
 
     # First try for a "was".
     my $meth = "PLXML::op_${was}::astnull";
@@ -1248,11 +1255,13 @@ sub ast {
 	return $self->$meth(@_);
     }
 
-    # Look at first madprop.
-    if (exists $astmad{$mad}) {
-	return $astmad{$mad}->($self);
+    if (%{$self->{mp}}) {
+        my $nulltype = $$self{mp}{null_type_first} || $self->{mp}{null_type};
+        if (exists $astmad{$nulltype}) {
+            return $astmad{$nulltype}->($self);
+        }
+        die "unknwon type '$nulltype'";
     }
-    warn "No mad $mad" unless $mad eq 'unknown';
 
     # Do something generic.
     my @newkids;
@@ -1319,7 +1328,7 @@ sub astnull {
     my $self = shift;
     my @newkids;
     return unless $$self{mp};
-    push @newkids, $self->madness('q = Q X : f O ( )');
+    push @newkids, $self->madness('q = Q X h : f O ( )');
     return P5AST::op_const->new(Kids => [@newkids]);
 }
 
@@ -1350,7 +1359,7 @@ sub ast {
 	if (not $$self{mp}{O}) {
 	    push @before, $self->madness('o');	# was unary
 	}
-	my @X = $self->madness(': X');
+	my @X = $self->madness(': X h');
 	if (exists $$self{private} and $$self{private} =~ /BARE/) {
 	    return $self->newtype->new(Kids => [@X]);
 	}
@@ -1480,8 +1489,8 @@ sub ast {
     if ($$self{mp}{X}) {
 	return $self->madness('X m');
     }
-    if ($$self{mp}{e}) {
-	return $self->madness('e m');
+    if ($$self{mp}{trans_something_e}) {
+	return $self->madness('trans_something_e m');
     }
     return $$self{Kids}[1]->ast($self,@_), $self->madness('m');
 }
@@ -1494,7 +1503,7 @@ sub ast {
     my @newkids;
     push @newkids, $self->madness('dx d ( * $');
     push @newkids, $$self{Kids}[0]->ast();
-    push @newkids, $self->madness(')');
+    push @newkids, $self->madness(') a');
     return $self->newtype->new(Kids => [@newkids]);
 }
 
@@ -1544,6 +1553,7 @@ sub astnull {
     else {
 	push @newkids, $$self{Kids}[0]->ast(@_);
     }
+    push @newkids, $self->madness('a');
     return P5AST::op_rv2cv->new(Kids => [@newkids]);
 }
 
@@ -1555,6 +1565,7 @@ sub ast {
     if (@{$$self{Kids}}) {
 	push @newkids, $$self{Kids}[0]->ast();
     }
+    push @newkids, $self->madness('a');
     return $self->newtype->new(Kids => [@newkids]);
 }
 
@@ -1592,7 +1603,7 @@ package PLXML::op_srefgen;
 sub ast {
     my @newkids;
     my $self = shift;
-    if ($$self{mp}{FIRST} and $$self{mp}{FIRST} eq '{') {
+    if ($self->{mp}{'{'}) {
 	local $::curstate;	# this is officially a block, so hide it
 	local $::curenc = $::curenc;
 	push @newkids, $self->madness('{');
@@ -1746,10 +1757,13 @@ sub ast {
     my $X = p5::token->new($$self{mp}{X});
     my @lfirst = $self->madness('q');
     my @llast = $self->madness('Q');
-    push @newkids,
-	@lfirst,
-	$self->madness('E'),	# XXX s/b e probably
-	@llast;
+    push @newkids, @lfirst;
+    if ($self->{mp}{trans_something_e}) {
+        push @newkids, $self->madness('trans_something_e');	# XXX s/b e probably
+    } else {
+        push @newkids, $self->{Kids}[-1]->ast($self, @_);
+    }
+    push @newkids, @llast;
     my @rfirst = $self->madness('z');
     my @rlast = $self->madness('Z');
     my @mods = $self->madness('m');
@@ -1783,10 +1797,10 @@ sub ast {
     my @llast = $self->madness('Q');
     push @newkids,
 	@lfirst,
-	$self->madness('E'),
+	$self->madness('trans_something_e'),
 	@llast;
     my @rfirst = $self->madness('z');
-    my @repl = $self->madness('R');
+    my @repl = $self->madness('r');
     my @rlast = $self->madness('Z');
     my @mods = $self->madness('m');
     if ($rfirst[-1]->uni ne $llast[-1]->uni) {
@@ -2690,10 +2704,8 @@ sub astnull {
 sub ast {
     my $self = shift;
 
-    my $mad = $$self{mp}{FIRST} || "unknown";
-
     my @retval;
-    if ($mad eq 'w') {
+    if ($self->{mp}{w}) {
 	my @newkids;
 	my @tmpkids;
 	push @tmpkids, $self->{Kids};
@@ -2721,8 +2733,8 @@ sub ast {
 	if ($$self{mp}{t}) {
 	    push @before, $self->madness('t');
 	}
-	elsif ($$self{mp}{e}) {
-	    push @after, $self->madness('e');
+	elsif ($$self{mp}{trans_something_e}) {
+	    push @after, $self->madness('trans_something_e');
 	}
 	return P5AST::op_cond->new(Kids => [@before, $retval, @after]);
     }
@@ -2747,7 +2759,7 @@ sub ast {
     my @folded = $self->madness('C');
     if (@folded) {
 	my @t = $self->madness('t');
-	my @e = $self->madness('e');
+	my @e = $self->madness('trans_something_e');
 	if (@e) {
 	    return $self->newtype->new(
 		Kids => [
@@ -2907,6 +2919,7 @@ package PLXML::op_enterwrite;
 package PLXML::op_leavewrite;
 package PLXML::op_prtf;
 package PLXML::op_print;
+package PLXML::op_say;
 package PLXML::op_sysopen;
 package PLXML::op_sysseek;
 package PLXML::op_sysread;

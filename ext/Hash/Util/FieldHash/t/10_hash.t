@@ -36,7 +36,7 @@ ok (Internals::HvREHASH(%h), "20 entries triggers rehash");
 
 
 # second part using an emulation of the PERL_HASH in perl, mounting an
-# attack on a prepopulated hash. This is also useful if you need normal
+# attack on a pre-populated hash. This is also useful if you need normal
 # keys which don't contain \0 -- suitable for stashes
 
 use constant MASK_U32  => 2**32;
@@ -49,12 +49,12 @@ fieldhash my %h2;
 %h2 = map {$_ => 1} 'a'..'cc';
 
 ok (!Internals::HvREHASH(%h2), 
-    "starting with pre-populated non-pathalogical hash (rehash flag if off)");
+    "starting with pre-populated non-pathological hash (rehash flag if off)");
 
 my @keys = get_keys(\%h2);
 $h2{$_}++ for @keys;
 ok (Internals::HvREHASH(%h2), 
-    scalar(@keys) . " colliding into the same bucket keys are triggerring rehash");
+    scalar(@keys) . " colliding into the same bucket keys are triggering rehash");
 
 sub get_keys {
     my $hr = shift;
@@ -82,7 +82,7 @@ sub get_keys {
     while (@keys < THRESHOLD+2) {
         # next if exists $hash->{$s};
         $hash = hash($s);
-        next unless ($hash & $mask) == 0;
+        next unless ($hash ^&^ $mask) == 0;
         $c++;
         printf "# %2d: %5s, %10s\n", $c, $s, $hash;
         push @keys, $s;
@@ -104,15 +104,15 @@ sub hash {
     for (@c) {
         # (A % M) + (B % M) == (A + B) % M
         # This works because '+' produces a NV, which is big enough to hold
-        # the intermidiate result. We only need the % before any "^" and "&"
+        # the intermediate result. We only need the % before any "^" and "&"
         # to get the result in the range for an I32.
         # and << doesn't work on NV, so using 1 << 10
         $u += ord;
         $u += $u * (1 << 10); $u %= MASK_U32;
-        $u ^= $u >> 6;
+        $u ^^^= $u >> 6;
     }
     $u += $u << 3;  $u %= MASK_U32;
-    $u ^= $u >> 11; $u %= MASK_U32;
+    $u ^^^= $u >> 11; $u %= MASK_U32;
     $u += $u << 15; $u %= MASK_U32;
     $u;
 }

@@ -168,18 +168,44 @@ PP(pp_sassign)
 	if (!got_coderef) {
 	    /* We've been returned a constant rather than a full subroutine,
 	       but they expect a subroutine reference to apply.  */
-	    ENTER;
-	    SvREFCNT_inc_void(SvRV(cv));
-	    /* newCONSTSUB takes a reference count on the passed in SV
-	       from us.  We set the name to NULL, otherwise we get into
-	       all sorts of fun as the reference to our new sub is
-	       donated to the GV that we're about to assign to.
-	    */
-	    SvRV_set(left, (SV *)newCONSTSUB(GvSTASH(right), NULL,
+	    if (SvROK(cv)) {
+		ENTER;
+		SvREFCNT_inc_void(SvRV(cv));
+		/* newCONSTSUB takes a reference count on the passed in SV
+		   from us.  We set the name to NULL, otherwise we get into
+		   all sorts of fun as the reference to our new sub is
+		   donated to the GV that we're about to assign to.
+		*/
+		SvRV_set(left, (SV *)newCONSTSUB(GvSTASH(right), NULL,
 						 SvRV(cv)));
-	    SvREFCNT_dec(cv);
-	    LEAVE;
+		SvREFCNT_dec(cv);
+		LEAVE;
+	    } else {
+		/* What can happen for the corner case *{"BONK"} = \&{"BONK"};
+		   is that
+		   First:   ops for \&{"BONK"}; return us the constant in the
+			    symbol table
+		   Second:  ops for *{"BONK"} cause that symbol table entry
+			    (and our reference to it) to be upgraded from RV
+			    to typeblob)
+		   Thirdly: We get here. cv is actually PVGV now, and its
+			    GvCV() is actually the subroutine we're looking for
+
+		   So change the reference so that it points to the subroutine
+		   of that typeglob, as that's what they were after all along.
+		*/
+		GV *const upgraded = (GV *) cv;
+		CV *const source = GvCV(upgraded);
+
+		assert(source);
+		assert(CvFLAGS(source) & CVf_CONST);
+
+		SvREFCNT_inc_void(source);
+		SvREFCNT_dec(upgraded);
+		SvRV_set(left, (SV *)source);
+	    }
 	}
+
     }
     SvSetMagicSV(right, left);
     SETs(right);
@@ -731,11 +757,7 @@ PP(pp_print)
 	if (MARK <= SP)
 	    goto just_say_no;
 	else {
-	    if (PL_op->op_type == OP_SAY) {
-		if (PerlIO_write(fp, "\n", 1) == 0 || PerlIO_error(fp))
-		    goto just_say_no;
-	    }
-            else if (PL_ors_sv && SvOK(PL_ors_sv))
+	    if (PL_ors_sv && SvOK(PL_ors_sv))
 		if (!do_print(PL_ors_sv, fp)) /* $\ */
 		    goto just_say_no;
 
@@ -982,6 +1004,8 @@ PP(pp_aassign)
 		}
 		TAINT_NOT;
 	    }
+	    if (PL_delaymagic & DM_ARRAY)
+		SvSETMAGIC((SV*)ary);
 	    break;
 	case SVt_PVHV: {				/* normal hash */
 		SV *tmpstr;
@@ -1129,14 +1153,6 @@ PP(pp_aassign)
 	    *relem++ = (lelem <= lastlelem) ? *lelem++ : &PL_sv_undef;
     }
 
-    /* This is done at the bottom and in this order because
-       mro_isa_changed_in() can throw exceptions */
-    if(PL_delayedisa) {
-        HV* stash = PL_delayedisa;
-        PL_delayedisa = NULL;
-        mro_isa_changed_in(stash);
-    }
-
     RETURN;
 }
 
@@ -1174,7 +1190,7 @@ PP(pp_match)
     const I32 oldsave = PL_savestack_ix;
     I32 update_minmatch = 1;
     I32 had_zerolen = 0;
-    U32 gpos = 0;
+    void* gpos = NULL;
 
     if (PL_op->op_flags & OPf_STACKED)
 	TARG = POPs;
@@ -1195,19 +1211,12 @@ PP(pp_match)
     TAINT_NOT;
 
     /* PMdf_USED is set after a ?? matches once */
-    if (
-#ifdef USE_ITHREADS
-        SvREADONLY(PL_regex_pad[pm->op_pmoffset])
-#else
-        pm->op_pmflags & PMf_USED
-#endif
-    ) {
+    if (0) {
       failure:
 	if (gimme == G_ARRAY)
 	    RETURN;
 	RETPUSHNO;
     }
-
 
 
     /* empty pattern special-cased to use last successful pattern if possible */
@@ -1233,7 +1242,7 @@ PP(pp_match)
 		    r_flags |= REXEC_IGNOREPOS;
 		    rx->offs[0].end = rx->offs[0].start = mg->mg_len;
 		} else if (rx->extflags & RXf_GPOS_FLOAT) 
-		    gpos = mg->mg_len;
+		    gpos = INT2PTR(void*, mg->mg_len);
 		else 
 		    rx->offs[0].end = rx->offs[0].start = mg->mg_len;
 		minmatch = (mg->mg_flags & MGf_MINMATCH) ? rx->gofs + 1 : 0;
@@ -1278,16 +1287,9 @@ play_it_again:
 	     && !SvROK(TARG))	/* Cannot trust since INTUIT cannot guess ^ */
 	    goto yup;
     }
-    if (CALLREGEXEC(rx, (char*)s, (char *)strend, (char*)truebase, minmatch, TARG, INT2PTR(void*, gpos), r_flags))
+    if (CALLREGEXEC(rx, (char*)s, (char *)strend, (char*)truebase, minmatch, TARG, gpos, r_flags))
     {
 	PL_curpm = pm;
-	if (dynpm->op_pmflags & PMf_ONCE) {
-#ifdef USE_ITHREADS
-            SvREADONLY_on(PL_regex_pad[dynpm->op_pmoffset]);
-#else
-	    dynpm->op_pmflags |= PMf_USED;
-#endif
-        }
 	goto gotcha;
     }
     else
@@ -1381,13 +1383,6 @@ yup:					/* Confirmed by INTUIT */
 	RX_MATCH_TAINTED_on(rx);
     TAINT_IF(RX_MATCH_TAINTED(rx));
     PL_curpm = pm;
-    if (dynpm->op_pmflags & PMf_ONCE) {
-#ifdef USE_ITHREADS
-        SvREADONLY_on(PL_regex_pad[dynpm->op_pmoffset]);
-#else
-        dynpm->op_pmflags |= PMf_USED;
-#endif
-    }
     if (RX_MATCH_COPIED(rx))
 	Safefree(rx->subbeg);
     RX_MATCH_COPIED_off(rx);
@@ -1635,15 +1630,15 @@ Perl_do_readline(pTHX)
 	    }
 	} else if (PerlIO_isutf8(fp)) { /* OP_READLINE, OP_RCATLINE */
 	     if (ckWARN(WARN_UTF8)) {
-		const U8 * const s = (const U8*)SvPVX_const(sv) + offset;
+		const char * const s = SvPVX_const(sv) + offset;
 		const STRLEN len = SvCUR(sv) - offset;
-		const U8 *f;
+		const char *f;
 
 		if (!is_utf8_string_loc(s, len, &f))
 		    /* Emulate :encoding(utf8) warning in the same case. */
 		    Perl_warner(aTHX_ packWARN(WARN_UTF8),
 				"utf8 \"\\x%02X\" does not map to Unicode",
-				f < (U8*)SvEND(sv) ? *f : 0);
+				f < SvEND(sv) ? (U8)*f : 0);
 	     }
 	}
 	if (gimme == G_ARRAY) {
@@ -2933,7 +2928,7 @@ S_method_common(pTHX_ SV* meth, U32* hashp)
 	    /* this isn't the name of a filehandle either */
 	    if (!packname ||
 		((UTF8_IS_START(*packname) && DO_UTF8(sv))
-		    ? !isIDFIRST_utf8((U8*)packname)
+		    ? !isIDFIRST_utf8(packname)
 		    : !isIDFIRST(*packname)
 		))
 	    {
@@ -2947,7 +2942,7 @@ S_method_common(pTHX_ SV* meth, U32* hashp)
 		packsv = sv;
             else {
 	        SV* const ref = newSViv(PTR2IV(stash));
-	        hv_store(PL_stashcache, packname, packlen, ref, 0);
+	        (void)hv_store(PL_stashcache, packname, packlen, ref, 0);
 	    }
 	    goto fetch;
 	}
@@ -3005,16 +3000,24 @@ S_method_common(pTHX_ SV* meth, U32* hashp)
 	}
 	if (!sep || ((sep - name) == 5 && strnEQ(name, "SUPER", 5))) {
 	    /* the method name is unqualified or starts with SUPER:: */
+#ifndef USE_ITHREADS
+	    if (sep)
+		stash = CopSTASH(PL_curcop);
+#else
 	    bool need_strlen = 1;
 	    if (sep) {
 		packname = CopSTASHPV(PL_curcop);
 	    }
-	    else if (stash) {
+	    else
+#endif
+	    if (stash) {
 		HEK * const packhek = HvNAME_HEK(stash);
 		if (packhek) {
 		    packname = HEK_KEY(packhek);
 		    packlen = HEK_LEN(packhek);
+#ifdef USE_ITHREADS
 		    need_strlen = 0;
+#endif
 		} else {
 		    goto croak;
 		}
@@ -3025,8 +3028,10 @@ S_method_common(pTHX_ SV* meth, U32* hashp)
 		Perl_croak(aTHX_
 			   "Can't use anonymous symbol table for method lookup");
 	    }
-	    else if (need_strlen)
+#ifdef USE_ITHREADS
+	    if (need_strlen)
 		packlen = strlen(packname);
+#endif
 
 	}
 	else {

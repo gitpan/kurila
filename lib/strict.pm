@@ -3,10 +3,10 @@ package strict;
 $strict::VERSION = "1.04";
 
 # Verify that we're called correctly so that strictures will work.
-unless ( __FILE__ =~ /(^|[\/\\])\Q@{[__PACKAGE__]}\E\.pm$/ ) {
+unless ( __FILE__ =~ /(^|[\/\\])\Q${\__PACKAGE__}\E\.pmc?$/ ) {
     # Can't use Carp, since Carp uses us!
     my (undef, $f, $l) = caller;
-    die("Incorrect use of pragma '@{[__PACKAGE__,]}' at $f line $l.\n");
+    die("Incorrect use of pragma '${\__PACKAGE__}' at $f line $l.\n");
 }
 
 my %bitmask = (
@@ -20,7 +20,7 @@ sub bits {
     my @wrong;
     foreach my $s (@_) {
 	push @wrong, $s unless exists $bitmask{$s};
-        $bits |= $bitmask{$s} || 0;
+        $bits ^|^= $bitmask{$s} || 0;
     }
     if (@wrong) {
         require Carp;
@@ -33,12 +33,12 @@ my $default_bits = bits(qw(refs subs vars));
 
 sub import {
     shift;
-    $^H |= @_ ? bits(@_) : $default_bits;
+    $^H ^|^= @_ ? bits(@_) : $default_bits;
 }
 
 sub unimport {
     shift;
-    $^H &= ~ (@_ ? bits(@_) : $default_bits);
+    $^H ^&^= ^~^ (@_ ? bits(@_) : $default_bits);
 }
 
 1;

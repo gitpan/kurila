@@ -1,9 +1,8 @@
 package open;
 use warnings;
 
-our $VERSION = '1.05';
-
-require 5.008001; # for PerlIO::get_layers()
+our $VERSION = '1.05'
+;
 
 my $locale_encoding;
 
@@ -89,7 +88,7 @@ sub import {
 		my $target = $layer;		# the layer name itself
 		$target =~ s/^(\w+)\(.+\)$/$1/;	# strip parameters
 
-		unless(PerlIO::Layer::->find($target,1)) {
+		unless(PerlIO::Layer->find($target,1)) {
 		    warnings::warnif("layer", "Unknown PerlIO layer '$target'");
 		}
 	    }

@@ -1,5 +1,5 @@
 name: kurila
-version: 1.4_0
+version: 1.5_0
 abstract: a geneticly modified perl
 author: ~
 license: perl
@@ -34,6 +34,7 @@ no_index:
     - ext/Unicode/Normalize
     - ext/Win32
     - ext/Win32API/File
+    - ext/Win32CORE
     - lib/Archive/Extract
     - lib/Archive/Tar
     - lib/Attribute/Handlers

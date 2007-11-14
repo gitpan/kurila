@@ -6,13 +6,8 @@ my %Expect_Name = (); # what we expect for $File::Find::name/fullname
 my %Expect_Dir  = (); # what we expect for $File::Find::dir
 my ($cwd, $cwd_untainted);
 
-
-BEGIN {
-    chdir 't' if -d 't';
-    unshift @INC => '../lib';
-}
-
 use Config;
+use Carp::Heavy ();
 
 BEGIN {
     if ($^O ne 'VMS') {
@@ -33,7 +28,7 @@ BEGIN {
 				 or
 				 substr($dir,0,1) ne "/"
 				 or
-				 (stat $dir)[2] & 002);
+				 (stat $dir)[2] ^&^ 002);
     }
     $ENV{'PATH'} = join($sep,@path);
 }
@@ -104,6 +99,7 @@ sub wanted_File_Dir {
     print "# \$File::Find::dir => '$File::Find::dir'\n";
     print "# \$_ => '$_'\n";
     s#\.$## if ($^O eq 'VMS' && $_ ne '.');
+    s/(.dir)?$//i if ($^O eq 'VMS' && -d _);
 	ok( $Expect_File{$_}, "Expected and found $File::Find::name" );
     if ( $FastFileTests_OK ) {
         delete $Expect_File{ $_}
@@ -159,7 +155,9 @@ sub dir_path {
 
     } else { # $first_arg ne '.'
         return $first_arg unless @_; # return plain filename
-        return File::Spec->catdir($first_arg, @_); # relative path
+	my $fname = File::Spec->catdir($first_arg, @_); # relative path
+	$fname = VMS::Filespec::unixpath($fname) if $^O eq 'VMS';
+        return $fname;
     }
 }
 
@@ -207,7 +205,9 @@ sub file_path {
 
     } else { # $first_arg ne '.'
         return $first_arg unless @_; # return plain filename
-        return File::Spec->catfile($first_arg, @_); # relative path
+	my $fname = File::Spec->catfile($first_arg, @_); # relative path
+	$fname = VMS::Filespec::unixify($fname) if $^O eq 'VMS';
+        return $fname;
     }
 }
 

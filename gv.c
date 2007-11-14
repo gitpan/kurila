@@ -33,6 +33,7 @@ Perl stores its global variables.
 #include "EXTERN.h"
 #define PERL_IN_GV_C
 #include "perl.h"
+#include "overload.c"
 
 static const char S_autoload[] = "AUTOLOAD";
 static const STRLEN S_autolen = sizeof(S_autoload)-1;
@@ -169,10 +170,24 @@ GP *
 Perl_newGP(pTHX_ GV *const gv)
 {
     GP *gp;
+    U32 hash;
+#ifdef USE_ITHREADS
     const char *const file
 	= (PL_curcop && CopFILE(PL_curcop)) ? CopFILE(PL_curcop) : "";
-    STRLEN len = strlen(file);
-    U32 hash;
+    const STRLEN len = strlen(file);
+#else
+    SV *const temp_sv = CopFILESV(PL_curcop);
+    const char *file;
+    STRLEN len;
+
+    if (temp_sv) {
+	file = SvPVX(temp_sv);
+	len = SvCUR(temp_sv);
+    } else {
+	file = "";
+	len = 0;
+    }
+#endif
 
     PERL_HASH(hash, file, len);
 
@@ -526,6 +541,37 @@ C<call_sv> apply equally to these functions.
 =cut
 */
 
+STATIC HV*
+S_gv_get_super_pkg(pTHX_ const char* name, I32 namelen)
+{
+    AV* superisa;
+    GV** gvp;
+    GV* gv;
+    HV* stash;
+
+    stash = gv_stashpvn(name, namelen, 0);
+    if(stash) return stash;
+
+    /* If we must create it, give it an @ISA array containing
+       the real package this SUPER is for, so that it's tied
+       into the cache invalidation code correctly */
+    stash = gv_stashpvn(name, namelen, GV_ADD);
+    gvp = (GV**)hv_fetchs(stash, "ISA", TRUE);
+    gv = *gvp;
+    gv_init(gv, stash, "ISA", 3, TRUE);
+    superisa = GvAVn(gv);
+    GvMULTI_on(gv);
+    sv_magic((SV*)superisa, (SV*)gv, PERL_MAGIC_isa, NULL, 0);
+#ifdef USE_ITHREADS
+    av_push(superisa, newSVpv(CopSTASHPV(PL_curcop), 0));
+#else
+    av_push(superisa, newSVhek(CopSTASH(PL_curcop)
+			       ? HvNAME_HEK(CopSTASH(PL_curcop)) : NULL));
+#endif
+
+    return stash;
+}
+
 GV *
 Perl_gv_fetchmethod_autoload(pTHX_ HV *stash, const char *name, I32 autoload)
 {
@@ -554,7 +600,7 @@ Perl_gv_fetchmethod_autoload(pTHX_ HV *stash, const char *name, I32 autoload)
 	    SV * const tmpstr = sv_2mortal(Perl_newSVpvf(aTHX_ "%s::SUPER",
 						  CopSTASHPV(PL_curcop)));
 	    /* __PACKAGE__::SUPER stash should be autovivified */
-	    stash = gv_stashpvn(SvPVX_const(tmpstr), SvCUR(tmpstr), GV_ADD);
+	    stash = gv_get_super_pkg(SvPVX_const(tmpstr), SvCUR(tmpstr));
 	    DEBUG_o( Perl_deb(aTHX_ "Treating %s as %s::%s\n",
 			 origname, HvNAME_get(stash), name) );
 	}
@@ -567,7 +613,7 @@ Perl_gv_fetchmethod_autoload(pTHX_ HV *stash, const char *name, I32 autoload)
 	    if (!stash && (nsplit - origname) >= 7 &&
 		strnEQ(nsplit - 7, "::SUPER", 7) &&
 		gv_stashpvn(origname, nsplit - origname - 7, 0))
-	      stash = gv_stashpvn(origname, nsplit - origname, GV_ADD);
+	      stash = gv_get_super_pkg(origname, nsplit - origname);
 	}
 	ostash = stash;
     }
@@ -1063,21 +1109,6 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 		    GvMULTI_on(gv);
 		    sv_magic((SV*)av, (SV*)gv, PERL_MAGIC_isa, NULL, 0);
 		    /* NOTE: No support for tied ISA */
-		    if ((add & GV_ADDMULTI) && strEQ(nambeg,"AnyDBM_File::ISA")
-			&& AvFILLp(av) == -1)
-			{
-			    const char *pname;
-			    av_push(av, newSVpvn(pname = "NDBM_File",9));
-			    gv_stashpvn(pname, 9, GV_ADD);
-			    av_push(av, newSVpvn(pname = "DB_File",7));
-			    gv_stashpvn(pname, 7, GV_ADD);
-			    av_push(av, newSVpvn(pname = "GDBM_File",9));
-			    gv_stashpvn(pname, 9, GV_ADD);
-			    av_push(av, newSVpvn(pname = "SDBM_File",9));
-			    gv_stashpvn(pname, 9, GV_ADD);
-			    av_push(av, newSVpvn(pname = "ODBM_File",9));
-			    gv_stashpvn(pname, 9, GV_ADD);
-			}
 		}
 		break;
 	    case 'O':
@@ -1286,19 +1317,15 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 	case ']':
 	{
 	    SV * const sv = GvSVn(gv);
-	    if (!sv_derived_from(PL_patchlevel, "version"))
-		upg_version(PL_patchlevel, TRUE);
-	    GvSV(gv) = vnumify(PL_patchlevel);
+	    /* pretend we are 5.10.0 */
+	    sv_setpv(sv, "5.010000");
 	    SvREADONLY_on(GvSV(gv));
-	    SvREFCNT_dec(sv);
 	}
 	break;
 	case '\026':	/* $^V */
 	{
 	    SV * const sv = GvSVn(gv);
-	    GvSV(gv) = new_version(PL_patchlevel);
-	    SvREADONLY_on(GvSV(gv));
-	    SvREFCNT_dec(sv);
+	    sv_setsv(sv, PL_patchlevel);
 	}
 	break;
 	}
@@ -1390,7 +1417,8 @@ Perl_gv_check(pTHX_ const HV *stash)
 #ifdef USE_ITHREADS
 		CopFILE(PL_curcop) = (char *)file;	/* set for warning */
 #else
-		CopFILEGV(PL_curcop) = gv_fetchfile(file);
+		CopFILEGV(PL_curcop)
+		    = gv_fetchfile_flags(file, HEK_LEN(GvFILE_HEK(gv)), 0);
 #endif
 		Perl_warner(aTHX_ packWARN(WARN_ONCE),
 			"Name \"%s::%s\" used only once: possible typo",
@@ -1461,7 +1489,7 @@ Perl_gp_free(pTHX_ GV *gv)
     if (gp->gp_hv && SvTYPE(gp->gp_hv) == SVt_PVHV) {
 	const char *hvname = HvNAME_get(gp->gp_hv);
 	if (PL_stashcache && hvname)
-	    hv_delete(PL_stashcache, hvname, HvNAMELEN_get(gp->gp_hv),
+	    (void)hv_delete(PL_stashcache, hvname, HvNAMELEN_get(gp->gp_hv),
 		      G_DISCARD);
 	SvREFCNT_dec(gp->gp_hv);
     }

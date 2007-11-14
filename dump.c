@@ -202,24 +202,26 @@ Perl_pv_escape( pTHX_ SV *dsv, char const * const str,
     const char * const end = pv + count; /* end of string */
     octbuf[0] = esc;
 
-    if (!flags & PERL_PV_ESCAPE_NOCLEAR) 
+    if (!(flags & PERL_PV_ESCAPE_NOCLEAR)) {
+	    /* This won't alter the UTF-8 flag */
 	    sv_setpvn(dsv, "", 0);
+    }
     
-    if ((flags & PERL_PV_ESCAPE_UNI_DETECT) && is_utf8_string((U8*)pv, count))
+    if ((flags & PERL_PV_ESCAPE_UNI_DETECT) && is_utf8_string(pv, count))
         isuni = 1;
     
     for ( ; (pv < end && (!max || (wrote < max))) ; pv += readsize ) {
-        const UV u= (isuni) ? utf8n_to_uvchr((U8*)pv, end - pv, &readsize, UTF8_CHECK_ONLY) : (U8)*pv;            
+        const UV u= (isuni) ? utf8n_to_uvchr(pv, end - pv, &readsize, UTF8_CHECK_ONLY) : (U8)*pv;            
         const U8 c = (U8)u & 0xFF;
         
-	if ( readsize == -1 ) {
+	if ( readsize == (STRLEN)-1 ) {
 	    chsize = my_snprintf( octbuf, PV_ESCAPE_OCTBUFSIZE, 
-                                      "%cx[%"UVxf"]", esc, (U8)*pv);
+                                      "%cx[%c]", esc, *pv);
 	    readsize = 1;
         } else if ( ( u > 255 ) || (flags & PERL_PV_ESCAPE_ALL)) {
             if (flags & PERL_PV_ESCAPE_FIRSTCHAR) 
                 chsize = my_snprintf( octbuf, PV_ESCAPE_OCTBUFSIZE, 
-                                      "%"UVxf, esc, u);
+                                      "%c%"UVxf, esc, u);
             else
                 chsize = my_snprintf( octbuf, PV_ESCAPE_OCTBUFSIZE, 
                                       "%cx{%"UVxf"}", esc, u);
@@ -266,6 +268,12 @@ Perl_pv_escape( pTHX_ SV *dsv, char const * const str,
             sv_catpvn(dsv, octbuf, chsize);
             wrote += chsize;
 	} else {
+	    /* If PERL_PV_ESCAPE_NOBACKSLASH is set then bytes in the range
+	       128-255 can be appended raw to the dsv. If dsv happens to be
+	       UTF-8 then we need catpvf to upgrade them for us.
+	       Or add a new API call sv_catpvc(). Think about that name, and
+	       how to keep it clear that it's unlike the s of catpvs, which is
+	       really an array octets, not a string.  */
             Perl_sv_catpvf( aTHX_ dsv, "%c", c);
 	    wrote++;
 	}
@@ -283,21 +291,21 @@ Perl_pv_escape( pTHX_ SV *dsv, char const * const str,
            |const U32 flags
 
 Converts a string into something presentable, handling escaping via
-pv_escape() and supporting quoting and elipses. 
+pv_escape() and supporting quoting and ellipses.
 
 If the PERL_PV_PRETTY_QUOTE flag is set then the result will be 
 double quoted with any double quotes in the string escaped. Otherwise
 if the PERL_PV_PRETTY_LTGT flag is set then the result be wrapped in
 angle brackets. 
            
-If the PERL_PV_PRETTY_ELIPSES flag is set and not all characters in
-string were output then an elipses C<...> will be appended to the 
+If the PERL_PV_PRETTY_ELLIPSES flag is set and not all characters in
+string were output then an ellipsis C<...> will be appended to the
 string. Note that this happens AFTER it has been quoted.
            
 If start_color is non-null then it will be inserted after the opening
 quote (if there is one) but before the escaped text. If end_color
 is non-null then it will be inserted after the escaped text but before
-any quotes or elipses.
+any quotes or ellipses.
 
 Returns a pointer to the prettified text as held by dsv.
            
@@ -312,12 +320,15 @@ Perl_pv_pretty( pTHX_ SV *dsv, char const * const str, const STRLEN count,
     const U8 dq = (flags & PERL_PV_PRETTY_QUOTE) ? '"' : '%';
     STRLEN escaped;
     
+    if (!(flags & PERL_PV_PRETTY_NOCLEAR)) {
+	    /* This won't alter the UTF-8 flag */
+	    sv_setpvn(dsv, "", 0);
+    }
+
     if ( dq == '"' )
-        sv_setpvn(dsv, "\"", 1);
+        sv_catpvn(dsv, "\"", 1);
     else if ( flags & PERL_PV_PRETTY_LTGT )
-        sv_setpvn(dsv, "<", 1);
-    else 
-        sv_setpvn(dsv, "", 0);
+        sv_catpvn(dsv, "<", 1);
         
     if ( start_color != NULL ) 
         Perl_sv_catpv( aTHX_ dsv, start_color);
@@ -332,7 +343,7 @@ Perl_pv_pretty( pTHX_ SV *dsv, char const * const str, const STRLEN count,
     else if ( flags & PERL_PV_PRETTY_LTGT )
         sv_catpvn( dsv, ">", 1);         
     
-    if ( (flags & PERL_PV_PRETTY_ELIPSES) && ( escaped < count ) )
+    if ( (flags & PERL_PV_PRETTY_ELLIPSES) && ( escaped < count ) )
 	    sv_catpvn( dsv, "...", 3 );
  
     return SvPVX(dsv);
@@ -511,10 +522,7 @@ Perl_do_pmop_dump(pTHX_ I32 level, PerlIO *file, const PMOP *pm)
     }
     Perl_dump_indent(aTHX_ level, file, "{\n");
     level++;
-    if (pm->op_pmflags & PMf_ONCE)
-	ch = '?';
-    else
-	ch = '/';
+    ch = '/';
     if (PM_GETRE(pm))
 	Perl_dump_indent(aTHX_ level, file, "PMf_PRE %c%s%c%s\n",
 	     ch, PM_GETRE(pm)->precomp, ch,
@@ -540,16 +548,6 @@ S_pm_description(pTHX_ const PMOP *pm)
     SV * const desc = newSVpvs("");
     const REGEXP * const regex = PM_GETRE(pm);
     const U32 pmflags = pm->op_pmflags;
-
-    if (pmflags & PMf_ONCE)
-	sv_catpv(desc, ",ONCE");
-#ifdef USE_ITHREADS
-    if (SvREADONLY(PL_regex_pad[pm->op_pmoffset]))
-        sv_catpv(desc, ":USED");
-#else
-    if (pmflags & PMf_USED)
-        sv_catpv(desc, ":USED");
-#endif
 
     if (regex) {
         if (regex->extflags & RXf_TAINTED)
@@ -596,11 +594,6 @@ S_sequence(pTHX_ register const OP *o)
     if (!o)
 	return;
 
-#ifdef PERL_MAD
-    if (o->op_next == 0)
- 	return;
-#endif
-
     if (!Sequence)
 	Sequence = newHV();
 
@@ -615,7 +608,7 @@ S_sequence(pTHX_ register const OP *o)
 	switch (o->op_type) {
 	case OP_STUB:
 	    if ((o->op_flags & OPf_WANT) != OPf_WANT_LIST) {
-		hv_store(Sequence, key, len, newSVuv(++PL_op_seq), 0);
+		(void)hv_store(Sequence, key, len, newSVuv(++PL_op_seq), 0);
 		break;
 	    }
 	    goto nothin;
@@ -633,7 +626,7 @@ S_sequence(pTHX_ register const OP *o)
 	  nothin:
 	    if (oldop && o->op_next)
 		continue;
-	    hv_store(Sequence, key, len, newSVuv(++PL_op_seq), 0);
+	    (void)hv_store(Sequence, key, len, newSVuv(++PL_op_seq), 0);
 	    break;
 
 	case OP_MAPWHILE:
@@ -646,20 +639,20 @@ S_sequence(pTHX_ register const OP *o)
 	case OP_DORASSIGN:
 	case OP_COND_EXPR:
 	case OP_RANGE:
-	    hv_store(Sequence, key, len, newSVuv(++PL_op_seq), 0);
+	    (void)hv_store(Sequence, key, len, newSVuv(++PL_op_seq), 0);
 	    sequence_tail(cLOGOPo->op_other);
 	    break;
 
 	case OP_ENTERLOOP:
 	case OP_ENTERITER:
-	    hv_store(Sequence, key, len, newSVuv(++PL_op_seq), 0);
+	    (void)hv_store(Sequence, key, len, newSVuv(++PL_op_seq), 0);
 	    sequence_tail(cLOOPo->op_redoop);
 	    sequence_tail(cLOOPo->op_nextop);
 	    sequence_tail(cLOOPo->op_lastop);
 	    break;
 
 	case OP_SUBST:
-	    hv_store(Sequence, key, len, newSVuv(++PL_op_seq), 0);
+	    (void)hv_store(Sequence, key, len, newSVuv(++PL_op_seq), 0);
 	    sequence_tail(cPMOPo->op_pmstashstartu.op_pmreplstart);
 	    break;
 
@@ -669,7 +662,7 @@ S_sequence(pTHX_ register const OP *o)
 	    break;
 
 	default:
-	    hv_store(Sequence, key, len, newSVuv(++PL_op_seq), 0);
+	    (void)hv_store(Sequence, key, len, newSVuv(++PL_op_seq), 0);
 	    break;
 	}
 	oldop = o;
@@ -980,11 +973,7 @@ static void S_dump_op_mad (pTHX_ I32 level, PerlIO *file, const OP *o)
 		sv_catpvn(tmpsv, &tmp, 1);
 	    sv_catpv(tmpsv, "'=");
 	    switch (mp->mad_type) {
-	    case MAD_NULL:
-		sv_catpv(tmpsv, "NULL");
-		Perl_dump_indent(aTHX_ level, file, "%s\n", SvPVX(tmpsv));
-		break;
-	    case MAD_PV:
+	    case MAD_SV:
 		sv_catpv(tmpsv, "<");
 		sv_catpvn(tmpsv, (char*)mp->mad_val, mp->mad_vlen);
 		sv_catpv(tmpsv, ">");
@@ -1281,7 +1270,7 @@ Perl_do_magic_dump(pTHX_ I32 level, PerlIO *file, const MAGIC *mg, I32 nest, I32
 		SV * const dsv = sv_newmortal();
                 const char * const s =  pv_pretty(dsv, re->wrapped, re->wraplen, 
                     60, NULL, NULL,
-                    ( PERL_PV_PRETTY_QUOTE | PERL_PV_ESCAPE_RE | PERL_PV_PRETTY_ELIPSES |
+                    ( PERL_PV_PRETTY_QUOTE | PERL_PV_ESCAPE_RE | PERL_PV_PRETTY_ELLIPSES |
                     (PERL_PV_ESCAPE_UNI))
                 );
 		Perl_dump_indent(aTHX_ level+1, file, "    PAT = %s\n", s);
@@ -1819,7 +1808,6 @@ Perl_do_sv_dump(pTHX_ I32 level, PerlIO *file, SV *sv, I32 nest, I32 maxnest, bo
 	Perl_dump_indent(aTHX_ level, file, "  OFP = 0x%"UVxf"\n", PTR2UV(IoOFP(sv)));
 	Perl_dump_indent(aTHX_ level, file, "  DIRP = 0x%"UVxf"\n", PTR2UV(IoDIRP(sv)));
 	Perl_dump_indent(aTHX_ level, file, "  LINES = %"IVdf"\n", (IV)IoLINES(sv));
-	Perl_dump_indent(aTHX_ level, file, "  SUBPROCESS = %"IVdf"\n", (IV)IoSUBPROCESS(sv));
 	if (isPRINT(IoTYPE(sv)))
             Perl_dump_indent(aTHX_ level, file, "  TYPE = '%c'\n", IoTYPE(sv));
 	else
@@ -1834,7 +1822,10 @@ void
 Perl_sv_dump(pTHX_ SV *sv)
 {
     dVAR;
-    do_sv_dump(0, Perl_debug_log, sv, 0, 0, 0, 0);
+    if (SvROK(sv))
+	do_sv_dump(0, Perl_debug_log, sv, 0, 4, 0, 0);
+    else
+	do_sv_dump(0, Perl_debug_log, sv, 0, 0, 0, 0);
 }
 
 int
@@ -2049,7 +2040,7 @@ Perl_xmldump_sub(pTHX_ const GV *gv)
 {
     SV * const sv = sv_newmortal();
 
-    gv_fullname3(sv, gv, Nullch);
+    gv_fullname3(sv, gv, NULL);
     Perl_xmldump_indent(aTHX_ 0, PL_xmlfp, "\nSUB %s = ", SvPVX(sv));
     if (CvXSUB(GvCV(gv)))
 	Perl_xmldump_indent(aTHX_ 0, PL_xmlfp, "(xsub 0x%"UVxf" %d)\n",
@@ -2070,34 +2061,28 @@ Perl_xmldump_eval(pTHX)
 char *
 Perl_sv_catxmlsv(pTHX_ SV *dsv, SV *ssv)
 {
-    return sv_catxmlpvn(dsv, SvPVX(ssv), SvCUR(ssv), IN_CODEPOINTS);
+    return sv_catxmlpvn(dsv, SvPVX(ssv), SvCUR(ssv));
 }
 
 char *
-Perl_sv_catxmlpvn(pTHX_ SV *dsv, const char *pv, STRLEN len, int utf8)
+Perl_sv_catxmlpvn(pTHX_ SV *dsv, const char *pv, STRLEN len)
 {
     unsigned int c;
     const char * const e = pv + len;
-    const char * const start = pv;
-    STRLEN dsvcur;
     STRLEN cl;
 
     sv_catpvn(dsv,"",0);
-    dsvcur = SvCUR(dsv);	/* in case we have to restart */
 
   retry:
     while (pv < e) {
-	if (utf8) {
-	    c = utf8_to_uvchr((U8*)pv, &cl);
-	    if (cl == 0) {
-		SvCUR(dsv) = dsvcur;
-		pv = start;
-		utf8 = 0;
-		goto retry;
-	    }
+	c = utf8n_to_uvchr(pv, UTF8_MAXBYTES, &cl, UTF8_CHECK_ONLY);
+	if ( (cl == (STRLEN)-1) ) {
+	    c = ((U8)*pv & 0xFF);
+	    Perl_sv_catpvf(aTHX_ dsv, "STUPIDXML(#x[%X])", c);
+	    pv++;
+
+	    goto retry;
 	}
-	else
-	    c = (*pv & 255);
 
 	switch (c) {
 	case 0x00:
@@ -2158,16 +2143,16 @@ Perl_sv_catxmlpvn(pTHX_ SV *dsv, const char *pv, STRLEN len, int utf8)
 	    Perl_sv_catpvf(aTHX_ dsv, "STUPIDXML(#x%X)", c);
 	    break;
 	case '<':
-	    Perl_sv_catpvf(aTHX_ dsv, "&lt;");
+	    sv_catpvs(dsv, "&lt;");
 	    break;
 	case '>':
-	    Perl_sv_catpvf(aTHX_ dsv, "&gt;");
+	    sv_catpvs(dsv, "&gt;");
 	    break;
 	case '&':
-	    Perl_sv_catpvf(aTHX_ dsv, "&amp;");
+	    sv_catpvs(dsv, "&amp;");
 	    break;
 	case '"':
-	    Perl_sv_catpvf(aTHX_ dsv, "&#34;");
+	    sv_catpvs(dsv, "&#34;");
 	    break;
 	default:
 	    if (c < 0xD800) {
@@ -2175,7 +2160,8 @@ Perl_sv_catxmlpvn(pTHX_ SV *dsv, const char *pv, STRLEN len, int utf8)
 		    Perl_sv_catpvf(aTHX_ dsv, "&#x%X;", c);
 		}
 		else {
-		    Perl_sv_catpvf(aTHX_ dsv, "%c", c);
+		    const char string = (char) c;
+		    sv_catpvn(dsv, &string, 1);
 		}
 		break;
 	    }
@@ -2188,10 +2174,7 @@ Perl_sv_catxmlpvn(pTHX_ SV *dsv, const char *pv, STRLEN len, int utf8)
 		Perl_sv_catpvf(aTHX_ dsv, "&#x%X;", c);
 	}
 
-	if (utf8)
-	    pv += UTF8SKIP(pv);
-	else
-	    pv++;
+	pv += cl;
     }
 
     return SvPVX(dsv);
@@ -2365,9 +2348,10 @@ Perl_do_pmop_xmldump(pTHX_ I32 level, PerlIO *file, const PMOP *pm)
     Perl_xmldump_indent(aTHX_ level, file, "<pmop \n");
     level++;
     if (PM_GETRE(pm)) {
-	const char * const s = PM_GETRE(pm)->precomp;
-	SV * const tmpsv = newSVpvn("",0);
-	sv_catxmlpvn(tmpsv, s, strlen(s), 1);
+	const regexp *const r = PM_GETRE(pm);
+	SV * const tmpsv = newSV(0);
+	Perl_sv_catxmlpvn(tmpsv, r->precomp,r->prelen);
+
 	Perl_xmldump_indent(aTHX_ level, file, "pre=\"%s\"\n",
 	     SvPVX(tmpsv));
 	SvREFCNT_dec(tmpsv);
@@ -2411,9 +2395,9 @@ static struct { const char slot; const char* name; } const slotnames[] =
     { 'c', "prototyped" },
     { 'G', "endsection" },
     { 'X', "value" },
-    { 'B', "bareword" },
+    { 'g', "forcedword" },
     { '^', "hat" },
-    { ';', "colon" },
+    { ';', "semicolon" },
     { 'o', "operator" },
     { '$', "variable" },
     { '(', "round_open" },
@@ -2467,9 +2451,12 @@ static struct { const char slot; const char* name; } const slotnames[] =
     { '~', "tilde" },
     { 't', "something_t" },
     { 'F', "format" },
+    { 'h', "constsub_args" },
+    { '>', "null_type" },
+    { '<', "null_type_first" },
     { 0,   NULL }
 };
-char* slotname(char s) {
+const char* slotname(char s) {
     int i=0;
     while (slotnames[i].slot != 0) {
 	if (slotnames[i].slot == s)
@@ -2550,9 +2537,9 @@ Perl_do_op_xmldump(pTHX_ I32 level, PerlIO *file, const OP *o)
 	    ENTER;
 	    SAVEFREESV(tmpsv1);
 	    SAVEFREESV(tmpsv2);
-	    gv_fullname3(tmpsv1, (GV*)cSVOPo->op_sv, Nullch);
+	    gv_fullname3(tmpsv1, (GV*)cSVOPo->op_sv, NULL);
 	    s = SvPV(tmpsv1,len);
-	    sv_catxmlpvn(tmpsv2, s, len, 1);
+	    sv_catxmlpvn(tmpsv2, s, len);
 	    S_xmldump_attr(aTHX_ level, file, "gv=\"%s\"", SvPV(tmpsv2, len));
 	    LEAVE;
 	}
@@ -2630,64 +2617,75 @@ Perl_do_op_xmldump(pTHX_ I32 level, PerlIO *file, const OP *o)
     }
 
     if (PL_madskills && o->op_madprop) {
-	char prevkey = '\0';
 	SV * const tmpsv = newSVpvn("", 0);
 	const MADPROP* mp = o->op_madprop;
 
-	if (!contents) {
-	    contents = 1;
-	    PerlIO_printf(file, ">\n");
-	}
-	Perl_xmldump_indent(aTHX_ level, file, "<madprops>\n");
+        if (!contents) {
+            contents = 1;
+            PerlIO_printf(file, ">\n");
+        }
+        Perl_xmldump_indent(aTHX_ level, file, "<madprops>\n");
 	level++;
 	while (mp) {
 	    char tmp = mp->mad_key;
-	    sv_setpvn(tmpsv,"\"",1);
+	    sv_setpvn(tmpsv,"",0);
 	    if (tmp) {
 		if (slotname(tmp))
 		    sv_catpv(tmpsv, slotname(tmp));
 		else
 		    Perl_croak(aTHX_ "madprop error: Unknow slot '%c'.", tmp);
 	    }
-	    if ((tmp == '_') || (tmp == '#')) { /* '_' '#' whitespace belong to the previous token. */
-		sv_catpv(tmpsv, "-");
-		sv_catpv(tmpsv, slotname(prevkey));
-	    }
-	    else
-		prevkey = tmp;
-	    sv_catpv(tmpsv, "\"");
 	    switch (mp->mad_type) {
-	    case MAD_NULL:
-		sv_catpv(tmpsv, "NULL");
-		Perl_xmldump_indent(aTHX_ level, file, "<mad_null key=%s/>\n", SvPVX(tmpsv));
-		break;
-	    case MAD_PV:
-		sv_catpv(tmpsv, " val=\"");
-		sv_catxmlpvn(tmpsv, (char*)mp->mad_val, mp->mad_vlen,1);
-		sv_catpv(tmpsv, "\"");
-		Perl_xmldump_indent(aTHX_ level, file, "<mad_pv key=%s/>\n", SvPVX(tmpsv));
-		break;
 	    case MAD_SV:
 		sv_catpv(tmpsv, " val=\"");
 		sv_catxmlsv(tmpsv, (SV*)mp->mad_val);
-		sv_catpv(tmpsv, "\"");
-		Perl_xmldump_indent(aTHX_ level, file, "<mad_sv key=%s/>\n", SvPVX(tmpsv));
+		sv_catpv(tmpsv, "\" ");
+
+		{
+		    const MADPROP* next = mp->mad_next;
+		    if (next) {
+			char xnext = next->mad_key;
+			if ((xnext == '_') || (xnext == '#')) { /* '_' '#' whitespace belong to the previous token. */
+			    sv_catpv(tmpsv, slotname(xnext));
+			    sv_catpv(tmpsv, "=\"");
+			    sv_catxmlsv(tmpsv, (SV*)next->mad_val);
+			    sv_catpv(tmpsv, "\" ");
+			    mp = next;
+			}
+		    }
+		    next = mp->mad_next;
+		    if (next) {
+			char xnext = next->mad_key;
+			if ((xnext == '_') || (xnext == '#')) { /* '_' '#' whitespace belong to the previous token. */
+			    sv_catpv(tmpsv, slotname(xnext));
+			    sv_catpv(tmpsv, "=\"");
+			    sv_catxmlsv(tmpsv, (SV*)next->mad_val);
+			    sv_catpv(tmpsv, "\" ");
+			    mp = next;
+			}
+		    }
+		}
+
+		sv_catpv(tmpsv, "/>\n");
+		Perl_xmldump_indent(aTHX_ level, file, "<mad_%s", SvPVX(tmpsv));
 		break;
 	    case MAD_OP:
+		/* in next loop */
 		if ((OP*)mp->mad_val) {
-		    Perl_xmldump_indent(aTHX_ level, file, "<mad_op key=%s>\n", SvPVX(tmpsv));
+		    Perl_xmldump_indent(aTHX_ level, file, "<mad_op key=\"%s\">\n", SvPVX(tmpsv));
 		    do_op_xmldump(level+1, file, (OP*)mp->mad_val);
 		    Perl_xmldump_indent(aTHX_ level, file, "</mad_op>\n");
 		}
 		break;
 	    default:
-		Perl_xmldump_indent(aTHX_ level, file, "<mad_unk key=%s/>\n", SvPVX(tmpsv));
+		Perl_croak(aTHX_ "unknown MAD_type");
 		break;
 	    }
 	    mp = mp->mad_next;
 	}
+
 	level--;
-	Perl_xmldump_indent(aTHX_ level, file, "</madprops>\n");
+ 	Perl_xmldump_indent(aTHX_ level, file, "</madprops>\n");
 
 	SvREFCNT_dec(tmpsv);
     }

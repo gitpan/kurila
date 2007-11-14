@@ -8,14 +8,14 @@ use warnings;
 my @pos = qw(__DATA__ __END__ AUTOLOAD BEGIN CHECK DESTROY default defined
 	    delete do END else eval elsif exists for foreach given grep
 	    goto glob INIT if last local m my map next no our pos print printf
-	    package prototype q qr qq qw qx redo return require s say scalar sort
+	    package prototype q qr qq qw qx redo return require s scalar sort
 	    split state study sub tr tie tied use undef UNITCHECK until untie
 	    unless when while y);
 
 my @neg = qw(__FILE__ __LINE__ __PACKAGE__ and abs alarm atan2 accept bless
 	    break bind binmode CORE cmp chr cos chop close chdir chomp chmod
 	    chown crypt chroot caller connect closedir continue die dump
-	    dbmopen dbmclose eq eof err exp exit exec each endgrent endpwent
+	    eq eof err exp exit exec each endgrent endpwent
 	    endnetent endhostent endservent endprotoent fork fcntl flock fileno
 	    getppid getpgrp getpwent getpwnam getpwuid getpeername
 	    getprotoent getpriority getprotobyname getprotobynumber
@@ -41,8 +41,6 @@ my %feature_kw = (
 	default => 'switch',
 	# continue is already a keyword
 	break   => 'switch',
-
-	say     => 'say',
 
 	err	=> 'err',
 

@@ -1,6 +1,5 @@
 package IO::Uncompress::Unzip;
 
-require 5.004 ;
 
 # for RFC1952
 
@@ -8,13 +7,13 @@ use strict ;
 use warnings;
 use bytes;
 
-use IO::Uncompress::RawInflate  2.004 ;
-use IO::Compress::Base::Common  2.004 qw(:Status createSelfTiedObject);
-use IO::Uncompress::Adapter::Identity 2.004 ;
-use IO::Compress::Zlib::Extra 2.004 ;
-use IO::Compress::Zip::Constants 2.004 ;
+use IO::Uncompress::RawInflate  2.006 ;
+use IO::Compress::Base::Common  2.006 qw(:Status createSelfTiedObject);
+use IO::Uncompress::Adapter::Identity 2.006 ;
+use IO::Compress::Zlib::Extra 2.006 ;
+use IO::Compress::Zip::Constants 2.006 ;
 
-use Compress::Raw::Zlib  2.004 qw(crc32) ;
+use Compress::Raw::Zlib  2.006 qw(crc32) ;
 
 BEGIN
 {
@@ -27,7 +26,7 @@ require Exporter ;
 
 our ($VERSION, @ISA, @EXPORT_OK, %EXPORT_TAGS, $UnzipError, %headerLookup);
 
-$VERSION = '2.004';
+$VERSION = '2.006';
 $UnzipError = '';
 
 @ISA    = qw(IO::Uncompress::RawInflate Exporter);
@@ -60,7 +59,7 @@ sub unzip
 
 sub getExtraParams
 {
-    use IO::Compress::Base::Common  2.004 qw(:Parse);
+    use IO::Compress::Base::Common  2.006 qw(:Parse);
 
     
     return (
@@ -498,16 +497,16 @@ sub _readZipHeader($)
     my $filename;
     my $extraField;
     my @EXTRA = ();
-    my $streamingMode = ($gpFlag & ZIP_GP_FLAG_STREAMING_MASK) ? 1 : 0 ;
+    my $streamingMode = ($gpFlag ^&^ ZIP_GP_FLAG_STREAMING_MASK) ? 1 : 0 ;
 
     return $self->HeaderError("Streamed Stored content not supported")
         if $streamingMode && $compressedMethod == 0 ;
 
     return $self->HeaderError("Encrypted content not supported")
-        if $gpFlag & (ZIP_GP_FLAG_ENCRYPTED_MASK|ZIP_GP_FLAG_STRONG_ENCRYPTED_MASK);
+        if $gpFlag ^&^ (ZIP_GP_FLAG_ENCRYPTED_MASK^|^ZIP_GP_FLAG_STRONG_ENCRYPTED_MASK);
 
     return $self->HeaderError("Patch content not supported")
-        if $gpFlag & ZIP_GP_FLAG_PATCHED_MASK;
+        if $gpFlag ^&^ ZIP_GP_FLAG_PATCHED_MASK;
 
     *$self->{ZipData}{Streaming} = $streamingMode;
 
@@ -681,13 +680,13 @@ sub _dosToUnixTime
 
 	my $dt = shift;
 
-	my $year = ( ( $dt >> 25 ) & 0x7f ) + 80;
-	my $mon  = ( ( $dt >> 21 ) & 0x0f ) - 1;
-	my $mday = ( ( $dt >> 16 ) & 0x1f );
+	my $year = ( ( $dt >> 25 ) ^&^ 0x7f ) + 80;
+	my $mon  = ( ( $dt >> 21 ) ^&^ 0x0f ) - 1;
+	my $mday = ( ( $dt >> 16 ) ^&^ 0x1f );
 
-	my $hour = ( ( $dt >> 11 ) & 0x1f );
-	my $min  = ( ( $dt >> 5 ) & 0x3f );
-	my $sec  = ( ( $dt << 1 ) & 0x3e );
+	my $hour = ( ( $dt >> 11 ) ^&^ 0x1f );
+	my $min  = ( ( $dt >> 5 ) ^&^ 0x3f );
+	my $sec  = ( ( $dt << 1 ) ^&^ 0x3e );
 
 	# catch errors
 	my $time_t =

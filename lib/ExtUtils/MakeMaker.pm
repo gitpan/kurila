@@ -1,8 +1,6 @@
 # $Id: /mirror/svn.schwern.org/CPAN/ExtUtils-MakeMaker/trunk/lib/ExtUtils/MakeMaker.pm 32261 2007-07-03T08:08:29.826721Z schwern  $
 package ExtUtils::MakeMaker;
 
-BEGIN {require 5.005_03;}
-
 require Exporter;
 use ExtUtils::MakeMaker::Config;
 use Carp ();
@@ -21,7 +19,7 @@ use vars qw(
 use vars qw($Revision);
 use strict;
 
-$VERSION = '6.36';
+$VERSION = '6.36_01';
 ($Revision) = q$Revision: 32261 $ =~ /Revision:\s+(\S+)/;
 
 @ISA = qw(Exporter);
@@ -480,7 +478,7 @@ sub new {
         }
         if ($self->{PARENT}) {
             $self->{PARENT}->{CHILDREN}->{$newclass} = $self;
-            foreach my $opt (qw(POLLUTE PERL_CORE)) {
+            foreach my $opt (qw(POLLUTE PERL_CORE LINKTYPE)) {
                 if (exists $self->{PARENT}->{$opt}
                     and not exists $self->{$opt})
                     {
@@ -635,7 +633,7 @@ END
             my(%a) = %{$self->{$section} || {}};
             push @{$self->{RESULT}}, "\n# --- MakeMaker $section section:";
             push @{$self->{RESULT}}, "# " . join ", ", %a if $Verbose && %a;
-            push @{$self->{RESULT}}, $self->nicetext($self->$method( %a ));
+            push @{$self->{RESULT}}, $self->nicetext($self->?$method( %a ));
         }
     }
 

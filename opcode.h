@@ -207,7 +207,6 @@ EXTCONST char* const PL_op_name[] = {
 	"caller",
 	"warn",
 	"die",
-	"reset",
 	"lineseq",
 	"nextstate",
 	"dbstate",
@@ -243,15 +242,12 @@ EXTCONST char* const PL_op_name[] = {
 	"tie",
 	"untie",
 	"tied",
-	"dbmopen",
-	"dbmclose",
 	"sselect",
 	"select",
 	"getc",
 	"read",
 	"prtf",
 	"print",
-	"say",
 	"sysopen",
 	"sysseek",
 	"sysread",
@@ -575,7 +571,6 @@ EXTCONST char* const PL_op_desc[] = {
 	"caller",
 	"warn",
 	"die",
-	"symbol reset",
 	"line sequence",
 	"next statement",
 	"debug next statement",
@@ -611,15 +606,12 @@ EXTCONST char* const PL_op_desc[] = {
 	"tie",
 	"untie",
 	"tied",
-	"dbmopen",
-	"dbmclose",
 	"select system call",
 	"select",
 	"getc",
 	"read",
 	"printf",
 	"print",
-	"say",
 	"sysopen",
 	"sysseek",
 	"sysread",
@@ -955,7 +947,6 @@ EXT Perl_ppaddr_t PL_ppaddr[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_pp_caller),
 	MEMBER_TO_FPTR(Perl_pp_warn),
 	MEMBER_TO_FPTR(Perl_pp_die),
-	MEMBER_TO_FPTR(Perl_pp_reset),
 	MEMBER_TO_FPTR(Perl_pp_null),	/* Perl_pp_lineseq */
 	MEMBER_TO_FPTR(Perl_pp_nextstate),
 	MEMBER_TO_FPTR(Perl_pp_dbstate),
@@ -991,15 +982,12 @@ EXT Perl_ppaddr_t PL_ppaddr[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_pp_tie),
 	MEMBER_TO_FPTR(Perl_pp_untie),
 	MEMBER_TO_FPTR(Perl_pp_tied),
-	MEMBER_TO_FPTR(Perl_pp_dbmopen),
-	MEMBER_TO_FPTR(Perl_pp_untie),	/* Perl_pp_dbmclose */
 	MEMBER_TO_FPTR(Perl_pp_sselect),
 	MEMBER_TO_FPTR(Perl_pp_select),
 	MEMBER_TO_FPTR(Perl_pp_getc),
 	MEMBER_TO_FPTR(Perl_pp_sysread),	/* Perl_pp_read */
 	MEMBER_TO_FPTR(Perl_pp_prtf),
 	MEMBER_TO_FPTR(Perl_pp_print),
-	MEMBER_TO_FPTR(Perl_pp_print),	/* Perl_pp_say */
 	MEMBER_TO_FPTR(Perl_pp_sysopen),
 	MEMBER_TO_FPTR(Perl_pp_sysseek),
 	MEMBER_TO_FPTR(Perl_pp_sysread),
@@ -1332,7 +1320,6 @@ EXT Perl_check_t PL_check[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* caller */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* warn */
 	MEMBER_TO_FPTR(Perl_ck_die),	/* die */
-	MEMBER_TO_FPTR(Perl_ck_fun),	/* reset */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* lineseq */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* nextstate */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* dbstate */
@@ -1368,15 +1355,12 @@ EXT Perl_check_t PL_check[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* tie */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* untie */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* tied */
-	MEMBER_TO_FPTR(Perl_ck_fun),	/* dbmopen */
-	MEMBER_TO_FPTR(Perl_ck_fun),	/* dbmclose */
 	MEMBER_TO_FPTR(Perl_ck_select),	/* sselect */
 	MEMBER_TO_FPTR(Perl_ck_select),	/* select */
 	MEMBER_TO_FPTR(Perl_ck_eof),	/* getc */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* read */
 	MEMBER_TO_FPTR(Perl_ck_listiob),	/* prtf */
 	MEMBER_TO_FPTR(Perl_ck_listiob),	/* print */
-	MEMBER_TO_FPTR(Perl_ck_listiob),	/* say */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* sysopen */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* sysseek */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* sysread */
@@ -1703,7 +1687,6 @@ EXTCONST U32 PL_opargs[] = {
 	0x00013608,	/* caller */
 	0x0000481d,	/* warn */
 	0x0000485d,	/* die */
-	0x00013614,	/* reset */
 	0x00000800,	/* lineseq */
 	0x00001404,	/* nextstate */
 	0x00001404,	/* dbstate */
@@ -1739,15 +1722,12 @@ EXTCONST U32 PL_opargs[] = {
 	0x0042e855,	/* tie */
 	0x0000f614,	/* untie */
 	0x0000f604,	/* tied */
-	0x00228814,	/* dbmopen */
-	0x00009614,	/* dbmclose */
 	0x02222808,	/* sselect */
 	0x0001c80c,	/* select */
 	0x0001d60c,	/* getc */
 	0x122ec81d,	/* read */
 	0x0005c815,	/* prtf */
 	0x0005c815,	/* print */
-	0x0005c815,	/* say */
 	0x1222c804,	/* sysopen */
 	0x0022c804,	/* sysseek */
 	0x122ec81d,	/* sysread */

@@ -85,7 +85,7 @@ true)
 		case "$osvers" in
 		3*)	shrpldflags="$shrpldflags -e _nostart"
 			;;
-		*)	shrpldflags="$shrpldflags -b noentry"
+		*)	shrpldflags="$shrpldflags -bnoentry"
 			;;
 		esac
 	        shrpldflags="$shrpldflags $ldflags $perllibs $cryptlib"
@@ -253,7 +253,7 @@ DYNALOADER = DynaLoader\$(OBJ_EXT)
 
 libs = $perllibs $cryptlib
 
-public = perl\$(EXE_EXT) $suidperl utilities translators
+public = perl\$(EXE_EXT) $suidperl utilities
 
 shellflags = $shellflags
 
@@ -445,10 +445,7 @@ all: $(FIRSTMAKEFILE) miniperl$(EXE_EXT) extra.pods $(private) $(unidatafiles) $
 	@echo " ";
 	@echo "	Everything is up to date. Type '$(MAKE) test' to run test suite."
 
-.PHONY: all translators utilities
-
-translators:	miniperl$(EXE_EXT) $(CONFIGPM) FORCE
-	@echo " "; echo "	Making x2p stuff"; cd x2p; $(LDLIBPTH) $(MAKE) all
+.PHONY: all utilities
 
 utilities:	miniperl$(EXE_EXT) $(CONFIGPM) $(plextract) lib/lib.pm FORCE
 	@echo " "; echo "	Making utilities"; cd utils; $(LDLIBPTH) $(MAKE) all
@@ -798,6 +795,29 @@ suidperl$(EXE_EXT): $& sperl$(OBJ_EXT) perlmain$(OBJ_EXT) $(LIBPERL) $(static_ex
 
 fi
 
+# Some environment have no system(), which mkpport uses.
+# Let's try running the commands with shell.
+case "${osname}" in
+catamount)
+$spitshell >>Makefile <<!GROK!THIS!
+.PHONY: makeppport
+makeppport: miniperl\$(EXE_EXT) \$(CONFIGPM)
+	-@for f in Makefile.PL PPPort_pm.PL PPPort_xs.PL ppport_h.PL; do \
+	(cd ext/Devel/PPPort && `pwd`/run.sh ../../../miniperl -I../../../lib \$\$f); \
+	done
+
+!GROK!THIS!
+;;
+*)
+$spitshell >>Makefile <<'!NO!SUBS!'
+.PHONY: makeppport
+makeppport: miniperl$(EXE_EXT) $(CONFIGPM)
+	$(LDLIBPTH) $(RUN) ./miniperl$(EXE_EXT) -Ilib mkppport
+
+!NO!SUBS!
+;;
+esac
+
 $spitshell >>Makefile <<'!NO!SUBS!'
 
 sperl$(OBJ_EXT): perl.c $(h)
@@ -813,16 +833,7 @@ sperl$(OBJ_EXT): perl.c $(h)
 .PHONY: preplibrary
 preplibrary: miniperl$(EXE_EXT) $(CONFIGPM) lib/lib.pm $(PREPLIBRARY_LIBPERL)
 	@sh ./makedir lib/auto
-	@echo "	AutoSplitting perl library"
-	$(LDLIBPTH) $(RUN) ./miniperl -Ilib -e 'use AutoSplit; \
-		autosplit_lib_modules(@ARGV)' lib/*.pm
-	$(LDLIBPTH) $(RUN) ./miniperl -Ilib -e 'use AutoSplit; \
-		autosplit_lib_modules(@ARGV)' lib/*/*.pm
 	$(MAKE) lib/re.pm
-
-.PHONY: makeppport
-makeppport: miniperl$(EXE_EXT) $(CONFIGPM)
-	$(LDLIBPTH) $(RUN) ./miniperl$(EXE_EXT) -Ilib mkppport
 
 lib/Config.pod: config.sh miniperl$(EXE_EXT) configpm Porting/Glossary
 	$(LDLIBPTH) $(RUN) ./miniperl -Ilib configpm
@@ -836,12 +847,9 @@ lib/re.pm: ext/re/re.pm
 	@-rm -f $@
 	cp ext/re/re.pm lib/re.pm
 
-$(plextract):	miniperl$(EXE_EXT) $(CONFIGPM) x2p/s2p
+$(plextract):	miniperl$(EXE_EXT) $(CONFIGPM)
 	@-rm -f $@
 	$(LDLIBPTH) $(RUN) ./miniperl -I`pwd`/lib $@.PL
-
-x2p/s2p: miniperl$(EXE_EXT) $(CONFIGPM) x2p/s2p.PL
-	cd x2p; $(LDLIBPTH) $(MAKE) s2p
 
 lib/lib.pm:	miniperl$(EXE_EXT) $(CONFIGPM)
 	@-rm -f $@
@@ -864,16 +872,16 @@ extra.pods: miniperl$(EXE_EXT)
 	-@rm -f pod/perlvms.pod
 	-@test -f vms/perlvms.pod && cd pod && $(LNS) ../vms/perlvms.pod perlvms.pod && cd .. && echo "pod/perlvms.pod" >> extra.pods
 	-@rm -f pod/perldelta.pod
-	-@test -f pod/perl595delta.pod && cd pod && $(LNS) perl595delta.pod perldelta.pod && cd .. && echo "pod/perldelta.pod" >> extra.pods # See buildtoc
+	-@test -f pod/perl5100delta.pod && cd pod && $(LNS) perl5100delta.pod perldelta.pod && cd .. && echo "pod/perldelta.pod" >> extra.pods # See buildtoc
 
 extras.make: perl$(EXE_EXT)
-	-@test ! -s extras.lst || PATH="`pwd`:${PATH}" PERL5LIB="`pwd`/lib" $(LDLIBPTH) ./perl -Ilib -MCPAN -e '@ARGV&&make(@ARGV)' `cat extras.lst`
+	-@test ! -s extras.lst || PATH="`pwd`:${PATH}" PERL5LIB="`pwd`/lib" $(LDLIBPTH) $(RUN) ./perl -Ilib -MCPAN -e '@ARGV&&make(@ARGV)' `cat extras.lst`
 
 extras.test: perl$(EXE_EXT)
-	-@test ! -s extras.lst || PATH="`pwd`:${PATH}" PERL5LIB="`pwd`/lib" $(LDLIBPTH) ./perl -Ilib -MCPAN -e '@ARGV&&test(@ARGV)' `cat extras.lst`
+	-@test ! -s extras.lst || PATH="`pwd`:${PATH}" PERL5LIB="`pwd`/lib" $(LDLIBPTH) $(RUN) ./perl -Ilib -MCPAN -e '@ARGV&&test(@ARGV)' `cat extras.lst`
 
 extras.install: perl$(EXE_EXT)
-	-@test ! -s extras.lst || PATH="`pwd`:${PATH}" PERL5LIB="`pwd`/lib" $(LDLIBPTH) ./perl -Ilib -MCPAN -e '@ARGV&&install(@ARGV)' `cat extras.lst`
+	-@test ! -s extras.lst || PATH="`pwd`:${PATH}" PERL5LIB="`pwd`/lib" $(LDLIBPTH) $(RUN) ./perl -Ilib -MCPAN -e '@ARGV&&install(@ARGV)' `cat extras.lst`
 
 .PHONY: install install-strip install-all install-verbose install-silent \
 	no-install install.perl install.man install.html
@@ -900,17 +908,17 @@ no-install:
 INSTALL_DEPENDENCE = all
 
 install.perl:	$(INSTALL_DEPENDENCE) installperl
-	$(LDLIBPTH) ./perl installperl --destdir=$(DESTDIR) $(INSTALLFLAGS) $(STRIPFLAGS)
+	$(LDLIBPTH) $(RUN) ./perl installperl --destdir=$(DESTDIR) $(INSTALLFLAGS) $(STRIPFLAGS)
 	-@test ! -s extras.lst || $(MAKE) extras.install
 
 install.man:	all installman
-	$(LDLIBPTH) ./perl installman --destdir=$(DESTDIR) $(INSTALLFLAGS)
+	$(LDLIBPTH) $(RUN) ./perl installman --destdir=$(DESTDIR) $(INSTALLFLAGS)
 
 # XXX Experimental. Hardwired values, but useful for testing.
 # Eventually Configure could ask for some of these values.
 install.html: all installhtml
 	-@test -f README.vms && cd vms && $(LNS) ../README.vms README_vms.pod && cd ..
-	$(LDLIBPTH) ./perl installhtml   \
+	$(LDLIBPTH) $(RUN) ./perl installhtml   \
       --podroot=. --podpath=. --recurse  \
       --htmldir=$(privlib)/html   \
       --htmlroot=$(privlib)/html  \
@@ -1024,7 +1032,7 @@ $spitshell >>Makefile <<'!NO!SUBS!'
 
 .PHONY: printconfig
 printconfig:
-	@eval `$(LDLIBPTH) ./perl -Ilib -V:$(CONFIGVAR)`; echo $$$(CONFIGVAR)
+	@eval `$(LDLIBPTH) $(RUN) ./perl -Ilib -V:$(CONFIGVAR)`; echo $$$(CONFIGVAR)
 
 .PHONY: clean _tidy _mopup _cleaner1 _cleaner2 \
 	realclean _realcleaner clobber _clobber \
@@ -1060,7 +1068,7 @@ _mopup:
 	-rm -f perl.third lib*.so.perl.third perl.3log t/perl.third t/perl.3log
 	-rm -f perl.pixie lib*.so.perl.pixie lib*.so.Addrs
 	-rm -f perl.Addrs perl.Counts t/perl.Addrs t/perl.Counts *perl.xok
-	-rm -f perlld cygwin.c ld2 libperl*.def libperl*.dll cygperl*.dll *.exe.stackdump
+	-rm -f cygwin.c libperl*.def libperl*.dll cygperl*.dll *.exe.stackdump
 	-rm -f perl$(EXE_EXT) suidperl$(EXE_EXT) miniperl$(EXE_EXT) $(LIBPERL) libperl.* microperl
 	-rm -f opcode.h-old opnames.h-old pp.sym-old pp_proto.h-old
 	-rm -f config.over
@@ -1069,7 +1077,6 @@ _mopup:
 _tidy:
 	-cd pod; $(LDLIBPTH) $(MAKE) clean
 	-cd utils; $(LDLIBPTH) $(MAKE) clean
-	-cd x2p; $(LDLIBPTH) $(MAKE) clean
 	-@for x in $(DYNALOADER) $(dynamic_ext) $(static_ext) $(nonxs_ext) ; do \
 	$(LDLIBPTH) sh ext/util/make_ext clean $$x MAKE=$(MAKE) ; \
 	done
@@ -1078,7 +1085,6 @@ _cleaner1:
 	-cd os2; rm -f Makefile
 	-cd pod; $(LDLIBPTH) $(MAKE) $(CLEAN)
 	-cd utils; $(LDLIBPTH) $(MAKE) $(CLEAN)
-	-cd x2p; $(LDLIBPTH) $(MAKE) $(CLEAN)
 	-@for x in $(DYNALOADER) $(dynamic_ext) $(static_ext) $(nonxs_ext) ; do \
 	$(LDLIBPTH) sh ext/util/make_ext $(CLEAN) $$x MAKE=$(MAKE) ; \
 	done
@@ -1147,7 +1153,6 @@ config.h: config_h.SH config.sh
 depend: makedepend
 	sh ./makedepend MAKE=$(MAKE)
 	- test -s perlmain.c && touch perlmain.c
-	cd x2p; $(MAKE) depend
 
 # Cannot postpone this until $firstmakefile is ready ;-)
 makedepend: makedepend.SH config.sh
@@ -1177,10 +1182,10 @@ test_prep: test_prep_pre miniperl$(EXE_EXT) $(unidatafiles) perl$(EXE_EXT) $(dyn
 	PERL=./perl $(MAKE) _test_prep
 
 _test_tty:
-	cd t && $(PERL_DEBUG) $(LDLIBPTH) $(PERL) $(TESTFILE) $(TEST_ARGS) </dev/tty
+	cd t && $(PERL_DEBUG) $(LDLIBPTH) $(PERL) $(TESTFILE) $(TEST_ARGS) $(TEST_FILES) </dev/tty
 
 _test_notty:
-	cd t && $(PERL_DEBUG) PERL_SKIP_TTY_TEST=1 $(LDLIBPTH) $(PERL) $(TESTFILE) $(TEST_ARGS)
+	cd t && $(PERL_DEBUG) PERL_SKIP_TTY_TEST=1 $(LDLIBPTH) $(PERL) $(TESTFILE) $(TEST_ARGS) $(TEST_FILES)
 
 unpack_files:
 	$(LDLIBPTH) $(RUN) ./miniperl$(EXE_EXT) -Ilib uupacktool.pl -u -m
@@ -1228,7 +1233,7 @@ test.torture torturetest:	test_prep
 
 minitest.utf16: minitest.prep
 	- cd t && (rm -f perl$(EXE_EXT); $(LNS) ../miniperl$(EXE_EXT) perl$(EXE_EXT)) \
-		&& $(LDLIBPTH) ./perl TEST -minitest -utf16 base/*.t comp/*.t cmd/*.t run/*.t io/*.t op/*.t uni/*.t </dev/tty
+		&& $(LDLIBPTH) $(RUN) ./perl TEST -minitest -utf16 base/*.t comp/*.t cmd/*.t run/*.t io/*.t op/*.t uni/*.t </dev/tty
 
 test.utf16 check.utf16: test_prep
 	PERL=./perl $(MAKE) TEST_ARGS=-utf16 _test
@@ -1289,7 +1294,7 @@ minitest.prep:
 # is crashing.
 minitest: miniperl$(EXE_EXT) lib/re.pm minitest.prep
 	- cd t && (rm -f perl$(EXE_EXT); $(LNS) ../miniperl$(EXE_EXT) perl$(EXE_EXT)) \
-		&& $(LDLIBPTH) ./perl TEST -minitest base/*.t comp/*.t cmd/*.t run/*.t io/*.t op/*.t uni/*.t </dev/tty
+		&& $(LDLIBPTH) $(RUN) ./perl TEST -minitest base/*.t comp/*.t cmd/*.t run/*.t io/*.t op/*.t uni/*.t </dev/tty
 
 # Test via harness
 
@@ -1307,28 +1312,28 @@ test_harness_notty: test_prep
 .PHONY: ok okfile oknack okfilenack nok nokfile noknack nokfilenack
 
 ok:	utilities
-	$(LDLIBPTH) ./perl -Ilib utils/perlbug -ok -s '(UNINSTALLED)'
+	$(LDLIBPTH) $(RUN) ./perl -Ilib utils/perlbug -ok -s '(UNINSTALLED)'
 
 okfile:	utilities
-	$(LDLIBPTH) ./perl -Ilib utils/perlbug -ok -s '(UNINSTALLED)' -F perl.ok
+	$(LDLIBPTH) $(RUN) ./perl -Ilib utils/perlbug -ok -s '(UNINSTALLED)' -F perl.ok
 
 oknack:	utilities
-	$(LDLIBPTH) ./perl -Ilib utils/perlbug -ok -s '(UNINSTALLED)' -A
+	$(LDLIBPTH) $(RUN) ./perl -Ilib utils/perlbug -ok -s '(UNINSTALLED)' -A
 
 okfilenack:	utilities
-	$(LDLIBPTH) ./perl -Ilib utils/perlbug -ok -s '(UNINSTALLED)' -F perl.ok -A
+	$(LDLIBPTH) $(RUN) ./perl -Ilib utils/perlbug -ok -s '(UNINSTALLED)' -F perl.ok -A
 
 nok:	utilities
-	$(LDLIBPTH) ./perl -Ilib utils/perlbug -nok -s '(UNINSTALLED)'
+	$(LDLIBPTH) $(RUN) ./perl -Ilib utils/perlbug -nok -s '(UNINSTALLED)'
 
 nokfile:	utilities
-	$(LDLIBPTH) ./perl -Ilib utils/perlbug -nok -s '(UNINSTALLED)' -F perl.nok
+	$(LDLIBPTH) $(RUN) ./perl -Ilib utils/perlbug -nok -s '(UNINSTALLED)' -F perl.nok
 
 noknack:	utilities
-	$(LDLIBPTH) ./perl -Ilib utils/perlbug -nok -s '(UNINSTALLED)' -A
+	$(LDLIBPTH) $(RUN) ./perl -Ilib utils/perlbug -nok -s '(UNINSTALLED)' -A
 
 nokfilenack:	utilities
-	$(LDLIBPTH) ./perl -Ilib utils/perlbug -nok -s '(UNINSTALLED)' -F perl.nok -A
+	$(LDLIBPTH) $(RUN) ./perl -Ilib utils/perlbug -nok -s '(UNINSTALLED)' -F perl.nok -A
 
 .PHONY: clist hlist shlist pllist
 
@@ -1385,65 +1390,5 @@ case `pwd` in
     ;;
 esac
 $rm -f $firstmakefile
-
-# Now do any special processing required before building.
-
-case "$ebcdic" in
-define)
-    xxx=''
-    echo "This is an EBCDIC system, checking if any parser files need regenerating." >&2
-case "$osname" in
-os390|posix-bc)
-    if cd x2p
-    then
-        rm -f y.tab.c y.tab.h
-        case "$osname" in
-        posix-bc)
-           # we are using two different yaccs in BS2000 Posix!
-           byacc a2p.y >/dev/null 2>&1
-           ;;
-        *) # e.g. os390
-           yacc  a2p.y >/dev/null 2>&1
-           ;;
-        esac
-        if cmp -s y.tab.c a2p.c
-        then
-            rm -f y.tab.c
-        else
-            echo "a2p.y -> a2p.c" >&2
-            mv -f y.tab.c a2p.c
-            chmod u+w a2p.c
-            sed -e 's/fprintf *( *stderr *,/PerlIO_printf(Perl_debug_log,/g' \
-		-e 's|^static void __YY_YACC_MAIN.*BS2000.*|/*static main deleted*/|' \
-                -e 's/y\.tab/a2p/g' a2p.c >a2p.tmp && mv a2p.tmp a2p.c
-            xxx="$xxx a2p.c"
-        fi
-        # In case somebody yacc -d:ed the a2p.y.
-        if test -f y.tab.h
-        then
-            if cmp -s y.tab.h a2p.h
-            then
-                rm -f y.tab.h
-            else
-                echo "a2p.h -> a2p.h" >&2
-                mv -f y.tab.h a2p.h
-                xxx="$xxx a2p.h"
-            fi
-        fi
-        cd ..
-    fi
-    ;;
-vmesa)
-    # Do nothing in VM/ESA.
-    ;;
-*)
-    echo "'$osname' is an EBCDIC system I don't know that well." >&4
-    ;;
-esac
-    case "$xxx" in
-    '') echo "No parser files were regenerated.  That's okay." >&2 ;;
-    esac
-    ;;
-esac
 
 # ex: set ts=8 sts=4 sw=4 noet:

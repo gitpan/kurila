@@ -363,10 +363,12 @@ Perl_allocmy(pTHX_ const char *const name)
     {
 	/* name[2] is true if strlen(name) > 2  */
 	if (!isPRINT(name[1]) || strchr("\t\n\r\f", name[1])) {
-	    yyerror(Perl_form(aTHX_ "Can't use global %c^%c%s in \"my\"",
-			      name[0], toCTRL(name[1]), name + 2));
+	    yyerror(Perl_form(aTHX_ "Can't use global %c^%c%s in \"%s\"",
+			      name[0], toCTRL(name[1]), name + 2,
+			      PL_parser->in_my == KEY_state ? "state" : "my"));
 	} else {
-	    yyerror(Perl_form(aTHX_ "Can't use global %s in \"my\"",name));
+	    yyerror(Perl_form(aTHX_ "Can't use global %s in \"%s\"",name,
+			      PL_parser->in_my == KEY_state ? "state" : "my"));
 	}
     }
 
@@ -384,6 +386,12 @@ Perl_allocmy(pTHX_ const char *const name)
 		    0, /*  not fake */
 		    PL_parser->in_my == KEY_state
     );
+    /* anon sub prototypes contains state vars should always be cloned,
+     * otherwise the state var would be shared between anon subs */
+
+    if (PL_parser->in_my == KEY_state && CvANON(PL_compcv))
+	CvCLONE_on(PL_compcv);
+
     return off;
 }
 
@@ -399,12 +407,6 @@ S_op_destroy(pTHX_ OP *o)
     }
     FreeOp(o);
 }
-
-#ifdef USE_ITHREADS
-#  define forget_pmop(a,b)	S_forget_pmop(aTHX_ a,b)
-#else
-#  define forget_pmop(a,b)	S_forget_pmop(aTHX_ a)
-#endif
 
 /* Destructor */
 
@@ -438,7 +440,6 @@ Perl_op_free(pTHX_ OP *o)
 	    if (refcnt) {
 		/* Need to find and remove any pattern match ops from the list
 		   we maintain for reset().  */
-		find_and_forget_pmops(o);
 		return;
 	    }
 	    }
@@ -593,7 +594,6 @@ Perl_op_clear(pTHX_ OP *o)
     case OP_MATCH:
     case OP_QR:
 clear_pmop:
-	forget_pmop(cPMOPo, 1);
 	cPMOPo->op_pmreplrootu.op_pmreplroot = NULL;
         /* we use the "SAFE" version of the PM_ macros here
          * since sv_clean_all might release some PMOPs
@@ -630,65 +630,6 @@ S_cop_free(pTHX_ COP* cop)
     if (! specialWARN(cop->cop_warnings))
 	PerlMemShared_free(cop->cop_warnings);
     SvREFCNT_dec((SV*)cop->cop_hints_hash);
-}
-
-STATIC void
-S_forget_pmop(pTHX_ PMOP *const o
-#ifdef USE_ITHREADS
-	      , U32 flags
-#endif
-	      )
-{
-    HV * const pmstash = PmopSTASH(o);
-    if (pmstash && !SvIS_FREED(pmstash)) {
-	MAGIC * const mg = mg_find((SV*)pmstash, PERL_MAGIC_symtab);
-	if (mg) {
-	    PMOP **const array = (PMOP**) mg->mg_ptr;
-	    U32 count = mg->mg_len / sizeof(PMOP**);
-	    U32 i = count;
-
-	    while (i--) {
-		if (array[i] == o) {
-		    /* Found it. Move the entry at the end to overwrite it.  */
-		    array[i] = array[--count];
-		    mg->mg_len = count * sizeof(PMOP**);
-		    /* Could realloc smaller at this point always, but probably
-		       not worth it. Probably worth free()ing if we're the
-		       last.  */
-		    if(!count) {
-			Safefree(mg->mg_ptr);
-			mg->mg_ptr = NULL;
-		    }
-		    break;
-		}
-	    }
-	}
-    }
-    if (PL_curpm == o) 
-	PL_curpm = NULL;
-#ifdef USE_ITHREADS
-    if (flags)
-	PmopSTASH_free(o);
-#endif
-}
-
-STATIC void
-S_find_and_forget_pmops(pTHX_ OP *o)
-{
-    if (o->op_flags & OPf_KIDS) {
-        OP *kid = cUNOPo->op_first;
-	while (kid) {
-	    switch (kid->op_type) {
-	    case OP_SUBST:
-	    case OP_PUSHRE:
-	    case OP_MATCH:
-	    case OP_QR:
-		forget_pmop((PMOP*)kid, 0);
-	    }
-	    find_and_forget_pmops(kid);
-	    kid = kid->op_sibling;
-	}
-    }
 }
 
 void
@@ -2565,11 +2506,11 @@ Perl_prepend_elem(pTHX_ I32 type, OP *first, OP *last)
 
 #ifdef PERL_MAD
  
-TOKEN *
-Perl_newTOKEN(pTHX_ I32 optype, YYSTYPE lval, MADPROP* madprop)
+MADTOKEN *
+Perl_newMADTOKEN(pTHX_ I32 optype, YYSTYPE lval, MADPROP* madprop)
 {
-    TOKEN *tk;
-    Newxz(tk, 1, TOKEN);
+    MADTOKEN *tk;
+    Newxz(tk, 1, MADTOKEN);
     tk->tk_type = (OPCODE)optype;
     tk->tk_type = 12345;
     tk->tk_lval = lval;
@@ -2578,7 +2519,7 @@ Perl_newTOKEN(pTHX_ I32 optype, YYSTYPE lval, MADPROP* madprop)
 }
 
 void
-Perl_token_free(pTHX_ TOKEN* tk)
+Perl_token_free(pTHX_ MADTOKEN* tk)
 {
     if (tk->tk_type != 12345)
 	return;
@@ -2587,13 +2528,13 @@ Perl_token_free(pTHX_ TOKEN* tk)
 }
 
 void
-Perl_token_getmad(pTHX_ TOKEN* tk, OP* o, char slot)
+Perl_token_getmad(pTHX_ MADTOKEN* tk, OP* o, char slot)
 {
     MADPROP* mp;
     MADPROP* tm;
     if (tk->tk_type != 12345) {
 	Perl_warner(aTHX_ packWARN(WARN_MISC),
-	     "Invalid TOKEN object ignored");
+	     "Invalid MADTOKEN object ignored");
 	return;
     }
     tm = tk->tk_mad;
@@ -2731,6 +2672,12 @@ Perl_append_madprops(pTHX_ MADPROP* tm, OP* o, char slot)
 }
 
 void
+Perl_append_madprops_pv(pTHX_ const char* v, OP* o, char slot)
+{
+    append_madprops(newMADsv(slot, newSVpv(v, 0)), o, slot);
+}
+
+void
 Perl_addmad(pTHX_ MADPROP* tm, MADPROP** root, char slot)
 {
     MADPROP* mp;
@@ -2758,7 +2705,7 @@ Perl_newMADsv(pTHX_ char key, SV* sv)
 }
 
 MADPROP *
-Perl_newMADPROP(pTHX_ char key, char type, void* val, I32 vlen)
+Perl_newMADPROP(pTHX_ char key, char type, const void* val, I32 vlen)
 {
     MADPROP *mp;
     Newxz(mp, 1, MADPROP);
@@ -2782,11 +2729,6 @@ Perl_mad_free(pTHX_ MADPROP* mp)
 /*    if (PL_parser && PL_parser->lex_state != LEX_NOTPARSING && mp->mad_vlen)
 	PerlIO_printf(PerlIO_stderr(), "DESTROYING '%c'=<%s>\n", mp->mad_key & 255, mp->mad_val); */
     switch (mp->mad_type) {
-    case MAD_NULL:
-	break;
-    case MAD_PV:
-	Safefree((char*)mp->mad_val);
-	break;
     case MAD_OP:
 	if (mp->mad_vlen)	/* vlen holds "strong/weak" boolean */
 	    op_free((OP*)mp->mad_val);
@@ -2960,8 +2902,8 @@ Perl_pmtrans(pTHX_ OP *o, OP *expr, OP *repl)
 			      ((SVOP*)repl)->op_sv;
     STRLEN tlen;
     STRLEN rlen;
-    const U8 *t = (U8*)SvPV_const(tstr, tlen);
-    const U8 *r = (U8*)SvPV_const(rstr, rlen);
+    const char *t = SvPV_const(tstr, tlen);
+    const char *r = SvPV_const(rstr, rlen);
     register I32 i;
     register I32 j;
     I32 grows = 0;
@@ -2979,8 +2921,8 @@ Perl_pmtrans(pTHX_ OP *o, OP *expr, OP *repl)
     if (o->op_private & OPpTRANS_UTF8) {
 	SV* const listsv = newSVpvs("# comment\n");
 	SV* transv = NULL;
-	const U8* tend = t + tlen;
-	const U8* rend = r + rlen;
+	const char* tend = t + tlen;
+	const char* rend = r + rlen;
 	STRLEN ulen;
 	UV tfirst = 1;
 	UV tlast = 0;
@@ -2994,8 +2936,8 @@ Perl_pmtrans(pTHX_ OP *o, OP *expr, OP *repl)
 	I32 bits;
 	I32 havefinal = 0;
 	U32 final = 0;
-	U8* tsave = NULL;
-	U8* rsave = NULL;
+	char* tsave = NULL;
+	char* rsave = NULL;
 	const U32 flags = UTF8_ALLOW_DEFAULT;
 
 /* There are several snags with this code on EBCDIC:
@@ -3005,7 +2947,7 @@ Perl_pmtrans(pTHX_ OP *o, OP *expr, OP *repl)
 */
 
 	if (complement) {
-	    U8 tmpbuf[UTF8_MAXBYTES+1];
+	    char tmpbuf[UTF8_MAXBYTES+1];
 	    UV *cp;
 	    UV nextmin = 0;
 	    Newx(cp, 2*tlen, UV);
@@ -3014,7 +2956,7 @@ Perl_pmtrans(pTHX_ OP *o, OP *expr, OP *repl)
 	    while (t < tend) {
 		cp[2*i] = utf8n_to_uvuni(t, tend-t, &ulen, flags);
 		t += ulen;
-		if (t < tend && NATIVE_TO_UTF(*t) == 0xff) {
+		if (t < tend && (U8)NATIVE_TO_UTF(*t) == 0xff) {
 		    t++;
 		    cp[2*i+1] = utf8n_to_uvuni(t, tend-t, &ulen, flags);
 		    t += ulen;
@@ -3032,7 +2974,7 @@ Perl_pmtrans(pTHX_ OP *o, OP *expr, OP *repl)
 		    t = uvuni_to_utf8(tmpbuf,nextmin);
 		    sv_catpvn(transv, (char*)tmpbuf, t - tmpbuf);
 		    if (diff > 1) {
-			U8  range_mark = UTF_TO_NATIVE(0xff);
+			char range_mark = UTF_TO_NATIVE((char)0xff);
 			t = uvuni_to_utf8(tmpbuf, val - 1);
 			sv_catpvn(transv, (char *)&range_mark, 1);
 			sv_catpvn(transv, (char*)tmpbuf, t - tmpbuf);
@@ -3045,13 +2987,13 @@ Perl_pmtrans(pTHX_ OP *o, OP *expr, OP *repl)
 	    t = uvuni_to_utf8(tmpbuf,nextmin);
 	    sv_catpvn(transv, (char*)tmpbuf, t - tmpbuf);
 	    {
-		U8 range_mark = UTF_TO_NATIVE(0xff);
+		char range_mark = UTF_TO_NATIVE((char)0xff);
 		sv_catpvn(transv, (char *)&range_mark, 1);
 	    }
 	    t = uvuni_to_utf8_flags(tmpbuf, 0x7fffffff,
 				    UNICODE_ALLOW_SUPER);
 	    sv_catpvn(transv, (char*)tmpbuf, t - tmpbuf);
-	    t = (const U8*)SvPVX_const(transv);
+	    t = SvPVX_const(transv);
 	    tlen = SvCUR(transv);
 	    tend = t + tlen;
 	    Safefree(cp);
@@ -3072,7 +3014,7 @@ Perl_pmtrans(pTHX_ OP *o, OP *expr, OP *repl)
 	    if (tfirst > tlast) {
 		tfirst = (I32)utf8n_to_uvuni(t, tend - t, &ulen, flags);
 		t += ulen;
-		if (t < tend && NATIVE_TO_UTF(*t) == 0xff) {	/* illegal utf8 val indicates range */
+		if (t < tend && (U8)NATIVE_TO_UTF(*t) == 0xff) {	/* illegal utf8 val indicates range */
 		    t++;
 		    tlast = (I32)utf8n_to_uvuni(t, tend - t, &ulen, flags);
 		    t += ulen;
@@ -3086,7 +3028,7 @@ Perl_pmtrans(pTHX_ OP *o, OP *expr, OP *repl)
 		if (r < rend) {
 		    rfirst = (I32)utf8n_to_uvuni(r, rend - r, &ulen, flags);
 		    r += ulen;
-		    if (r < rend && NATIVE_TO_UTF(*r) == 0xff) {	/* illegal utf8 val indicates range */
+		    if (r < rend && (U8)NATIVE_TO_UTF(*r) == 0xff) {	/* illegal utf8 val indicates range */
 			r++;
 			rlast = (I32)utf8n_to_uvuni(r, rend - r, &ulen, flags);
 			r += ulen;
@@ -3187,21 +3129,21 @@ Perl_pmtrans(pTHX_ OP *o, OP *expr, OP *repl)
     if (complement) {
 	Zero(tbl, 256, short);
 	for (i = 0; i < (I32)tlen; i++)
-	    tbl[t[i]] = -1;
+	    tbl[(U8)t[i]] = -1;
 	for (i = 0, j = 0; i < 256; i++) {
 	    if (!tbl[i]) {
 		if (j >= (I32)rlen) {
 		    if (del)
 			tbl[i] = -2;
 		    else if (rlen)
-			tbl[i] = r[j-1];
+			tbl[i] = (U8)r[j-1];
 		    else
 			tbl[i] = (short)i;
 		}
 		else {
-		    if (i < 128 && r[j] >= 128)
+		    if (i < 128 && (U8)r[j] >= 128)
 			grows = 1;
-		    tbl[i] = r[j++];
+		    tbl[i] = (U8)r[j++];
 		}
 	    }
 	}
@@ -3222,7 +3164,7 @@ Perl_pmtrans(pTHX_ OP *o, OP *expr, OP *repl)
 	    }
 	    tbl[0x100] = (short)(rlen - j);
 	    for (i=0; i < (I32)rlen - j; i++)
-		tbl[0x101+i] = r[j+i];
+		tbl[0x101+i] = (U8)r[j+i];
 	}
     }
     else {
@@ -3239,16 +3181,14 @@ Perl_pmtrans(pTHX_ OP *o, OP *expr, OP *repl)
 	for (i = 0, j = 0; i < (I32)tlen; i++,j++) {
 	    if (j >= (I32)rlen) {
 		if (del) {
-		    if (tbl[t[i]] == -1)
-			tbl[t[i]] = -2;
+		    if (tbl[(U8)t[i]] == -1)
+			tbl[(U8)t[i]] = -2;
 		    continue;
 		}
 		--j;
 	    }
-	    if (tbl[t[i]] == -1) {
-		if (t[i] < 128 && r[j] >= 128)
-		    grows = 1;
-		tbl[t[i]] = r[j];
+	    if (tbl[(U8)t[i]] == -1) {
+		tbl[(U8)t[i]] = (U8)r[j];
 	    }
 	}
     }
@@ -3492,7 +3432,6 @@ Perl_pmruntime(pTHX_ OP *o, OP *expr, bool isreg)
 	    repl->op_next = (OP*)rcop;
 
 	    pm->op_pmreplrootu.op_pmreplroot = scalar((OP*)rcop);
-	    assert(!(pm->op_pmflags & PMf_ONCE));
 	    pm->op_pmstashstartu.op_pmreplstart = LINKLIST(rcop);
 	    rcop->op_next = 0;
 	}
@@ -3630,8 +3569,12 @@ Perl_utilize(pTHX_ int aver, I32 floor, OP *version, OP *idop, OP *arg)
     if (idop->op_type != OP_CONST)
 	Perl_croak(aTHX_ "Module name must be constant");
 
-    if (PL_madskills)
+#ifdef PERL_MAD
+    if (PL_madskills) {
 	op_getmad(idop,pegop,'U');
+	append_madprops_pv("use", pegop, '>');
+    }
+#endif
 
     veop = NULL;
 
@@ -3917,7 +3860,7 @@ Perl_newASSIGNOP(pTHX_ I32 flags, OP *left, I32 optype, OP *right)
 	PL_modcount = 0;
 	/* Grandfathering $[ assignment here.  Bletch.*/
 	/* Only simple assignments like C<< ($[) = 1 >> are allowed */
-	PL_eval_start = (left->op_type == OP_CONST) ? right : 0;
+	PL_eval_start = (left->op_type == OP_CONST) ? right : NULL;
 	left = mod(left, OP_AASSIGN);
 	if (PL_eval_start)
 	    PL_eval_start = 0;
@@ -4008,47 +3951,11 @@ Perl_newASSIGNOP(pTHX_ I32 flags, OP *left, I32 optype, OP *right)
 	if (right && right->op_type == OP_SPLIT && !PL_madskills) {
 	    OP* tmpop = ((LISTOP*)right)->op_first;
 	    if (tmpop && (tmpop->op_type == OP_PUSHRE)) {
-		PMOP * const pm = (PMOP*)tmpop;
-		if (left->op_type == OP_RV2AV &&
-		    !(left->op_private & OPpLVAL_INTRO) &&
-		    !(o->op_private & OPpASSIGN_COMMON) )
-		{
-		    tmpop = ((UNOP*)left)->op_first;
-		    if (tmpop->op_type == OP_GV
-#ifdef USE_ITHREADS
-			&& !pm->op_pmreplrootu.op_pmtargetoff
-#else
-			&& !pm->op_pmreplrootu.op_pmtargetgv
-#endif
-			) {
-#ifdef USE_ITHREADS
-			pm->op_pmreplrootu.op_pmtargetoff
-			    = cPADOPx(tmpop)->op_padix;
-			cPADOPx(tmpop)->op_padix = 0;	/* steal it */
-#else
-			pm->op_pmreplrootu.op_pmtargetgv
-			    = (GV*)cSVOPx(tmpop)->op_sv;
-			cSVOPx(tmpop)->op_sv = NULL;	/* steal it */
-#endif
-			pm->op_pmflags |= PMf_ONCE;
-			tmpop = cUNOPo->op_first;	/* to list (nulled) */
-			tmpop = ((UNOP*)tmpop)->op_first; /* to pushmark */
-			tmpop->op_sibling = NULL;	/* don't free split */
-			right->op_next = tmpop->op_next;  /* fix starting loc */
-			op_free(o);			/* blow off assign */
-			right->op_flags &= ~OPf_WANT;
-				/* "I don't know and I don't care." */
-			return right;
-		    }
-		}
-		else {
-                   if (PL_modcount < RETURN_UNLIMITED_NUMBER &&
-		      ((LISTOP*)right)->op_last->op_type == OP_CONST)
-		    {
-			SV *sv = ((SVOP*)((LISTOP*)right)->op_last)->op_sv;
-			if (SvIVX(sv) == 0)
-			    sv_setiv(sv, PL_modcount+1);
-		    }
+		if (PL_modcount < RETURN_UNLIMITED_NUMBER &&
+		    ((LISTOP*)right)->op_last->op_type == OP_CONST) {
+		    SV *sv = ((SVOP*)((LISTOP*)right)->op_last)->op_sv;
+		    if (SvIVX(sv) == 0)
+			sv_setiv(sv, PL_modcount+1);
 		}
 	    }
 	}
@@ -4203,6 +4110,7 @@ S_new_logop(pTHX_ I32 type, I32 flags, OP** firstp, OP** otherp)
 	    if ((o2->op_type == OP_PADSV || o2->op_type == OP_PADAV
 			|| o2->op_type == OP_PADHV)
 		&& o2->op_private & OPpLVAL_INTRO
+		&& !(o2->op_private & OPpPAD_STATE)
 		&& ckWARN(WARN_DEPRECATED))
 	    {
 		Perl_warner(aTHX_ packWARN(WARN_DEPRECATED),
@@ -4318,6 +4226,7 @@ Perl_newCONDOP(pTHX_ I32 flags, OP *first, OP *trueop, OP *falseop)
 	    live = newUNOP(OP_NULL, 0, live);
 	    op_getmad(first, live, 'C');
 	    op_getmad(dead, live, left ? 'e' : 't');
+	    append_madprops_pv("const_cond", live, '<');
 	} else {
 	    op_free(first);
 	    op_free(dead);
@@ -4383,9 +4292,7 @@ Perl_newRANGE(pTHX_ I32 flags, OP *left, OP *right)
     right->op_next = flop;
 
     range->op_targ = pad_alloc(OP_RANGE, SVs_PADMY);
-    sv_upgrade(PAD_SV(range->op_targ), SVt_PVNV);
     flip->op_targ = pad_alloc(OP_RANGE, SVs_PADMY);
-    sv_upgrade(PAD_SV(flip->op_targ), SVt_PVNV);
 
     flip->op_private =  left->op_type == OP_CONST ? OPpFLIP_LINENUM : 0;
     flop->op_private = right->op_type == OP_CONST ? OPpFLIP_LINENUM : 0;
@@ -4811,6 +4718,11 @@ S_looks_like_bool(pTHX_ const OP *o)
 	    return (
 	    	looks_like_bool(cLOGOPo->op_first)
 	     && looks_like_bool(cLOGOPo->op_first->op_sibling));
+
+	case OP_NULL:
+	    return (
+		o->op_flags & OPf_KIDS
+	    && looks_like_bool(cUNOPo->op_first));
 
 	case OP_ENTERSUB:
 
@@ -5455,7 +5367,8 @@ Perl_newATTRSUB(pTHX_ I32 floor, OP *o, OP *proto, OP *attrs, OP *block)
 			   CopFILE(PL_curcop),
 			   (long)PL_subline, (long)CopLINE(PL_curcop));
 	    gv_efullname3(tmpstr, gv, NULL);
-	    hv_store(GvHV(PL_DBsub), SvPVX_const(tmpstr), SvCUR(tmpstr), sv, 0);
+	    (void)hv_store(GvHV(PL_DBsub), SvPVX_const(tmpstr),
+		    SvCUR(tmpstr), sv, 0);
 	    hv = GvHVn(db_postponed);
 	    if (HvFILL(hv) > 0 && hv_exists(hv, SvPVX_const(tmpstr), SvCUR(tmpstr))) {
 		CV * const pcv = GvCV(db_postponed);
@@ -5570,6 +5483,13 @@ Perl_newCONSTSUB(pTHX_ HV *stash, const char *name, SV *sv)
 
     ENTER;
 
+    if (IN_PERL_RUNTIME) {
+	/* at runtime, it's not safe to manipulate PL_curcop: it may be
+	 * an op shared between threads. Use a non-shared COP for our
+	 * dirty work */
+	 SAVEVPTR(PL_curcop);
+	 PL_curcop = &PL_compiling;
+    }
     SAVECOPLINE(PL_curcop);
     CopLINE_set(PL_curcop, PL_parser ? PL_parser->copline : NOLINE);
 
@@ -5899,7 +5819,7 @@ Perl_ck_bitop(pTHX_ OP *o)
 		(right->op_flags & OPf_PARENS) == 0))
 	    if (ckWARN(WARN_PRECEDENCE))
 		Perl_warner(aTHX_ packWARN(WARN_PRECEDENCE),
-			"Possible precedence problem on bitwise %c operator",
+			"Possible precedence problem on bitwise ^%c^ operator",
 			o->op_type == OP_BIT_OR ? '|'
 			    : o->op_type == OP_BIT_AND ? '&' : '^'
 			);
@@ -6859,6 +6779,7 @@ Perl_ck_compsub(pTHX_ OP *o)
 OP *
 Perl_ck_sassign(pTHX_ OP *o)
 {
+    dVAR;
     OP * const kid = cLISTOPo->op_first;
     /* has a disposable target? */
     if ((PL_opargs[kid->op_type] & OA_TARGLEX)
@@ -7023,6 +6944,8 @@ Perl_ck_require(pTHX_ OP *o)
 	    SV * const sv = kid->op_sv;
 	    U32 was_readonly = SvREADONLY(sv);
 	    char *s;
+	    STRLEN len;
+	    const char *end;
 
 	    if (was_readonly) {
 		if (SvFAKE(sv)) {
@@ -7034,14 +6957,17 @@ Perl_ck_require(pTHX_ OP *o)
 		}
 	    }   
 
-	    for (s = SvPVX(sv); *s; s++) {
+	    s = SvPVX(sv);
+	    len = SvCUR(sv);
+	    end = s + len;
+	    for (; s < end; s++) {
 		if (*s == ':' && s[1] == ':') {
-		    const STRLEN len = strlen(s+2)+1;
 		    *s = '/';
-		    Move(s+2, s+1, len, char);
-		    SvCUR_set(sv, SvCUR(sv) - 1);
+		    Move(s+2, s+1, end - s, char);
+		    --end;
 		}
 	    }
+	    SvEND_set(sv, end);
 	    sv_catpvs(sv, ".pm");
 	    SvFLAGS(sv) |= was_readonly;
 	}
@@ -7585,6 +7511,9 @@ Perl_ck_subr(pTHX_ OP *o)
 		Perl_croak(aTHX_ "Malformed prototype for %s: %"SVf,
 			   gv_ename(namegv), SVfARG(cv));
 	    }
+#ifdef PERL_MAD
+	    addmad(newMADsv('c', newSVpvn(proto-1, 1)), &o3->op_madprop, 0);
+#endif
 	}
 	else
 	    list(o2);
@@ -7900,7 +7829,6 @@ Perl_peep(pTHX_ register OP *o)
 	    break;
 
 	case OP_SUBST:
-	    assert(!(cPMOP->op_pmflags & PMf_ONCE));
 	    while (cPMOP->op_pmstashstartu.op_pmreplstart &&
 		   cPMOP->op_pmstashstartu.op_pmreplstart->op_type == OP_NULL)
 		cPMOP->op_pmstashstartu.op_pmreplstart
@@ -8239,9 +8167,7 @@ Perl_peep(pTHX_ register OP *o)
 	
 	case OP_QR:
 	case OP_MATCH:
-	    if (!(cPMOP->op_pmflags & PMf_ONCE)) {
-		assert (!cPMOP->op_pmstashstartu.op_pmreplstart);
-	    }
+	    assert (!cPMOP->op_pmstashstartu.op_pmreplstart);
 	    break;
 	}
 	oldop = o;

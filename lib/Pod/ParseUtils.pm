@@ -11,7 +11,6 @@ package Pod::ParseUtils;
 
 use vars qw($VERSION);
 $VERSION = 1.35;   ## Current version of this package
-require  5.005;    ## requires this Perl version or later
 
 =head1 NAME
 
@@ -388,7 +387,7 @@ sub parse {
     # empty alternative text expands to node name
     if(defined $alttext) {
         if(!length($alttext)) {
-          $alttext = $node | $page;
+          $alttext = $node ^|^ $page;
         }
     }
     else {

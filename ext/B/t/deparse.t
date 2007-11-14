@@ -21,26 +21,28 @@ BEGIN {
 
 use warnings;
 use strict;
-use Test::More tests => 50;
+use feature ":5.10";
+use Test::More tests => 54;
 
 use B::Deparse;
 my $deparse = B::Deparse->new();
 ok($deparse);
 
 # Tell B::Deparse about our ambient pragmas
-{ my ($hint_bits, $warning_bits);
- BEGIN { ($hint_bits, $warning_bits) = ($^H, ${^WARNING_BITS}); }
+{ my ($hint_bits, $warning_bits, $hinthash);
+ BEGIN { ($hint_bits, $warning_bits, $hinthash) = ($^H, ${^WARNING_BITS}, \%^H); }
  $deparse->ambient_pragmas (
      hint_bits    => $hint_bits,
      warning_bits => $warning_bits,
+     '%^H'	  => $hinthash,
  );
 }
 
 $/ = "\n####\n";
 while (<DATA>) {
     chomp;
-    s/#(.*)$//mg;
-    my ($num) = $1 =~ m/(\d+)/;
+    s/#\s*(.*)$//mg;
+    my ($num, $testname) = $1 =~ m/(\d+)\s*(.*)/;
     my ($input, $expected);
     if (/(.*)\n>>>>\n(.*)/s) {
 	($input, $expected) = ($1, $2);
@@ -52,7 +54,8 @@ while (<DATA>) {
     my $coderef = eval "sub {$input}";
 
     if ($@) {
-	ok(0, "$num deparsed: $@");
+	diag("$num deparsed: $@");
+	ok(0, $testname);
     }
     else {
 	my $deparsed = $deparse->coderef2text( $coderef );
@@ -60,7 +63,7 @@ while (<DATA>) {
 	$regex =~ s/(\S+)/\Q$1/g;
 	$regex =~ s/\s+/\\s+/g;
 	$regex = '^\{\s*' . $regex . '\s*\}$';
-        like($deparsed, qr/$regex/);
+        like($deparsed, qr/$regex/, $testname);
     }
 }
 
@@ -328,10 +331,32 @@ my $f = sub {
 ####
 # 42
 my $bar;
-'Foo'->$bar('orz');
+'Foo'->?$bar('orz');
 ####
 # 43
 'Foo'->bar('orz');
 ####
 # 44
 'Foo'->bar;
+####
+# 45
+1; # was 'say'
+####
+# 46 state vars
+state $x = 42;
+####
+# 47 state var assignment
+{
+    my $y = (state $x = 42);
+}
+>>>>
+{
+    my $y = state $x = 42;
+}
+####
+# 48 state vars in anoymous subroutines
+$a = sub {
+    state $x;
+    return $x++;
+}
+;

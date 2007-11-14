@@ -274,8 +274,8 @@ sub warning {
 sub gimme {
     my $op    = shift @_;
     my $flags = $op->flags;
-    if ( $flags & OPf_WANT ) {
-        return ( ( $flags & OPf_WANT ) == OPf_WANT_LIST ? 1 : 0 );
+    if ( $flags ^&^ OPf_WANT ) {
+        return ( ( $flags ^&^ OPf_WANT ) == OPf_WANT_LIST ? 1 : 0 );
     }
     return undef;      ## no critic undef
 }
@@ -338,11 +338,11 @@ for (
 
         my $elt;
         if ( not $op->isa('B::PADOP') ) {
-            $elt = $op->$attr;
+            $elt = $op->?$attr;
         }
         return $elt if eval { $elt->isa('B::SV') };
 
-        my $ix         = $op->$pad_attr;
+        my $ix         = $op->?$pad_attr;
         my @entire_pad = $curcv->PADLIST->ARRAY;
         my @elts       = map +( $_->ARRAY )[$ix], @entire_pad;
         ($elt) = first {
@@ -361,7 +361,7 @@ sub B::OP::lint {
 
     # Call all registered plugins
     my $m;
-    $m = $_->can('match'), $op->$m( \%check ) for @plugins;
+    $m = $_->can('match'), $op->?$m( \%check ) for @plugins;
     return;
 }
 
@@ -381,7 +381,7 @@ sub B::COP::lint {
 
     # Call all registered plugins
     my $m;
-    $m = $_->can('match'), $op->$m( \%check ) for @plugins;
+    $m = $_->can('match'), $op->?$m( \%check ) for @plugins;
     return;
 }
 
@@ -417,8 +417,8 @@ CONTEXT: {
         # our( @bar ); would also trigger this error so I exclude
         # that.
         next
-            if $op->private & OPpOUR_INTRO
-            and ( $op->flags & OPf_WANT ) == OPf_WANT_VOID;
+            if $op->private ^&^ OPpOUR_INTRO
+            and ( $op->flags ^&^ OPf_WANT ) == OPf_WANT_VOID;
 
         warning 'Implicit scalar context for %s in %s',
             $opname eq "rv2av" ? "array" : "hash", $parent->desc;
@@ -446,7 +446,7 @@ PRIVATE_NAMES: {
 
     # Call all registered plugins
     my $m;
-    $m = $_->can('match'), $op->$m( \%check ) for @plugins;
+    $m = $_->can('match'), $op->?$m( \%check ) for @plugins;
     return;
 }
 
@@ -459,7 +459,7 @@ IMPLICIT_READ: {
         next
             unless $check{implicit_read}
             and $op->name eq "match"
-            and not( $op->flags & OPf_STACKED
+            and not( $op->flags ^&^ OPf_STACKED
             or inside_grepmap() );
         warning 'Implicit match on $_';
     }
@@ -471,13 +471,13 @@ IMPLICIT_WRITE: {
         next
             unless $check{implicit_write}
             and $op->name eq "subst"
-            and not $op->flags & OPf_STACKED;
+            and not $op->flags ^&^ OPf_STACKED;
         warning 'Implicit substitution on $_';
     }
 
     # Call all registered plugins
     my $m;
-    $m = $_->can('match'), $op->$m( \%check ) for @plugins;
+    $m = $_->can('match'), $op->?$m( \%check ) for @plugins;
     return;
 }
 
@@ -502,7 +502,7 @@ IMPLICIT_FOO: {
 
     # Call all registered plugins
     my $m;
-    $m = $_->can('match'), $op->$m( \%check ) for @plugins;
+    $m = $_->can('match'), $op->?$m( \%check ) for @plugins;
     return;
 }
 
@@ -529,10 +529,10 @@ BARE_SUBS: {
         next
             unless $check{bare_subs}
             and $op->name eq 'const'
-            and $op->private & OPpCONST_BARE;
+            and $op->private ^&^ OPpCONST_BARE;
 
         my $sv = $op->sv_harder;
-        next unless $sv->FLAGS & SVf_POK;
+        next unless $sv->FLAGS ^&^ SVf_POK;
 
         my $sub     = $sv->PV;
         my $subname = "$curstash\::$sub";
@@ -632,7 +632,7 @@ UNDEFINED_SUBS: {
 
     # Call all registered plugins
     my $m;
-    $m = $_->can('match'), $op->$m( \%check ) for @plugins;
+    $m = $_->can('match'), $op->?$m( \%check ) for @plugins;
     return;
 }
 

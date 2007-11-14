@@ -1,7 +1,6 @@
 package subs;
 
 our $VERSION = '1.00';
-
 =head1 NAME
 
 subs - Perl pragma to predeclare sub names
@@ -25,8 +24,6 @@ declarations with C<no vars> or C<no subs>.
 See L<perlmodlib/Pragmatic Modules> and L<strict/strict subs>.
 
 =cut
-
-require 5.000;
 
 sub import {
     my $callpack = caller;

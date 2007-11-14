@@ -21,6 +21,7 @@ These functions are related to the method resolution order of perl classes
 */
 
 #include "EXTERN.h"
+#define PERL_IN_MRO_C
 #include "perl.h"
 
 struct mro_meta*
@@ -83,8 +84,8 @@ invalidated).
 
 =cut
 */
-AV*
-Perl_mro_get_linear_isa_dfs(pTHX_ HV *stash, I32 level)
+static AV*
+S_mro_get_linear_isa_dfs(pTHX_ HV *stash, I32 level)
 {
     AV* retval;
     GV** gvp;
@@ -159,7 +160,7 @@ Perl_mro_get_linear_isa_dfs(pTHX_ HV *stash, I32 level)
 	    while(subrv_items--) {
 		SV *const subsv = *subrv_p++;
 		if(!hv_exists_ent(stored, subsv, 0)) {
-		    hv_store_ent(stored, subsv, &PL_sv_undef, 0);
+		    (void)hv_store_ent(stored, subsv, &PL_sv_undef, 0);
 		    av_push(retval, newSVsv(subsv));
 		}
             }
@@ -197,8 +198,8 @@ invalidated).
 =cut
 */
 
-AV*
-Perl_mro_get_linear_isa_c3(pTHX_ HV* stash, I32 level)
+static AV*
+S_mro_get_linear_isa_c3(pTHX_ HV* stash, I32 level)
 {
     AV* retval;
     GV** gvp;
@@ -290,7 +291,7 @@ Perl_mro_get_linear_isa_c3(pTHX_ HV* stash, I32 level)
                     SV* const seqitem = *seq_ptr++;
                     HE* const he = hv_fetch_ent(tails, seqitem, 0, 0);
                     if(!he) {
-                        hv_store_ent(tails, seqitem, newSViv(1), 0);
+                        (void)hv_store_ent(tails, seqitem, newSViv(1), 0);
                     }
                     else {
                         SV* const val = HeVAL(he);
@@ -540,14 +541,14 @@ Perl_mro_isa_changed_in(pTHX_ HV* stash)
 	   save time by not making two calls to the common HV code for the
 	   case where it doesn't exist.  */
 	   
-	hv_store(mroisarev, stashname, stashname_len, &PL_sv_yes, 0);
+	(void)hv_store(mroisarev, stashname, stashname_len, &PL_sv_yes, 0);
 
         if(isarev) {
             hv_iterinit(isarev);
             while((iter = hv_iternext(isarev))) {
                 I32 revkeylen;
                 char* const revkey = hv_iterkey(iter, &revkeylen);
-		hv_store(mroisarev, revkey, revkeylen, &PL_sv_yes, 0);
+		(void)hv_store(mroisarev, revkey, revkeylen, &PL_sv_yes, 0);
             }
         }
     }
@@ -778,10 +779,8 @@ XS(XS_mro_get_isarev)
     dVAR;
     dXSARGS;
     SV* classname;
-    SV** svp;
+    HE* he;
     HV* isarev;
-    char* classname_pv;
-    STRLEN classname_len;
     AV* ret_array;
 
     PERL_UNUSED_ARG(cv);
@@ -794,10 +793,8 @@ XS(XS_mro_get_isarev)
     SP -= items;
 
     
-    classname_pv = SvPV_nolen(classname);
-    classname_len = strlen(classname_pv);
-    svp = hv_fetch(PL_isarev, classname_pv, classname_len, 0);
-    isarev = svp ? (HV*)*svp : NULL;
+    he = hv_fetch_ent(PL_isarev, classname, 0, 0);
+    isarev = he ? (HV*)HeVAL(he) : NULL;
 
     ret_array = newAV();
     if(isarev) {
@@ -820,7 +817,7 @@ XS(XS_mro_is_universal)
     HV* isarev;
     char* classname_pv;
     STRLEN classname_len;
-    SV** svp;
+    HE* he;
 
     PERL_UNUSED_ARG(cv);
 
@@ -829,11 +826,10 @@ XS(XS_mro_is_universal)
 
     classname = ST(0);
 
-    classname_pv = SvPV_nolen(classname);
-    classname_len = strlen(classname_pv);
+    classname_pv = SvPV(classname,classname_len);
 
-    svp = hv_fetch(PL_isarev, classname_pv, classname_len, 0);
-    isarev = svp ? (HV*)*svp : NULL;
+    he = hv_fetch_ent(PL_isarev, classname, 0, 0);
+    isarev = he ? (HV*)HeVAL(he) : NULL;
 
     if((classname_len == 9 && strEQ(classname_pv, "UNIVERSAL"))
         || (isarev && hv_exists(isarev, "UNIVERSAL", 9)))
@@ -1086,14 +1082,14 @@ XS(XS_mro_nextcan)
                valid for the child */
             if (SvTYPE(candidate) == SVt_PVGV && (cand_cv = GvCV(candidate)) && !GvCVGEN(candidate)) {
                 SvREFCNT_inc_simple_void_NN((SV*)cand_cv);
-                hv_store_ent(nmcache, newSVsv(sv), (SV*)cand_cv, 0);
+                (void)hv_store_ent(nmcache, newSVsv(sv), (SV*)cand_cv, 0);
                 XPUSHs(sv_2mortal(newRV_inc((SV*)cand_cv)));
                 XSRETURN(1);
             }
         }
     }
 
-    hv_store_ent(nmcache, newSVsv(sv), &PL_sv_undef, 0);
+    (void)hv_store_ent(nmcache, newSVsv(sv), &PL_sv_undef, 0);
     if(throw_nomethod)
         Perl_croak(aTHX_ "No next::method '%s' found for %s", subname, hvname);
     XSRETURN_EMPTY;

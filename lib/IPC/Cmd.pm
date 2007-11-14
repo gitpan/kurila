@@ -13,7 +13,7 @@ BEGIN {
                         $USE_IPC_RUN $USE_IPC_OPEN3 $WARN
                     ];
 
-    $VERSION        = '0.36_01';
+    $VERSION        = '0.40';
     $VERBOSE        = 0;
     $DEBUG          = 0;
     $WARN           = 1;
@@ -25,6 +25,7 @@ BEGIN {
 }
 
 require Carp;
+use File::Spec;
 use Params::Check               qw[check];
 use Module::Load::Conditional   qw[can_load];
 use Locale::Maketext::Simple    Style => 'gettext';
@@ -186,9 +187,10 @@ sub can_run {
         return MM->maybe_command($command);
 
     } else {
-        for my $dir ((split /\Q$Config::Config{path_sep}\E/, $ENV{PATH}),
-                     File::Spec->curdir()
-        ) {
+        for my $dir (
+            (split /\Q$Config::Config{path_sep}\E/, $ENV{PATH}),
+            File::Spec->curdir
+        ) {           
             my $abs = File::Spec->catfile($dir, $command);
             return $abs if $abs = MM->maybe_command($abs);
         }
@@ -437,6 +439,8 @@ sub _open3_run {
 
     ### add an epxlicit break statement
     ### code courtesy of theorbtwo from #london.pm
+    my $stdout_done = 0;
+    my $stderr_done = 0;
     OUTER: while ( my @ready = $selector->can_read ) {
 
         for my $h ( @ready ) {
@@ -457,9 +461,12 @@ sub _open3_run {
             ### if we would print anyway, we'd provide bogus information
             $_out_handler->( "$buf" ) if $len && $h == $kidout;
             $_err_handler->( "$buf" ) if $len && $h == $kiderror;
-            
-            ### child process is done printing.
-            last OUTER if $h == $kidout and $len == 0
+
+            ### Wait till child process is done printing to both
+            ### stdout and stderr.
+            $stdout_done = 1 if $h == $kidout   and $len == 0;
+            $stderr_done = 1 if $h == $kiderror and $len == 0;
+            last OUTER if ($stdout_done && $stderr_done);
         }
     }
 
@@ -598,8 +605,10 @@ sub _system_run {
                 
             ### we should re-open this filehandle right now, not
             ### just dup it
+            ### Use 2-arg version of open, as 5.5.x doesn't support
+            ### 3-arg version =/
             if( $redir eq '>&' ) {
-                open( $fh, '>', File::Spec->devnull ) or (
+                open( $fh, '>' . File::Spec->devnull ) or (
                     Carp::carp(loc("Could not reopen '$name': %1", $!)),
                     return
                 );
@@ -671,7 +680,7 @@ settings honored cleanly.
 Otherwise, if the variable C<$IPC::Cmd::USE_IPC_OPEN3> is set to true 
 (See the C<GLOBAL VARIABLES> Section), try to execute the command using
 C<IPC::Open3>. Buffers will be available on all platforms except C<Win32>,
-interactive commands will still execute cleanly, and also your  verbosity
+interactive commands will still execute cleanly, and also your verbosity
 settings will be adhered to nicely;
 
 =item *
@@ -764,22 +773,22 @@ however, since you can just inspect your buffers for the contents.
 
 C<IPC::Run>, C<IPC::Open3>
 
-=head1 AUTHOR
-
-This module by
-Jos Boumans E<lt>kane@cpan.orgE<gt>.
-
 =head1 ACKNOWLEDGEMENTS
 
 Thanks to James Mastros and Martijn van der Streek for their
 help in getting IPC::Open3 to behave nicely.
 
+=head1 BUG REPORTS
+
+Please report bugs or other issues to E<lt>bug-ipc-cmd@rt.cpan.orgE<gt>.
+
+=head1 AUTHOR
+
+This module by Jos Boumans E<lt>kane@cpan.orgE<gt>.
+
 =head1 COPYRIGHT
 
-This module is
-copyright (c) 2002 - 2006 Jos Boumans E<lt>kane@cpan.orgE<gt>.
-All rights reserved.
+This library is free software; you may redistribute and/or modify it 
+under the same terms as Perl itself.
 
-This library is free software;
-you may redistribute and/or modify it under the same
-terms as Perl itself.
+=cut

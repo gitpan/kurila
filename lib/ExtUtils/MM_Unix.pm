@@ -1,6 +1,5 @@
 package ExtUtils::MM_Unix;
 
-require 5.005_03;  # Maybe further back, dunno
 
 use strict;
 
@@ -18,7 +17,7 @@ use vars qw($VERSION @ISA
 
 use ExtUtils::MakeMaker qw($Verbose neatvalue);
 
-$VERSION = '1.54_01';
+$VERSION = '1.54_02';
 
 require ExtUtils::MM_Any;
 @ISA = qw(ExtUtils::MM_Any);
@@ -35,8 +34,7 @@ BEGIN {
     $Is_SunOS4  = $^O eq 'sunos';
     $Is_Solaris = $^O eq 'solaris';
     $Is_SunOS   = $Is_SunOS4 || $Is_Solaris;
-    $Is_BSD     = $^O =~ /^(?:free|net|open)bsd$/ or
-                  $^O eq 'bsdos' or $^O eq 'interix';
+    $Is_BSD     = $^O =~ /^(?:(?:free|net|open)bsd|bsdos|interix|dragonfly)$/;
 }
 
 BEGIN {
@@ -673,7 +671,7 @@ sub dist_core {
     {
         my $method = $target.'_target';
         $make_frag .= "\n";
-        $make_frag .= $self->$method();
+        $make_frag .= $self->?$method();
     }
 
     return $make_frag;
@@ -1027,7 +1025,7 @@ WARNING
             next unless $self->maybe_command($abs);
             print "Executing $abs\n" if ($trace >= 2);
 
-            my $version_check = qq{$abs -le "require $ver; print qq{VER_OK}"};
+            my $version_check = qq{$abs -le "\$] >= $ver; print qq{VER_OK}"};
             $version_check = "$Config{run} $version_check"
                 if defined $Config{run} and length $Config{run};
 
@@ -1323,7 +1321,7 @@ sub init_MANPODS {
         }
         else {
             my $init_method = "init_${man}PODS";
-            $self->$init_method();
+            $self->?$init_method();
 	}
     }
 }

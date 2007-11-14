@@ -6,9 +6,6 @@
 
 /* A Perl sub that returns a hashref to the object registry */
 #define HUF_OB_REG "Hash::Util::FieldHash::_ob_reg"
-/* Magic cookies to recognize object id's.  Hi, Eva, David */
-#define HUF_COOKIE 2805.1980
-#define HUF_REFADDR_COOKIE 1811.1976
 /* Identifier for PERL_MAGIC_ext magic */
 #define HUF_IDCACHE 0x4944
 
@@ -130,12 +127,12 @@ I32 HUF_destroy_obj(pTHX_ IV index, SV* trigger) {
         while (ent = hv_iternext(field_tab)) {
             SV* field_ref = HeVAL(ent);
             SV* field = SvRV(field_ref);
-            hv_delete_ent((HV*)field, ob_id, G_DISCARD, 0);
+            hv_delete_ent((HV*)field, ob_id, 0, 0);
         }
         /* make it safe in case we must run in global clenaup, after all */
         if (PL_in_clean_all)
             HUF_global(HUF_RESET); /* shoudn't be needed */
-        hv_delete_ent(MY_CXT.ob_reg, ob_id, G_DISCARD, 0);
+        hv_delete_ent(MY_CXT.ob_reg, ob_id, 0, 0);
     }
     return 0;
 }
@@ -375,6 +372,7 @@ OUTPUT:
 
 void
 id(SV* ref)
+PROTOTYPE: $
 PPCODE:
     if (SvROK(ref)) {
         XPUSHs(HUF_obj_id(ref));

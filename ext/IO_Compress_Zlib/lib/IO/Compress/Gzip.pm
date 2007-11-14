@@ -1,19 +1,18 @@
 
 package IO::Compress::Gzip ;
 
-require 5.004 ;
 
 use strict ;
 use warnings;
 use bytes;
 
 
-use IO::Compress::RawDeflate 2.004 ;
+use IO::Compress::RawDeflate 2.006 ;
 
-use Compress::Raw::Zlib  2.004 ;
-use IO::Compress::Base::Common  2.004 qw(:Status :Parse createSelfTiedObject);
-use IO::Compress::Gzip::Constants 2.004 ;
-use IO::Compress::Zlib::Extra 2.004 ;
+use Compress::Raw::Zlib  2.006 ;
+use IO::Compress::Base::Common  2.006 qw(:Status :Parse createSelfTiedObject);
+use IO::Compress::Gzip::Constants 2.006 ;
+use IO::Compress::Zlib::Extra 2.006 ;
 
 BEGIN
 {
@@ -27,7 +26,7 @@ require Exporter ;
 
 our ($VERSION, @ISA, @EXPORT_OK, %EXPORT_TAGS, $GzipError);
 
-$VERSION = '2.004';
+$VERSION = '2.006';
 $GzipError = '' ;
 
 @ISA    = qw(IO::Compress::RawDeflate Exporter);
@@ -201,11 +200,11 @@ sub mkHeader
 
     # FLAGS
     my $flags       = GZIP_FLG_DEFAULT ;
-    $flags |= GZIP_FLG_FTEXT    if $param->value('TextFlag') ;
-    $flags |= GZIP_FLG_FHCRC    if $param->value('HeaderCRC') ;
-    $flags |= GZIP_FLG_FEXTRA   if $param->wantValue('ExtraField') ;
-    $flags |= GZIP_FLG_FNAME    if $param->wantValue('Name') ;
-    $flags |= GZIP_FLG_FCOMMENT if $param->wantValue('Comment') ;
+    $flags ^|^= GZIP_FLG_FTEXT    if $param->value('TextFlag') ;
+    $flags ^|^= GZIP_FLG_FHCRC    if $param->value('HeaderCRC') ;
+    $flags ^|^= GZIP_FLG_FEXTRA   if $param->wantValue('ExtraField') ;
+    $flags ^|^= GZIP_FLG_FNAME    if $param->wantValue('Name') ;
+    $flags ^|^= GZIP_FLG_FCOMMENT if $param->wantValue('Comment') ;
     
     # MTIME
     my $time = $param->valueOrDefault('Time', GZIP_MTIME_DEFAULT) ;
@@ -228,13 +227,13 @@ sub mkHeader
             ) ;
 
     # EXTRA
-    if ($flags & GZIP_FLG_FEXTRA) {
+    if ($flags ^&^ GZIP_FLG_FEXTRA) {
         my $extra = $param->value('ExtraField') ;
         $out .= pack("v", length $extra) . $extra ;
     }
 
     # NAME
-    if ($flags & GZIP_FLG_FNAME) {
+    if ($flags ^&^ GZIP_FLG_FNAME) {
         my $name .= $param->value('Name') ;
         $name =~ s/\x00.*$//;
         $out .= $name ;
@@ -245,7 +244,7 @@ sub mkHeader
     }
 
     # COMMENT
-    if ($flags & GZIP_FLG_FCOMMENT) {
+    if ($flags ^&^ GZIP_FLG_FCOMMENT) {
         my $comment .= $param->value('Comment') ;
         $comment =~ s/\x00.*$//;
         $out .= $comment ;
@@ -256,7 +255,7 @@ sub mkHeader
     }
 
     # HEADER CRC
-    $out .= pack("v", crc32($out) & 0x00FF ) if $param->value('HeaderCRC') ;
+    $out .= pack("v", crc32($out) ^&^ 0x00FF ) if $param->value('HeaderCRC') ;
 
     noUTF8($out);
 

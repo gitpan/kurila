@@ -160,13 +160,13 @@ sge		$x ge $y
 seq		$x eq $y
 sne		$x ne $y
 scmp		$x cmp $y
-bit_and		$x & $y
-bit_xor		$x ^ $y
-bit_or		$x | $y
+bit_and		$x ^&^ $y
+bit_xor		$x ^^^ $y
+bit_or		$x ^|^ $y
 negate		-$x
 i_negate	SKIP (set by optimizer)
 not		!$x
-complement	~$x
+complement	^~^$x
 atan2		atan2 1
 sin		sin 1
 cos		cos 1
@@ -233,7 +233,7 @@ xor		$x xor $y
 cond_expr	$x ? 1 : 0
 andassign	$x &&= $y
 orassign	$x ||= $y
-method		Foo->$x()
+method		Foo->?$x()
 entersub	f()
 leavesub	sub f{} f()
 leavesublv	sub f:lvalue{return $x} f()
@@ -268,8 +268,6 @@ binmode		binmode FOO
 tie		tie
 untie		untie
 tied		tied
-dbmopen		dbmopen
-dbmclose	dbmclose
 sselect		SKIP (set by optimizer)
 select		select FOO
 getc		getc FOO

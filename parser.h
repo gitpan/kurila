@@ -14,8 +14,8 @@
 typedef struct {
     YYSTYPE val;    /* semantic value */
     short   state;
-    AV	    *comppad; /* value of PL_comppad when this value was created */
     I32     savestack_ix;	/* size of savestack at this state */
+    AV	    *comppad; /* value of PL_comppad when this value was created */
 #ifdef DEBUGGING
     const char  *name; /* token/rule name for -Dpv */
 #endif
@@ -73,10 +73,9 @@ typedef struct yy_parser {
     line_t	copline;	/* current line number */
     U16		in_my;		/* we're compiling a "my"/"our" declaration */
     U8		lex_state;	/* next token is determined */
-    /* space for a U8 here */
+    U8		error_count;	/* how many compile errors so far, max 10 */
     PerlIO	*rsfp;		/* current source file pointer */
     AV		*rsfp_filters;	/* holds chain of active source filters */
-    U8		error_count;	/* how many compile errors so far, max 10 */
 
 #ifdef PERL_MAD
     SV		*endwhite;
@@ -93,7 +92,7 @@ typedef struct yy_parser {
     SV		*thiswhite;
 
 /* What we know when we're in LEX_KNOWNEXT state. */
-    NEXTTOKE	nexttoke[5];	/* value of next token, if any */
+    NEXTMADTOKE	nexttoke[5];	/* value of next token, if any */
     I32		curforce;
 #else
     YYSTYPE	nextval[5];	/* value of next token, if any */

@@ -2,12 +2,12 @@
 
 package Getopt::Long;
 
-# RCS Status      : $Id: Long.pm,v 2.73 2007/01/27 20:00:34 jv Exp $
+# RCS Status      : $Id: Long.pm,v 2.74 2007/09/29 13:40:13 jv Exp $
 # Author          : Johan Vromans
 # Created On      : Tue Sep 11 15:00:12 1990
 # Last Modified By: Johan Vromans
-# Last Modified On: Sat Jan 27 20:59:00 2007
-# Update Count    : 1552
+# Last Modified On: Sat Sep 29 15:38:55 2007
+# Update Count    : 1571
 # Status          : Released
 
 ################ Copyright ################
@@ -30,15 +30,14 @@ package Getopt::Long;
 
 ################ Module Preamble ################
 
-use 5.004;
 
 use strict;
 
 use vars qw($VERSION);
-$VERSION        =  2.36;
+$VERSION        =  2.37;
 # For testing versions only.
 use vars qw($VERSION_STRING);
-$VERSION_STRING = "2.36";
+$VERSION_STRING = "2.37";
 
 use Exporter;
 use vars qw(@ISA @EXPORT @EXPORT_OK);
@@ -205,7 +204,7 @@ sub getoptions {
 	# Locally set exception handler to default, otherwise it will
 	# be called implicitly here, and again explicitly when we try
 	# to deliver the messages.
-	local ($SIG{__DIE__}) = '__DEFAULT__';
+	local ($SIG{__DIE__}) = 'DEFAULT';
 	$ret = Getopt::Long::GetOptions (@_);
     };
 
@@ -305,7 +304,7 @@ sub GetOptionsFromArray($@) {
 	local ($^W) = 0;
 	print STDERR
 	  ("Getopt::Long $Getopt::Long::VERSION (",
-	   '$Revision: 2.73 $', ") ",
+	   '$Revision: 2.74 $', ") ",
 	   "called from package \"$pkg\".",
 	   "\n  ",
 	   "argv: (@$argv)",
@@ -588,7 +587,7 @@ sub GetOptionsFromArray($@) {
 			    if $debug;
 			my $eval_error = do {
 			    local $@;
-			    local $SIG{__DIE__}  = '__DEFAULT__';
+			    local $SIG{__DIE__}  = 'DEFAULT';
 			    eval {
 				&{$linkage{$opt}}
 				  (Getopt::Long::CallBack->new
@@ -706,7 +705,7 @@ sub GetOptionsFromArray($@) {
 		  if $debug;
 		my $eval_error = do {
 		    local $@;
-		    local $SIG{__DIE__}  = '__DEFAULT__';
+		    local $SIG{__DIE__}  = 'DEFAULT';
 		    eval { &$cb ($tryopt) };
 		    $@;
 		};
@@ -1055,7 +1054,7 @@ sub FindOption ($$$$$) {
 
     # Check if there is an option argument available.
     if ( $gnu_compat && defined $optarg && $optarg eq '' ) {
-	return (1, $opt, $ctl, $type eq 's' ? '' : 0) unless $mand;
+	return (1, $opt, $ctl, $type eq 's' ? '' : 0) ;#unless $mand;
 	$optarg = 0 unless $type eq 's';
     }
 
@@ -1064,6 +1063,7 @@ sub FindOption ($$$$$) {
 	 ? ($optarg eq '')
 	 : !(defined $rest || @$argv > 0) ) {
 	# Complain if this option needs an argument.
+#	if ( $mand && !($type eq 's' ? defined($optarg) : 0) ) {
 	if ( $mand ) {
 	    return (0) if $passthrough;
 	    warn ("Option ", $opt, " requires an argument\n");
@@ -2257,7 +2257,7 @@ processed. The only exception is when C<--> is used:
     --foo arg1 --bar arg2 -- arg3
 
 This will call the callback routine for arg1 and arg2, and then
-terminate GetOptions() leaving C<"arg2"> in C<@ARGV>.
+terminate GetOptions() leaving C<"arg3"> in C<@ARGV>.
 
 If C<require_order> is enabled, options processing
 terminates when the first non-option is encountered.

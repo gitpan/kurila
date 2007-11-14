@@ -74,7 +74,7 @@ sub AUTOLOAD
 		croak qq(Can't locate object method "$wanted_method" ),
 		      qq(via package "$caller_class");
 	};
-	return $self->$call_method(@_[1..$#_]) if ref $call_method eq 'CODE';
+	return $self->?$call_method(@_[1..$#_]) if ref $call_method eq 'CODE';
 	no strict 'refs';
 	($wanted_method=${*{Symbol::fetch_glob($caller_class."::AUTOLOAD")}}) =~ s/.*:://
 		if $wanted_method eq 'AUTOLOAD';
@@ -114,44 +114,44 @@ sub AUTOLOAD
 	no strict 'refs';
 	my %seen;
 	my @every = map { my $sub = "${_}::$wanted_method";
-		          !*{$sub}{CODE} || $seen{$sub}++ ? () : $sub
+		          !*{Symbol::fetch_glob($sub)}{CODE} || $seen{$sub}++ ? () : $sub
 		        } @forebears
 				unless $wanted_method eq 'AUTOLOAD';
 
 	my $want = wantarray;
 	if (@every) {
 		if ($want) {
-			return map {($_, [$self->$_(@_[1..$#_])])} @every;
+			return map {($_, [$self->?$_(@_[1..$#_])])} @every;
 		}
 		elsif (defined $want) {
-			return { map {($_, scalar($self->$_(@_[1..$#_])))}
+			return { map {($_, scalar($self->?$_(@_[1..$#_])))}
 				     @every
 			       };
 		}
 		else {
-			$self->$_(@_[1..$#_]) for @every;
+			$self->?$_(@_[1..$#_]) for @every;
 			return;
 		}
 	}
 
 	@every = map { my $sub = "${_}::AUTOLOAD";
-		       !*{$sub}{CODE} || $seen{$sub}++ ? () : "${_}::AUTOLOAD"
+		       !*{Symbol::fetch_glob($sub)}{CODE} || $seen{$sub}++ ? () : "${_}::AUTOLOAD"
 		     } @forebears;
 	if ($want) {
 		return map { $$_ = ref($self)."::EVERY::".$wanted_method;
-			     ($_, [$self->$_(@_[1..$#_])]);
+			     ($_, [$self->?$_(@_[1..$#_])]);
 			   } @every;
 	}
 	elsif (defined $want) {
 		return { map { $$_ = ref($self)."::EVERY::".$wanted_method;
-			       ($_, scalar($self->$_(@_[1..$#_])))
+			       ($_, scalar($self->?$_(@_[1..$#_])))
 			     } @every
 		       };
 	}
 	else {
 		for (@every) {
 			$$_ = ref($self)."::EVERY::".$wanted_method;
-			$self->$_(@_[1..$#_]);
+			$self->?$_(@_[1..$#_]);
 		}
 		return;
 	}

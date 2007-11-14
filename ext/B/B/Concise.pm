@@ -14,7 +14,7 @@ use warnings; # uses #3 and #4, since warnings uses Carp
 
 use Exporter (); # use #5
 
-our $VERSION   = "0.72";
+our $VERSION   = "0.74";
 our @ISA       = qw(Exporter);
 our @EXPORT_OK = qw( set_style set_style_standard add_callback
 		     concise_subref concise_cv concise_main
@@ -74,6 +74,7 @@ my $big_endian = 1;	# more <sequence#> display
 my $tree_style = 0;	# tree-order details
 my $banner = 1;		# print banner before optree is traversed
 my $do_main = 0;	# force printing of main routine
+my $show_src;		# show source code
 
 # another factor: can affect all styles!
 our @callbacks;		# allow external management
@@ -142,15 +143,17 @@ sub concise_subref {
 
 sub concise_stashref {
     my($order, $h) = @_;
+    local *s;
     foreach my $k (sort keys %$h) {
-	local *s = $h->{$k};
+	next unless defined $h->{$k};
+	*s = $h->{$k};
 	my $coderef = *s{CODE} or next;
 	reset_sequence();
 	print "FUNC: ", *s, "\n";
 	my $codeobj = svref_2object($coderef);
 	next unless ref $codeobj eq 'B::CV';
-	eval { concise_cv_obj($order, $codeobj) }
-	or warn "err $@ on $codeobj";
+	eval { concise_cv_obj($order, $codeobj, $k) };
+	warn "err $@ on $codeobj" if $@;
     }
 }
 
@@ -244,6 +247,7 @@ my @tree_decorations =
    [" ", map("$start_sym$_$end_sym", "q", "w", "t", "x", "m"), "", 0],
   );
 
+my @render_packs; # collect -stash=<packages>
 
 sub compileOpts {
     # set rendering state from options and args
@@ -263,13 +267,13 @@ sub compileOpts {
 	}
 	# tree-specific
 	elsif ($o eq "-compact") {
-	    $tree_style |= 1;
+	    $tree_style ^|^= 1;
 	} elsif ($o eq "-loose") {
-	    $tree_style &= ~1;
+	    $tree_style ^&^= ^~^1;
 	} elsif ($o eq "-vt") {
-	    $tree_style |= 2;
+	    $tree_style ^|^= 2;
 	} elsif ($o eq "-ascii") {
-	    $tree_style &= ~2;
+	    $tree_style ^&^= ^~^2;
 	}
 	# sequence numbering
 	elsif ($o =~ /^-base(\d+)$/) {
@@ -279,6 +283,7 @@ sub compileOpts {
 	} elsif ($o eq "-littleendian") {
 	    $big_endian = 0;
 	}
+	# miscellaneous, presentation
 	elsif ($o eq "-nobanner") {
 	    $banner = 0;
 	} elsif ($o eq "-banner") {
@@ -288,6 +293,14 @@ sub compileOpts {
 	    $do_main = 1;
 	} elsif ($o eq "-nomain") {
 	    $do_main = 0;
+	} elsif ($o eq "-src") {
+	    $show_src = 1;
+	}
+	elsif ($o =~ /^-stash=(.*)/) {
+	    my $pkg = $1;
+	    no strict 'refs';
+	    eval "require $pkg" unless %{Symbol::stash($pkg)};
+	    push @render_packs, $pkg;
 	}
 	# line-style options
 	elsif (exists $style{substr($o, 1)}) {
@@ -350,7 +363,12 @@ sub compile {
 		concise_subref($order, $objref, $objname);
 	    }
 	}
-	if (!@args or $do_main) {
+	for my $pkg (@render_packs) {
+	    no strict 'refs';
+	    concise_stashref($order, \%{Symbol::stash($pkg)});
+	}
+
+	if (!@args or $do_main or @render_packs) {
 	    print $walkHandle "main program:\n" if $do_main;
 	    concise_main($order);
 	}
@@ -388,15 +406,15 @@ my $chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 sub op_flags { # common flags (see BASOP.op_flags in op.h)
     my($x) = @_;
     my(@v);
-    push @v, "v" if ($x & 3) == 1;
-    push @v, "s" if ($x & 3) == 2;
-    push @v, "l" if ($x & 3) == 3;
-    push @v, "K" if $x & 4;
-    push @v, "P" if $x & 8;
-    push @v, "R" if $x & 16;
-    push @v, "M" if $x & 32;
-    push @v, "S" if $x & 64;
-    push @v, "*" if $x & 128;
+    push @v, "v" if ($x ^&^ 3) == 1;
+    push @v, "s" if ($x ^&^ 3) == 2;
+    push @v, "l" if ($x ^&^ 3) == 3;
+    push @v, "K" if $x ^&^ 4;
+    push @v, "P" if $x ^&^ 8;
+    push @v, "R" if $x ^&^ 16;
+    push @v, "M" if $x ^&^ 32;
+    push @v, "S" if $x ^&^ 64;
+    push @v, "*" if $x ^&^ 128;
     return join("", @v);
 }
 
@@ -428,7 +446,7 @@ sub seq {
 sub walk_topdown {
     my($op, $sub, $level) = @_;
     $sub->($op, $level);
-    if ($op->flags & OPf_KIDS) {
+    if ($op->flags ^&^ OPf_KIDS) {
 	for (my $kid = $op->first; $$kid; $kid = $kid->sibling) {
 	    walk_topdown($kid, $sub, $level + 1);
 	}
@@ -553,6 +571,9 @@ sub fmt_line {    # generate text-line for op.
 
     $text =~ s/\#([a-zA-Z]+)/$hr->{$1}/eg;	# populate #var's
     $text =~ s/[ \t]*~+[ \t]*/ /g;		# squeeze tildes
+
+    $text = "# $hr->{src}\n$text" if $show_src and $hr->{src};
+
     chomp $text;
     return "$text\n" if $text ne "";
     return $text; # suppress empty lines
@@ -641,7 +662,7 @@ sub _flags {
     my($hash, $x) = @_;
     my @s;
     for my $flag (sort {$b <=> $a} keys %$hash) {
-	if ($hash->{$flag} and $x & $flag and $x >= $flag) {
+	if ($hash->{$flag} and $x ^&^ $flag and $x >= $flag) {
 	    $x -= $flag;
 	    push @s, $hash->{$flag};
 	}
@@ -664,7 +685,7 @@ sub concise_sv {
     my($sv, $hr, $preferpv) = @_;
     $hr->{svclass} = class($sv);
     $hr->{svclass} = "UV"
-      if $hr->{svclass} eq "IV" and $sv->FLAGS & SVf_IVisUV;
+      if $hr->{svclass} eq "IV" and $sv->FLAGS ^&^ SVf_IVisUV;
     Carp::cluck("bad concise_sv: $sv") unless $sv and $$sv;
     $hr->{svaddr} = sprintf("%#x", $$sv);
     if ($hr->{svclass} eq "GV") {
@@ -684,13 +705,13 @@ sub concise_sv {
 	}
 	if (class($sv) eq "SPECIAL") {
 	    $hr->{svval} .= ["Null", "sv_undef", "sv_yes", "sv_no"]->[$$sv];
-	} elsif ($preferpv && $sv->FLAGS & SVf_POK) {
+	} elsif ($preferpv && $sv->FLAGS ^&^ SVf_POK) {
 	    $hr->{svval} .= cstring($sv->PV);
-	} elsif ($sv->FLAGS & SVf_NOK) {
+	} elsif ($sv->FLAGS ^&^ SVf_NOK) {
 	    $hr->{svval} .= $sv->NV;
-	} elsif ($sv->FLAGS & SVf_IOK) {
+	} elsif ($sv->FLAGS ^&^ SVf_IOK) {
 	    $hr->{svval} .= $sv->int_value;
-	} elsif ($sv->FLAGS & SVf_POK) {
+	} elsif ($sv->FLAGS ^&^ SVf_POK) {
 	    $hr->{svval} .= cstring($sv->PV);
 	} elsif (class($sv) eq "HV") {
 	    $hr->{svval} .= 'HASH';
@@ -700,6 +721,23 @@ sub concise_sv {
 	my $out = $hr->{svclass};
 	return $out .= " $hr->{svval}" ; 
     }
+}
+
+my %srclines;
+
+sub fill_srclines {
+    my $fullnm = shift;
+    if ($fullnm eq '-e') {
+	$srclines{$fullnm} = [ $fullnm, "-src not supported for -e" ];
+	return;
+    }
+    open (my $fh, '<', $fullnm)
+	or warn "# $fullnm: $!, (chdirs not supported by this feature yet)\n"
+	and return;
+    my @l = <$fh>;
+    chomp @l;
+    unshift @l, $fullnm; # like @{_<$fullnm} in debug, array starts at 1
+    $srclines{$fullnm} = \@l;
 }
 
 sub concise_op {
@@ -716,7 +754,7 @@ sub concise_op {
 	$h{extarg} = "";
     } elsif ($op->name =~ /^leave(sub(lv)?|write)?$/) {
 	# targ potentially holds a reference count
-	if ($op->private & 64) {
+	if ($op->private ^&^ 64) {
 	    my $refs = "ref" . ($h{targ} != 1 ? "s" : "");
 	    $h{targarglife} = $h{targarg} = "$h{targ} $refs";
 	}
@@ -724,7 +762,7 @@ sub concise_op {
 	my $padname = (($curcv->PADLIST->ARRAY)[0]->ARRAY)[$h{targ}];
 	if (defined $padname and class($padname) ne "SPECIAL") {
 	    $h{targarg}  = $padname->PVX;
-	    if ($padname->FLAGS & SVf_FAKE) {
+	    if ($padname->FLAGS ^&^ SVf_FAKE) {
 		if ($] < 5.009) {
 		    $h{targarglife} = "$h{targarg}:FAKE";
 		} else {
@@ -732,11 +770,11 @@ sub concise_op {
 		    # See changes 19939 and 20005
 		    my $fake = '';
 		    $fake .= 'a'
-		   	if $padname->PARENT_FAKELEX_FLAGS & PAD_FAKELEX_ANON;
+		   	if $padname->PARENT_FAKELEX_FLAGS ^&^ PAD_FAKELEX_ANON;
 		    $fake .= 'm'
-		   	if $padname->PARENT_FAKELEX_FLAGS & PAD_FAKELEX_MULTI;
+		   	if $padname->PARENT_FAKELEX_FLAGS ^&^ PAD_FAKELEX_MULTI;
 		    $fake .= ':' . $padname->PARENT_PAD_INDEX
-			if $curcv->CvFLAGS & CVf_ANON;
+			if $curcv->CvFLAGS ^&^ CVf_ANON;
 		    $h{targarglife} = "$h{targarg}:FAKE:$fake";
 		}
 	    }
@@ -787,10 +825,17 @@ sub concise_op {
 	$h{coplabel} = $label;
 	$label = $label ? "$label: " : "";
 	my $loc = $op->file;
+	my $pathnm = $loc;
 	$loc =~ s[.*/][];
-	$loc .= ":" . $op->line;
+	my $ln = $op->line;
+	$loc .= ":$ln";
 	my($stash, $cseq) = ($op->stash->NAME, $op->cop_seq - $cop_seq_base);
 	$h{arg} = "($label$stash $cseq $loc)";
+	if ($show_src) {
+	    fill_srclines($pathnm) unless exists $srclines{$pathnm};
+	    $h{src} = "$ln: " . ($srclines{$pathnm}[$ln]
+				 // "-src unavailable under -e");
+	}
     } elsif ($h{class} eq "LOOP") {
 	$h{arg} = "(next->" . seq($op->nextop) . " last->" . seq($op->lastop)
 	  . " redo->" . seq($op->redoop) . ")";
@@ -799,7 +844,7 @@ sub concise_op {
 	$h{arg} = "(other->" . seq($op->other) . ")";
     }
     elsif ($h{class} eq "SVOP" or $h{class} eq "PADOP") {
-	unless ($h{name} eq 'aelemfast' and $op->flags & OPf_SPECIAL) {
+	unless ($h{name} eq 'aelemfast' and $op->flags ^&^ OPf_SPECIAL) {
 	    my $idx = ($h{class} eq "SVOP") ? $op->targ : $op->padix;
 	    my $preferpv = $h{name} eq "method_named";
 	    if ($h{class} eq "PADOP" or !${$op->sv}) {
@@ -892,7 +937,7 @@ sub tree {
     my $style = $tree_decorations[$tree_style];
     my($space, $single, $kids, $kid, $nokid, $last, $lead, $size) = @$style;
     my $name = concise_op($op, $level, $treefmt);
-    if (not $op->flags & OPf_KIDS) {
+    if (not $op->flags ^&^ OPf_KIDS) {
 	return $name . "\n";
     }
     my @lines;
@@ -1052,11 +1097,11 @@ on threaded and un-threaded perls.
 =head1 OPTIONS
 
 Arguments that don't start with a hyphen are taken to be the names of
-subroutines to print the OPs of; if no such functions are specified,
-the main body of the program (outside any subroutines, and not
-including use'd or require'd files) is rendered.  Passing C<BEGIN>,
-C<UNITCHECK>, C<CHECK>, C<INIT>, or C<END> will cause all of the
-corresponding special blocks to be printed.
+subroutines to render; if no such functions are specified, the main
+body of the program (outside any subroutines, and not including use'd
+or require'd files) is rendered.  Passing C<BEGIN>, C<UNITCHECK>,
+C<CHECK>, C<INIT>, or C<END> will cause all of the corresponding
+special blocks to be printed.  Arguments must follow options.
 
 Options affect how things are rendered (ie printed).  They're presented
 here by their visual effect, 1st being strongest.  They're grouped
@@ -1192,7 +1237,42 @@ obviously mutually exclusive with bigendian.
 
 =head2 Other options
 
-These are pairwise exclusive.
+=over 4
+
+=item B<-src>
+
+With this option, the rendering of each statement (starting with the
+nextstate OP) will be preceded by the 1st line of source code that
+generates it.  For example:
+
+    1  <0> enter
+    # 1: my $i;
+    2  <;> nextstate(main 1 junk.pl:1) v:{
+    3  <0> padsv[$i:1,10] vM/LVINTRO
+    # 3: for $i (0..9) {
+    4  <;> nextstate(main 3 junk.pl:3) v:{
+    5  <0> pushmark s
+    6  <$> const[IV 0] s
+    7  <$> const[IV 9] s
+    8  <{> enteriter(next->j last->m redo->9)[$i:1,10] lKS
+    k  <0> iter s
+    l  <|> and(other->9) vK/1
+    # 4:     print "line ";
+    9      <;> nextstate(main 2 junk.pl:4) v
+    a      <0> pushmark s
+    b      <$> const[PV "line "] s
+    c      <@> print vK
+    # 5:     print "$i\n";
+    ...
+
+=item B<-stash="somepackage">
+
+With this, "somepackage" will be required, then the stash is
+inspected, and each function is rendered.
+
+=back
+
+The following options are pairwise exclusive.
 
 =over 4
 
@@ -1431,7 +1511,28 @@ The numeric value of the OP's flags.
 =item B<#hints>
 
 The COP's hint flags, rendered with abbreviated names if possible. An empty
-string if this is not a COP.
+string if this is not a COP. Here are the symbols used:
+
+    $ strict refs
+    & strict subs
+    * strict vars
+    i integers
+    l locale
+    b bytes
+    [ arybase
+    { block scope
+    % localise %^H
+    < open in
+    > open out
+    I overload int
+    F overload float
+    B overload binary
+    S overload string
+    R overload re
+    T taint
+    E eval
+    X filetest access
+    U utf-8
 
 =item B<#hintsval>
 
@@ -1568,6 +1669,12 @@ This is B<very> similar to previous, only the first two ops differ.  This
 subroutine rendering is more representative, insofar as a single main
 program will have many subs.
 
+=item perl -MB::Concise -e 'B::Concise::compile("-exec","-src", \%B::Concise::)->()'
+
+This renders all functions in the B::Concise package with the source
+lines.  It eschews the O framework so that the stashref can be passed
+directly to B::Concise::compile().  See -stash option for a more
+convenient way to render a package.
 
 =back
 

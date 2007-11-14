@@ -282,6 +282,13 @@ invalid anytime, even before the end of the current statement.  Use
 literals or global values as arguments to the "p" pack() template to
 avoid this warning.
 
+=item Attempt to reload %s aborted.
+
+(F) You tried to load a file with C<use> or C<require> that failed to
+compile once already.  Perl will not try to compile this file again
+unless you delete its entry from %INC.  See L<perlfunc/require> and
+L<perlvar/%INC>.
+
 =item Attempt to set length of freed array
 
 (W) You tried to set the length of an array which has been freed.  You
@@ -606,13 +613,13 @@ quotas or other plumbing problems.
 =item Can't declare class for non-scalar %s in "%s"
 
 (F) Currently, only scalar variables can be declared with a specific
-class qualifier in a "my" or "our" declaration.  The semantics may be
+class qualifier in a "my", "our" or "state" declaration.  The semantics may be
 extended for other types of variables in future.
 
 =item Can't declare %s in "%s"
 
-(F) Only scalar, array, and hash variables may be declared as "my" or
-"our" variables.  They must have ordinary identifiers as names.
+(F) Only scalar, array, and hash variables may be declared as "my", "our" or
+"state" variables.  They must have ordinary identifiers as names.
 
 =item Can't do inplace edit: %s is not a regular file
 
@@ -848,7 +855,7 @@ extensions.
 =item Can't localize lexical variable %s
 
 (F) You used local on a variable name that was previously declared as a
-lexical variable using "my".  This is not allowed.  If you want to
+lexical variable using "my" or "state".  This is not allowed.  If you want to
 localize a package variable of the same name, qualify it with the
 package name.
 
@@ -1133,7 +1140,7 @@ allowed.  See L<perlfunc/pack>.
 (F) Only a simple scalar variable may be used as a loop variable on a
 foreach.
 
-=item Can't use global %s in "my"
+=item Can't use global %s in "%s"
 
 (F) You tried to declare a magical variable as a lexical variable.  This
 is not allowed, because the magic can be tied to only one location
@@ -1804,10 +1811,10 @@ L<perlfunc/getsockopt>.
 
 =item Global symbol "%s" requires explicit package name
 
-(F) You've said "use strict vars", which indicates that all variables
-must either be lexically scoped (using "my"), declared beforehand using
-"our", or explicitly qualified to say which package the global variable
-is in (using "::").
+(F) You've said "use strict" or "use strict vars", which indicates 
+that all variables must either be lexically scoped (using "my" or "state"), 
+declared beforehand using "our", or explicitly qualified to say 
+which package the global variable is in (using "::").
 
 =item glob failed (%s)
 
@@ -1952,7 +1959,7 @@ Interpretation of the octal number stopped before the 8 or 9.
 =item Illegal switch in PERL5OPT: %s
 
 (X) The PERL5OPT environment variable may only be used to set the
-following switches: B<-[CDIMUdmtwA]>.
+following switches: B<-[CDIMUdmtw]>.
 
 =item Ill-formed CRTL environ value "%s"
 
@@ -2493,7 +2500,7 @@ See L<perlfunc/pack>.
 (F) Lexically scoped subroutines are not yet implemented.  Don't try
 that yet.
 
-=item "my" variable %s can't be in a package
+=item "%s" variable %s can't be in a package
 
 (F) Lexically scoped variables aren't in a package, so it doesn't make
 sense to try to declare one with a package qualifier on the front.  Use
@@ -2680,7 +2687,7 @@ package has restricted the set of allowed keys using the L<fields> pragma.
 
 =item No such class %s
 
-(F) You provided a class qualifier in a "my" or "our" declaration, but
+(F) You provided a class qualifier in a "my", "our" or "state" declaration, but
 this class doesn't exist at this point in your program.
 
 =item No such pipe open
@@ -3206,7 +3213,7 @@ when you meant
 
     my ($foo, $bar) = @_;
 
-Remember that "my", "our", and "local" bind tighter than comma.
+Remember that "my", "our", "local" and "state" bind tighter than comma.
 
 =item C<-p> destination: %s
 
@@ -3560,7 +3567,7 @@ a reference count of other than 1.
 
 (F) You used C<\g0> or similar in a regular expression. You may refer to
 capturing parentheses only with strictly positive integers (normal
-backreferences) or with stricly negative integers (relative
+backreferences) or with strictly negative integers (relative
 backreferences), but using 0 does not make sense.
 
 =item Reference to nonexistent group in regex; marked by <-- HERE in m/%s/
@@ -4395,11 +4402,11 @@ reserved word.  It's best to put such a word in quotes, or capitalize it
 somehow, or insert an underbar into it.  You might also declare it as a
 subroutine.
 
-=item Unrecognized character %s
+=item Unrecognized character %s in column %d
 
 (F) The Perl parser has no idea what to do with the specified character
-in your Perl script (or eval).  Perhaps you tried to run a compressed
-script, a binary program, or a directory as a Perl program.
+in your Perl script (or eval) at the specified column.  Perhaps you tried 
+to run a compressed script, a binary program, or a directory as a Perl program.
 
 =item Unrecognized escape \\%c in character class passed through in regex; marked by <-- HERE in m/%s/
 
@@ -4736,7 +4743,7 @@ to be huge numbers, and so usually indicates programmer error.
 If you really do mean it, explicitly numify your reference, like so:
 C<$array[0+$ref]>.  This warning is not given for overloaded objects,
 either, because you can overload the numification and stringification
-operators and then you assumedly know what you are doing.
+operators and then you assumably know what you are doing.
 
 =item Use of reserved word "%s" is deprecated
 
@@ -4854,7 +4861,7 @@ known at compile time.  See L<perlre>.
 
 =item "%s" variable %s masks earlier declaration in same %s
 
-(W misc) A "my" or "our" variable has been redeclared in the current
+(W misc) A "my", "our" or "state" variable has been redeclared in the current
 scope or statement, effectively eliminating all access to the previous
 instance.  This is almost always a typographical error.  Note that the
 earlier variable will still exist until the end of the scope or until
@@ -4913,6 +4920,9 @@ C<use 5.006_001>.  This of course won't help: the older Perls
 won't suddenly start understanding newer features, but at least
 they will show a sensible error message indicating the required
 minimum version.
+
+This warning is suppressed if the C<use 5.x.y> is preceded by a
+C<use 5.006> (see C<use VERSION> in L<perlfunc/use>).
 
 =item Warning: something's wrong
 

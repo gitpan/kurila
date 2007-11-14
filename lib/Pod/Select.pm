@@ -11,7 +11,6 @@ package Pod::Select;
 
 use vars qw($VERSION);
 $VERSION = 1.35;  ## Current version of this package
-require  5.005;    ## requires this Perl version or later
 
 #############################################################################
 
@@ -468,7 +467,7 @@ sub match_section {
         for (my $i = 0; $i < $MAX_HEADING_LEVEL; ++$i) {
             $regex   = $section_spec->[$i];
             $negated = ($regex =~ s/^\!//);
-            $match  &= ($negated ? ($headings[$i] !~ /${regex}/)
+            $match  ^&^= ($negated ? ($headings[$i] !~ /${regex}/)
                                  : ($headings[$i] =~ /${regex}/));
             last unless ($match);
         }

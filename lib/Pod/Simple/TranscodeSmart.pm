@@ -1,6 +1,4 @@
 
-require 5;
-use 5.008;
 ## Anything before 5.8.0 is GIMPY!
 ## This module is to be use()'d only by Pod::Simple::Transcode
 
@@ -13,7 +11,7 @@ sub is_dumb  {0}
 sub is_smart {1}
 
 sub all_encodings {
-  return Encode::->encodings(':all');
+  return Encode->encodings(':all');
 }
 
 sub encoding_is_available {

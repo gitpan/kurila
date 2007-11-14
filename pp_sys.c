@@ -297,22 +297,7 @@ S_emulate_eaccess(pTHX_ const char* path, Mode_t mode)
 
     return res;
 }
-#   define PERL_EFF_ACCESS(p,f) (emulate_eaccess((p), (f)))
-#endif
-
-#if !defined(PERL_EFF_ACCESS)
-/* With it or without it: anyway you get a warning: either that
-   it is unused, or it is declared static and never defined.
- */
-STATIC int
-S_emulate_eaccess(pTHX_ const char* path, Mode_t mode)
-{
-    PERL_UNUSED_ARG(path);
-    PERL_UNUSED_ARG(mode);
-    Perl_croak(aTHX_ "switching effective uid is not implemented");
-    /*NOTREACHED*/
-    return -1;
-}
+#   define PERL_EFF_ACCESS(p,f) (S_emulate_eaccess(aTHX_ (p), (f)))
 #endif
 
 PP(pp_backtick)
@@ -478,7 +463,7 @@ PP(pp_die)
     }
     else {
 	tmpsv = TOPs;
-        tmps = SvROK(tmpsv) ? NULL : SvPV_const(tmpsv, len);
+        tmps = SvROK(tmpsv) ? (const char *)NULL : SvPV_const(tmpsv, len);
     }
     if (!tmps || !len) {
 	SV * const error = ERRSV;
@@ -943,59 +928,6 @@ PP(pp_tied)
     RETPUSHUNDEF;
 }
 
-PP(pp_dbmopen)
-{
-    dVAR; dSP;
-    dPOPPOPssrl;
-    HV* stash;
-    GV *gv;
-
-    HV * const hv = (HV*)POPs;
-    SV * const sv = sv_2mortal(newSVpvs("AnyDBM_File"));
-    stash = gv_stashsv(sv, 0);
-    if (!stash || !(gv = gv_fetchmethod(stash, "TIEHASH"))) {
-	PUTBACK;
-	require_pv("AnyDBM_File.pm");
-	SPAGAIN;
-	if (!(gv = gv_fetchmethod(stash, "TIEHASH")))
-	    DIE(aTHX_ "No dbm on this machine");
-    }
-
-    ENTER;
-    PUSHMARK(SP);
-
-    EXTEND(SP, 5);
-    PUSHs(sv);
-    PUSHs(left);
-    if (SvIV(right))
-	PUSHs(sv_2mortal(newSVuv(O_RDWR|O_CREAT)));
-    else
-	PUSHs(sv_2mortal(newSVuv(O_RDWR)));
-    PUSHs(right);
-    PUTBACK;
-    call_sv((SV*)GvCV(gv), G_SCALAR);
-    SPAGAIN;
-
-    if (!sv_isobject(TOPs)) {
-	SP--;
-	PUSHMARK(SP);
-	PUSHs(sv);
-	PUSHs(left);
-	PUSHs(sv_2mortal(newSVuv(O_RDONLY)));
-	PUSHs(right);
-	PUTBACK;
-	call_sv((SV*)GvCV(gv), G_SCALAR);
-	SPAGAIN;
-    }
-
-    if (sv_isobject(TOPs)) {
-	sv_unmagic((SV *) hv, PERL_MAGIC_tied);
-	sv_magic((SV*)hv, TOPs, PERL_MAGIC_tied, NULL, 0);
-    }
-    LEAVE;
-    RETURN;
-}
-
 PP(pp_sselect)
 {
 #ifdef HAS_SELECT
@@ -1446,7 +1378,7 @@ PP(pp_sysread)
 	if (offset >= (int)blen)
 	    offset += SvCUR(bufsv) - blen;
 	else
-	    offset = utf8_hop((U8 *)buffer,offset) - (U8 *) buffer;
+	    offset = utf8_hop(buffer,offset) - buffer;
     }
  more_bytes:
     bufsize = SvCUR(bufsv);
@@ -1560,7 +1492,7 @@ PP(pp_send)
     STRLEN blen;
     STRLEN orig_blen_bytes;
     const int op_type = PL_op->op_type;
-    U8 *tmpbuf = NULL;
+    char *tmpbuf = NULL;
     
     GV *const gv = (GV*)*++MARK;
     if (PL_op->op_type == OP_SYSWRITE
@@ -1622,7 +1554,7 @@ PP(pp_send)
 		    /* Don't call sv_len_utf8 again because it will call magic
 		       or overloading a second time, and we might get back a
 		       different result.  */
-		    blen_chars = utf8_length((U8*)buffer, (U8*)buffer + blen);
+		    blen_chars = utf8_length(buffer, buffer + blen);
 		} else {
 		    /* It's safe, and it may well be cached.  */
 		    blen_chars = sv_len_utf8(bufsv);
@@ -1668,8 +1600,8 @@ PP(pp_send)
 		   the SV has overloading, in which case we can't or mustn't
 		   or mustn't call it again.  */
 
-		buffer = (const char*)utf8_hop((const U8 *)buffer, offset);
-		length = utf8_hop((U8 *)buffer, length) - (U8 *)buffer;
+		buffer = utf8_hop(buffer, offset);
+		length = utf8_hop(buffer, length) - buffer;
 	    } else {
 		/* It's a real UTF-8 SV, and it's not going to change under
 		   us.  Take advantage of any cache.  */
@@ -1724,7 +1656,7 @@ PP(pp_send)
 	goto say_undef;
     SP = ORIGMARK;
     if (IN_CODEPOINTS)
-        retval = utf8_length((U8*)buffer, (U8*)buffer + retval);
+        retval = utf8_length(buffer, buffer + retval);
 
     Safefree(tmpbuf);
 #if Size_t_size > IVSIZE
@@ -1755,7 +1687,12 @@ PP(pp_eof)
 		    IoLINES(io) = 0;
 		    IoFLAGS(io) &= ~IOf_START;
 		    do_open(gv, "-", 1, FALSE, O_RDONLY, 0, NULL);
-		    sv_setpvn(GvSV(gv), "-", 1);
+		    if ( GvSV(gv) ) {
+			sv_setpvn(GvSV(gv), "-", 1);
+		    }
+		    else {
+			GvSV(gv) = newSVpvn("-", 1);
+		    }
 		    SvSETMAGIC(GvSV(gv));
 		}
 		else if (!nextargv(gv))
@@ -4953,7 +4890,7 @@ PP(pp_gpwent)
 #   ifdef PWGECOS
 	PUSHs(sv = sv_2mortal(newSVpv(pwent->pw_gecos, 0)));
 #   else
-	PUSHs(sv_mortalcopy(&PL_sv_no));
+	PUSHs(sv = sv_mortalcopy(&PL_sv_no));
 #   endif
 #   ifndef INCOMPLETE_TAINTS
 	/* pw_gecos is tainted because user himself can diddle with it. */

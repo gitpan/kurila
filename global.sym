@@ -156,6 +156,8 @@ Perl_hv_exists
 Perl_hv_exists_ent
 Perl_hv_fetch
 Perl_hv_fetch_ent
+Perl_hv_common
+Perl_hv_common_key_len
 Perl_hv_free_ent
 Perl_hv_iterinit
 Perl_hv_iterkey
@@ -534,7 +536,6 @@ Perl_sv_cat_decode
 Perl_sv_reftype
 Perl_sv_replace
 Perl_sv_report_used
-Perl_sv_reset
 Perl_sv_setpvf
 Perl_sv_vsetpvf
 Perl_sv_setiv
@@ -752,7 +753,8 @@ Perl_signbit
 Perl_emulate_cop_io
 Perl_get_re_arg
 Perl_mro_get_linear_isa
-Perl_mro_get_linear_isa_c3
-Perl_mro_get_linear_isa_dfs
 Perl_mro_method_changed_in
+Perl_sys_init
+Perl_sys_init3
+Perl_sys_term
 # ex: set ro:

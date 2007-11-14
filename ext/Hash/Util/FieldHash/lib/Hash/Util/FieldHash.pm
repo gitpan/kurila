@@ -1,9 +1,10 @@
 package Hash::Util::FieldHash;
 
-use 5.009004;
 use strict;
 use warnings;
 use Scalar::Util qw( reftype);
+
+our $VERSION = '1.02_01';
 
 require Exporter;
 our @ISA = qw(Exporter);
@@ -19,8 +20,6 @@ our %EXPORT_TAGS = (
     )],
 );
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
-
-our $VERSION = '1.01';
 
 {
     require XSLoader;
@@ -847,7 +846,8 @@ value of the mode makes a difference, but that may change.
 
 =head1 AUTHOR
 
-Anno Siegel, E<lt>anno4000@zrz.tu-berlin.deE<gt>
+Anno Siegel (ANNO) wrote the xs code and the changes in perl proper
+Jerry Hedden (JDHEDDEN) made it faster
 
 =head1 COPYRIGHT AND LICENSE
 

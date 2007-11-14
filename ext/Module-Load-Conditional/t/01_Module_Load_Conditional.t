@@ -1,24 +1,17 @@
 ### Module::Load::Conditional test suite ###
-BEGIN { 
-    if( $ENV{PERL_CORE} ) {
-        chdir '../ext/Module-Load-Conditional'
-            if -d '../ext/Module-Load-Conditional';
-        unshift @INC, '../../../lib';
-    
-        ### fix perl location too
-        $^X = '../../../t/' . $^X;
-    }
-} 
 
+BEGIN { use FindBin; }
 BEGIN { chdir 't' if -d 't' }
 
 use strict;
-use lib qw[../lib to_load];
 use File::Spec ();
+use Test::More 'no_plan';
 
-use Test::More tests => 23;
+use constant ON_VMS     => $^O eq 'VMS';
 
-### case 1 ###
+use lib "$FindBin::Bin/../lib";
+use lib "$FindBin::Bin/to_load";
+
 use_ok( 'Module::Load::Conditional' );
 
 ### stupid stupid warnings ###
@@ -40,17 +33,37 @@ use_ok( 'Module::Load::Conditional' );
                 );
 
     ok( $rv->{uptodate},    q[Verify self] );
-    ok( $rv->{version} == $Module::Load::Conditional::VERSION,  
+    is( $rv->{version}, $Module::Load::Conditional::VERSION,  
                             q[  Found proper version] );
 
-    ok( $INC{'Module/Load/Conditional.pm'} eq
-        File::Spec::Unix->catfile(File::Spec->splitdir($rv->{file}) ),
+    ### break up the specification
+    my @rv_path = do {
+
+        ### Use the UNIX specific method, as the VMS one currently
+        ### converts the file spec back to VMS format.
+        my $class = ON_VMS ? 'File::Spec::Unix' : 'File::Spec';
+        
+        my($vol, $path, $file) = $class->splitpath( $rv->{'file'} );
+
+        my @path = ($vol, $class->splitdir( $path ), $file );
+
+        ### First element could be blank for some system types like VMS
+        shift @path if $vol eq '';
+
+        ### and return it    
+        @path;
+    };
+    
+    is( $INC{'Module/Load/Conditional.pm'},            
+            File::Spec::Unix->catfile(@rv_path),
                             q[  Found proper file]
     );
 
 }
 
-{
+### the version may contain an _, which means perl will warn about 'not
+### numeric' -- turn off that warning here.
+{   local $^W;
     my $rv = check_install(
                         module  => 'Module::Load::Conditional',
                         version => $Module::Load::Conditional::VERSION + 1,
@@ -85,6 +98,23 @@ use_ok( 'Module::Load::Conditional' );
     is( $rv->{version}, 2,          "   Version is correct" );
 }
 
+### test beta/developer release versions
+{   my $test_ver = $Module::Load::Conditional::VERSION;
+    
+    ### strip beta tags
+    $test_ver =~ s/_\d+//g;
+    $test_ver .= '_99';
+    
+    my $rv = check_install( 
+                    module  => 'Module::Load::Conditional', 
+                    version => $test_ver,
+                );
+
+    ok( $rv,                "Checking beta versions" );
+    ok( !$rv->{'uptodate'}, "   Beta version is higher" );
+    
+}    
+
 ### test $FIND_VERSION
 {   local $Module::Load::Conditional::FIND_VERSION = 0;
     local $Module::Load::Conditional::FIND_VERSION = 0;
@@ -113,7 +143,7 @@ use_ok( 'Module::Load::Conditional' );
 }
 
 {
-    my $use_list = { 'Must::Be::Loaded' => 1 };
+    my $use_list = { 'MustBe::Loaded' => 1 };
     my $bool = can_load( modules => $use_list );
 
     ok( !$bool, q[Detect out of date module] );
@@ -121,12 +151,12 @@ use_ok( 'Module::Load::Conditional' );
 
 {
     delete $INC{'LoadIt.pm'};
-    delete $INC{'Must/Be/Loaded.pm'};
+    delete $INC{'MustBe/Loaded.pm'};
 
-    my $use_list = { 'LoadIt' => 1, 'Must::Be::Loaded' => 1 };
+    my $use_list = { 'LoadIt' => 1, 'MustBe::Loaded' => 1 };
     my $bool = can_load( modules => $use_list );
 
-    ok( !$INC{'LoadIt.pm'} && !$INC{'Must/Be/Loaded.pm'},
+    ok( !$INC{'LoadIt.pm'} && !$INC{'MustBe/Loaded.pm'},
         q[Do not load if one prerequisite fails]
     );
 }
@@ -152,6 +182,9 @@ SKIP:{
     {   package A::B::C::D; 
         $A::B::C::D::VERSION = $$; 
         $INC{'A/B/C/D.pm'}   = $$.$$;
+        
+        ### XXX this is no longer needed with M::Load 0.11_01
+        #$INC{'[.A.B.C]D.pm'} = $$.$$ if $^O eq 'VMS';
     }
     
     my $href = check_install( module => 'A::B::C::D', version => 0 );
@@ -163,5 +196,4 @@ SKIP:{
     ok( can_load( modules => { 'A::B::C::D' => 0 } ),
                                 '   can_load successful' );
 }
-
 

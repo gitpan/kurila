@@ -1,12 +1,11 @@
 package Opcode;
 
-use 5.006_001;
 
 use strict;
 
 our($VERSION, @ISA, @EXPORT_OK);
 
-$VERSION = "1.09";
+$VERSION = "1.11";
 
 use Carp;
 use Exporter ();
@@ -379,7 +378,7 @@ account the magical open of ARGV.
 
     readline rcatline getc read
 
-    print say sysread syswrite send recv
+    print sysread syswrite send recv
 
     eof tell seek sysseek
 
@@ -405,7 +404,6 @@ These are a hotchpotch of opcodes still waiting to be considered
 
     tie untie
 
-    dbmopen dbmclose
     sselect select
     pipe_op sockpair
 
@@ -532,6 +530,14 @@ SystemV Interprocess Communications:
 
     shmctl shmget shmread shmwrite
 
+=item :load
+
+This tag holds opcodes related to loading modules and getting information
+about calling environment and args.
+
+    require dofile 
+    caller
+
 =item :still_to_be_decided
 
     chdir
@@ -546,11 +552,6 @@ SystemV Interprocess Communications:
     pack unpack -- can be used to create/use memory pointers
 
     entereval -- can be used to hide code from initial compile
-    require dofile 
-
-    caller -- get info about calling environment and args
-
-    reset
 
     dbstate -- perl -d version of nextstate(ment) opcode
 

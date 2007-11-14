@@ -61,10 +61,10 @@ $a = ":="; split /($a)/o, "a:=b:=c"; print "@_"
 EXPECT
 a := b := c
 ########
-$cusp = ~0 ^ (~0 >> 1);
+$cusp = ^~^0 ^^^ (^~^0 >> 1);
 use integer;
 $, = " ";
-print +($cusp - 1) % 8, $cusp % 8, -$cusp % 8, 8 | (($cusp + 1) % 8 + 7), "!\n";
+print +($cusp - 1) % 8, $cusp % 8, -$cusp % 8, 8 ^|^ (($cusp + 1) % 8 + 7), "!\n";
 EXPECT
 7 0 0 8 !
 ########
@@ -422,8 +422,8 @@ no strict "refs";
 package X;
 sub any { bless {} }
 my $f = "FH000"; # just to thwart any future optimisations
-sub afh { select select *{Symbol::fetch_glob(++$f)}; 
-          my $r = *{Symbol::fetch_glob($f)}{IO}; delete $X::{$f}; bless $r }
+sub afh { select select *{Symbol::fetch_glob(++$f)};
+          my $r = *{Symbol::fetch_glob($f)}{IO}; delete Symbol::stash('X')->{$f}; bless $r }
 sub DESTROY { print "destroyed\n" }
 package main;
 print "start\n";
@@ -574,29 +574,6 @@ die qr(x)
 EXPECT
 (?-uxism:x)
 ########
-# Inaba Hiroto
-reset;
-if (0) {
-  if ("" =~ //) {
-  }
-}
-########
-# Nicholas Clark
-$ENV{TERM} = 0;
-reset;
-// if 0;
-########
-# Vadim Konovalov
-use strict;
-sub new_pmop($) {
-    my $pm = shift;
-    return eval "sub {shift=~/$pm/}";
-}
-new_pmop "abcdef"; reset;
-new_pmop "abcdef"; reset;
-new_pmop "abcdef"; reset;
-new_pmop "abcdef"; reset;
-########
 # David Dyck
 # coredump in 5.7.1
 close STDERR; die;
@@ -666,36 +643,6 @@ ok
 print join '', @a, "\n";
 EXPECT
 123456789
-######## [ID 20020104.007] "coredump on dbmclose"
-package Foo;
-eval { require AnyDBM_File }; # not all places have dbm* functions
-if ($@) {
-    print "ok\n";
-    exit 0;
-}
-package Foo;
-sub new {
-        my $proto = shift;
-        my $class = ref($proto) || $proto;
-        my $self  = {};
-        bless($self,$class);
-        my %LT;
-        dbmopen(%LT, "dbmtest", 0666) ||
-	    die "Can't open dbmtest because of $!\n";
-        $self->{'LT'} = \%LT;
-        return $self;
-}
-sub DESTROY {
-        my $self = shift;
-	dbmclose(%{$self->{'LT'}});
-	1 while unlink 'dbmtest';
-	1 while unlink glob("dbmtest.*");
-	print "ok\n";
-}
-package main;
-$test = Foo->new(); # must be package var
-EXPECT
-ok
 ######## example from Camel 5, ch. 15, pp.406 (with my)
 # SKIP: ord "A" == 193 # EBCDIC
 use strict;

@@ -82,7 +82,7 @@ else {
 
     $| = 1;		# command buffering
 
-    $SIG{"INT"} = "ok3";     kill "INT",$$; sleep 1;
+    $SIG{"INT"} = \&ok3;     kill "INT",$$; sleep 1;
     $SIG{"INT"} = "IGNORE";  kill "INT",$$; sleep 1; print "ok 4\n";
     $SIG{"INT"} = "DEFAULT"; kill "INT",$$; sleep 1; print "not ok 4\n";
 
@@ -112,7 +112,7 @@ END
 	return sub { $x };
     }
     $| = 1;		# command buffering
-    $SIG{"INT"} = "ok5";
+    $SIG{"INT"} = \&ok5;
     {
 	local $SIG{"INT"}=x();
 	print ""; # Needed to expose failure in 5.8.0 (why?)
@@ -127,7 +127,7 @@ END
     close CMDPIPE;
     $? >>= 8 if $^O eq 'VMS'; # POSIX status hiding in 2nd byte
     my $todo = ($^O eq 'os2' ? ' # TODO: EMX v0.9d_fix4 bug: wrong nibble? ' : '');
-    print $? & 0xFF ? "ok 6$todo\n" : "not ok 6$todo\n";
+    print $? ^&^ 0xFF ? "ok 6$todo\n" : "not ok 6$todo\n";
 
     $test += 4;
 }
@@ -193,6 +193,9 @@ our ($wd, $script);
        # Cygwin turns the symlink into the real file
        chomp($wd = `pwd`);
        $wd =~ s#/t$##;
+       if ($Is_Cygwin) {
+	   $wd = Cygwin::win_to_posix_path(Cygwin::posix_to_win_path($wd, 1));
+       }
     }
     elsif($Is_os2) {
        $wd = Cwd::sys_cwd();
@@ -205,6 +208,7 @@ our ($wd, $script);
     }
     my $perl = ($Is_MacOS || $Is_VMS) ? $^X : "$wd/perl";
     my $headmaybe = '';
+    my $middlemaybe = '';
     my $tailmaybe = '';
     $script = "$wd/show-shebang";
     if ($Is_MSWin32) {
@@ -234,6 +238,12 @@ EOT
     elsif ($Is_VMS) {
       $script = "[]show-shebang";
     }
+    elsif ($Is_Cygwin) {
+      $middlemaybe = <<'EOX'
+$^X = Cygwin::win_to_posix_path(Cygwin::posix_to_win_path($^X, 1));
+$0 = Cygwin::win_to_posix_path(Cygwin::posix_to_win_path($0, 1));
+EOX
+    }
     if ($^O eq 'os390' or $^O eq 'posix-bc' or $^O eq 'vmesa') {  # no shebang
 	$headmaybe = <<EOH ;
     eval 'exec ./perl -S \$0 \${1+"\$\@"}'
@@ -242,7 +252,7 @@ EOH
     }
     my $s1 = "\$^X is $perl, \$0 is $script\n";
     ok open(SCRIPT, ">$script"), $!;
-    ok print(SCRIPT $headmaybe . <<EOB . <<'EOF' . $tailmaybe), $!;
+    ok print(SCRIPT $headmaybe . <<EOB . $middlemaybe . <<'EOF' . $tailmaybe), $!;
 #!$wd/perl
 EOB
 print "\$^X is $^X, \$0 is $0\n";

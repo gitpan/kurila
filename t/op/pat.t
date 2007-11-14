@@ -20,10 +20,19 @@ eval 'use Config';          #  Defaults assumed if this fails
 
 
 # use utf8;
+# use charnames ':full';
+#     my $SIGMA = "\N{GREEK CAPITAL LETTER SIGMA}";
+#     my $char  = "\N{COMBINING GREEK PERISPOMENI}";
 # use re Debug => 'ALL';
 
-# "123" =~ /^.*1/; # .*23\x{100}$/, 'uft8 + multiple floating substr');
-# ok("123\x{100}" =~ /^.*1/); # .*23\x{100}$/, 'uft8 + multiple floating substr');
+#     print "fran\N{LATIN SMALL LETTER C WITH CEDILLA}ais" =~
+# 	  /fran(?:c\N{COMBINING CEDILLA}?|\N{LATIN SMALL LETTER C WITH CEDILLA})ais/ &&
+# 	$& eq "fran\N{LATIN SMALL LETTER C WITH CEDILLA}ais" ? "ok\n" : "not XXX";
+# # # "123" =~ /^.*1/; # .*23\x{100}$/, 'uft8 + multiple floating substr');
+# # # ok("123\x{100}" =~ /^.*1/); # .*23\x{100}$/, 'uft8 + multiple floating substr');
+
+# #     # Before #13843 this was failing by matching falsely.
+# #     print "_:$char:_" =~ m/_:$SIGMA:_/i ? "not ok 786\n" : "ok 786\n";
 
 # __END__
 
@@ -105,32 +114,10 @@ if (/^$_$/) {print "ok 23\n";} else {print "not ok 23\n";}
 # used to be a test for $*
 if ("ab\ncd\n" =~ /^cd/m) {print "ok 24\n";} else {print "not ok 24\n";}
 
-$XXX{123} = 123;
-$XXX{234} = 234;
-$XXX{345} = 345;
-
-@XXX = ('ok 25','not ok 25', 'ok 26','not ok 26','not ok 27');
-while ($_ = shift(@XXX)) {
-    ?(.*)? && (print $1,"\n");
-    /not/ && reset;
-    if (/not ok 26/) {
-      if ($^O eq 'VMS') {
-	$_ = shift(@XXX);
-      }
-      else {
-	reset 'X';
-      }
-   }
+# once pattern has been removed.
+for (25..27) {
+    print "ok $_\n";
 }
-
-if ($^O ne 'VMS') {
-  while (my ($key,$val) = each(%XXX)) {
-    print "not ok 27\n";
-    exit;
-  }
-}
-
-print "ok 27\n";
 
 'cde' =~ /[^ab]*/;
 'xyz' =~ //;
@@ -2605,31 +2592,6 @@ print "# some Unicode properties\n";
     $test++;
 }
 
-{
-    print "# [ID 20020412.005] wrong pmop flags checked when empty pattern\n";
-    # requires reuse of last successful pattern
-    $test = 898;
-    $test =~ /\d/;
-    for (0 .. 1) {
-	my $match = ?? + 0;
-	if ($match != $_) {
-	    print "ok $test\n";
-	} else {
-	    printf "not ok %s\t# 'match once' %s on %s iteration\n", $test,
-		    $match ? 'succeeded' : 'failed', $_ ? 'second' : 'first';
-	}
-	++$test;
-    }
-    $test =~ /(\d)/;
-    my $result = join '', $test =~ //g;
-    if ($result eq $test) {
-	print "ok $test\n";
-    } else {
-	printf "not ok %s\t# expected '%s', got '%s'\n", $test, $test, $result;
-    }
-    ++$test;
-}
-
 print "# user-defined character properties\n";
 
 sub InKana1 {
@@ -2662,7 +2624,7 @@ sub InNotKana {
 END
 }
 
-$test = 901;
+$test = 898;
 
 print "\x{3040}" =~ /\p{InKana1}/ ? "ok $test\n" : "not ok $test\n"; $test++;
 print "\x{303F}" =~ /\P{InKana1}/ ? "ok $test\n" : "not ok $test\n"; $test++;
@@ -2692,7 +2654,6 @@ print "e" =~ /\P{InConsonant}/ ? "ok $test\n" : "not ok $test\n"; $test++;
 
 if (!$ENV{PERL_SKIP_PSYCHO_TEST}){
     print "# [ID 20020630.002] utf8 regex only matches 32k\n";
-    $test = 911;
     for ([ 'byte', "\x{ff}" ], [ 'utf8', "\x{1ff}" ]) {
 	my($type, $char) = @$_;
 	for my $len (32000, 32768, 33000) {
@@ -2706,7 +2667,7 @@ if (!$ENV{PERL_SKIP_PSYCHO_TEST}){
     ok(1,'Skipped Psycho') for 1..12;
 }
 
-$test = 923;
+$test = 920;
 
 $a = bless qr/foo/, 'Foo';
 print(('goodfood' =~ $a ? '' : 'not '),
@@ -4217,6 +4178,25 @@ sub kt
     $_ = '123'; 
     iseq("$1",'abc',"/g leads to unsafe match vars: $1");
 }
+{
+    local $Message="Message-ID: <20070818091501.7eff4831@r2d2>";
+    my $str= "";
+    for(0..5){
+        my @x;
+        $str .= "@x"; # this should ALWAYS be the empty string
+        'a'=~/(a|)/;
+        push @x,1;
+    }
+    iseq(length($str),"0","Trie scope error, string should be empty");
+    $str="";
+    my @foo = ('a')x5;
+    for (@foo) {
+        my @bar;
+        $str .= "@bar";
+        s/a|/push @bar, 1/e;
+    }
+    iseq(length($str),"0","Trie scope error, string should be empty");
+}
 
 # Test counter is at bottom of file. Put new tests above here.
 #-------------------------------------------------------------------
@@ -4262,6 +4242,15 @@ ok($@=~/\QSequence \k... not terminated in regex;\E/);
     $_="123";
     s/(?=\d+)|(?<=\d)/!Bang!/g;
     iseq($_,"!Bang!1!Bang!2!Bang!3!Bang!");
+}
+
+# [perl #45337] utf8 + "[a]a{2}" + /$.../ = panic: sv_len_utf8 cache
+
+{
+    local ${^UTF8CACHE} = -1;
+    use utf8;
+    my $s="[a]a{2}";
+    ok("aaa" =~ /$s/, "#45337");
 }
 
 # Put new tests above the dotted line about a page above this comment

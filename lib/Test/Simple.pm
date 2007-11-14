@@ -1,10 +1,9 @@
 package Test::Simple;
 
-use 5.004;
 
 use strict 'vars';
 use vars qw($VERSION @ISA @EXPORT);
-$VERSION = '0.70';
+$VERSION = '0.72';
 $VERSION = eval $VERSION;    # make the alpha version come out as a number
 
 use Test::Builder::Module;

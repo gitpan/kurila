@@ -1,6 +1,5 @@
 package Hash::Util;
 
-require 5.007003;
 use strict;
 use Carp;
 use warnings;
@@ -370,7 +369,7 @@ sub all_keys{}
 sub legal_keys(\%) { legal_ref_keys(@_)  }
 sub hidden_keys(\%){ hidden_ref_keys(@_) }
 
-=item b<legal_keys>
+=item B<legal_keys>
 
   my @keys = legal_keys(%hash);
 

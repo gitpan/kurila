@@ -4,7 +4,7 @@ use strict;
 no strict qw(refs subs);
 
 use vars qw($VERSION);
-$VERSION = '2.12';
+$VERSION = '2.13';
 
 # constant.pm is slow
 sub SUCCESS () { 1 }
@@ -72,12 +72,13 @@ sub import {
 
     my $inheritor = caller(0);
 
+    my @bases;
     foreach my $base (@_) {
         if ( $inheritor eq $base ) {
             warn "Class '$inheritor' tried to inherit from itself\n";
         }
 
-        next if $inheritor->isa($base);
+        next if grep $_->isa($base), ($inheritor, @bases);
 
         if (has_version($base)) {
             ${*{Symbol::fetch_glob($base.'::VERSION')}} = '-1, set by base.pm' 
@@ -93,19 +94,21 @@ sub import {
                 die if $@ && $@ !~ /^Can't locate .*? at \(eval /;
                 unless (%{*{Symbol::fetch_glob("$base\::")}}) {
                     require Carp;
+                    local $" = " ";
                     Carp::croak(<<ERROR);
 Base class package "$base" is empty.
-    (Perhaps you need to 'use' the module which defines that package first.)
+    (Perhaps you need to 'use' the module which defines that package first,
+    or make that module available in \@INC (\@INC contains: @INC).
 ERROR
                 }
-                $sigdie = $SIG{__DIE__};
+                $sigdie = $SIG{__DIE__} || undef;
             }
             # Make sure a global $SIG{__DIE__} makes it out of the localization.
             $SIG{__DIE__} = $sigdie if defined $sigdie;
             ${*{Symbol::fetch_glob($base.'::VERSION')}} = "-1, set by base.pm"
               unless defined ${*{Symbol::fetch_glob($base.'::VERSION')}};
         }
-        push @{*{Symbol::fetch_glob("$inheritor\::ISA")}}, $base;
+        push @bases, $base;
 
         if ( has_fields($base) || has_attr($base) ) {
             # No multiple fields inheritance *suck*
@@ -117,6 +120,8 @@ ERROR
             }
         }
     }
+    # Save this until the end so it's all or nothing if the above loop croaks.
+    push @{*{Symbol::fetch_glob("$inheritor\::ISA")}}, @bases;
 
     if( defined $fields_base ) {
         inherit_fields($inheritor, $fields_base);
@@ -155,18 +160,18 @@ END
             Carp::croak ("Inherited fields can't override existing fields");
         }
 
-        if( $battr->[$v] & PRIVATE ) {
-            $dattr->[$v] = PRIVATE | INHERITED;
+        if( $battr->[$v] ^&^ PRIVATE ) {
+            $dattr->[$v] = PRIVATE ^|^ INHERITED;
         }
         else {
-            $dattr->[$v] = INHERITED | $battr->[$v];
+            $dattr->[$v] = INHERITED ^|^ $battr->[$v];
             $dfields->{$k} = $v;
         }
     }
 
     foreach my $idx (1..$#{$battr}) {
         next if defined $dattr->[$idx];
-        $dattr->[$idx] = $battr->[$idx] & INHERITED;
+        $dattr->[$idx] = $battr->[$idx] ^&^ INHERITED;
     }
 }
 

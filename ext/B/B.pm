@@ -67,7 +67,7 @@ sub B::GV::SAFENAME {
   # from toke.c
 
   $name =~ s/^([\cA-\cZ\c\\c[\c]\c?\c_\c^])/"^".
-	chr( utf8::unicode_to_native( 64 ^ ord($1) ))/e;
+	chr( utf8::unicode_to_native( 64 ^^^ ord($1) ))/e;
 
   # When we say unicode_to_native we really mean ascii_to_native,
   # which matters iff this is a non-ASCII platform (EBCDIC).
@@ -77,7 +77,7 @@ sub B::GV::SAFENAME {
 
 sub B::IV::int_value {
   my ($self) = @_;
-  return (($self->FLAGS() & SVf_IVisUV()) ? $self->UVX : $self->IV);
+  return (($self->FLAGS() ^&^ SVf_IVisUV()) ? $self->UVX : $self->IV);
 }
 
 sub B::NULL::as_string() {""}
@@ -114,8 +114,8 @@ sub walkoptree_slow {
     $op_count++; # just for statistics
     $level ||= 0;
     warn(sprintf("walkoptree: %d. %s\n", $level, peekop($op))) if $debug;
-    $op->$method($level) if $op->can($method);
-    if ($$op && ($op->flags & OPf_KIDS)) {
+    $op->?$method($level) if $op->can($method);
+    if ($$op && ($op->flags ^&^ OPf_KIDS)) {
 	my $kid;
 	unshift(@parents, $op);
 	for ($kid = $op->first; $$kid; $kid = $kid->sibling) {
@@ -174,7 +174,7 @@ sub walkoptree_exec {
 	    return;
 	}
 	savesym($op, sprintf("%s (0x%lx)", class($op), $$op));
-	$op->$method($level);
+	$op->?$method($level);
 	$ppname = $op->name;
 	if ($ppname =~
 	    /^(d?or(assign)?|and(assign)?|mapwhile|grepwhile|entertry|range|cond_expr)$/)
@@ -228,7 +228,7 @@ sub walksymtable {
                walksymtable(\%{*{Symbol::fetch_glob($fullname)}}, $method, $recurse, $sym);
 	    }
 	} else {
-           svref_2object(\*{Symbol::fetch_glob($fullname)})->$method();
+           svref_2object(\*{Symbol::fetch_glob($fullname)})->?$method();
 	}
     }
 }

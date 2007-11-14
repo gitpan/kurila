@@ -147,6 +147,13 @@ package Maintainers;
 		'CPAN'		=> 1,
 		},
 
+	'constant' =>
+		{
+		'MAINTAINER'	=> 'saper',
+		'FILES'		=> q[lib/constant.{pm,t}],
+		'CPAN'		=> 1,
+		},
+
 	'Compress::Zlib' =>
 		{
 		'MAINTAINER'	=> 'pmqs',
@@ -312,8 +319,10 @@ package Maintainers;
 	'ExtUtils::MakeMaker' =>
 		{
 		'MAINTAINER'	=> 'mschwern',
-		'FILES'	=> q[lib/ExtUtils/{Liblist,MakeMaker,Mkbootstrap,Mksymlists,MM*,MY,testlib}.pm lib/ExtUtils/{Command,Liblist,MakeMaker}
-				     lib/ExtUtils/t t/lib/MakeMaker t/lib/TieIn.pm t/lib/TieOut.pm],
+		'FILES'	=> q[lib/ExtUtils/{Liblist,MakeMaker,Mkbootstrap,Mksymlists,MM*,MY,testlib}.pm
+			lib/ExtUtils/{Command,Liblist,MakeMaker}
+			lib/ExtUtils/t/{[0-9A-LN-Za-z]*,Mkbootstrap,MM_*}.t
+			t/lib/MakeMaker t/lib/TieIn.pm t/lib/TieOut.pm],
 		'CPAN'		=> 1,
 		},
 
@@ -608,13 +617,6 @@ package Maintainers;
 		{
 		'MAINTAINER'	=> 'kane',
 		'FILES'		=> q[lib/Object/Accessor.pm lib/Object/Accessor],
-		'CPAN'		=> 1,
-		},
-
-	'Package::Constants' =>
-		{
-		'MAINTAINER'	=> 'kane',
-		'FILES'		=> q[lib/Package/Constants lib/Package/Constants.pm],
 		'CPAN'		=> 1,
 		},
 
@@ -952,7 +954,7 @@ package Maintainers;
 		{
 		'MAINTAINER'	=> 'jand',
 		'FILES'		=> q[win32 README.win32 t/win32 ext/Win32CORE],
-		'CPAN'		=> 0,
+		'CPAN'		=> 1,
 		},
 
 	'Win32' =>
@@ -974,13 +976,6 @@ package Maintainers;
 		'MAINTAINER'	=> 'saper',
 		'FILES'		=> q[ext/DynaLoader/t/XSLoader.t ext/DynaLoader/XSLoader_pm.PL],
 		'CPAN'		=> 1,
-		},
-
-	's2p' =>
-		{
-		'MAINTAINER'	=> 'laun',
-		'FILES'		=> q[x2p/s2p.PL],
-		'CPAN'		=> 0,
 		},
 	);
 
