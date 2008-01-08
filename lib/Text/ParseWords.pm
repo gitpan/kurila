@@ -45,7 +45,7 @@ sub nested_quotewords {
     my($delim, $keep, @lines) = @_;
     my($i, @allwords);
 
-    for ($i = 0; $i < @lines; $i++) {
+    for ($i = 0; $i +< @lines; $i++) {
 	@{$allwords[$i]} = parse_line($delim, $keep, $lines[$i]);
 	return() unless (@{$allwords[$i]} || !length($lines[$i]));
     }
@@ -65,28 +65,28 @@ sub parse_line {
         # Do not refactor without being careful and testing it on very long strings.
         # See Perl bug #42980 for an example of a stack busting input.
         $line =~ s/^
-                    (?: 
+                    (?:
                         # double quoted string
                         (")                             # $quote
-                        ((?>[^\\"]*(?:\\.[^\\"]*)*))"   # $quoted 
+                        ((?>[^\\"]*(?:\\.[^\\"]*)*))"   # $quoted
 		    |	# --OR--
                         # singe quoted string
                         (')                             # $quote
-                        ((?>[^\\']*(?:\\.[^\\']*)*))'   # $quoted
+                        ([^']*)'                        # $quoted
                     |   # --OR--
                         # unquoted string
-		        (                               # $unquoted 
-                            (?:\\.|[^\\"'])*?           
-                        )		
+		        (                               # $unquoted
+                            (?:\\.|[^\\"'])*?
+                        )
                         # followed by
 		        (                               # $delim
                             \Z(?!\n)                    # EOL
                         |   # --OR--
                             (?-x:$delimiter)            # delimiter
-                        |   # --OR--                    
+                        |   # --OR--
                             (?!^)(?=["'])               # a quote
-                        )  
-		    )//xs or return;		# extended layout                  
+                        )
+		    )//xs or return;		# extended layout
         my ($quote, $quoted, $unquoted, $delim) = (($1 ? ($1,$2) : ($3,$4)), $5, $6);
 
 
@@ -99,12 +99,11 @@ sub parse_line {
 	    $unquoted =~ s/\\(.)/$1/sg;
 	    if (defined $quote) {
 		$quoted =~ s/\\(.)/$1/sg if ($quote eq '"');
-		$quoted =~ s/\\([\\'])/$1/g if ( $PERL_SINGLE_QUOTE && $quote eq "'");
             }
 	}
         $word .= substr($line, 0, 0);	# leave results tainted
         $word .= defined $quote ? $quoted : $unquoted;
- 
+
         if (length($delim)) {
             push(@pieces, $word);
             push(@pieces, $delim) if ($keep eq 'delimiters');
@@ -140,7 +139,7 @@ sub old_shellwords {
 	    if (s/\A"(([^"\\]|\\.)*)"//s) {
 		($snippet = $1) =~ s#\\(.)#$1#sg;
 	    }
-	    elsif (/\A"/) {
+	    elsif (m/\A"/) {
 		require Carp;
 		Carp::carp("Unmatched double quote: $_");
 		return();
@@ -148,7 +147,7 @@ sub old_shellwords {
 	    elsif (s/\A'(([^'\\]|\\.)*)'//s) {
 		($snippet = $1) =~ s#\\(.)#$1#sg;
 	    }
-	    elsif (/\A'/) {
+	    elsif (m/\A'/) {
 		require Carp;
 		Carp::carp("Unmatched single quote: $_");
 		return();
@@ -189,7 +188,7 @@ Text::ParseWords - parse text into an array of tokens or array of arrays
 
 =head1 DESCRIPTION
 
-The &nested_quotewords() and &quotewords() functions accept a delimiter 
+The &nested_quotewords() and &quotewords() functions accept a delimiter
 (which can be a regular expression)
 and a list of lines and then breaks those lines up into a list of
 words ignoring delimiters that appear inside quotes.  &quotewords()
@@ -279,12 +278,12 @@ Maintainer is Hal Pomeranz <pomeranz@netcom.com>, 1994-1997 (Original
 author unknown).  Much of the code for &parse_line() (including the
 primary regexp) from Joerk Behrends <jbehrends@multimediaproduzenten.de>.
 
-Examples section another documentation provided by John Heidemann 
+Examples section another documentation provided by John Heidemann
 <johnh@ISI.EDU>
 
 Bug reports, patches, and nagging provided by lots of folks-- thanks
 everybody!  Special thanks to Michael Schwern <schwern@envirolink.org>
-for assuring me that a &nested_quotewords() would be useful, and to 
+for assuring me that a &nested_quotewords() would be useful, and to
 Jeff Friedl <jfriedl@yahoo-inc.com> for telling me not to worry about
 error-checking (sort of-- you had to be there).
 

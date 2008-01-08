@@ -45,7 +45,7 @@ sub hostname {
 
     # method 4 - does hostname happen to work?
     my($rslt) = `hostname`;
-    if ($rslt !~ /IVVERB/) { ($host) = $rslt =~ /^(\S+)/; }
+    if ($rslt !~ m/IVVERB/) { ($host) = $rslt =~ m/^(\S+)/; }
     return $host if $host;
 
     # rats!
@@ -111,7 +111,7 @@ sub hostname {
     || eval {
 	local $SIG{__DIE__};
         my($a,$b,$c,$d);
-	($host,$a,$b,$c,$d)=split(/[:\. ]/,`/com/host`,6);
+	($host,$a,$b,$c,$d)=split(m/[:\. ]/,`/com/host`,6);
     }
 
     # bummer

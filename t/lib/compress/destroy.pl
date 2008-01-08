@@ -9,9 +9,6 @@ use CompTestUtils;
 
 BEGIN
 {
-    plan(skip_all => "Destroy not supported in Perl $]")
-        if $] == 5.008 || ( $] >= 5.005 && $] < 5.006) ;
-
     # use Test::NoWarnings, if available
     my $extra = 0 ;
     $extra = 1
@@ -63,7 +60,7 @@ hello world
 this is a test
 EOM
 
-        my $fh = 'IO::File'->new( "> $name") ;
+        my $fh = 'IO::File'->new( "$name", ">") ;
 
         {
           ok my $x = $CompressClass-> new( $fh, -AutoClose => 1)  ;

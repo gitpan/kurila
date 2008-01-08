@@ -56,7 +56,7 @@ See L<perlfunc/stat> about the S_I* constants.
 =cut
 
 use strict;
-our($VERSION, @ISA, @EXPORT, @EXPORT_OK, %EXPORT_TAGS, $AUTOLOAD);
+our($VERSION, @ISA, @EXPORT, @EXPORT_OK, %EXPORT_TAGS);
 
 require Exporter;
 use XSLoader ();
@@ -227,18 +227,5 @@ sub S_ISCHR    { ( $_[0] ^&^ _S_IFMT() ) == S_IFCHR()   }
 sub S_ISFIFO   { ( $_[0] ^&^ _S_IFMT() ) == S_IFIFO()   }
 sub S_ISWHT    { ( $_[0] ^&^ _S_IFMT() ) == S_IFWHT()   }
 sub S_ISENFMT  { ( $_[0] ^&^ _S_IFMT() ) == S_IFENFMT() }
-
-sub AUTOLOAD {
-    (my $constname = $AUTOLOAD) =~ s/.*:://;
-    die "&Fcntl::constant not defined" if $constname eq 'constant';
-    my ($error, $val) = constant($constname);
-    if ($error) {
-        my (undef,$file,$line) = caller;
-        die "$error at $file line $line.\n";
-    }
-    no strict 'refs';
-    *{Symbol::fetch_glob($AUTOLOAD)} = sub { $val };
-    goto &{*{Symbol::fetch_glob($AUTOLOAD)}};
-}
 
 1;

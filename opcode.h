@@ -467,20 +467,20 @@ EXTCONST char* const PL_op_desc[] = {
 	"string",
 	"left bitshift (<<)",
 	"right bitshift (>>)",
-	"numeric lt (<)",
-	"integer lt (<)",
-	"numeric gt (>)",
-	"integer gt (>)",
-	"numeric le (<=)",
-	"integer le (<=)",
-	"numeric ge (>=)",
-	"integer ge (>=)",
+	"numeric lt (+<)",
+	"integer lt (+<)",
+	"numeric gt (+>)",
+	"integer gt (+>)",
+	"numeric le (+<=)",
+	"integer le (+<=)",
+	"numeric ge (+>=)",
+	"integer ge (+>=)",
 	"numeric eq (==)",
 	"integer eq (==)",
 	"numeric ne (!=)",
 	"integer ne (!=)",
-	"numeric comparison (<=>)",
-	"integer comparison (<=>)",
+	"numeric comparison (<+>)",
+	"integer comparison (<+>)",
 	"string lt",
 	"string gt",
 	"string le",
@@ -488,13 +488,13 @@ EXTCONST char* const PL_op_desc[] = {
 	"string eq",
 	"string ne",
 	"string comparison (cmp)",
-	"bitwise and (&)",
-	"bitwise xor (^)",
-	"bitwise or (|)",
+	"bitwise and (^&^)",
+	"bitwise xor (^^^)",
+	"bitwise or (^|^)",
 	"negation (-)",
 	"integer negation (-)",
 	"not",
-	"1's complement (~)",
+	"1's complement (^~^)",
 	"smart match",
 	"atan2",
 	"sin",
@@ -1286,7 +1286,7 @@ EXT Perl_check_t PL_check[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_ck_unpack),	/* unpack */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* pack */
 	MEMBER_TO_FPTR(Perl_ck_split),	/* split */
-	MEMBER_TO_FPTR(Perl_ck_join),	/* join */
+	MEMBER_TO_FPTR(Perl_ck_fun),	/* join */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* list */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* lslice */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* anonlist */

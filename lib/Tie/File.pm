@@ -44,11 +44,11 @@ sub TIEARRAY {
     # deferred-write buffer size (if specified)
     $opts{memory} = $DEFAULT_MEMORY_SIZE;
     $opts{memory} = $opts{dw_size}
-      if defined $opts{dw_size} && $opts{dw_size} > $DEFAULT_MEMORY_SIZE;
+      if defined $opts{dw_size} && $opts{dw_size} +> $DEFAULT_MEMORY_SIZE;
     # Dora Winifred Read
   }
   $opts{dw_size} = $opts{memory} unless defined $opts{dw_size};
-  if ($opts{dw_size} > $opts{memory}) {
+  if ($opts{dw_size} +> $opts{memory}) {
       croak("$pack: dw_size may not be larger than total memory allocation\n");
   }
   # are we in deferred-write mode?
@@ -101,20 +101,15 @@ sub TIEARRAY {
     croak "usage: tie \@array, $pack, filename, [option => value]...";
   } else {
     # $fh = \do { local *FH };  # XXX this is buggy
-    if ($] < 5.006) {
-	# perl 5.005 and earlier don't autovivify filehandles
-	require Symbol;
-	$fh = Symbol::gensym();
-    }
     sysopen $fh, $file, $opts{mode}, 0666 or return;
     binmode $fh;
     ++$opts{ourfh};
   }
   { my $ofh = select $fh; $| = 1; select $ofh } # autoflush on write
-  if (defined $opts{discipline} && $] >= 5.006) {
+  if (defined $opts{discipline}) {
     # This avoids a compile-time warning under 5.005
     eval 'binmode($fh, $opts{discipline})';
-    croak $@ if $@ =~ /unknown discipline/i;
+    croak $@ if $@ =~ m/unknown discipline/i;
     die if $@;
   }
   $opts{fh} = $fh;
@@ -131,7 +126,7 @@ sub FETCH {
   $rec = $self->_fetch($n) unless defined $rec;
 
   # inlined _chomp1
-  substr($rec, - $self->{recseplen}) = ""
+  substr($rec, - $self->{recseplen}, undef, "")
     if defined $rec && $self->{autochomp};
   $rec;
 }
@@ -143,7 +138,7 @@ sub _chomp {
   if ($self->{autochomp}) {
     for (@_) {
       next unless defined;
-      substr($_, - $self->{recseplen}) = "";
+      substr($_, - $self->{recseplen}, undef, "");
     }
   }
 }
@@ -153,7 +148,7 @@ sub _chomp1 {
   my ($self, $rec) = @_;
   return $rec unless $self->{autochomp};
   return unless defined $rec;
-  substr($rec, - $self->{recseplen}) = "";
+  substr($rec, - $self->{recseplen}, undef, "");
   $rec;
 }
 
@@ -165,7 +160,7 @@ sub _fetch {
     return $cached if defined $cached;
   }
 
-  if ($#{$self->{offsets}} < $n) {
+  if ($#{$self->{offsets}} +< $n) {
     return if $self->{eof};  # request for record beyond end of file
     my $o = $self->_fill_offsets_to($n);
     # If it's still undefined, there is no such record, so return 'undef'
@@ -230,7 +225,7 @@ sub _store_deferred {
   $self->{cache}->remove($n);
   my $old_deferred = $self->{deferred}{$n};
 
-  if (defined $self->{deferred_max} && $n > $self->{deferred_max}) {
+  if (defined $self->{deferred_max} && $n +> $self->{deferred_max}) {
     $self->{deferred_max} = $n;
   }
   $self->{deferred}{$n} = $rec;
@@ -239,7 +234,7 @@ sub _store_deferred {
   $len_diff -= length($old_deferred) if defined $old_deferred;
   $self->{deferred_s} += $len_diff;
   $self->{cache}->adj_limit(-$len_diff);
-  if ($self->{deferred_s} > $self->{dw_size}) {
+  if ($self->{deferred_s} +> $self->{dw_size}) {
     $self->_flush;
   } elsif ($self->_cache_too_full) {
     $self->_cache_flush;
@@ -267,7 +262,7 @@ sub FETCHSIZE {
   my $n = $self->{eof} ? $#{$self->{offsets}} : $self->_fill_offsets;
 
   my $top_deferred = $self->_defer_max;
-  $n = $top_deferred+1 if defined $top_deferred && $n < $top_deferred+1;
+  $n = $top_deferred+1 if defined $top_deferred && $n +< $top_deferred+1;
   $n;
 }
 
@@ -282,7 +277,7 @@ sub STORESIZE {
   return if $len == $olen;      # Woo-hoo!
 
   # file gets longer
-  if ($len > $olen) {
+  if ($len +> $olen) {
     if ($self->_is_deferring) {
       for ($olen .. $len-1) {
         $self->_store_deferred($_, $self->{recsep});
@@ -296,7 +291,7 @@ sub STORESIZE {
   # file gets shorter
   if ($self->_is_deferring) {
     # TODO maybe replace this with map-plus-assignment?
-    for (grep $_ >= $len, keys %{$self->{deferred}}) {
+    for (grep $_ +>= $len, keys %{$self->{deferred}}) {
       $self->_delete_deferred($_);
     }
     $self->{deferred_max} = $len-1;
@@ -307,7 +302,7 @@ sub STORESIZE {
   $#{$self->{offsets}} = $len;
 #  $self->{offsets}[0] = 0;      # in case we just chopped this
 
-  $self->{cache}->remove(grep $_ >= $len, $self->{cache}->ckeys);
+  $self->{cache}->remove(grep $_ +>= $len, $self->{cache}->ckeys);
 }
 
 ### OPTIMIZE ME
@@ -387,7 +382,7 @@ sub DELETE {
     # Note that delete @a[-3..-1] deletes the records in the wrong order,
     # so we only chop the very last one out of the file.  We could repair this
     # by tracking deleted records inside the object.
-  } elsif ($n < $lastrec) {
+  } elsif ($n +< $lastrec) {
     $self->STORE($n, "");
   }
   $rec;
@@ -396,7 +391,7 @@ sub DELETE {
 sub EXISTS {
   my ($self, $n) = @_;
   return 1 if exists $self->{deferred}{$n};
-  $n < $self->FETCHSIZE;
+  $n +< $self->FETCHSIZE;
 }
 
 sub SPLICE {
@@ -438,27 +433,27 @@ sub _splice {
     $nrecs = $oldsize unless defined $nrecs;
     my $oldpos = $pos;
 
-    if ($pos < 0) {
+    if ($pos +< 0) {
       $pos += $oldsize;
-      if ($pos < 0) {
+      if ($pos +< 0) {
         croak "Modification of non-creatable array value attempted, subscript $oldpos";
       }
     }
 
-    if ($pos > $oldsize) {
+    if ($pos +> $oldsize) {
       return unless @data;
       $pos = $oldsize;          # This is what perl does for normal arrays
     }
 
     # The manual is very unclear here
-    if ($nrecs < 0) {
+    if ($nrecs +< 0) {
       $nrecs = $oldsize - $pos + $nrecs;
-      $nrecs = 0 if $nrecs < 0;
+      $nrecs = 0 if $nrecs +< 0;
     }
 
     # nrecs is too big---it really means "until the end"
     # 20030507
-    if ($nrecs + $pos > $oldsize) {
+    if ($nrecs + $pos +> $oldsize) {
       $nrecs = $oldsize - $pos;
     }
   }
@@ -512,7 +507,7 @@ sub _splice {
     # need to be renumbered
     # Maybe merge this with the previous block?
     {
-      my @oldkeys = grep $_ >= $pos + $nrecs, $self->{cache}->ckeys;
+      my @oldkeys = grep $_ +>= $pos + $nrecs, $self->{cache}->ckeys;
       my @newkeys = map $_-$nrecs+@data, @oldkeys;
       $self->{cache}->rekey(\@oldkeys, \@newkeys);
     }
@@ -577,7 +572,7 @@ sub _twrite {
   $self->_write_record($next_block);
 
   # There might be leftover data at the end of the file
-  $self->_chop_file if $len_diff < 0;
+  $self->_chop_file if $len_diff +< 0;
 }
 
 # _iwrite(D, S, E)
@@ -595,8 +590,8 @@ sub _iwrite {
   my $c = $e-$s-$d;
   local *FH = $self->{fh};
   confess "Not enough space to insert $d bytes between $s and $e"
-    if $c < 0;
-  confess "[$s,$e) is an invalid insertion range" if $e < $s;
+    if $c +< 0;
+  confess "[$s,$e) is an invalid insertion range" if $e +< $s;
 
   $self->_seekb($s);
   read FH, my $buf, $e-$s;
@@ -629,7 +624,7 @@ sub _mtwrite {
     $pos += $delta;             # This is where the data goes now
     my $dlen = length $data;
     $self->_seekb($pos);
-    if ($len >= $dlen) {        # the data will fit
+    if ($len +>= $dlen) {        # the data will fit
       $self->_write_record($data);
       $delta += ($dlen - $len); # everything following moves down by this much
       $data = ""; # All the data in the buffer has been written
@@ -645,7 +640,7 @@ sub _mtwrite {
     my $ndlen = length $data;
     if ($delta == 0) {
       $self->_write_record($data);
-    } elsif ($delta < 0) {
+    } elsif ($delta +< 0) {
       # upcopy (close up gap)
       if (@_) {
         $self->_upcopy($end, $end + $delta, $_[1] - $end);  
@@ -673,15 +668,15 @@ sub _mtwrite {
 sub _upcopy {
   my $blocksize = 8192;
   my ($self, $spos, $dpos, $len) = @_;
-  if ($dpos > $spos) {
+  if ($dpos +> $spos) {
     die "source ($spos) was upstream of destination ($dpos) in _upcopy";
   } elsif ($dpos == $spos) {
     return;
   }
   
-  while (! defined ($len) || $len > 0) {
+  while (! defined ($len) || $len +> 0) {
     my $readsize = ! defined($len) ? $blocksize
-               : $len > $blocksize ? $blocksize
+               : $len +> $blocksize ? $blocksize
                : $len;
       
     my $fh = $self->{fh};
@@ -710,12 +705,12 @@ sub _downcopy {
   my ($self, $data, $pos, $len) = @_;
   my $fh = $self->{fh};
 
-  while (! defined $len || $len > 0) {
+  while (! defined $len || $len +> 0) {
     my $readsize = ! defined($len) ? $blocksize 
-      : $len > $blocksize? $blocksize : $len;
+      : $len +> $blocksize? $blocksize : $len;
     $self->_seekb($pos);
     read $fh, my($old), $readsize;
-    my $last_read_was_short = length($old) < $readsize;
+    my $last_read_was_short = length($old) +< $readsize;
     $data .= $old;
     my $writable;
     if ($last_read_was_short) {
@@ -771,7 +766,7 @@ sub _oadjust {
     }
 
     for my $i ($pos .. $pos+$nrecs-1) {
-      last if $i+1 > $#{$self->{offsets}};
+      last if $i+1 +> $#{$self->{offsets}};
       my $oldlen = $self->{offsets}[$i+1] - $self->{offsets}[$i];
       $delta -= $oldlen;
     }
@@ -854,7 +849,7 @@ sub _fill_offsets_to {
   local *OFF = $self->{offsets};
   my $rec;
 
-  until ($#OFF >= $n) {
+  until ($#OFF +>= $n) {
     $self->_seek(-1);           # tricky -- see comment at _seek
     $rec = $self->_read_record;
     if (defined $rec) {
@@ -904,7 +899,7 @@ sub _read_record {
   my $rec;
   { local $/ = $self->{recsep};
     my $fh = $self->{fh};
-    $rec = <$fh>;
+    $rec = ~< $fh;
   }
   return unless defined $rec;
   if (substr($rec, -$self->{recseplen}) ne $self->{recsep}) {
@@ -939,7 +934,7 @@ sub _cache_flush {
 
 sub _cache_too_full {
   my $self = shift;
-  $self->{cache}->bytes + $self->{deferred_s} >= $self->{memory};
+  $self->{cache}->bytes + $self->{deferred_s} +>= $self->{memory};
 }
 
 ################################################################
@@ -964,7 +959,7 @@ sub _extend_file_to {
   my $extras = $n - $#{$self->{offsets}};
 
   # Todo : just use $self->{recsep} x $extras here?
-  while ($extras-- > 0) {
+  while ($extras-- +> 0) {
     $self->_write_record($self->{recsep});
     push @{$self->{offsets}}, int(tell $self->{fh});
   }
@@ -983,7 +978,7 @@ sub _chop_file {
 # The result should be at least $n.
 sub _bufsize {
   my $n = shift;
-  return 8192 if $n <= 0;
+  return 8192 if $n +<= 0;
   my $b = $n ^&^ ^~^8191;
   $b += 8192 if $n ^&^ 8191;
   $b;
@@ -997,7 +992,7 @@ sub _bufsize {
 # Lock the file
 sub flock {
   my ($self, $op) = @_;
-  unless (@_ <= 3) {
+  unless (@_ +<= 3) {
     my $pack = ref $self;
     croak "Usage: $pack\->flock([OPERATION])";
   }
@@ -1033,7 +1028,7 @@ sub autochomp {
 sub offset {
   my ($self, $n) = @_;
 
-  if ($#{$self->{offsets}} < $n) {
+  if ($#{$self->{offsets}} +< $n) {
     return if $self->{eof};     # request for record beyond the end of file
     my $o = $self->_fill_offsets_to($n);
     # If it's still undefined, there is no such record, so return 'undef'
@@ -1075,7 +1070,7 @@ sub flush {
 
 sub _old_flush {
   my $self = shift;
-  my @writable = sort {$a<=>$b} (keys %{$self->{deferred}});
+  my @writable = sort {$a<+>$b} (keys %{$self->{deferred}});
 
   while (@writable) {
     # gather all consecutive records from the front of @writable
@@ -1094,7 +1089,7 @@ sub _old_flush {
 
 sub _flush {
   my $self = shift;
-  my @writable = sort {$a<=>$b} (keys %{$self->{deferred}});
+  my @writable = sort {$a<+>$b} (keys %{$self->{deferred}});
   my @args;
   my @adjust;
 
@@ -1155,7 +1150,7 @@ sub _defer_max {
   return $self->{deferred_max} if defined $self->{deferred_max};
   my $max = -1;
   for my $key (keys %{$self->{deferred}}) {
-    $max = $key if $key > $max;
+    $max = $key if $key +> $max;
   }
   $self->{deferred_max} = $max;
   $max;
@@ -1209,19 +1204,19 @@ sub _annotate_ad_history {
   my ($self, $n) = @_;
   return unless $self->{autodefer}; # feature is disabled
   return if $self->{defer};     # already in explicit defer mode
-  return unless $self->{offsets}[-1] >= $self->{autodefer_filelen_threshhold};
+  return unless $self->{offsets}[-1] +>= $self->{autodefer_filelen_threshhold};
 
   local *H = $self->{ad_history};
   if ($n eq 'CLEAR') {
     @H = (-2, -1);              # prime the history with fake records
     $self->_stop_autodeferring;
-  } elsif ($n =~ /^\d+$/) {
+  } elsif ($n =~ m/^\d+$/) {
     if (@H == 0) {
       @H =  ($n, $n);
     } else {                    # @H == 2
       if ($H[1] == $n-1) {      # another consecutive record
         $H[1]++;
-        if ($H[1] - $H[0] + 1 >= $self->{autodefer_threshhold}) {
+        if ($H[1] - $H[0] + 1 +>= $self->{autodefer_threshhold}) {
           $self->{autodeferring} = 1;
         }
       } else {                  # nonconsecutive- erase and start over
@@ -1313,7 +1308,7 @@ sub _check_integrity {
     local $. = 0;
     local $/ = $rs;
 
-    while (<F>) {
+    while ( ~< *F) {
       my $n = $. - 1;
       my $cached = $self->{cache}->_produce($n);
       my $offset = $self->{offsets}[$.];
@@ -1335,7 +1330,7 @@ sub _check_integrity {
         _ci_warn("The offset table was marked complete, but it is missing element $.");
       }
     }
-    if (@{$self->{offsets}} > $.+1) {
+    if (@{$self->{offsets}} +> $.+1) {
         $good = 0;
         my $n = @{$self->{offsets}};
         _ci_warn("The offset table has $n items, but the file has only $.");
@@ -1345,7 +1340,7 @@ sub _check_integrity {
     for my $n ($self->{cache}->ckeys) {
       my $r = $self->{cache}->_produce($n);
       $cached += length($r);
-      next if $n+1 <= $.;         # checked this already
+      next if $n+1 +<= $.;         # checked this already
       _ci_warn("spurious caching of record $n");
       $good = 0;
     }
@@ -1387,13 +1382,13 @@ sub _check_integrity {
   }
 
   # Total size of deferbuffer should not exceed the specified limit
-  if ($deferred_s > $self->{dw_size}) {
+  if ($deferred_s +> $self->{dw_size}) {
     _ci_warn("buffer size is $self->{deferred_s} which exceeds the limit of $self->{dw_size}");
     $good = 0;
   }
 
   # Total size of cached data should not exceed the specified limit
-  if ($deferred_s + $cached > $self->{memory}) {
+  if ($deferred_s + $cached +> $self->{memory}) {
     my $total = $deferred_s + $cached;
     _ci_warn("total stored data size is $total which exceeds the limit of $self->{memory}");
     $good = 0;
@@ -1411,7 +1406,7 @@ sub _check_integrity {
   if (@{$self->{ad_history}} == 0) {
     # That's OK, no additional tests required
   } elsif (@{$self->{ad_history}} == 2) {
-    my @non_number = grep !/^-?\d+$/, @{$self->{ad_history}};
+    my @non_number = grep !m/^-?\d+$/, @{$self->{ad_history}};
     if (@non_number) {
       my $msg;
       { local $" = ')(';
@@ -1419,7 +1414,7 @@ sub _check_integrity {
       }
       _ci_warn($msg);
       $good = 0;
-    } elsif ($self->{ad_history}[1] < $self->{ad_history}[0]) {
+    } elsif ($self->{ad_history}[1] +< $self->{ad_history}[0]) {
       _ci_warn("ad_history has nonsensical values @{$self->{ad_history}}");
       $good = 0;
     }
@@ -1493,7 +1488,7 @@ sub insert {
     confess "undefined max" ;
   }
   confess "undefined val" unless defined $val;
-  return if length($val) > $self->[MAX];
+  return if length($val) +> $self->[MAX];
 
 #  if ($self->[STAT]) {
 #    $self->[STAT][$key] = 1;
@@ -1508,7 +1503,7 @@ sub insert {
     $self->[HEAP]->insert($key, $val);
   }
   $self->[BYTES] += length($val);
-  $self->flush if $self->[BYTES] > $self->[MAX];
+  $self->flush if $self->[BYTES] +> $self->[MAX];
 }
 
 sub expire {
@@ -1592,7 +1587,7 @@ sub update {
   my ($self, $key, $val) = @_;
   local *_;
   croak "missing argument to ->update" unless defined $key;
-  if (length($val) > $self->[MAX]) {
+  if (length($val) +> $self->[MAX]) {
     my ($oldval) = $self->remove($key);
     $self->[BYTES] -= length($oldval) if defined $oldval;
   } elsif (exists $self->[HASH]{$key}) {
@@ -1640,7 +1635,7 @@ sub bytes {
 # Expire oldest item from cache until cache size is smaller than $max
 sub reduce_size_to {
   my ($self, $max) = @_;
-  until ($self->[BYTES] <= $max) {
+  until ($self->[BYTES] +<= $max) {
     # Note that Tie::File::Cache::expire has been inlined here
     my $old_data = $self->[HEAP]->popheap;
     return unless defined $old_data;
@@ -1653,7 +1648,7 @@ sub reduce_size_to {
 # If the cache is too full, expire the oldest records
 sub flush {
   my $self = shift;
-  $self->reduce_size_to($self->[MAX]) if $self->[BYTES] > $self->[MAX];
+  $self->reduce_size_to($self->[MAX]) if $self->[BYTES] +> $self->[MAX];
 }
 
 # For internal use only
@@ -1674,7 +1669,7 @@ sub _check_integrity {          # For CACHE
   # Test HASH
   my $bytes = 0;
   for my $k (keys %{$self->[HASH]}) {
-    if ($k ne '0' && $k !~ /^[1-9][0-9]*$/) {
+    if ($k ne '0' && $k !~ m/^[1-9][0-9]*$/) {
       $good = 0;
       _ci_warn "Cache hash key <$k> is non-numeric";
     }
@@ -1708,7 +1703,7 @@ sub _check_integrity {          # For CACHE
   }
 
   # Test MAX
-  if ($bytes > $self->[MAX]) {
+  if ($bytes +> $self->[MAX]) {
     $good = 0;
     _ci_warn "Total data in cache is $bytes, exceeds maximum $self->[MAX]";
   }
@@ -1813,7 +1808,7 @@ sub _insert {
 #  $self->_check_loc($i) if defined $i;
   $i = 1 unless defined $i;
   until (! defined $self->[$i]) {
-    if ($self->[$i][SEQ] > $item->[SEQ]) { # inserted item is older
+    if ($self->[$i][SEQ] +> $item->[SEQ]) { # inserted item is older
       ($self->[$i], $item) = ($item, $self->[$i]);
       $self->[0][1]->_heap_move($self->[$i][KEY], $i);
     }
@@ -1848,7 +1843,7 @@ sub remove {
     $ii = $R if not defined $self->[$L];
     $ii = $L if not defined $self->[$R];
     unless (defined $ii) {
-      $ii = $self->[$L][SEQ] < $self->[$R][SEQ] ? $L : $R;
+      $ii = $self->[$L][SEQ] +< $self->[$R][SEQ] ? $L : $R;
     }
 
     $self->[$i] = $self->[$ii]; # Promote child to fill vacated spot
@@ -1881,7 +1876,7 @@ sub promote {
     $dir = $R unless defined $self->[$L];
     $dir = $L unless defined $self->[$R];
     unless (defined $dir) {
-      $dir = $self->[$L][SEQ] < $self->[$R][SEQ] ? $L : $R;
+      $dir = $self->[$L][SEQ] +< $self->[$R][SEQ] ? $L : $R;
     }
     @{$self}[$i, $dir] = @{$self}[$dir, $i];
     for ($i, $dir) {
@@ -1966,7 +1961,7 @@ sub _satisfies_heap_condition {
   for (0, 1) {
     my $c = $n*2 + $_;
     next unless defined $self->[$c];
-    if ($self->[$n][SEQ] >= $self->[$c]) {
+    if ($self->[$n][SEQ] +>= $self->[$c]) {
       _ci_warn "Node $n of heap does not predate node $c";
       $good = 0 ;
     }
@@ -1978,7 +1973,7 @@ sub _satisfies_heap_condition {
 # Return a list of all the values, sorted by expiration order
 sub expire_order {
   my $self = shift;
-  my @nodes = sort {$a->[SEQ] <=> $b->[SEQ]} $self->_nodes;
+  my @nodes = sort {$a->[SEQ] <+> $b->[SEQ]} $self->_nodes;
   map { $_->[KEY] } @nodes;
 }
 

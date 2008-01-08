@@ -5,7 +5,7 @@ package IO::Compress::Base ;
 use strict ;
 use warnings;
 
-use IO::Compress::Base::Common 2.006 ;
+use IO::Compress::Base::Common v2.006 ;
 
 use IO::File ;
 use Scalar::Util qw(blessed readonly);
@@ -37,7 +37,7 @@ sub saveErrorString
 {
     my $self   = shift ;
     my $retval = shift ;
-    ${ *$self->{Error} } = shift ;
+    ${ *$self->{Error} } = shift() . (${*$self->{Error}} ? "\nprevious: ${*$self->{Error}}" : "") ;
     ${ *$self->{ErrorNo} } = shift() + 0 if @_ ;
 
     return $retval;
@@ -90,7 +90,7 @@ sub writeAt
     if (defined *$self->{FH}) {
         my $here = tell(*$self->{FH});
         return $self->saveErrorString(undef, "Cannot seek to end of output filehandle: $!", $!) 
-            if $here < 0 ;
+            if $here +< 0 ;
         seek(*$self->{FH}, $offset, SEEK_SET)
             or return $self->saveErrorString(undef, "Cannot seek to end of output filehandle: $!", $!) ;
         defined *$self->{FH}->write($data, length $data)
@@ -99,7 +99,7 @@ sub writeAt
             or return $self->saveErrorString(undef, "Cannot seek to end of output filehandle: $!", $!) ;
     }
     else {
-        substr(${ *$self->{Buffer} }, $offset, length($data)) = $data ;
+        substr(${ *$self->{Buffer} }, $offset, length($data), $data) ;
     }
 
     return 1;
@@ -120,7 +120,7 @@ sub output
     }
 
     if ( defined *$self->{FH} ) {
-        defined *$self->{FH}->write( $data, length $data )
+        defined IO::Handle::write(*$self->{FH}, $data, length $data )
           or return $self->saveErrorString(0, $!, $!); 
     }
     else {
@@ -181,7 +181,7 @@ sub _create
     {
         $oneShot = 0 ;
         $got = $obj->checkParams($class, undef, @_)
-            or return undef ;
+          or $obj->croakError("invalid params");
     }
 
     my $lax = ! $got->value('Strict') ;
@@ -189,7 +189,7 @@ sub _create
     my $outType = whatIsOutput($outValue);
 
     $obj->ckOutputParam($class, $outValue)
-        or return undef ;
+      or $obj->croakError("invalid output param");
 
     if ($outType eq 'buffer') {
         *$obj->{Buffer} = $outValue;
@@ -234,7 +234,7 @@ sub _create
     if (! $merge)
     {
         *$obj->{Compress} = $obj->mkComp($class, $got)
-            or return undef;
+            or $obj->croakError("Failed making Compress");
         
         *$obj->{UnCompSize} = U64->new() ;
         *$obj->{CompSize} = U64->new() ;
@@ -247,7 +247,7 @@ sub _create
             if ($outType eq 'handle') {
                 *$obj->{FH} = $outValue ;
                 setBinModeOutput(*$obj->{FH}) ;
-                $outValue->flush() ;
+                IO::Handle::flush($outValue);
                 *$obj->{Handle} = 1 ;
                 if ($appendOutput)
                 {
@@ -260,7 +260,7 @@ sub _create
                 my $mode = '>' ;
                 $mode = '>>'
                     if $appendOutput;
-                *$obj->{FH} = IO::File->new( "$mode $outValue") 
+                *$obj->{FH} = IO::File->new( "$outValue", "$mode")
                     or return $obj->saveErrorString(undef, "cannot open file '$outValue': $!", $!) ;
                 *$obj->{StdIO} = ($outValue eq '-'); 
                 setBinModeOutput(*$obj->{FH}) ;
@@ -269,7 +269,7 @@ sub _create
 
         *$obj->{Header} = $obj->mkHeader($got) ;
         $obj->output( *$obj->{Header} )
-            or return undef;
+            or $obj->croakError("Failed writing header");
     }
     else
     {
@@ -314,7 +314,7 @@ sub _def
     my $name = (caller(1))[3] ;
 
     $obj->croakError("$name: expected at least 1 parameters\n")
-        unless @_ >= 1 ;
+        unless @_ +>= 1 ;
 
     my $input = shift ;
     my $haveOut = @_ ;
@@ -473,7 +473,7 @@ sub _wr2
 
         if ( ! $isFilehandle )
         {
-            $fh = IO::File->new( "<$input")
+            $fh = IO::File->new( "$input", "<")
                 or return $self->saveErrorString(undef, "cannot open file '$input': $!", $!) ;
         }
         binmode $fh if *$self->{Got}->valueOrDefault('BinModeIn') ;
@@ -481,14 +481,14 @@ sub _wr2
         my $status ;
         my $buff ;
         my $count = 0 ;
-        while (($status = read($fh, $buff, 16 * 1024)) > 0) {
+        while (($status = read($fh, $buff, 16 * 1024)) +> 0) {
             $count += length $buff;
             defined $self->syswrite($buff, @_) 
                 or return undef ;
         }
 
         return $self->saveErrorString(undef, $!, $!) 
-            if $status < 0 ;
+            if $status +< 0 ;
 
         if ( (!$isFilehandle || *$self->{AutoClose}) && $input ne '-')
         {    
@@ -574,22 +574,22 @@ sub syswrite
     }
 
 
-    if (@_ > 1) {
+    if (@_ +> 1) {
         my $slen = defined $$buffer ? length($$buffer) : 0;
         my $len = $slen;
         my $offset = 0;
-        $len = $_[1] if $_[1] < $len;
+        $len = $_[1] if $_[1] +< $len;
 
-        if (@_ > 2) {
+        if (@_ +> 2) {
             $offset = $_[2] || 0;
             $self->croakError(*$self->{ClassName} . "::write: offset outside string") 
-                if $offset > $slen;
-            if ($offset < 0) {
+                if $offset +> $slen;
+            if ($offset +< 0) {
                 $offset += $slen;
-                $self->croakError( *$self->{ClassName} . "::write: offset outside string") if $offset < 0;
+                $self->croakError( *$self->{ClassName} . "::write: offset outside string") if $offset +< 0;
             }
             my $rem = $slen - $offset;
-            $len = $rem if $rem < $len;
+            $len = $rem if $rem +< $len;
         }
 
         $buffer = \substr($$buffer, $offset, $len) ;
@@ -664,7 +664,7 @@ sub flush
         if $status == STATUS_ERROR;
 
     if ( defined *$self->{FH} ) {
-        *$self->{FH}->clearerr();
+        IO::Handle::clearerr(*$self->{FH});
     }
 
     *$self->{CompSize}->add(length $outBuffer) ;
@@ -673,7 +673,7 @@ sub flush
         or return 0;
 
     if ( defined *$self->{FH} ) {
-        defined *$self->{FH}->flush()
+        defined IO::Handle::flush(*$self->{FH})
             or return $self->saveErrorString(0, $!, $!); 
     }
 
@@ -747,8 +747,7 @@ sub close
     return 1 if *$self->{Closed} || ! *$self->{Compress} ;
     *$self->{Closed} = 1 ;
 
-    untie *$self 
-        if $] >= 5.008 ;
+    untie *$self;
 
     $self->_writeTrailer()
         or return 0 ;
@@ -764,7 +763,7 @@ sub close
         #if (! *$self->{Handle} || *$self->{AutoClose}) {
         if ((! *$self->{Handle} || *$self->{AutoClose}) && ! *$self->{StdIO}) {
             $! = 0 ;
-            *$self->{FH}->close()
+            close(*$self->{FH})
                 or return $self->saveErrorString(0, $!, $!); 
         }
         delete *$self->{FH} ;
@@ -853,13 +852,13 @@ sub seek
 
     # Outlaw any attempt to seek backwards
     $self->croakError(*$self->{ClassName} . "::seek: cannot seek backwards")
-        if $target < $here ;
+        if $target +< $here ;
 
     # Walk the file to the new offset
     my $offset = $target - $here ;
 
     my $buffer ;
-    defined $self->syswrite("\x00" x $offset)
+    defined $self->syswrite("\0" x $offset)
         or return 0;
 
     return 1 ;
@@ -878,7 +877,7 @@ sub fileno
 {
     my $self     = shift ;
     return defined *$self->{FH} 
-            ? *$self->{FH}->fileno() 
+            ? fileno(*$self->{FH}) 
             : undef ;
 }
 

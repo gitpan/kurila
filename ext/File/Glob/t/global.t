@@ -9,7 +9,7 @@ BEGIN {
 	push @INC, '../lib'; 
     }
     require Config; Config->import;
-    if ($Config{'extensions'} !~ /\bFile\/Glob\b/i) {
+    if ($Config{'extensions'} !~ m/\bFile\/Glob\b/i) {
         print "1..0\n";
         exit 0;
     }
@@ -26,7 +26,7 @@ BEGIN {
 BEGIN {
     if ("Just another Perl hacker," ne (glob("*"))[0]) {
         die <<EOMessage;
-Your version of perl ($]) doesn't seem to allow extensions to override
+Your version of perl ($^V) doesn't seem to allow extensions to override
 the core glob operator.
 EOMessage
     }
@@ -41,7 +41,7 @@ my @r = glob;
 print "not " if $_ ne ($^O eq "MacOS" ? ":op:*.t" : "op/*.t");
 print "ok 2\n";
 
-print "# |@r|\nnot " if @r < 3;
+print "# |@r|\nnot " if @r +< 3;
 print "ok 3\n";
 
 # check if <*/*> works
@@ -51,7 +51,7 @@ if ($^O eq "MacOS") {
     @r = glob("*/*.t");
 }
 # at least t/global.t t/basic.t, t/taint.t
-print "not " if @r < 3;
+print "not " if @r +< 3;
 print "ok 4\n";
 my $r = scalar @r;
 

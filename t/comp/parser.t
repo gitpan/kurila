@@ -15,7 +15,7 @@ eval '%@x=0;';
 like( $@, qr/^Can't modify hash dereference in repeat \(x\)/, '%@x=0' );
 
 # Bug 20010422.005
-eval q{{s//${}/; //}};
+eval q{{s//${}/; m//}};
 like( $@, qr/syntax error/, 'syntax error, used to dump core' );
 
 # Bug 20010528.007
@@ -83,20 +83,20 @@ is( $@, '', 'PL_lex_brackstack' );
     undef $a;
     undef @b;
     my $a="A";
-    is("${a}{", "A{", "interpolation, qq//");
+    is("${a}\{", "A\{", "interpolation, qq//");
     is("${a}[", "A[", "interpolation, qq//");
     my @b=("B");
-    is("@{b}{", "B{", "interpolation, qq//");
+    is("@{b}\{", "B\{", "interpolation, qq//");
     is(qr/${a}{/, '(?-uxism:A{)', "interpolation, qr//");
-    my $c = "A{";
-    $c =~ /${a}{/;
+    my $c = "A\{";
+    $c =~ m/${a}{/;
     is($&, 'A{', "interpolation, m//");
-    $c =~ s/${a}{/foo/;
+    $c =~ s/${a}\{/foo/;
     is($c, 'foo', "interpolation, s/...//");
-    $c =~ s/foo/${a}{/;
+    $c =~ s/foo/${a}\{/;
     is($c, 'A{', "interpolation, s//.../");
-    is(<<"${a}{", "A{ A[ B{\n", "interpolation, here doc");
-${a}{ ${a}[ @{b}{
+    is(<<"${a}{", "A\{ A[ B\{\n", "interpolation, here doc");
+${a}\{ ${a}[ @{b}\{
 ${a}{
 }
 
@@ -115,7 +115,7 @@ pass();
 # Bug #21875
 # { q.* => ... } should be interpreted as hash, not block
 
-foreach my $line (split /\n/, <<'EOF')
+foreach my $line (split m/\n/, <<'EOF')
 1 { foo => 'bar' }
 1 { qoo => 'bar' }
 1 { q   => 'bar' }
@@ -126,7 +126,7 @@ foreach my $line (split /\n/, <<'EOF')
 1 { q=bar= => 'bar' }
 EOF
 {
-    my ($expect, $eval) = split / /, $line, 2;
+    my ($expect, $eval) = split m/ /, $line, 2;
     my $result = eval $eval;
     ok($@ eq  '', "eval $eval");
     is(ref $result, $expect ? 'HASH' : '', $eval);
@@ -172,13 +172,13 @@ EOF
 eval q{ foo::$bar };
 like( $@, qr/Bad name after foo::/, 'Bad name after foo::' );
 eval q{ foo''bar };
-like( $@, qr/Bad name after foo'/, 'Bad name after foo\'' );
+like( $@, qr/Bad name after foo'/, q|Bad name after foo'| );
 
 # test for ?: context error
 eval q{($a ? $x : ($y)) = 5};
 like( $@, qr/Assignment to both a list and a scalar/, 'Assignment to both a list and a scalar' );
 
-eval q{ s/x/#/e };
+eval q{ s/x/#/ };
 is( $@, '', 'comments in s///e' );
 
 # these five used to coredump because the op cleanup on parse error could

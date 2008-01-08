@@ -21,13 +21,13 @@ if ('PerlIO::Layer'->find( 'perlio')) {
     ok(open(FOO,"<:crlf",$file));
 
     my $text;
-    { local $/; $text = <FOO> }
+    { local $/; $text = ~< *FOO }
     is(count_chars($text, "\015\012"), 0);
     is(count_chars($text, "\n"), 2000);
 
     binmode(FOO);
     seek(FOO,0,0);
-    { local $/; $text = <FOO> }
+    { local $/; $text = ~< *FOO }
     is(count_chars($text, "\015\012"), 2000);
 
     SKIP:
@@ -39,11 +39,11 @@ if ('PerlIO::Layer'->find( 'perlio')) {
 	my $fcontents = join "", map {"$_\015\012"} "a".."zzz";
 	open my $fh, "<:crlf", \$fcontents;
 	local $/ = "xxx";
-	local $_ = <$fh>;
+	local $_ = ~< $fh;
 	my $pos = tell $fh; # pos must be behind "xxx", before "\nxxy\n"
 	seek $fh, $pos, 0;
 	$/ = "\n";
-	$s = <$fh>.<$fh>;
+	$s = ( ~< $fh ) . ~< $fh;
 	ok($s eq "\nxxy\n");
     }
 
@@ -57,20 +57,20 @@ if ('PerlIO::Layer'->find( 'perlio')) {
     # not accumulate).
     for my $utf8 ('', ':utf8') {
 	for my $binmode (1..2) {
-	    open(FOO, ">$file");
+	    open(FOO, ">", "$file");
 	    # require PerlIO; print PerlIO::get_layers(FOO), "\n";
 	    binmode(FOO, "$utf8:crlf") for 1..$binmode;
 	    # require PerlIO; print PerlIO::get_layers(FOO), "\n";
 	    print FOO "Hello\n";
 	    close FOO;
-	    open(FOO, "<$file");
+	    open(FOO, "<", "$file");
 	    binmode(FOO);
-	    my $foo = scalar <FOO>;
+	    my $foo = scalar ~< *FOO;
 	    close FOO;
 	    print join(" ", "#", map { sprintf("%02x", $_) } unpack("C*", $foo)),
 	    "\n";
-	    ok($foo =~ /\x0d\x0a$/);
-	    ok($foo !~ /\x0d\x0d/);
+	    ok($foo =~ m/\x0d\x0a$/);
+	    ok($foo !~ m/\x0d\x0d/);
 	}
     }
 }
@@ -81,6 +81,6 @@ else {
 sub count_chars {
     my($text, $chars) = @_;
     my $seen = 0;
-    $seen++ while $text =~ /$chars/g;
+    $seen++ while $text =~ m/$chars/g;
     return $seen;
 }

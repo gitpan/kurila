@@ -6,7 +6,7 @@ BEGIN {
 	@INC = '../lib';
 	require Config; Config->import;
 	keys %Config; # Silence warning
-	if ($Config{extensions} !~ /\bList\/Util\b/) {
+	if ($Config{extensions} !~ m/\bList\/Util\b/) {
 	    print "1..0 # Skip: List::Util was not built\n";
 	    exit 0;
 	}
@@ -14,7 +14,7 @@ BEGIN {
 }
 
 use Scalar::Util ();
-use Test::More  (grep { /dualvar/ } @Scalar::Util::EXPORT_FAIL)
+use Test::More  (grep { m/dualvar/ } @Scalar::Util::EXPORT_FAIL)
 			? (skip_all => 'dualvar requires XS version')
 			: (tests => 11);
 
@@ -44,7 +44,7 @@ ok( $var == $numstr,	'NV');
 
 $var = dualvar(1<<31, "");
 ok( $var == (1<<31),	'UV 1');
-ok( $var > 0,		'UV 2');
+ok( $var +> 0,		'UV 2');
 
 tie my $tied, 'Tied';
 $var = dualvar($tied, "ok");

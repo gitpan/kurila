@@ -40,7 +40,7 @@ can_ok( 'XSLoader' => 'bootstrap_inherit' );
 
 # Check error messages
 eval { XSLoader::load() };
-like( $@, '/^XSLoader::load\(\'Your::Module\', \$Your::Module::VERSION\)/',
+like( $@, q|/^XSLoader::load\('Your::Module', \$Your::Module::VERSION\)/|,
         "calling XSLoader::load() with no argument" );
 
 eval q{ package Thwack; XSLoader::load('Thwack'); };
@@ -53,7 +53,7 @@ $extensions =~ s|/|::|g;
 
 for my $module (sort keys %modules) {
     SKIP: {
-        skip "$module not available", 3 if $extensions !~ /\b$module\b/;
+        skip "$module not available", 3 if $extensions !~ m/\b$module\b/;
 
         eval qq{ package $module; XSLoader::load('$module', "qunckkk"); };
         like( $@, "/^$module object version \\S+ does not match bootstrap parameter (?:qunckkk|0)/",  

@@ -1,17 +1,17 @@
 use Perl6::Form;
 
-for (<DATA>) {
-	($title, $page) = split /[\t\n]+/;
+for ( ~< *DATA) {
+	($title, $page) = split m/[\t\n]+/;
 	push @contents, $title;
 	push @page, $page;
 }
 
 print form
 	 {page=>{width=>51},hfill=>'=-'},
-	 "{||||{*}|||||}\n\n",
+	 "\{||||\{*\}|||||\}\n\n",
 	 "[ Table of Contents ]",
 	 {hfill=>' .'},
-	 "   {[[[[[{*}[[[[[}{]]]}   ",
+	 "   \{[[[[[\{*\}[[[[[\}\{]]]\}   ",
 	     \@contents,    \@page;
 
 __DATA__

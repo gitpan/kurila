@@ -2,7 +2,7 @@ BEGIN {
     chdir 't' if -d 't';
     @INC = '../lib';
     require Config; Config->import;
-    if ($Config{'extensions'} !~ /\bXS\/Typemap\b/) {
+    if ($Config{'extensions'} !~ m/\bXS\/Typemap\b/) {
         print "1..0 # Skip: XS::Typemap was not built\n";
         exit 0;
     }
@@ -319,11 +319,11 @@ if (defined $fh) {
   ok( $Config{useperlio} ? T_STDIO_close( $fh ) : close( $fh ) );
 
   # open from perl, and check contents
-  open($fh, "< $testfile");
+  open($fh, "<", "$testfile");
   ok($fh);
-  my $line = <$fh>;
+  my $line = ~< $fh;
   ok($line,$lines[0]);
-  $line = <$fh>;
+  $line = ~< $fh;
   ok($line,$lines[1]);
 
   ok(close($fh));

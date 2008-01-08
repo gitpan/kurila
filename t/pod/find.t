@@ -67,10 +67,10 @@ if ($^O eq 'VMS') {
     $result =~ s/$undollared/pod::/g;
     $result =~ s/\$//g;
     my $count = 0;
-    my @result = split(/,/,$result);
-    my @compare = split(/,/,$compare);
+    my @result = split(m/,/,$result);
+    my @compare = split(m/,/,$compare);
     foreach(@compare) {
-        $count += grep {/$_/} @result;
+        $count += grep {m/$_/} @result;
     }
     ok($count/($#result+1)-1,$#compare);
 }

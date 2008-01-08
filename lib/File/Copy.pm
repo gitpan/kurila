@@ -57,7 +57,7 @@ sub _catname {
 
     if ($^O eq 'MacOS') {
 	# a partial dir name that's valid only in the cwd (e.g. 'tmp')
-	$to = ':' . $to if $to !~ /:/;
+	$to = ':' . $to if $to !~ m/:/;
     }
 
     return File::Spec->catfile($to, basename($from));
@@ -97,7 +97,7 @@ sub copy {
     }
 
     if ((($Config{d_symlink} && $Config{d_readlink}) || $Config{d_link}) &&
-	!($^O eq 'MSWin32' || $^O eq 'os2' || $^O eq 'vms')) {
+	!($^O eq 'MSWin32' || $^O eq 'os2')) {
 	my @fs = stat($from);
 	if (@fs) {
 	    my @ts = stat($to);
@@ -121,7 +121,28 @@ sub copy {
 	&& !($from_a_handle && $^O eq 'NetWare')
        )
     {
-	return syscopy($from, $to);
+	my $copy_to = $to;
+
+        if ($^O eq 'VMS' && -e $from) {
+
+            if (! -d $to && ! -d $from) {
+
+                # VMS has sticky defaults on extensions, which means that
+                # if there is a null extension on the destination file, it
+                # will inherit the extension of the source file
+                # So add a '.' for a null extension.
+
+                $copy_to = VMS::Filespec::vmsify($to);
+                my ($vol, $dirs, $file) = File::Spec->splitpath($copy_to);
+                $file = $file . '.' unless ($file =~ m/(?<!\^)\./);
+                $copy_to = File::Spec->catpath($vol, $dirs, $file);
+
+                # Get rid of the old versions to be like UNIX
+                1 while unlink $copy_to;
+            }
+        }
+
+        return syscopy($from, $copy_to);
     }
 
     my $closefrom = 0;
@@ -133,9 +154,9 @@ sub copy {
     if ($from_a_handle) {
        $from_h = $from;
     } else {
-	$from = _protect($from) if $from =~ /^\s/s;
+	$from = _protect($from) if $from =~ m/^\s/s;
        $from_h = \do { local *FH };
-       open($from_h, "< $from\0") or goto fail_open1;
+       open($from_h, "<", "$from\0") or goto fail_open1;
        binmode $from_h or die "($!,$^E)";
 	$closefrom = 1;
     }
@@ -144,20 +165,20 @@ sub copy {
     if ($to_a_handle) {
        $to_h = $to;
     } else {
-	$to = _protect($to) if $to =~ /^\s/s;
+	$to = _protect($to) if $to =~ m/^\s/s;
        $to_h = \do { local *FH };
-       open($to_h,"> $to\0") or goto fail_open2;
+       open($to_h,">", "$to\0") or goto fail_open2;
        binmode $to_h or die "($!,$^E)";
 	$closeto = 1;
     }
 
     if (@_) {
 	$size = shift(@_) + 0;
-	croak("Bad buffer size for copy: $size\n") unless ($size > 0);
+	croak("Bad buffer size for copy: $size\n") unless ($size +> 0);
     } else {
 	$size = tied(*$from_h) ? 0 : -s $from_h || 0;
-	$size = 1024 if ($size < 512);
-	$size = $Too_Big if ($size > $Too_Big);
+	$size = 1024 if ($size +< 512);
+	$size = $Too_Big if ($size +> $Too_Big);
     }
 
     $! = 0;
@@ -166,7 +187,7 @@ sub copy {
        defined($r = sysread($from_h, $buf, $size))
 	    or goto fail_inner;
 	last unless $r;
-	for ($w = 0; $w < $r; $w += $t) {
+	for ($w = 0; $w +< $r; $w += $t) {
            $t = syswrite($to_h, $buf, $r - $w, $w)
 		or goto fail_inner;
 	}
@@ -214,7 +235,27 @@ sub move {
       # will not rename with overwrite
       unlink $to;
     }
-    return 1 if rename $from, $to;
+
+    my $rename_to = $to;
+    if (-$^O eq 'VMS' && -e $from) {
+
+        if (! -d $to && ! -d $from) {
+            # VMS has sticky defaults on extensions, which means that
+            # if there is a null extension on the destination file, it
+            # will inherit the extension of the source file
+            # So add a '.' for a null extension.
+
+            $rename_to = VMS::Filespec::vmsify($to);
+            my ($vol, $dirs, $file) = File::Spec->splitpath($rename_to);
+            $file = $file . '.' unless ($file =~ m/(?<!\^)\./);
+            $rename_to = File::Spec->catpath($vol, $dirs, $file);
+
+            # Get rid of the old versions to be like UNIX
+            1 while unlink $rename_to;
+        }
+    }
+
+    return 1 if rename $from, $rename_to;
 
     # Did rename return an error even though it succeeded, because $to
     # is on a remote NFS file system, and NFS lost the server's ack?
@@ -279,7 +320,7 @@ unless (defined &syscopy) {
 
 	    return 0 unless -e $from;
 
-	    if ($to =~ /(.*:)([^:]+):?$/) {
+	    if ($to =~ m/(.*:)([^:]+):?$/) {
 		($dir, $toname) = ($1, $2);
 	    } else {
 		($dir, $toname) = (":", $to);

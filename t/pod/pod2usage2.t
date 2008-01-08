@@ -15,13 +15,13 @@ BEGIN {
 sub getoutput
 {
   my ($code) = @_;
-  my $pid = open(IN, "-|");
+  my $pid = open(IN, "-|", "-");
   unless(defined $pid) {
     die "Cannot fork: $!";
   }
   if($pid) {
     # parent
-    my @out = <IN>;
+    my @out = ~< *IN;
     close(IN);
     my $exit = $?>>8;
     s/^/#/ for @out;
@@ -30,7 +30,7 @@ sub getoutput
     return($exit, join("",@out));
   }
   # child
-  open(STDERR, ">&STDOUT");
+  open(STDERR, ">&", \*STDOUT);
   &$code;
   print "--NORMAL-RETURN--\n";
   exit 0;

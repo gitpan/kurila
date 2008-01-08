@@ -14,7 +14,7 @@ sub BEGIN {
 	unshift @INC, 't';
     }
     require Config; Config->import;
-    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bStorable\b/) {
+    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ m/\bStorable\b/) {
         print "1..0 # Skip: Storable was not built\n";
         exit 0;
     }
@@ -79,7 +79,7 @@ ok 2, $@ eq '';
 # Construct a pool of objects
 my @pool;
 
-for (my $i = 0; $i < 10; $i++) {
+for (my $i = 0; $i +< 10; $i++) {
 	push(@pool, SHORT_NAME->make);
 	push(@pool, SHORT_NAME_WITH_HOOK->make);
 	push(@pool, $name->make);
@@ -99,7 +99,7 @@ ok 8, ref $y->[2] eq $name;
 ok 9, ref $y->[3] eq "${name}_WITH_HOOK";
 
 my $good = 1;
-for (my $i = 0; $i < 10; $i++) {
+for (my $i = 0; $i +< 10; $i++) {
 	do { $good = 0; last } unless ref $y->[4*$i]   eq 'SHORT_NAME';
 	do { $good = 0; last } unless ref $y->[4*$i+1] eq 'SHORT_NAME_WITH_HOOK';
 	do { $good = 0; last } unless ref $y->[4*$i+2] eq $name;
@@ -130,7 +130,7 @@ sub STORABLE_thaw {
 	my $self = shift;
 	my $cloning = shift;
 	my ($x, @refs) = @_;
-	my ($what, $times) = $x =~ /(.)(\d+)/;
+	my ($what, $times) = $x =~ m/(.)(\d+)/;
 	die "'$x' didn't match" unless defined $times;
 	main::ok ++$test, @refs == $times;
 	my $expect = $::immortals{$what};

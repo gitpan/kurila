@@ -130,7 +130,7 @@ sub load_loc {
     return $Loc{$pkg} if exists $Loc{$pkg};
 
     eval { require Locale::Maketext::Lexicon; 1 }   or return;
-    $Locale::Maketext::Lexicon::VERSION > 0.20	    or return;
+    $Locale::Maketext::Lexicon::VERSION +> 0.20	    or return;
     eval { require File::Spec; 1 }		    or return;
 
     my $path = $args{Path} || $class->auto_path($args{Class}) or return;
@@ -146,13 +146,13 @@ sub load_loc {
 	package $pkg;
 	use base 'Locale::Maketext';
         %${pkg}::Lexicon = ( '_AUTO' => 1 );
-	Locale::Maketext::Lexicon->import({
+	Locale::Maketext::Lexicon->import(\{
 	    'i-default' => [ 'Auto' ],
 	    '*'	=> [ Gettext => \$pattern ],
 	    _decode => \$decode,
 	    _encoding => \$encoding,
-	});
-	*tense = sub { \$_[1] . ((\$_[2] eq 'present') ? 'ing' : 'ed') }
+	\});
+	*tense = sub \{ \$_[1] . ((\$_[2] eq 'present') ? 'ing' : 'ed') \}
 	    unless defined &tense;
 
 	1;
@@ -178,11 +178,11 @@ sub load_loc {
                     |
                         ([1-9]\d*|\*)           # 4 - variable
                     )
-            }{
+            }{{
                 $1 ? $1
                    : $2 ? "\[$2,"._unescape($3)."]"
                         : "[_$4]"
-            }egx;
+            }}gx;
 	    return $lh->maketext($str, @_);
 	};
     }
@@ -205,7 +205,7 @@ sub default_loc {
             $str =~ s{((?<!~)(?:~~)*)\[_([1-9]\d*|\*)\]}
                      {$1%$2}g;
             $str =~ s{((?<!~)(?:~~)*)\[([A-Za-z#*]\w*),([^\]]+)\]} 
-                     {"$1%$2(" . _escape($3) . ')'}eg;
+                     {{"$1%$2(" . _escape($3) . ')'}}g;
 	    _default_gettext($str, @_);
 	};
     }
@@ -241,16 +241,16 @@ sub _default_gettext {
 		[^)]*		#     and other ignorable params
 	    \)			#   closing function call
 	)			# closing either one of
-    }{
+    }{{
 	my $digit = $2 || shift;
 	$digit . (
 	    $1 ? (
 		($1 eq 'tense') ? (($3 eq 'present') ? 'ing' : 'ed') :
-		($1 eq 'quant') ? ' ' . (($digit > 1) ? ($4 || "$3s") : $3) :
+		($1 eq 'quant') ? ' ' . (($digit +> 1) ? ($4 || "$3s") : $3) :
 		''
 	    ) : ''
 	);
-    }egx;
+    }}gx;
     return $str;
 };
 
@@ -262,8 +262,8 @@ sub _escape {
 
 sub _unescape {
     join(',', map {
-        /\A(\s*)%([1-9]\d*|\*)(\s*)\z/ ? "$1_$2$3" : $_
-    } split(/,/, $_[0]));
+        m/\A(\s*)%([1-9]\d*|\*)(\s*)\z/ ? "$1_$2$3" : $_
+    } split(m/,/, $_[0]));
 }
 
 sub auto_path {

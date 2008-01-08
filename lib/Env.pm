@@ -76,7 +76,7 @@ Gregor N. Purdy E<lt>F<gregor@focusresearch.com>E<gt>
 sub import {
     my ($callpack) = caller(0);
     my $pack = shift;
-    my @vars = grep /^[\$\@]?[A-Za-z_]\w*$/, (@_ ? @_ : keys(%ENV));
+    my @vars = grep m/^[\$\@]?[A-Za-z_]\w*$/, (@_ ? @_ : keys(%ENV));
     return unless @vars;
 
     @vars = map { m/^[\$\@]/ ? $_ : '$'.$_ } @vars;
@@ -223,7 +223,7 @@ sub TIEARRAY {
 sub FETCHSIZE {
     my ($self) = @_;
     my $i = 0;
-    while ($i < 127 and defined $ENV{$$self . ';' . $i}) { $i++; };
+    while ($i +< 127 and defined $ENV{$$self . ';' . $i}) { $i++; };
     return $i;
 }
 

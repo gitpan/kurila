@@ -50,10 +50,10 @@ foreach my $file (
     $parser->output_string(\$outstring);
     $parser->parse_file(source_path($file));
 
-    open(IN, $precooked) or die "Can't read-open $precooked: $!";
+    open(IN, "<", $precooked) or die "Can't read-open $precooked: $!";
     {
       local $/;
-      $compstring = <IN>;
+      $compstring = ~< *IN;
     }
     close(IN);
 
@@ -75,7 +75,7 @@ foreach my $file (
       $x =~ m/^(\x00*)/s or die;
       my $at = length($1);
       print "# Difference at byte $at...\n";
-      if($at > 10) {
+      if($at +> 10) {
         $at -= 5;
       }
       {

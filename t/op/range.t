@@ -73,7 +73,7 @@ is ("@b", $b);
     my $bad = 0;
     local $SIG{'__WARN__'} = sub { $bad = 1 };
     my $x = 'a-e';
-    $x =~ s/(\w)-(\w)/join ':', $1 .. $2/e;
+    $x =~ s/(\w)-(\w)/{join ':', $1 .. $2}/;
     is ($x, 'a:b:c:d:e');
 }
 
@@ -152,37 +152,37 @@ is(join(":", map "[$_]", @foo), '[]');
 }
 {
     local $1;
-    "2" =~ /(.+)/;
+    "2" =~ m/(.+)/;
     @foo=(); push @foo, $_ for undef..$1;
     is(join(":", @foo), '0:1:2');
 }
 {
     local $1;
-    "-2" =~ /(.+)/;
+    "-2" =~ m/(.+)/;
     @foo=(); push @foo, $_ for $1..undef;
     is(join(":", @foo), '-2:-1:0');
 }
 {
     local $1;
-    "B" =~ /(.+)/;
+    "B" =~ m/(.+)/;
     @foo=(); push @foo, $_ for undef..$1;
     is(join(":", map "[$_]", @foo), '[]');
 }
 {
     local $1;
-    "B" =~ /(.+)/;
+    "B" =~ m/(.+)/;
     @foo=(); push @foo, $_ for ""..$1;
     is(join(":", map "[$_]", @foo), '[]');
 }
 {
     local $1;
-    "B" =~ /(.+)/;
+    "B" =~ m/(.+)/;
     @foo=(); push @foo, $_ for $1..undef;
     is(join(":", map "[$_]", @foo), '');
 }
 {
     local $1;
-    "B" =~ /(.+)/;
+    "B" =~ m/(.+)/;
     @foo=(); push @foo, $_ for $1.."";
     is(join(":", map "[$_]", @foo), '');
 }

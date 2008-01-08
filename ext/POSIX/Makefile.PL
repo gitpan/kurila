@@ -1,12 +1,9 @@
-# Explicitly avoid including '.' in @INC; autoloader gets confused since it
-# can find POSIX.pm, but can't find autosplit.ix.
-BEGIN { @INC = '../../lib';}
-#
+
 use ExtUtils::MakeMaker;
-use ExtUtils::Constant 0.11 'WriteConstants';
+use ExtUtils::Constant v0.11 'WriteConstants';
 use Config;
 my $rt_signals;
-if ($Config{sig_name} =~ /\bRTMIN\b/ && $Config{sig_name} =~ /\bRTMAX\b/) {
+if ($Config{sig_name} =~ m/\bRTMIN\b/ && $Config{sig_name} =~ m/\bRTMAX\b/) {
     # Yes, it really has them. (Some systems define the C pre-processor
     # symbols, but they depend on other macros that are only defined during
     # kernel compilation
@@ -24,6 +21,7 @@ WriteMakefile(
     XSPROTOARG	=> '-noprototypes',	# XXX remove later?
     VERSION_FROM => 'POSIX.pm',
     realclean	=> {FILES=> 'const-c.inc const-xs.inc'},
+    PROXYSUBS => 1,
 );
 
 my @names =
@@ -122,7 +120,7 @@ if ($rt_signals) {
 }
 
 WriteConstants(
-    ($] > 5.009002 ? (PROXYSUBS => 1) : ()),
+    PROXYSUBS => 1,
     NAME => 'POSIX',
     NAMES => \@names,
 );

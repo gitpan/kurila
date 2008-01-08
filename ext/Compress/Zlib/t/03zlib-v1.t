@@ -21,13 +21,7 @@ BEGIN
     $extra = 1
         if eval { require Test::NoWarnings ;  Test::NoWarnings->import(); 1 };
 
-    my $count = 0 ;
-    if ($] < 5.005) {
-        $count = 390 ;
-    }
-    else {
-        $count = 401 ;
-    }
+    my $count = 401 ;
 
 
     plan tests => $count + $extra ;
@@ -132,7 +126,7 @@ ok $hello eq $uncompr ;
 $compr = compress(\$hello) ;
 ok $compr ne "" ;
 
-substr($compr,0, 1) = "\xFF";
+substr($compr,0, 1, "\xFF");
 ok !defined uncompress (\$compr) ;
 
 # deflate/inflate - small buffer
@@ -348,7 +342,7 @@ EOM
     ok length $dest ;
 
     # write it to disk
-    ok open(FH, ">$name") ;
+    ok open(FH, ">", "$name") ;
     binmode(FH);
     print FH $dest ;
     close FH ;
@@ -376,7 +370,7 @@ EOM
     ok length $dest ;
 
     # write it to disk
-    ok open(FH, ">$name") ;
+    ok open(FH, ">", "$name") ;
     binmode(FH);
     print FH $dest ;
     close FH ;
@@ -456,37 +450,37 @@ EOM
 
     # corrupt header - 1st byte wrong
     my $bad = $keep ;
-    substr($bad, 0, 1) = "\xFF" ;
+    substr($bad, 0, 1, "\x[FF]") ;
     $ungzip = Compress::Zlib::memGunzip(\$bad) ;
     ok ! defined $ungzip ;
 
     # corrupt header - 2st byte wrong
     $bad = $keep ;
-    substr($bad, 1, 1) = "\xFF" ;
+    substr($bad, 1, 1, "\x[FF]") ;
     $ungzip = Compress::Zlib::memGunzip(\$bad) ;
     ok ! defined $ungzip ;
 
     # corrupt header - method not deflated
     $bad = $keep ;
-    substr($bad, 2, 1) = "\xFF" ;
+    substr($bad, 2, 1, "\x[FF]") ;
     $ungzip = Compress::Zlib::memGunzip(\$bad) ;
     ok ! defined $ungzip ;
 
     # corrupt header - reserverd bits used
     $bad = $keep ;
-    substr($bad, 3, 1) = "\xFF" ;
+    substr($bad, 3, 1, "\x[FF]") ;
     $ungzip = Compress::Zlib::memGunzip(\$bad) ;
     ok ! defined $ungzip ;
 
     # corrupt trailer - length wrong
     $bad = $keep ;
-    substr($bad, -8, 4) = "\xFF" x 4 ;
+    substr($bad, -8, 4, "\x[FF]" x 4) ;
     $ungzip = Compress::Zlib::memGunzip(\$bad) ;
     ok ! defined $ungzip ;
 
     # corrupt trailer - CRC wrong
     $bad = $keep ;
-    substr($bad, -4, 4) = "\xFF" x 4 ;
+    substr($bad, -4, 4, "\x[FF]" x 4) ;
     $ungzip = Compress::Zlib::memGunzip(\$bad) ;
     ok ! defined $ungzip ;
 }
@@ -657,7 +651,7 @@ EOM
 
 
     # Check inflateSync leaves good data in buffer
-    $Answer =~ /^(.)(.*)$/ ;
+    $Answer =~ m/^(.)(.*)$/ ;
     my ($initial, $rest) = ($1, $2);
 
     
@@ -773,32 +767,32 @@ EOM
     like $@, '/^Compress::Zlib::inflateInit: Expected even number of parameters, got 1/';
 
     eval { deflateInit(-Joe => 1) };
-    ok $@ =~ /^Compress::Zlib::deflateInit: unknown key value\(s\) Joe at/;
+    ok $@ =~ m/^Compress::Zlib::deflateInit: unknown key value\(s\) Joe at/;
 
     eval { inflateInit(-Joe => 1) };
-    ok $@ =~ /^Compress::Zlib::inflateInit: unknown key value\(s\) Joe at/;
+    ok $@ =~ m/^Compress::Zlib::inflateInit: unknown key value\(s\) Joe at/;
 
     eval { deflateInit(-Bufsize => 0) };
-    ok $@ =~ /^.*?: Bufsize must be >= 1, you specified 0 at/;
+    ok $@ =~ m/^.*?: Bufsize must be >= 1, you specified 0 at/;
 
     eval { inflateInit(-Bufsize => 0) };
-    ok $@ =~ /^.*?: Bufsize must be >= 1, you specified 0 at/;
+    ok $@ =~ m/^.*?: Bufsize must be >= 1, you specified 0 at/;
 
     eval { deflateInit(-Bufsize => -1) };
     #ok $@ =~ /^.*?: Bufsize must be >= 1, you specified -1 at/;
-    ok $@ =~ /^Compress::Zlib::deflateInit: Parameter 'Bufsize' must be an unsigned int, got '-1'/;
+    ok $@ =~ m/^Compress::Zlib::deflateInit: Parameter 'Bufsize' must be an unsigned int, got '-1'/;
 
     eval { inflateInit(-Bufsize => -1) };
-    ok $@ =~ /^Compress::Zlib::inflateInit: Parameter 'Bufsize' must be an unsigned int, got '-1'/;
+    ok $@ =~ m/^Compress::Zlib::inflateInit: Parameter 'Bufsize' must be an unsigned int, got '-1'/;
 
     eval { deflateInit(-Bufsize => "xxx") };
-    ok $@ =~ /^Compress::Zlib::deflateInit: Parameter 'Bufsize' must be an unsigned int, got 'xxx'/;
+    ok $@ =~ m/^Compress::Zlib::deflateInit: Parameter 'Bufsize' must be an unsigned int, got 'xxx'/;
 
     eval { inflateInit(-Bufsize => "xxx") };
-    ok $@ =~ /^Compress::Zlib::inflateInit: Parameter 'Bufsize' must be an unsigned int, got 'xxx'/;
+    ok $@ =~ m/^Compress::Zlib::inflateInit: Parameter 'Bufsize' must be an unsigned int, got 'xxx'/;
 
     eval { gzopen([], 0) ; }  ;
-    ok $@ =~ /^gzopen: file parameter is not a filehandle or filename at/
+    ok $@ =~ m/^gzopen: file parameter is not a filehandle or filename at/
 	or print "# $@\n" ;
 
 #    my $x = Symbol::gensym() ;
@@ -808,7 +802,6 @@ EOM
 
 }
 
-if ($] >= 5.005)
 {
     # test inflate with a substr
 
@@ -829,7 +822,7 @@ if ($] >= 5.005)
     ok $k = inflateInit() ;
      
     #($Z, $status) = $k->inflate(substr($Y, 0, -1)) ;
-    ($Z, $status) = $k->inflate(substr($Y, 0)) ;
+    ($Z, $status) = $k->inflate($Y);
      
     ok $status == Z_STREAM_END ;
     ok $contents eq $Z ;
@@ -837,7 +830,6 @@ if ($] >= 5.005)
     
 }
 
-if ($] >= 5.005)
 {
     # deflate/inflate in scalar context
 
@@ -857,7 +849,7 @@ if ($] >= 5.005)
      
     ok $k = inflateInit() ;
      
-    $Z = $k->inflate(substr($Y, 0, -1)) ;
+    $Z = $k->inflate($Y);
     #$Z = $k->inflate(substr($Y, 0)) ;
      
     ok $contents eq $Z ;
@@ -899,7 +891,7 @@ if ($] >= 5.005)
 
     ok my $compressed = Compress::Zlib::memGzip(\$contents) ;
 
-    ok length $compressed > 4096 ;
+    ok length $compressed +> 4096 ;
     ok my $out = Compress::Zlib::memGunzip(\$compressed) ;
      
     ok $contents eq $out ;
@@ -924,7 +916,7 @@ EOM
     {
         title "Header Corruption - Fingerprint wrong 1st byte" ;
         my $buffer = $good ;
-        substr($buffer, 0, 1) = 'x' ;
+        substr($buffer, 0, 1, 'x') ;
 
         ok ! Compress::Zlib::memGunzip(\$buffer) ;
     }
@@ -932,7 +924,7 @@ EOM
     {
         title "Header Corruption - Fingerprint wrong 2nd byte" ;
         my $buffer = $good ;
-        substr($buffer, 1, 1) = "\xFF" ;
+        substr($buffer, 1, 1, "\x[FF]") ;
 
         ok ! Compress::Zlib::memGunzip(\$buffer) ;
     }
@@ -940,7 +932,7 @@ EOM
     {
         title "Header Corruption - CM not 8";
         my $buffer = $good ;
-        substr($buffer, 2, 1) = 'x' ;
+        substr($buffer, 2, 1, 'x') ;
 
         ok ! Compress::Zlib::memGunzip(\$buffer) ;
     }
@@ -948,7 +940,7 @@ EOM
     {
         title "Header Corruption - Use of Reserved Flags";
         my $buffer = $good ;
-        substr($buffer, 3, 1) = "\xff";
+        substr($buffer, 3, 1, "\x[ff]");
 
         ok ! Compress::Zlib::memGunzip(\$buffer) ;
     }
@@ -968,7 +960,7 @@ EOM
     ok  $x->write($string) ;
     ok  $x->close ;
 
-    substr($truncated, $index) = '' ;
+    substr($truncated, $index, undef, '') ;
 
     ok ! Compress::Zlib::memGunzip(\$truncated) ;
 
@@ -988,7 +980,7 @@ EOM
     ok  $x->write($string) ;
     ok  $x->close ;
 
-    substr($truncated, $index) = '' ;
+    substr($truncated, $index, undef, '') ;
 
     ok ! Compress::Zlib::memGunzip(\$truncated) ;
 }
@@ -1006,7 +998,7 @@ EOM
     ok  $x->write($string) ;
     ok  $x->close ;
 
-    substr($truncated, $index) = '' ;
+    substr($truncated, $index, undef, '') ;
     ok ! Compress::Zlib::memGunzip(\$truncated) ;
 }
 
@@ -1022,7 +1014,7 @@ EOM
     ok  $x->write($string) ;
     ok  $x->close ;
 
-    substr($truncated, $index) = '' ;
+    substr($truncated, $index, undef, '') ;
 
     ok ! Compress::Zlib::memGunzip(\$truncated) ;
 }
@@ -1070,7 +1062,7 @@ EOM
         title "Trailer Corruption - Trailer truncated to $got bytes" ;
         my $buffer = $good ;
 
-        substr($buffer, $trim) = '';
+        substr($buffer, $trim, undef, '');
 
         ok my $u = Compress::Zlib::memGunzip(\$buffer) ;
         ok $u eq $string;
@@ -1080,7 +1072,7 @@ EOM
     {
         title "Trailer Corruption - Length Wrong, CRC Correct" ;
         my $buffer = $good ;
-        substr($buffer, -4, 4) = pack('V', 1234);
+        substr($buffer, -4, 4, pack('V', 1234));
 
         ok ! Compress::Zlib::memGunzip(\$buffer) ;
     }
@@ -1088,8 +1080,8 @@ EOM
     {
         title "Trailer Corruption - Length Wrong, CRC Wrong" ;
         my $buffer = $good ;
-        substr($buffer, -4, 4) = pack('V', 1234);
-        substr($buffer, -8, 4) = pack('V', 1234);
+        substr($buffer, -4, 4, pack('V', 1234));
+        substr($buffer, -8, 4, pack('V', 1234));
 
         ok ! Compress::Zlib::memGunzip(\$buffer) ;
 
@@ -1104,7 +1096,7 @@ sub slurp
     my $input;
     my $fil = gzopen($name, "rb") ;
     ok $fil , "opened $name";
-    cmp_ok $fil->gzread($input, 50000), ">", 0, "read more than zero bytes";
+    cmp_ok $fil->gzread($input, 50000), "+>", 0, "read more than zero bytes";
     ok ! $fil->gzclose(), "closed ok";
 
     return $input;
@@ -1118,7 +1110,7 @@ sub trickle
     my $input;
     $fil = gzopen($name, "rb") ;
     ok $fil, "opened ok";
-    while ($fil->gzread($input, 50000) > 0)
+    while ($fil->gzread($input, 50000) +> 0)
     {
         $got .= $input;
         $input = '';
@@ -1161,7 +1153,7 @@ sub trickle
     is trickle($name), $data1 . $data2, "got expected data from trickle";
 
     title "Trailing Data";
-    open F, ">>$name";
+    open F, ">>", "$name";
     print F $trailing;
     close F;
 

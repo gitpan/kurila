@@ -53,8 +53,8 @@ sub do_module($) {
     MODULE_CMD: while (1) {
         print("$module cmd? ");
 
-        my $reply = <STDIN>; chomp($reply);
-        my($cmd) = $reply =~ /^(\w)\b/;
+        my $reply = ~< *STDIN; chomp($reply);
+        my($cmd) = $reply =~ m/^(\w)\b/;
 
         last if $cmd eq 'q';
 
@@ -159,7 +159,7 @@ print($help);
 while (1)
    {
    print("cmd? ");
-   my $reply = <STDIN>; chomp($reply);
+   my $reply = ~< *STDIN; chomp($reply);
    CASE:
       {
       $reply eq 'l' and do
@@ -167,7 +167,7 @@ while (1)
          print("Installed modules are:\n   ", join("\n   ", @Modules), "\n");
          last CASE;
          };
-      $reply =~ /^m\s+/ and do
+      $reply =~ m/^m\s+/ and do
          {
          do_module((split(' ', $reply))[1]);
          last CASE;

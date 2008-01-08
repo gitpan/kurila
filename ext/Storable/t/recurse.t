@@ -14,7 +14,7 @@ sub BEGIN {
 	unshift @INC, 't';
     }
     require Config; Config->import;
-    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bStorable\b/) {
+    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ m/\bStorable\b/) {
         print "1..0 # Skip: Storable was not built\n";
         exit 0;
     }
@@ -120,7 +120,7 @@ sub make { bless [], shift }
 sub STORABLE_freeze {
 	my $self = shift;
 	$hook_called++;
-	return (freeze($self), $self) if ++$recursed < $MAX;
+	return (freeze($self), $self) if ++$recursed +< $MAX;
 	return ("no", $self);
 }
 

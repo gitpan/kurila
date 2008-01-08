@@ -9,11 +9,13 @@ use Carp ;
 use strict ;
 use warnings ;
 use bytes ;
-our ($VERSION, $XS_VERSION, @ISA, @EXPORT, $AUTOLOAD);
+our ($VERSION, $XS_VERSION, @ISA, @EXPORT);
 
-$VERSION = '2.006';
-$XS_VERSION = $VERSION; 
-$VERSION = eval $VERSION;
+BEGIN {
+    $VERSION = '2.006';
+    $XS_VERSION = $VERSION; 
+    $VERSION = eval $VERSION;
+}
 
 @ISA = qw(Exporter);
 # Items to export into callers namespace by default. Note: do not export
@@ -63,32 +65,16 @@ $VERSION = eval $VERSION;
 );
 
 
-sub AUTOLOAD {
-    my($constname);
-    ($constname = $AUTOLOAD) =~ s/.*:://;
-    my ($error, $val) = constant($constname);
-    Carp::croak $error if $error;
-    no strict 'refs';
-    *{Symbol::fetch_glob($AUTOLOAD)} = sub { $val };
-    goto &{Symbol::fetch_glob($AUTOLOAD)};
-}
-
 use constant FLAG_APPEND             => 1 ;
 use constant FLAG_CRC                => 2 ;
 use constant FLAG_ADLER              => 4 ;
 use constant FLAG_CONSUME_INPUT      => 8 ;
 
-eval {
+
+BEGIN {
     require XSLoader;
     XSLoader::load('Compress::Raw::Zlib', $XS_VERSION);
-    1;
-} 
-or do {
-    require DynaLoader;
-    local @ISA = qw(DynaLoader);
-    Compress::Raw::Zlib->bootstrap( $XS_VERSION) ; 
-};
- 
+}
 
 use constant Parse_any      => 0x01;
 use constant Parse_unsigned => 0x02;
@@ -274,7 +260,7 @@ sub Compress::Raw::Zlib::Parameters::_checkType
         return $self->setError("Parameter '$key' must be an unsigned int, got 'undef'")
             if $validate && ! defined $value ;
         return $self->setError("Parameter '$key' must be an unsigned int, got '$value'")
-            if $validate && $value !~ /^\d+$/;
+            if $validate && $value !~ m/^\d+$/;
 
         $$output = defined $value ? $value : 0 ;    
         return 1;
@@ -284,7 +270,7 @@ sub Compress::Raw::Zlib::Parameters::_checkType
         return $self->setError("Parameter '$key' must be a signed int, got 'undef'")
             if $validate && ! defined $value ;
         return $self->setError("Parameter '$key' must be a signed int, got '$value'")
-            if $validate && $value !~ /^-?\d+$/;
+            if $validate && $value !~ m/^-?\d+$/;
 
         $$output = defined $value ? $value : 0 ;    
         return 1 ;
@@ -292,7 +278,7 @@ sub Compress::Raw::Zlib::Parameters::_checkType
     elsif ($type ^&^ Parse_boolean)
     {
         return $self->setError("Parameter '$key' must be an int, got '$value'")
-            if $validate && defined $value && $value !~ /^\d*$/;
+            if $validate && defined $value && $value !~ m/^\d*$/;
         $$output =  defined $value ? $value != 0 : 0 ;    
         return 1;
     }
@@ -352,7 +338,7 @@ sub Compress::Raw::Zlib::Deflate::new
 
     croak "Compress::Raw::Zlib::Deflate::new: Bufsize must be >= 1, you specified " . 
             $got->value('Bufsize')
-        unless $got->value('Bufsize') >= 1;
+        unless $got->value('Bufsize') +>= 1;
 
     my $flags = 0 ;
     $flags ^|^= FLAG_APPEND if $got->value('AppendOutput') ;
@@ -388,7 +374,7 @@ sub Compress::Raw::Zlib::Inflate::new
 
     croak "Compress::Raw::Zlib::Inflate::new: Bufsize must be >= 1, you specified " . 
             $got->value('Bufsize')
-        unless $got->value('Bufsize') >= 1;
+        unless $got->value('Bufsize') +>= 1;
 
     my $flags = 0 ;
     $flags ^|^= FLAG_APPEND if $got->value('AppendOutput') ;
@@ -416,7 +402,7 @@ sub Compress::Raw::Zlib::InflateScan::new
 
     croak "Compress::Raw::Zlib::InflateScan::new: Bufsize must be >= 1, you specified " . 
             $got->value('Bufsize')
-        unless $got->value('Bufsize') >= 1;
+        unless $got->value('Bufsize') +>= 1;
 
     my $flags = 0 ;
     #$flags |= FLAG_APPEND if $got->value('AppendOutput') ;
@@ -447,7 +433,7 @@ sub Compress::Raw::Zlib::inflateScanStream::createDeflateStream
 
     croak "Compress::Raw::Zlib::InflateScan::createDeflateStream: Bufsize must be >= 1, you specified " . 
             $got->value('Bufsize')
-        unless $got->value('Bufsize') >= 1;
+        unless $got->value('Bufsize') +>= 1;
 
     my $flags = 0 ;
     $flags ^|^= FLAG_APPEND if $got->value('AppendOutput') ;
@@ -498,7 +484,7 @@ sub Compress::Raw::Zlib::deflateStream::deflateParams
 
     croak "Compress::Raw::Zlib::Inflate::deflateParams: Bufsize must be >= 1, you specified " . 
             $got->value('Bufsize')
-        if $got->parsed('Bufsize') && $got->value('Bufsize') <= 1;
+        if $got->parsed('Bufsize') && $got->value('Bufsize') +<= 1;
 
     my $flags = 0;
     $flags ^|^= 1 if $got->parsed('Level') ;

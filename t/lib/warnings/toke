@@ -177,7 +177,7 @@ $a =< 2 ;
 $a =/ 2 ;
 EXPECT
 syntax error at - line 8, near "=."
-Unterminated <> operator at - line 9.
+No operator expected, but found '<', '<=' or '<=>' operator at - line 9.
 ########
 # toke.c
 use warnings 'syntax' ;
@@ -209,12 +209,14 @@ Scalar value @a{3} better written as $a{3} at - line 4.
 # toke.c
 use warnings 'syntax' ;
 $_ = "ab" ; 
-s/(ab)/\1/e;
+s/(ab)/{\1}/;
 no warnings 'syntax' ;
 $_ = "ab" ; 
-s/(ab)/\1/e;
+s/(ab)/{\1}/e;
 EXPECT
 Can't use \1 to mean $1 in expression at - line 4.
+syntax error at - line 7, near "s/(ab)/{\1}/e"
+Execution of - aborted due to compilation errors.
 ########
 # toke.c
 use warnings 'reserved' ;
@@ -596,7 +598,7 @@ EXPECT
 Precedence problem: open FOO should be open(FOO) at - line 2.
 ########
 # toke.c (and [perl #16184])
-open FOO => "<&0"; close FOO;
+open FOO => "<&", "0"; close FOO;
 EXPECT
 ########
 # toke.c
@@ -644,6 +646,14 @@ no warnings 'misc' ;
 $a = "\m" ;
 EXPECT
 Unrecognized escape \m passed through at - line 3.
+########
+use warnings 'misc' ;
+my $a =~ m/[a\mb]/ ;
+no warnings 'misc' ;
+$a =~ m/[a\mb]/ ;
+EXPECT
+Unrecognized escape \m passed through at - line 2.
+Unrecognized escape \m passed through at - line 2.
 ########
 # toke.c
 use warnings 'portable' ;
@@ -725,11 +735,11 @@ Possible unintended interpolation of @mjd_previously_unused_array in string at -
 # toke.c
 # 20020328 mjd-perl-patch+@plover.com at behest of jfriedl@yahoo.com
 use warnings 'regexp';
-"foo" =~ /foo/c;
-"foo" =~ /foo/cg;
+"foo" =~ m/foo/c;
+"foo" =~ m/foo/cg;
 no warnings 'regexp';
-"foo" =~ /foo/c;
-"foo" =~ /foo/cg;
+"foo" =~ m/foo/c;
+"foo" =~ m/foo/cg;
 EXPECT
 Use of /c modifier is meaningless without /g at - line 4.
 ########
@@ -795,19 +805,17 @@ Number found where operator expected at (eval 1) line 1, near "5 6"
 # toke.c
 use warnings "syntax";
 $_ = $a = 1;
-$a !=~  /1/;
+$a !=~  m/1/;
 $a !=~ m#1#;
-$a !=~/1/;
-$a !=~ ?/?;
+$a !=~m/1/;
 $a !=~ y/1//;
 $a !=~ tr/1//;
 $a !=~ s/1//;
 $a != ~/1/;
 no warnings "syntax";
-$a !=~  /1/;
+$a !=~  m/1/;
 $a !=~ m#1#;
-$a !=~/1/;
-$a !=~ ?/?;
+$a !=~m/1/;
 $a !=~ y/1//;
 $a !=~ tr/1//;
 $a !=~ s/1//;

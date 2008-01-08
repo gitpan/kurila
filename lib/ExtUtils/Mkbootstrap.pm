@@ -38,7 +38,7 @@ sub Mkbootstrap {
 	shift @INC;
     }
 
-    if ($Config{'dlsrc'} =~ /^dl_dld/){
+    if ($Config{'dlsrc'} =~ m/^dl_dld/){
 	package DynaLoader;
 	push(@dl_resolve_using, dl_findfile('-lc'));
     }
@@ -46,7 +46,7 @@ sub Mkbootstrap {
     my(@all) = (@bsloadlibs, @DynaLoader::dl_resolve_using);
     my($method) = '';
     if (@all){
-	open BS, ">$baseext.bs"
+	open BS, ">", "$baseext.bs"
 		or die "Unable to open $baseext.bs: $!";
 	print STDOUT "Writing $baseext.bs\n";
 	print STDOUT "	containing: @all" if $Verbose;

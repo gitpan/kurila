@@ -15,7 +15,7 @@ $ENV{PERL5LIB} = "../lib" unless $Is_VMS;
 $|=1;
 
 undef $/;
-our @prgs = split "\n########\n", <DATA>;
+our @prgs = split "\n########\n", ~< *DATA;
 print "1..", scalar @prgs, "\n";
 
 our $tmpfile = "runltmp000";
@@ -29,8 +29,8 @@ for (@prgs){
     if (s/^\s*(-\w+)//){
        $switch = $1;
     }
-    my($prog,$expected) = split(/\nEXPECT\n/, $_);
-    open TEST, ">$tmpfile";
+    my($prog,$expected) = split(m/\nEXPECT\n/, $_);
+    open TEST, ">", "$tmpfile";
     print TEST "$prog\n";
     close TEST or die "Could not close: $!";
     my $results = $Is_VMS ?
@@ -115,13 +115,13 @@ sub TIEHANDLE {
 }
 sub PRINT {
 print STDERR "PRINT CALLED\n";
-(split(/./, 'x'x10000))[0];
+(split(m/./, 'x'x10000))[0];
 eval('die("test\n")');
 }
  
 package main;
  
-open FH, ">&STDOUT";
+open FH, ">&", \*STDOUT;
 tie *FH, 'TEST';
 print FH "OK\n";
 print STDERR "DONE\n";
@@ -161,7 +161,7 @@ STR
 OK
 ########
 sub foo {
-  $a <=> $b unless eval('$a == 0 ? bless undef : ($a <=> $b)');
+  $a <+> $b unless eval('$a == 0 ? bless undef : ($a <+> $b)');
 }
 our @a = (3, 2, 0, 1);
 @a = sort foo @a;
@@ -171,7 +171,7 @@ EXPECT
 ########
 sub foo {
   goto bar if $a == 0 || $b == 0;
-  $a <=> $b;
+  $a <+> $b;
 }
 our @a = (3, 2, 0, 1);
 @a = sort foo @a;
@@ -184,12 +184,12 @@ Can't "goto" out of a pseudo block at - line 2.
 ########
 our %seen = ();
 sub sortfn {
-  (split(/./, 'x'x10000))[0];
+  (split(m/./, 'x'x10000))[0];
   my (@y) = ( 4, 6, 5);
-  @y = sort { $a <=> $b } @y;
+  @y = sort { $a <+> $b } @y;
   my $t = "sortfn ".join(', ', @y)."\n";
   print $t if ($seen{$t}++ == 0);
-  return $_[0] <=> $_[1];
+  return $_[0] <+> $_[1];
 }
 our @x = ( 3, 2, 1 );
 @x = sort { &sortfn($a, $b) } @x;
@@ -199,7 +199,7 @@ sortfn 4, 5, 6
 ---- 1, 2, 3
 ########
 our @a = (3, 2, 1);
-@a = sort { eval('die("no way")') ,  $a <=> $b} @a;
+@a = sort { eval('die("no way")') ,  $a <+> $b} @a;
 print join(", ", @a)."\n";
 EXPECT
 1, 2, 3
@@ -257,7 +257,7 @@ EXPECT
 Can't find label bbb at - line 8.
 ########
 sub foo {
-  $a <=> $b unless eval('$a == 0 ? die("foo\n") : ($a <=> $b)');
+  $a <+> $b unless eval('$a == 0 ? die("foo\n") : ($a <+> $b)');
 }
 our @a = (3, 2, 0, 1);
 @a = sort foo @a;
@@ -274,7 +274,7 @@ sub FETCH {
   return "fetch";
 }
 sub STORE {
-(split(/./, 'x'x10000))[0];
+(split(m/./, 'x'x10000))[0];
 }
 package main;
 tie our $bar, 'TEST';
@@ -395,11 +395,11 @@ EXPECT
 ########
 sub TIEHANDLE { bless {} }
 sub PRINT { 
-    (split(/./, 'x'x10000))[0];
+    (split(m/./, 'x'x10000))[0];
     eval('die("test\n")');
     warn "[TIE] $_[1]";
 }
-open OLDERR, '>&STDERR';
+open OLDERR, '>&', \*STDERR;
 tie *STDERR, '';
 
 use warnings FATAL => qw(uninitialized);

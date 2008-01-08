@@ -89,11 +89,11 @@ rmtree 'auto/FakeMod';
 ok( mkpath('auto/FakeMod') );
 END { rmtree 'auto' }
 
-ok(open(PACKLIST, '>auto/FakeMod/.packlist'));
+ok(open(PACKLIST, ">", 'auto/FakeMod/.packlist'));
 print PACKLIST 'list';
 close PACKLIST;
 
-ok(open(FAKEMOD, '>auto/FakeMod/FakeMod.pm'));
+ok(open(FAKEMOD, ">", 'auto/FakeMod/FakeMod.pm'));
 
 print FAKEMOD <<'FAKE';
 package FakeMod;
@@ -229,7 +229,7 @@ SKIP: {
       unless $Config{man1direxp};
     @files = $ei->files('goodmod', 'doc', $Config{man1direxp});
     is( scalar @files, 1, '... should find doc file under given dir' );
-    is( (grep { /foo$/ } @files), 1, '... checking file name' );
+    is( (grep { m/foo$/ } @files), 1, '... checking file name' );
 }
 SKIP: {
     skip('no man directories on this system', 1) unless $mandirs;

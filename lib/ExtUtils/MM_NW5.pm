@@ -32,8 +32,8 @@ use ExtUtils::MakeMaker qw( &neatvalue );
 
 $ENV{EMXSHELL} = 'sh'; # to run `commands`
 
-my $BORLAND  = $Config{'cc'} =~ /^bcc/i;
-my $GCC      = $Config{'cc'} =~ /^gcc/i;
+my $BORLAND  = $Config{'cc'} =~ m/^bcc/i;
+my $GCC      = $Config{'cc'} =~ m/^gcc/i;
 
 
 =item os_flavor
@@ -89,7 +89,7 @@ sub init_platform {
 
     # If the final binary name is greater than 8 chars,
     # truncate it here.
-    if(length($self->{'BASEEXT'}) > 8) {
+    if(length($self->{'BASEEXT'}) +> 8) {
         $self->{'NLM_SHORT_NAME'} = substr($self->{'BASEEXT'},0,8);
     }
 
@@ -226,8 +226,7 @@ MAKE_FRAG
     }
 
     # Reconstruct the X.Y.Z version.
-    my $version = join '.', map { sprintf "%d", $_ }
-                              $] =~ /(\d)\.(\d{3})(\d{2})/;
+    my $version = $^V;
     $m .= sprintf '	$(LD) $(LDFLAGS) $(OBJECT:.obj=.obj) -desc "Perl %s Extension ($(BASEEXT))  XS_VERSION: $(XS_VERSION)" -nlmversion $(NLM_VERSION)', $version;
 
     # Taking care of long names like FileHandle, ByteLoader, SDBM_File etc

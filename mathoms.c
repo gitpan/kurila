@@ -36,8 +36,6 @@ PERL_CALLCONV IV Perl_sv_2iv(pTHX_ register SV *sv);
 PERL_CALLCONV UV Perl_sv_2uv(pTHX_ register SV *sv);
 PERL_CALLCONV char * Perl_sv_2pv(pTHX_ register SV *sv, STRLEN *lp);
 PERL_CALLCONV char * Perl_sv_2pv_nolen(pTHX_ register SV *sv);
-PERL_CALLCONV char * Perl_sv_2pvbyte_nolen(pTHX_ register SV *sv);
-PERL_CALLCONV char * Perl_sv_2pvutf8_nolen(pTHX_ register SV *sv);
 PERL_CALLCONV void Perl_sv_force_normal(pTHX_ register SV *sv);
 PERL_CALLCONV void Perl_sv_setsv(pTHX_ SV *dstr, register SV *sstr);
 PERL_CALLCONV void Perl_sv_catpvn(pTHX_ SV *dsv, const char* sstr, STRLEN slen);
@@ -46,11 +44,7 @@ PERL_CALLCONV void Perl_sv_catsv(pTHX_ SV *dstr, register SV *sstr);
 PERL_CALLCONV void Perl_sv_catsv_mg(pTHX_ SV *dsv, register SV *ssv);
 PERL_CALLCONV char * Perl_sv_pv(pTHX_ SV *sv);
 PERL_CALLCONV char * Perl_sv_pvn_force(pTHX_ SV *sv, STRLEN *lp);
-PERL_CALLCONV char * Perl_sv_pvbyte(pTHX_ SV *sv);
-PERL_CALLCONV char * Perl_sv_pvutf8(pTHX_ SV *sv);
 PERL_CALLCONV NV Perl_huge(void);
-PERL_CALLCONV void Perl_gv_fullname3(pTHX_ SV *sv, const GV *gv, const char *prefix);
-PERL_CALLCONV void Perl_gv_efullname3(pTHX_ SV *sv, const GV *gv, const char *prefix);
 PERL_CALLCONV GV * Perl_gv_fetchmethod(pTHX_ HV *stash, const char *name);
 PERL_CALLCONV HE * Perl_hv_iternext(pTHX_ HV *hv);
 PERL_CALLCONV void Perl_hv_magic(pTHX_ HV *hv, GV *gv, int how);
@@ -337,66 +331,6 @@ Perl_sv_pvn_force(pTHX_ SV *sv, STRLEN *lp)
     return sv_pvn_force_flags(sv, lp, SV_GMAGIC);
 }
 
-/* sv_pvbyte () is now a macro using Perl_sv_2pv_flags();
- * this function provided for binary compatibility only
- */
-
-char *
-Perl_sv_pvbyte(pTHX_ SV *sv)
-{
-    return sv_pv(sv);
-}
-
-/*
-=for apidoc sv_pvbyte
-
-Use C<SvPVbyte_nolen> instead.
-
-=for apidoc sv_pvbyten
-
-A private implementation of the C<SvPVbyte> macro for compilers
-which can't cope with complex macro expressions. Always use the macro
-instead.
-
-=cut
-*/
-
-char *
-Perl_sv_pvbyten(pTHX_ SV *sv, STRLEN *lp)
-{
-    return sv_pvn(sv,lp);
-}
-
-/* sv_pvutf8 () is now a macro using Perl_sv_2pv_flags();
- * this function provided for binary compatibility only
- */
-
-char *
-Perl_sv_pvutf8(pTHX_ SV *sv)
-{
-    return sv_pv(sv);
-}
-
-/*
-=for apidoc sv_pvutf8
-
-Use the C<SvPVutf8_nolen> macro instead
-
-=for apidoc sv_pvutf8n
-
-A private implementation of the C<SvPVutf8> macro for compilers
-which can't cope with complex macro expressions. Always use the macro
-instead.
-
-=cut
-*/
-
-char *
-Perl_sv_pvutf8n(pTHX_ SV *sv, STRLEN *lp)
-{
-    return sv_pvn(sv,lp);
-}
-
 int
 Perl_fprintf_nocontext(PerlIO *stream, const char *format, ...)
 {
@@ -431,46 +365,6 @@ Perl_huge(void)
 #  endif
 }
 #endif
-
-/* compatibility with versions <= 5.003. */
-void
-Perl_gv_fullname(pTHX_ SV *sv, const GV *gv)
-{
-    gv_fullname3(sv, gv, sv == (const SV*)gv ? "*" : "");
-}
-
-/* compatibility with versions <= 5.003. */
-void
-Perl_gv_efullname(pTHX_ SV *sv, const GV *gv)
-{
-    gv_efullname3(sv, gv, sv == (const SV*)gv ? "*" : "");
-}
-
-void
-Perl_gv_fullname3(pTHX_ SV *sv, const GV *gv, const char *prefix)
-{
-    gv_fullname4(sv, gv, prefix, TRUE);
-}
-
-void
-Perl_gv_efullname3(pTHX_ SV *sv, const GV *gv, const char *prefix)
-{
-    gv_efullname4(sv, gv, prefix, TRUE);
-}
-
-/*
-=for apidoc gv_fetchmethod
-
-See L<gv_fetchmethod_autoload>.
-
-=cut
-*/
-
-GV *
-Perl_gv_fetchmethod(pTHX_ HV *stash, const char *name)
-{
-    return gv_fetchmethod_autoload(stash, name, TRUE);
-}
 
 HE *
 Perl_hv_iternext(pTHX_ HV *hv)

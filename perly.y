@@ -631,7 +631,7 @@ package :	PACKAGE WORD ';'
 
 use	:	USE startsub
 			{ CvSPECIAL_on(PL_compcv); /* It's a BEGIN {} */ }
-		    WORD WORD listexpr ';'
+		    THING WORD listexpr ';'
 			{ SvREFCNT_inc_simple_void(PL_compcv);
 #ifdef MAD
 			  $$ = utilize(IVAL($1), $2, $4, $5, $6);
@@ -751,10 +751,11 @@ method	:	METHOD
 	;
 
 /* Some kind of subscripted expression */
-subscripted:    star '{' expr ';' '}'        /* *main::{something} */
+subscripted:    star '{' expr ';' '}'        /* *main::{something} like *STDOUT{IO} */
                         /* In this and all the hash accessors, ';' is
                          * provided by the tokeniser */
-			{ $$ = newBINOP(OP_GELEM, 0, $1, scalar($3));
+			{
+                          $$ = newBINOP(OP_GELEM, 0, $1, scalar($3));
 			    PL_parser->expect = XOPERATOR;
 			  TOKEN_GETMAD($2,$$,'{');
 			  TOKEN_GETMAD($4,$$,';');

@@ -342,18 +342,21 @@ sub remove_vstring {
     my $twig = shift;
 
     for my $op_const ($twig->findnodes(q|//op_const|), $twig->findnodes(q|op_null[@was="const"]|)) {
-        next unless (get_madprop($op_const, "value") || '') =~ m/\Av/;
+        # starts with a 'v' or a digital with at least two '.'
+        next unless (get_madprop($op_const, "value") || '') =~ m/\A(v|\d.*[.].*[.])/;
+
         next if get_madprop($op_const, "forcedword");
         next if $op_const->att('private') && ($op_const->att('private') =~ m/BARE/);
         next if get_madprop($op_const->parent, "quote_open");
         next if $op_const->parent->tag eq "mad_op";
         next if $op_const->parent->tag eq "op_require";
-        next if $op_const->parent->tag eq "op_concat";
+        next if not $op_const->att('PVMG');
 
         set_madprop($op_const, "quote_open", "&#34;", wsbefore => get_madprop($op_const, "value", "wsbefore"));
         set_madprop($op_const, "quote_close", "&#34;");
         my $v = get_madprop($op_const, "value");
         $v =~ s/^v//;
+        $v =~ s/_//g; # strip '_'
         $v =~ m/^[\d.]+$/ or die "Invalid string '$v'";
         $v =~ s/(\d+)/ sprintf '\x{%x}', $1 /ge;
         $v =~ s/[.]//g;
@@ -496,6 +499,112 @@ sub t_parenthesis {
     }
 }
 
+sub use_pkg_version {
+    my $xml = shift;
+    # "use MODULE 0.9" to "use MODULE v0.9"
+    for my $madv ($xml->findnodes(qq|//mad_op[\@key='version']|)) {
+        my $const = $madv->child(0);
+        next if get_madprop($const, 'value') =~ m/^v/;
+        set_madprop($const, 'value', "v" . get_madprop($const, 'value'));
+    }
+}
+
+sub lvalue_subs {
+    my $xml = shift;
+    for my $op ($xml->findnodes(qq|//op_substr|)) {
+        next unless ($op->parent->tag eq "op_sassign");
+        next unless $op->pos == 3;
+        my $assign = $op->parent;
+
+        if ($op->children_count < 4+1) {
+            # create third argument 'undef'
+            my $third = $op->insert_new_elt('last_child', 'op_null');
+            set_madprop($third, "comma", ",");
+            set_madprop($third, "null_type", ",");
+            my $third_v = $third->insert_new_elt('last_child', "op_const");
+            set_madprop($third_v, "value", 'undef', wsbefore => ' ');
+        }
+
+        # move rhs to 4th argument
+        my $fourth = $op->insert_new_elt('last_child', 'op_null');
+        set_madprop($fourth, "comma", ",");
+        set_madprop($fourth, "null_type", ",");
+        $assign->child(1)->move($fourth);
+        
+        $op->replace($assign);
+    }
+}
+
+<<<<<<< HEAD:mad/p5kurila.pl
+sub force_m {
+    my $xml = shift;
+    for my $op ($xml->findnodes(qq|//op_match|), $xml->findnodes(qq|//op_pushre|)) {
+        next unless get_madprop($op, "quote_open") eq "/";
+        set_madprop($op, quote_open => "m/");
+    }
+}
+
+sub rename_pointy_ops {
+    my $xml = shift;
+
+    # rename '<FH>' to '~< *FH'
+    for my $op ($xml->findnodes(qq|//op_readline|)) {
+        my $v = get_madprop($op, "value") or next;
+        $v =~ m/^&lt;(.*)&gt;$/ or next;
+        $v = $1;
+        $v ||= "ARGV";
+        $v = "*" . $v if $v =~ m/^\w/;
+        set_madprop($op, "value" => "~&lt; " . $v, 
+                    wsbefore => get_madprop($op, "value", "wsbefore") || " " );
+    }
+
+    # rename '<' to '+<'
+    for my $op (map { $xml->findnodes(qq'//$_') } map { ("op_i_$_", "op_$_") } qw|lt le gt ge|) {
+        next unless get_madprop($op, "operator") =~ m/^[<>]/;
+        set_madprop($op, operator => '+' . get_madprop($op, "operator") );
+    }
+
+    # rename '<=>' to '<+>'
+    for my $op (map { $xml->findnodes("//$_") } qw|op_ncmp op_i_ncmp|) {
+        next unless get_madprop($op, "operator") eq "&lt;=&gt;";
+        set_madprop($op, operator => '&lt;+&gt;');
+    }
+}
+
+sub qq_block_escape {
+    my $op = shift;
+
+    for my $prop (qw|assign value|) {
+        my $v = get_madprop($op, $prop);
+        next unless $v;
+        $v =~ s/([}{])/\\$1/g;
+        set_madprop($op, $prop, $v);
+    }
+    for my $child ($op->children) {
+        next if $child->tag eq "madprops";
+        qq_block_escape($child);
+    }
+}
+
+sub qq_block {
+    # escape '{' and '}' inside a double quoted string
+    my $xml = shift;
+    for my $mad_quote ($xml->findnodes(qq|//madprops/mad_null_type_first[\@val="quote"]|)) {
+        my $op = $mad_quote->parent->parent;
+        next unless get_madprop($op, "quote_open") =~ m/^(&#34;|&lt;&lt;[^'])/;
+        qq_block_escape($op);
+    }
+}
+
+sub pointy_anon_hash {
+    my $xml = shift;
+    for my $op ($xml->findnodes(qq|//op_anonhash|)) {
+        next unless get_madprop($op, "curly_open");
+        set_madprop($op, "curly_open" => '&lt;');
+        set_madprop($op, "curly_close" => ']');
+    }
+}
+
 my $from = 0; # floating point number with starting version of kurila.
 GetOptions("from=f" => \$from);
 
@@ -519,7 +628,6 @@ if ($from < 1.4 - 0.05) {
     }
 
     make_glob_sub( $twig );
-    remove_vstring( $twig );
 
 #     # add_encoding_latin1($twig);
 
@@ -527,20 +635,28 @@ if ($from < 1.4 - 0.05) {
     remove_typed_declaration($twig);
 }
 
-if ($from < 1.405) {
+if ($from < 1.5 - 0.05) {
     rename_bit_operators($twig);
     remove_useversion($twig);
-}
-
-if ($from < 1.415) {
     change_deref_method($twig);
-}
 
-for my $op_const ($twig->findnodes(q|//op_const|)) {
-    const_handler($twig, $op_const);
+    for my $op_const ($twig->findnodes(q|//op_const|)) {
+        const_handler($twig, $op_const);
+    }
+    intuit_more($twig);
 }
-intuit_more($twig);
 #t_parenthesis($twig);
 
+if ($from < 1.6 - 0.05) {
+    remove_vstring( $twig );
+    use_pkg_version($twig);
+    lvalue_subs( $twig );
+}
+
+#rename_pointy_ops( $twig );
+#pointy_anon_hash( $twig );
+force_m( $twig );
+qq_block( $twig );
+
 # print
-$twig->print;
+$twig->print( pretty_print => 'indented' );

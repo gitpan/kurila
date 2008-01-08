@@ -260,17 +260,14 @@
 #define gv_AVadd		Perl_gv_AVadd
 #define gv_HVadd		Perl_gv_HVadd
 #define gv_IOadd		Perl_gv_IOadd
-#define gv_autoload4		Perl_gv_autoload4
 #define gv_check		Perl_gv_check
 #define gv_efullname		Perl_gv_efullname
 #define gv_efullname4		Perl_gv_efullname4
 #define gv_fetchfile		Perl_gv_fetchfile
 #define gv_fetchfile_flags	Perl_gv_fetchfile_flags
 #define gv_fetchmeth		Perl_gv_fetchmeth
-#define gv_fetchmeth_autoload	Perl_gv_fetchmeth_autoload
-#define gv_fetchmethod_autoload	Perl_gv_fetchmethod_autoload
+#define gv_fetchmethod		Perl_gv_fetchmethod
 #define gv_fetchpv		Perl_gv_fetchpv
-#define gv_fullname		Perl_gv_fullname
 #define gv_fullname4		Perl_gv_fullname4
 #define gv_init			Perl_gv_init
 #define gv_name_set		Perl_gv_name_set
@@ -413,7 +410,6 @@
 #define magic_getpack		Perl_magic_getpack
 #define magic_getpos		Perl_magic_getpos
 #define magic_getsig		Perl_magic_getsig
-#define magic_getsubstr		Perl_magic_getsubstr
 #define magic_gettaint		Perl_magic_gettaint
 #define magic_getuvar		Perl_magic_getuvar
 #define magic_getvec		Perl_magic_getvec
@@ -439,7 +435,6 @@
 #define magic_setpos		Perl_magic_setpos
 #define magic_setregexp		Perl_magic_setregexp
 #define magic_setsig		Perl_magic_setsig
-#define magic_setsubstr		Perl_magic_setsubstr
 #define magic_settaint		Perl_magic_settaint
 #define magic_setuvar		Perl_magic_setuvar
 #define magic_setvec		Perl_magic_setvec
@@ -790,6 +785,7 @@
 #define scan_hex		Perl_scan_hex
 #define scan_num		Perl_scan_num
 #define scan_oct		Perl_scan_oct
+#define parse_escape		Perl_parse_escape
 #ifdef PERL_CORE
 #define scope			Perl_scope
 #endif
@@ -831,6 +827,9 @@
 #define sv_2iv_flags		Perl_sv_2iv_flags
 #define sv_2mortal		Perl_sv_2mortal
 #define sv_2nv			Perl_sv_2nv
+#ifdef PERL_CORE
+#define sv_2num			Perl_sv_2num
+#endif
 #define sv_2pv_flags		Perl_sv_2pv_flags
 #define sv_2pvutf8		Perl_sv_2pvutf8
 #define sv_2pvbyte		Perl_sv_2pvbyte
@@ -917,7 +916,6 @@
 #define sv_usepvn_flags		Perl_sv_usepvn_flags
 #define sv_vcatpvfn		Perl_sv_vcatpvfn
 #define sv_vsetpvfn		Perl_sv_vsetpvfn
-#define str_to_version		Perl_str_to_version
 #define swash_init		Perl_swash_init
 #define swash_fetch		Perl_swash_fetch
 #define taint_env		Perl_taint_env
@@ -1482,7 +1480,6 @@
 #define scan_const		S_scan_const
 #define scan_heredoc		S_scan_heredoc
 #define scan_ident		S_scan_ident
-#define scan_inputsymbol	S_scan_inputsymbol
 #define scan_pat		S_scan_pat
 #define scan_str		S_scan_str
 #define scan_subst		S_scan_subst
@@ -1497,7 +1494,7 @@
 #define incline			S_incline
 #define intuit_more		S_intuit_more
 #define lop			S_lop
-#define missingterm		S_missingterm
+#define missingterminator	S_missingterminator
 #define no_op			S_no_op
 #define sublex_done		S_sublex_done
 #define sublex_push		S_sublex_push
@@ -1507,7 +1504,6 @@
 #endif
 #ifdef PERL_CORE
 #define ao			S_ao
-#define incl_perldb		S_incl_perldb
 #endif
 #  if defined(PERL_CR_FILTER)
 #ifdef PERL_CORE
@@ -1921,7 +1917,6 @@
 #define ck_glob			Perl_ck_glob
 #define ck_grep			Perl_ck_grep
 #define ck_index		Perl_ck_index
-#define ck_join			Perl_ck_join
 #define ck_lengthconst		Perl_ck_lengthconst
 #define ck_lfun			Perl_ck_lfun
 #define ck_listiob		Perl_ck_listiob
@@ -2517,17 +2512,14 @@
 #define gv_AVadd(a)		Perl_gv_AVadd(aTHX_ a)
 #define gv_HVadd(a)		Perl_gv_HVadd(aTHX_ a)
 #define gv_IOadd(a)		Perl_gv_IOadd(aTHX_ a)
-#define gv_autoload4(a,b,c,d)	Perl_gv_autoload4(aTHX_ a,b,c,d)
 #define gv_check(a)		Perl_gv_check(aTHX_ a)
 #define gv_efullname(a,b)	Perl_gv_efullname(aTHX_ a,b)
 #define gv_efullname4(a,b,c,d)	Perl_gv_efullname4(aTHX_ a,b,c,d)
 #define gv_fetchfile(a)		Perl_gv_fetchfile(aTHX_ a)
 #define gv_fetchfile_flags(a,b,c)	Perl_gv_fetchfile_flags(aTHX_ a,b,c)
 #define gv_fetchmeth(a,b,c,d)	Perl_gv_fetchmeth(aTHX_ a,b,c,d)
-#define gv_fetchmeth_autoload(a,b,c,d)	Perl_gv_fetchmeth_autoload(aTHX_ a,b,c,d)
-#define gv_fetchmethod_autoload(a,b,c)	Perl_gv_fetchmethod_autoload(aTHX_ a,b,c)
+#define gv_fetchmethod(a,b)	Perl_gv_fetchmethod(aTHX_ a,b)
 #define gv_fetchpv(a,b,c)	Perl_gv_fetchpv(aTHX_ a,b,c)
-#define gv_fullname(a,b)	Perl_gv_fullname(aTHX_ a,b)
 #define gv_fullname4(a,b,c,d)	Perl_gv_fullname4(aTHX_ a,b,c,d)
 #ifdef PERL_CORE
 #endif
@@ -2673,7 +2665,6 @@
 #define magic_getpack(a,b)	Perl_magic_getpack(aTHX_ a,b)
 #define magic_getpos(a,b)	Perl_magic_getpos(aTHX_ a,b)
 #define magic_getsig(a,b)	Perl_magic_getsig(aTHX_ a,b)
-#define magic_getsubstr(a,b)	Perl_magic_getsubstr(aTHX_ a,b)
 #define magic_gettaint(a,b)	Perl_magic_gettaint(aTHX_ a,b)
 #define magic_getuvar(a,b)	Perl_magic_getuvar(aTHX_ a,b)
 #define magic_getvec(a,b)	Perl_magic_getvec(aTHX_ a,b)
@@ -2699,7 +2690,6 @@
 #define magic_setpos(a,b)	Perl_magic_setpos(aTHX_ a,b)
 #define magic_setregexp(a,b)	Perl_magic_setregexp(aTHX_ a,b)
 #define magic_setsig(a,b)	Perl_magic_setsig(aTHX_ a,b)
-#define magic_setsubstr(a,b)	Perl_magic_setsubstr(aTHX_ a,b)
 #define magic_settaint(a,b)	Perl_magic_settaint(aTHX_ a,b)
 #define magic_setuvar(a,b)	Perl_magic_setuvar(aTHX_ a,b)
 #define magic_setvec(a,b)	Perl_magic_setvec(aTHX_ a,b)
@@ -3047,6 +3037,7 @@
 #define scan_hex(a,b,c)		Perl_scan_hex(aTHX_ a,b,c)
 #define scan_num(a,b)		Perl_scan_num(aTHX_ a,b)
 #define scan_oct(a,b,c)		Perl_scan_oct(aTHX_ a,b,c)
+#define parse_escape(a,b,c,d)	Perl_parse_escape(aTHX_ a,b,c,d)
 #ifdef PERL_CORE
 #define scope(a)		Perl_scope(aTHX_ a)
 #endif
@@ -3088,6 +3079,9 @@
 #define sv_2iv_flags(a,b)	Perl_sv_2iv_flags(aTHX_ a,b)
 #define sv_2mortal(a)		Perl_sv_2mortal(aTHX_ a)
 #define sv_2nv(a)		Perl_sv_2nv(aTHX_ a)
+#ifdef PERL_CORE
+#define sv_2num(a)		Perl_sv_2num(aTHX_ a)
+#endif
 #define sv_2pv_flags(a,b,c)	Perl_sv_2pv_flags(aTHX_ a,b,c)
 #define sv_2pvutf8(a,b)		Perl_sv_2pvutf8(aTHX_ a,b)
 #define sv_2pvbyte(a,b)		Perl_sv_2pvbyte(aTHX_ a,b)
@@ -3172,7 +3166,6 @@
 #define sv_usepvn_flags(a,b,c,d)	Perl_sv_usepvn_flags(aTHX_ a,b,c,d)
 #define sv_vcatpvfn(a,b,c,d,e,f,g)	Perl_sv_vcatpvfn(aTHX_ a,b,c,d,e,f,g)
 #define sv_vsetpvfn(a,b,c,d,e,f,g)	Perl_sv_vsetpvfn(aTHX_ a,b,c,d,e,f,g)
-#define str_to_version(a)	Perl_str_to_version(aTHX_ a)
 #define swash_init(a,b,c,d,e)	Perl_swash_init(aTHX_ a,b,c,d,e)
 #define swash_fetch(a,b,c)	Perl_swash_fetch(aTHX_ a,b,c)
 #define taint_env()		Perl_taint_env(aTHX)
@@ -3741,9 +3734,8 @@
 #define scan_const(a)		S_scan_const(aTHX_ a)
 #define scan_heredoc(a)		S_scan_heredoc(aTHX_ a)
 #define scan_ident(a,b,c,d,e)	S_scan_ident(aTHX_ a,b,c,d,e)
-#define scan_inputsymbol(a)	S_scan_inputsymbol(aTHX_ a)
 #define scan_pat(a,b)		S_scan_pat(aTHX_ a,b)
-#define scan_str(a,b,c)		S_scan_str(aTHX_ a,b,c)
+#define scan_str(a,b,c,d)	S_scan_str(aTHX_ a,b,c,d)
 #define scan_subst(a)		S_scan_subst(aTHX_ a)
 #define scan_trans(a)		S_scan_trans(aTHX_ a)
 #define scan_word(a,b,c,d,e)	S_scan_word(aTHX_ a,b,c,d,e)
@@ -3756,15 +3748,14 @@
 #define incline(a)		S_incline(aTHX_ a)
 #define intuit_more(a)		S_intuit_more(aTHX_ a)
 #define lop(a,b,c)		S_lop(aTHX_ a,b,c)
-#define missingterm(a)		S_missingterm(aTHX_ a)
+#define missingterminator(a)	S_missingterminator(aTHX_ a)
 #define no_op(a,b)		S_no_op(aTHX_ a,b)
 #define sublex_done()		S_sublex_done(aTHX)
 #define sublex_push()		S_sublex_push(aTHX)
-#define sublex_start()		S_sublex_start(aTHX)
+#define sublex_start(a,b)	S_sublex_start(aTHX_ a,b)
 #define filter_gets(a,b,c)	S_filter_gets(aTHX_ a,b,c)
 #define tokenize_use(a,b)	S_tokenize_use(aTHX_ a,b)
 #define ao(a)			S_ao(aTHX_ a)
-#define incl_perldb()		S_incl_perldb(aTHX)
 #endif
 #  if defined(PERL_CR_FILTER)
 #ifdef PERL_CORE
@@ -3774,7 +3765,7 @@
 #  endif
 #  if defined(DEBUGGING)
 #ifdef PERL_CORE
-#define tokereport(a)		S_tokereport(aTHX_ a)
+#define tokereport(a,b)		S_tokereport(aTHX_ a,b)
 #define printbuf(a,b)		S_printbuf(aTHX_ a,b)
 #endif
 #  endif
@@ -4184,7 +4175,6 @@
 #define ck_glob(a)		Perl_ck_glob(aTHX_ a)
 #define ck_grep(a)		Perl_ck_grep(aTHX_ a)
 #define ck_index(a)		Perl_ck_index(aTHX_ a)
-#define ck_join(a)		Perl_ck_join(aTHX_ a)
 #define ck_lengthconst(a)	Perl_ck_lengthconst(aTHX_ a)
 #define ck_lfun(a)		Perl_ck_lfun(aTHX_ a)
 #define ck_listiob(a)		Perl_ck_listiob(aTHX_ a)

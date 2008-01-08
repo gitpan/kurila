@@ -2,7 +2,7 @@
 
 print "1..22\n";
 
-open (tmp,'>Cmd_while.tmp') || die "Can't create Cmd_while.tmp.";
+open (tmp, ">",'Cmd_while.tmp') || die "Can't create Cmd_while.tmp.";
 print tmp "tvi925\n";
 print tmp "tvi920\n";
 print tmp "vt100\n";
@@ -12,33 +12,33 @@ close tmp or die "Could not close: $!";
 
 # test "last" command
 
-open(fh,'Cmd_while.tmp') || die "Can't open Cmd_while.tmp.";
-while (<fh>) {
-    last if /vt100/;
+open(fh, "<",'Cmd_while.tmp') || die "Can't open Cmd_while.tmp.";
+while ( ~< *fh) {
+    last if m/vt100/;
 }
-if (!eof && /vt100/) {print "ok 1\n";} else {print "not ok 1 $_\n";}
+if (!eof && m/vt100/) {print "ok 1\n";} else {print "not ok 1 $_\n";}
 
 # test "next" command
 
 $bad = '';
-open(fh,'Cmd_while.tmp') || die "Can't open Cmd_while.tmp.";
-while (<fh>) {
-    next if /vt100/;
-    $bad = 1 if /vt100/;
+open(fh, "<",'Cmd_while.tmp') || die "Can't open Cmd_while.tmp.";
+while ( ~< *fh) {
+    next if m/vt100/;
+    $bad = 1 if m/vt100/;
 }
-if (!eof || /vt100/ || $bad) {print "not ok 2\n";} else {print "ok 2\n";}
+if (!eof || m/vt100/ || $bad) {print "not ok 2\n";} else {print "ok 2\n";}
 
 # test "redo" command
 
 $bad = '';
-open(fh,'Cmd_while.tmp') || die "Can't open Cmd_while.tmp.";
-while (<fh>) {
+open(fh, "<",'Cmd_while.tmp') || die "Can't open Cmd_while.tmp.";
+while ( ~< *fh) {
     if (s/vt100/VT100/g) {
 	s/VT100/Vt100/g;
 	redo;
     }
-    $bad = 1 if /vt100/;
-    $bad = 1 if /VT100/;
+    $bad = 1 if m/vt100/;
+    $bad = 1 if m/VT100/;
 }
 if (!eof || $bad) {print "not ok 3\n";} else {print "ok 3\n";}
 
@@ -47,43 +47,43 @@ if (!eof || $bad) {print "not ok 3\n";} else {print "ok 3\n";}
 # test "last" command
 
 $badcont = '';
-open(fh,'Cmd_while.tmp') || die "Can't open Cmd_while.tmp.";
-line: while (<fh>) {
-    if (/vt100/) {last line;}
+open(fh, "<",'Cmd_while.tmp') || die "Can't open Cmd_while.tmp.";
+line: while ( ~< *fh) {
+    if (m/vt100/) {last line;}
 } continue {
-    $badcont = 1 if /vt100/;
+    $badcont = 1 if m/vt100/;
 }
-if (!eof && /vt100/) {print "ok 4\n";} else {print "not ok 4\n";}
+if (!eof && m/vt100/) {print "ok 4\n";} else {print "not ok 4\n";}
 if (!$badcont) {print "ok 5\n";} else {print "not ok 5\n";}
 
 # test "next" command
 
 $bad = '';
 $badcont = 1;
-open(fh,'Cmd_while.tmp') || die "Can't open Cmd_while.tmp.";
-entry: while (<fh>) {
-    next entry if /vt100/;
-    $bad = 1 if /vt100/;
+open(fh, "<",'Cmd_while.tmp') || die "Can't open Cmd_while.tmp.";
+entry: while ( ~< *fh) {
+    next entry if m/vt100/;
+    $bad = 1 if m/vt100/;
 } continue {
-    $badcont = '' if /vt100/;
+    $badcont = '' if m/vt100/;
 }
-if (!eof || /vt100/ || $bad) {print "not ok 6\n";} else {print "ok 6\n";}
+if (!eof || m/vt100/ || $bad) {print "not ok 6\n";} else {print "ok 6\n";}
 if (!$badcont) {print "ok 7\n";} else {print "not ok 7\n";}
 
 # test "redo" command
 
 $bad = '';
 $badcont = '';
-open(fh,'Cmd_while.tmp') || die "Can't open Cmd_while.tmp.";
-loop: while (<fh>) {
+open(fh, "<",'Cmd_while.tmp') || die "Can't open Cmd_while.tmp.";
+loop: while ( ~< *fh) {
     if (s/vt100/VT100/g) {
 	s/VT100/Vt100/g;
 	redo loop;
     }
-    $bad = 1 if /vt100/;
-    $bad = 1 if /VT100/;
+    $bad = 1 if m/vt100/;
+    $bad = 1 if m/VT100/;
 } continue {
-    $badcont = 1 if /vt100/;
+    $badcont = 1 if m/vt100/;
 }
 if (!eof || $bad) {print "not ok 8\n";} else {print "ok 8\n";}
 if (!$badcont) {print "ok 9\n";} else {print "not ok 9\n";}
@@ -109,14 +109,14 @@ $i = 9;
 print "ok $i\n";
 
 # Check curpm is reset when jumping out of a scope
-'abc' =~ /b/;
+'abc' =~ m/b/;
 WHILE:
 while (1) {
   $i++;
   print "#$`,$&,$',\nnot " unless $` . $& . $' eq "abc";
   print "ok $i\n";
   {                             # Localize changes to $` and friends
-    'end' =~ /end/;
+    'end' =~ m/end/;
     redo WHILE if $i == 11;
     next WHILE if $i == 12;
     # 13 do a normal loop
@@ -132,7 +132,7 @@ print "ok $i\n";
     my $var = 16;
     while (my $i = ++$var) {
 	next if $i == 17;
-	last if $i > 17;
+	last if $i +> 17;
 	my $i = 0;
     }
     continue {

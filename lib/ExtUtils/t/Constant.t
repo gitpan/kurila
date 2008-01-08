@@ -15,11 +15,10 @@ BEGIN {
 # use warnings;
 use strict;
 use ExtUtils::MakeMaker;
-use ExtUtils::Constant qw (C_constant autoload);
+use ExtUtils::Constant qw (C_constant);
 use File::Spec;
 use Cwd;
 
-my $better_than_56 = $] > 5.007;
 # For debugging set this to 1.
 my $keep_files = 0;
 $| = 1;
@@ -30,7 +29,7 @@ my $perl = $^X;
 # only need it when $^X isn't absolute, which is going to be 5.8.0 or later
 # (where ExtUtils::Constant is in the core, and tests against the uninstalled
 # perl)
-$perl = File::Spec->rel2abs ($perl) unless $] < 5.006;
+$perl = File::Spec->rel2abs ($perl);
 # ExtUtils::Constant::C_constant uses $^X inside a comment, and we want to
 # compare output to ensure that it is the same. We were probably run as ./perl
 # whereas we will run the child with the full path in $perl. So make $^X for
@@ -172,11 +171,11 @@ sub build_and_run {
   # Convert from days to seconds
   $timewarp *= 86400;
   print "# Makefile.PL is $timewarp second(s) older than $makefile$makefile_ext\n";
-  if ($timewarp < 0) {
+  if ($timewarp +< 0) {
       # Sleep for a while to catch up.
       $timewarp = -$timewarp;
       $timewarp+=2;
-      $timewarp = 10 if $timewarp > 10;
+      $timewarp = 10 if $timewarp +> 10;
       print "# Sleeping for $timewarp second(s) to try to resolve this\n";
       sleep $timewarp;
   }
@@ -215,9 +214,9 @@ sub build_and_run {
 
   @makeout = `$maketest`;
 
-  if (open OUTPUT, "<$output") {
+  if (open OUTPUT, "<", "$output") {
     local $/; # Slurp it - faster.
-    print <OUTPUT>;
+    print ~< *OUTPUT;
     close OUTPUT or print "# Close $output failed: $!\n";
   } else {
     # Harness will report missing test results at this point.
@@ -234,23 +233,7 @@ sub build_and_run {
   $realtest++;
 
   if (defined $expect) {
-      # -x is busted on Win32 < 5.6.1, so we emulate it.
-      my $regen;
-      if( $^O eq 'MSWin32' && $] <= 5.006001 ) {
-	  open(REGENTMP, ">regentmp") or die $!;
-	  open(XS, "$package.xs")     or die $!;
-	  my $saw_shebang;
-	  while(<XS>) {
-	      $saw_shebang++ if /^#!.*/i ;
-	      print REGENTMP $_ if $saw_shebang;
-	  }
-	  close XS;  close REGENTMP;
-	  $regen = `$runperl regentmp`;
-	  unlink 'regentmp';
-      }
-      else {
-	  $regen = `$runperl -x $package.xs`;
-      }
+      my $regen = `$runperl -x $package.xs`;
       if ($?) {
 	  print "not ok $realtest # $runperl -x $package.xs failed: $?\n";
 	  } else {
@@ -320,16 +303,15 @@ sub Makefile_PL {
   # We really need a Makefile.PL because make test for a no dynamic linking perl
   # will run Makefile.PL again as part of the "make perl" target.
   my $makefilePL = "Makefile.PL";
-  open FH, ">$makefilePL" or die "open >$makefilePL: $!\n";
+  open FH, ">", "$makefilePL" or die "open >$makefilePL: $!\n";
   print FH <<"EOT";
 #!$perl -w
 use ExtUtils::MakeMaker;
 WriteMakefile(
               'NAME'		=> "$package",
               'VERSION_FROM'	=> "$package.pm", # finds \$VERSION
-              (\$] >= 5.005 ?
-               (#ABSTRACT_FROM => "$package.pm", # XXX add this
-                AUTHOR     => "$0") : ())
+              #ABSTRACT_FROM => "$package.pm", # XXX add this
+              AUTHOR     => "$0",
              );
 EOT
 
@@ -343,7 +325,7 @@ sub MANIFEST {
   # We really need a MANIFEST because make distclean checks it.
   my $manifest = "MANIFEST";
   push @files, $manifest;
-  open FH, ">$manifest" or die "open >$manifest: $!\n";
+  open FH, ">", "$manifest" or die "open >$manifest: $!\n";
   print FH "$_\n" foreach @files;
   close FH or die "close $manifest: $!\n";
   return @files;
@@ -360,6 +342,7 @@ sub write_and_run_extension {
 				     XS_FH => \*XS,
 				     NAME => $package,
 				     NAMES => $items,
+                                     PROXYSUBS => 1,
 				     @$wc_args,
 				     );
 
@@ -386,14 +369,14 @@ sub write_and_run_extension {
   ################ Header
   my $header_name = "test.h";
   push @files, $header_name;
-  open FH, ">$header_name" or die "open >$header_name: $!\n";
+  open FH, ">", "$header_name" or die "open >$header_name: $!\n";
   print FH $header or die $!;
   close FH or die "close $header_name: $!\n";
 
   ################ XS
   my $xs_name = "$package.xs";
   push @files, $xs_name;
-  open FH, ">$xs_name" or die "open >$xs_name: $!\n";
+  open FH, ">", "$xs_name" or die "open >$xs_name: $!\n";
 
   print FH <<"EOT";
 #include "EXTERN.h"
@@ -413,20 +396,20 @@ EOT
   ################ PM
   my $pm = "$package.pm";
   push @files, $pm;
-  open FH, ">$pm" or die "open >$pm: $!\n";
+  open FH, ">", "$pm" or die "open >$pm: $!\n";
   print FH "package $package;\n";
 
   print FH <<'EOT';
 
 use strict;
 EOT
-  printf FH "use warnings;\n" unless $] < 5.006;
+  printf FH "use warnings;\n";
   print FH <<'EOT';
 use Carp;
 
 require Exporter;
 require DynaLoader;
-use vars qw ($VERSION @ISA @EXPORT_OK $AUTOLOAD);
+use vars qw ($VERSION @ISA @EXPORT_OK);
 
 $VERSION = '0.01';
 @ISA = qw(Exporter DynaLoader);
@@ -438,37 +421,35 @@ EOT
   # Print the names of all our autoloaded constants
   print FH "\t$_\n" foreach (@$export_names);
   print FH ");\n";
-  # Print the AUTOLOAD subroutine ExtUtils::Constant generated for us
-  print FH autoload ($package, $]);
   print FH "$package->bootstrap(\$VERSION);\n1;\n__END__\n";
   close FH or die "close $pm: $!\n";
 
   ################ test.pl
   my $testpl = "test.pl";
   push @files, $testpl;
-  open FH, ">$testpl" or die "open >$testpl: $!\n";
+  open FH, ">", "$testpl" or die "open >$testpl: $!\n";
   # Standard test header (need an option to suppress this?)
   print FH <<"EOT" or die $!;
 use strict;
 use $package qw(@$export_names);
 
 print "1..2\n";
-if (open OUTPUT, ">$output") {
+if (open OUTPUT, ">", "$output") \{
   print "ok 1\n";
   select OUTPUT;
-} else {
+\} else \{
   print "not ok 1 # Failed to open '$output': \$!\n";
   exit 1;
-}
+\}
 EOT
   print FH $testfile or die $!;
   print FH <<"EOT" or die $!;
 select STDOUT;
-if (close OUTPUT) {
+if (close OUTPUT) \{
   print "ok 2\n";
-} else {
+\} else \{
   print "not ok 2 # Failed to close '$output': \$!\n";
-}
+\}
 EOT
   close FH or die "close $testpl: $!\n";
 
@@ -513,7 +494,7 @@ my @common_items = (
                    );
 
 my @args = undef;
-push @args, [PROXYSUBS => 1] if $] > 5.009002;
+push @args, [PROXYSUBS => 1];
 foreach my $args (@args)
 {
   # Simple tests
@@ -546,7 +527,7 @@ EOT
 
   my @items = ("FIVE", {name=>"OK6", type=>"PV",},
                {name=>"OK7", type=>"PVN",
-                value=>['"not ok 7\\n\\0ok 7\\n"', 15]},
+                value=>['"not ok 7\n\0ok 7\n"', 15]},
                {name => "FARTHING", type=>"NV"},
                {name => "NOT_ZERO", type=>"UV", value=>"~(UV)0"},
                {name => "OPEN", type=>"PV", value=>'"/*"', macro=>1},
@@ -617,7 +598,7 @@ $test++;
 
 # UV
 my $not_zero = NOT_ZERO;
-if ($not_zero > 0 && $not_zero == ^~^0) {
+if ($not_zero +> 0 && $not_zero == ^~^0) {
   print "ok $test\n";
 } else {
   print "not ok $test # \$not_zero=$not_zero ^~^0=" . (^~^0) . "\n";
@@ -647,7 +628,7 @@ $test++;
 my $notdef = eval { NOTDEF; };
 if (defined $notdef) {
   print "not ok $test # \$notdef='$notdef'\n";
-} elsif ($@ !~ /Your vendor has not defined ExtTest macro NOTDEF/) {
+} elsif ($@ !~ m/Undefined subroutine .*NOTDEF called/) {
   print "not ok $test # \$@='$@'\n";
 } else {
   print "ok $test\n";
@@ -658,7 +639,7 @@ $test++;
 my $notthere = eval { &ExtTest::NOTTHERE; };
 if (defined $notthere) {
   print "not ok $test # \$notthere='$notthere'\n";
-} elsif ($@ !~ /NOTTHERE is not a valid ExtTest macro/) {
+} elsif ($@ !~ m/Undefined subroutine .*NOTTHERE called/) {
   chomp $@;
   print "not ok $test # \$@='$@'\n";
 } else {
@@ -697,7 +678,7 @@ $test++;
 $notdef = eval { &ExtTest::So };
 if (defined $notdef) {
   print "not ok $test # \$notdef='$notdef'\n";
-} elsif ($@ !~ /^So is not a valid ExtTest macro/) {
+} elsif ($@ !~ m/^Undefined subroutine .*So called/) {
   print "not ok $test # \$@='$@'\n";
 } else {
   print "ok $test\n";
@@ -708,7 +689,7 @@ $test++;
 $notdef = eval { &ExtTest::EW };
 if (defined $notdef) {
   print "not ok $test # \$notdef='$notdef'\n";
-} elsif ($@ !~ /^EW is not a valid ExtTest macro/) {
+} elsif ($@ !~ m/^Undefined subroutine .*EW called/) {
   print "not ok $test # \$@='$@'\n";
 } else {
   print "ok $test\n";
@@ -751,18 +732,18 @@ EOT
 
 $test_body .= <<"EOT";
 my \$rfc1149 = RFC1149;
-if (\$rfc1149 ne "$parent_rfc1149") {
+if (\$rfc1149 ne "$parent_rfc1149") \{
   print "not ok \$test # '\$rfc1149' ne '$parent_rfc1149'\n";
-} else {
+\} else \{
   print "ok \$test\n";
-}
+\}
 \$test++;
 
-if (\$rfc1149 != 1149) {
+if (\$rfc1149 != 1149) \{
   printf "not ok \$test # %d != 1149\n", \$rfc1149;
-} else {
+\} else \{
   print "ok \$test\n";
-}
+\}
 \$test++;
 
 EOT
@@ -788,28 +769,28 @@ sub explict_call_constant {
   my ($string, $expect) = @_;
   # This does assume simple strings suitable for ''
   my $test_body = <<"EOT";
-{
+\{
   my (\$error, \$got) = ${package}::constant ('$string');\n;
 EOT
 
   if (defined $expect) {
     # No error expected
     $test_body .= <<"EOT";
-  if (\$error or \$got ne "$expect") {
+  if (\$error or \$got ne "$expect") \{
     print "not ok $dummytest # error '\$error', expect '$expect', got '\$got'\n";
-  } else {
+  \} else \{
     print "ok $dummytest\n";
-    }
-  }
+    \}
+  \}
 EOT
   } else {
     # Error expected.
     $test_body .= <<"EOT";
-  if (\$error) {
+  if (\$error) \{
     print "ok $dummytest # error='\$error' (as expected)\n";
-  } else {
+  \} else \{
     print "not ok $dummytest # expected error, got no error and '\$got'\n";
-  }
+  \}
 EOT
   }
   $dummytest++;
@@ -830,17 +811,17 @@ sub simple {
     $test_header .= "#define $thisname $counter\n";
     $test_body .= <<"EOT";
 \$value = $thisname;
-if (\$value == $counter) {
+if (\$value == $counter) \{
   print "ok $dummytest\n";
-} else {
+\} else \{
   print "not ok $dummytest # $thisname gave \$value\n";
-}
+\}
 EOT
     ++$dummytest;
     # Yes, the last time round the loop appends a z to the string.
     for my $i (0 .. length $thisname) {
       my $copyname = $thisname;
-      substr ($copyname, $i, 1) = 'z';
+      substr ($copyname, $i, 1, 'z');
       $test_body .= explict_call_constant ($copyname,
                                            $copyname eq $thisname
                                              ? $thisname : undef);

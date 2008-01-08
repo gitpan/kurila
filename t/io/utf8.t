@@ -24,7 +24,7 @@ open(F,"+>:utf8",'a');
 print F chr(0x100)."\x[c2]\x[a3]";
 cmp_ok( tell(F), '==', 4, tell(F) );
 print F "\n";
-cmp_ok( tell(F), '>=', 5, tell(F) );
+cmp_ok( tell(F), '+>=', 5, tell(F) );
 seek(F,0,0);
 is( getc(F), chr(0x100) );
 is( getc(F), "\x[c2]\x[a3]" );
@@ -42,7 +42,7 @@ is( getc(F), $chr );
 is( getc(F), "\n" );
 seek(F,0,0);
 binmode(F,":utf8");
-is( scalar(<F>), "\x{100}\x[c2]\x[a3]\n" );
+is( scalar( ~< *F), "\x{100}\x[c2]\x[a3]\n" );
 seek(F,0,0);
 $buf = chr(0x200);
 $count = read(F,$buf,2,1);
@@ -59,13 +59,13 @@ close(F);
     close F;
 
     open F, "<:utf8", 'a' or die $!;
-    $x = <F>;
+    $x = ~< *F;
     chomp($x);
     is( $x, chr(300) );
 
-    open F, "a" or die $!; # Not UTF
+    open F, "<", "a" or die $!; # Not UTF
     binmode(F, ":bytes");
-    $x = <F>;
+    $x = ~< *F;
     chomp($x);
     $chr = bytes::chr(196).bytes::chr(172);
     is( $x, $chr );
@@ -91,15 +91,15 @@ close(F);
 
     close F;
 
-    open F, "a" or die $!; # Not UTF
+    open F, "<", "a" or die $!; # Not UTF
     binmode(F, ":bytes");
-    $x = <F>;
+    $x = ~< *F;
     chomp($x);
     $chr = chr(300).chr(130);
     is( $x, $chr, sprintf('(%vd)', $x) );
 
     open F, "<:utf8", "a" or die $!;
-    $x = <F>;
+    $x = ~< *F;
     chomp($x);
     close F;
     is( $x, chr(300).chr(130), sprintf('(%vd)', $x) );
@@ -127,7 +127,7 @@ close F;
 
 open F, "<", "a" or die $!;
 binmode(F, ":bytes");
-$x = <F>; chomp $x;
+$x = ~< *F; chomp $x;
 $chr = chr(130);
 is( $x, $a . $chr );
 
@@ -142,7 +142,7 @@ close F;
 
 open F, "<", "a" or die $!;
 binmode(F, ":bytes");
-$x = <F>; chomp $x;
+$x = ~< *F; chomp $x;
 SKIP: {
     skip("Defaulting to UTF-8 output means that we can't generate a mangled file")
 	if $UTF8_OUTPUT;
@@ -154,7 +154,7 @@ SKIP: {
 SKIP: {
 	my @warnings;
 	open F, "<:utf8", "a" or die $!;
-	$x = <F>; chomp $x;
+	$x = ~< *F; chomp $x;
 	local $SIG{__WARN__} = sub { push @warnings, $_[0]; };
 	eval { sprintf "%vd\n", $x };
 	is (scalar @warnings, 1);
@@ -204,17 +204,17 @@ is($failed, undef);
     for my $u (@a) {
 	for my $v (@a) {
 	    # print "# @$u - @$v\n";
-	    open F, ">a";
+	    open F, ">", "a";
 	    binmode(F, ":" . $u->[1]);
 	    print F chr($u->[0]);
 	    close F;
 
-	    open F, "<a";
+	    open F, "<", "a";
 	    binmode(F, ":" . $u->[1]);
 
 	    my $s = chr($v->[0]);
 
-	    $s .= <F>;
+	    $s .= ~< *F;
 	    is( $s, chr($v->[0]) . chr($u->[0]), 'rcatline utf8' );
 	    close F;
 	    $t++;
@@ -225,7 +225,7 @@ is($failed, undef);
 
 {
     # [perl #23428] Somethings rotten in unicode semantics
-    open F, ">a";
+    open F, ">", "a";
     binmode F, ":utf8";
     syswrite(F, $a = chr(0x100));
     close F;
@@ -241,7 +241,7 @@ is($failed, undef);
     use warnings 'utf8';
     undef $@;
     local $SIG{__WARN__} = sub { $@ = shift };
-    open F, ">a";
+    open F, ">", "a";
     binmode F;
     my ($chrE4, $chrF6) = ("\x[E4]", "\x[F6]");
     print F "foo", $chrE4, "\n";
@@ -249,12 +249,12 @@ is($failed, undef);
     close F;
     open F, "<:utf8", "a";
     undef $@;
-    my $line = <F>;
+    my $line = ~< *F;
     my ($chrE4, $chrF6) = ("E4", "F6");
     like( $@, qr/utf8 "\\x$chrE4" does not map to Unicode .+ <F> line 1/,
 	  "<:utf8 readline must warn about bad utf8");
     undef $@;
-    $line .= <F>;
+    $line .= ~< *F;
     like( $@, qr/utf8 "\\x$chrF6" does not map to Unicode .+ <F> line 2/,
 	  "<:utf8 rcatline must warn about bad utf8");
     close F;

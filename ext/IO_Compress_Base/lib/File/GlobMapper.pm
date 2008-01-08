@@ -8,19 +8,10 @@ our ($CSH_GLOB);
 
 BEGIN
 {
-    if ($] < 5.006)
-    { 
-        require File::BSDGlob; File::BSDGlob->import( qw(:glob)) ;
-        $CSH_GLOB = File::BSDGlob::GLOB_CSH() ;
-        *globber = \&File::BSDGlob::csh_glob;
-    }  
-    else
-    { 
         require File::Glob; File::Glob->import( qw(:glob)) ;
         $CSH_GLOB = File::Glob::GLOB_CSH() ;
         #*globber = \&File::Glob::bsd_glob;
         *globber = \&File::Glob::csh_glob;
-    }  
 }
 
 our ($Error);
@@ -31,7 +22,7 @@ $VERSION = '0.000_02';
 
 
 our ($noPreBS, $metachars, $matchMetaRE, %mapping, %wildCount);
-$noPreBS = '(?<!\\\)' ; # no preceeding backslash
+$noPreBS = '(?<!\\)' ; # no preceeding backslash
 $metachars = '.*?[](){}';
 $matchMetaRE = '[' . quotemeta($metachars) . ']';
 
@@ -179,7 +170,7 @@ sub _parseBit
         }
         elsif ($2 eq '{' || $2 eq '}')
         {
-            return _retError "Nested {} not allowed" ;
+            return _retError "Nested \{\} not allowed" ;
         }
     }
 
@@ -238,7 +229,7 @@ sub _parseInputGlob
         }
         elsif ($2 eq '}')
         {
-            return _unmatched "}" ;
+            return _unmatched "\}" ;
         }
         elsif ($2 eq '{')
         {
@@ -248,7 +239,7 @@ sub _parseInputGlob
             my $tmp ;
             unless ( $string =~ s/(.*?)$noPreBS\}//)
             {
-                return _unmatched "{";
+                return _unmatched "\{";
             }
             #$string =~ s#(.*?)\}##;
 
@@ -294,11 +285,11 @@ sub _parseOutputGlob
                   [^/]        # a non-slash character
                         *     # repeated 0 or more times (0 means me)
               )
-            }{
+            }{{
               $1
                   ? (getpwnam($1))[7]
                   : ( $ENV{HOME} || $ENV{LOGDIR} )
-            }ex;
+            }}x;
 
     }
 
@@ -306,15 +297,15 @@ sub _parseOutputGlob
     while ( $string =~ m/#(\d)/g )
     {
         croak "Max wild is #$maxwild, you tried #$1"
-            if $1 > $maxwild ;
+            if $1 +> $maxwild ;
     }
 
-    my $noPreBS = '(?<!\\\)' ; # no preceeding backslash
+    my $noPreBS = '(?<!\\)' ; # no preceeding backslash
     #warn "noPreBS = '$noPreBS'\n";
 
     #$string =~ s/${noPreBS}\$(\d)/\${$1}/g;
-    $string =~ s/${noPreBS}#(\d)/\${$1}/g;
-    $string =~ s#${noPreBS}\*#\${inFile}#g;
+    $string =~ s/${noPreBS}#(\d)/\$\{$1\}/g;
+    $string =~ s#${noPreBS}\*#\$\{inFile\}#g;
     $string = '"' . $string . '"';
 
     #print "OUTPUT '$self->{OutputGlob}' => '$string'\n";

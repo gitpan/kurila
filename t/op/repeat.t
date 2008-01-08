@@ -54,7 +54,7 @@ is(join('', (@x,1) x 4),    '1231123112311231',     '(@x,1) x Y');
 is(join(':', () x 4),       '',                     '() x Y');
 is(join(':', (9) x 4),      '9:9:9:9',              '(X) x Y');
 is(join(':', (9,9) x 4),    '9:9:9:9:9:9:9:9',      '(X,X) x Y');
-is(join('', (split(//,"123")) x 2), '123123',       'split and x');
+is(join('', (split(m//,"123")) x 2), '123123',       'split and x');
 
 is(join('', @x x -12),      '',                     '@x x -12');
 is(join('', (@x) x -14),    '',                     '(@x) x -14');
@@ -113,7 +113,7 @@ is(join('', (@x) x -14),    '',                     '(@x) x -14');
 #
 # jhi@iki.fi
 #
-is("\xdd" x 24, "\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd\xdd", 'Dec C bug');
+is("\x[dd]" x 24, "\x[dddddddddddddddddddddddddddddddddddddddddddddddd]", 'Dec C bug');
 
 
 # When we use a list repeat in a scalar context, it behaves like
@@ -141,7 +141,7 @@ is(77, scalar ((1,7)x2),    'stack truncation');
     local $TODO = "x operator not copying elements in 'for' list? [ID 20010809.028]";
     my $x = 'abcd';
     my $y = '';
-    for (($x =~ /./g) x 2) {
+    for (($x =~ m/./g) x 2) {
 	$y .= chop;
     }
     is($y, 'abcdabcd');

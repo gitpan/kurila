@@ -16,7 +16,7 @@ use Locale::Constants;
 #	Public Global Variables
 #-----------------------------------------------------------------------
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
-$VERSION   = sprintf("%d.%02d", q$Revision: 2.7 $ =~ /(\d+)\.(\d+)/);
+$VERSION   = sprintf("%d.%02d", q$Revision: 2.7 $ =~ m/(\d+)\.(\d+)/);
 @ISA       = qw(Exporter);
 @EXPORT    = qw(code2country country2code
                 all_country_codes all_country_names
@@ -38,7 +38,7 @@ my $COUNTRIES = [];
 sub code2country
 {
     my $code = shift;
-    my $codeset = @_ > 0 ? shift : LOCALE_CODE_DEFAULT;
+    my $codeset = @_ +> 0 ? shift : LOCALE_CODE_DEFAULT;
 
 
     return undef unless defined $code;
@@ -51,7 +51,7 @@ sub code2country
     #-------------------------------------------------------------------
     if ($codeset == LOCALE_CODE_NUMERIC)
     {
-	return undef if ($code =~ /\D/);
+	return undef if ($code =~ m/\D/);
 	$code = sprintf("%.3d", $code);
     }
     else
@@ -81,7 +81,7 @@ sub code2country
 sub country2code
 {
     my $country = shift;
-    my $codeset = @_ > 0 ? shift : LOCALE_CODE_DEFAULT;
+    my $codeset = @_ +> 0 ? shift : LOCALE_CODE_DEFAULT;
 
 
     return undef unless defined $country;
@@ -131,7 +131,7 @@ sub country_code2code
 #=======================================================================
 sub all_country_codes
 {
-    my $codeset = @_ > 0 ? shift : LOCALE_CODE_DEFAULT;
+    my $codeset = @_ +> 0 ? shift : LOCALE_CODE_DEFAULT;
 
     return keys %{ $CODES->[$codeset] };
 }
@@ -144,7 +144,7 @@ sub all_country_codes
 #=======================================================================
 sub all_country_names
 {
-    my $codeset = @_ > 0 ? shift : LOCALE_CODE_DEFAULT;
+    my $codeset = @_ +> 0 ? shift : LOCALE_CODE_DEFAULT;
 
     return values %{ $CODES->[$codeset] };
 }
@@ -164,7 +164,7 @@ sub alias_code
 {
     my $alias = shift;
     my $real  = shift;
-    my $codeset = @_ > 0 ? shift : LOCALE_CODE_DEFAULT;
+    my $codeset = @_ +> 0 ? shift : LOCALE_CODE_DEFAULT;
 
     my $country;
 
@@ -176,7 +176,7 @@ sub alias_code
     }
     $country = $CODES->[$codeset]->{$real};
     $CODES->[$codeset]->{$alias} = $country;
-    $COUNTRIES->[$codeset]->{"\L$country"} = $alias;
+    $COUNTRIES->[$codeset]->{lc "$country"} = $alias;
 
     return $alias;
 }
@@ -200,7 +200,7 @@ sub rename_country
 {
     my $code     = shift;
     my $new_name = shift;
-    my $codeset = @_ > 0 ? shift : _code2codeset($code);
+    my $codeset = @_ +> 0 ? shift : _code2codeset($code);
     my $country;
     my $c;
 
@@ -227,7 +227,7 @@ sub rename_country
 	}
 
 	$CODES->[$cset]->{$c} = $new_name;
-	$COUNTRIES->[$cset]->{"\L$new_name"} = $c;
+	$COUNTRIES->[$cset]->{lc "$new_name"} = $c;
     }
 
     return 1;
@@ -268,16 +268,16 @@ sub _code2codeset
     local $_;
 
 
-    while (<DATA>)
+    while ( ~< *DATA)
     {
-        next unless /\S/;
+        next unless m/\S/;
         chop;
-        ($alpha2, $alpha3, $numeric, @countries) = split(/:/, $_);
+        ($alpha2, $alpha3, $numeric, @countries) = split(m/:/, $_);
 
         $CODES->[LOCALE_CODE_ALPHA_2]->{$alpha2} = $countries[0];
 	foreach $country (@countries)
 	{
-	    $COUNTRIES->[LOCALE_CODE_ALPHA_2]->{"\L$country"} = $alpha2;
+	    $COUNTRIES->[LOCALE_CODE_ALPHA_2]->{lc "$country"} = $alpha2;
 	}
 
 	if ($alpha3)
@@ -285,7 +285,7 @@ sub _code2codeset
             $CODES->[LOCALE_CODE_ALPHA_3]->{$alpha3} = $countries[0];
 	    foreach $country (@countries)
 	    {
-		$COUNTRIES->[LOCALE_CODE_ALPHA_3]->{"\L$country"} = $alpha3;
+		$COUNTRIES->[LOCALE_CODE_ALPHA_3]->{lc "$country"} = $alpha3;
 	    }
 	}
 
@@ -294,7 +294,7 @@ sub _code2codeset
             $CODES->[LOCALE_CODE_NUMERIC]->{$numeric} = $countries[0];
 	    foreach $country (@countries)
 	    {
-		$COUNTRIES->[LOCALE_CODE_NUMERIC]->{"\L$country"} = $numeric;
+		$COUNTRIES->[LOCALE_CODE_NUMERIC]->{lc "$country"} = $numeric;
 	    }
 	}
 

@@ -204,12 +204,6 @@ use strict;
 use Pod::InputObjects;
 use Carp;
 use Exporter;
-BEGIN {
-   if ($] < 5.6) {
-      require Symbol;
-      Symbol->import();
-   }
-}
 @ISA = qw(Exporter);
 
 ## These "variables" are used as local "glob aliases" for performance
@@ -781,11 +775,11 @@ sub parse_text {
     ## Iterate over all sequence starts text (NOTE: split with
     ## capturing parens keeps the delimiters)
     $_ = $text;
-    my @tokens = split /([A-Z]<(?:<+\s)?)/;
+    my @tokens = split m/([A-Z]<(?:<+\s)?)/;
     while ( @tokens ) {
         $_ = shift @tokens;
         ## Look for the beginning of a sequence
-        if ( /^([A-Z])(<(?:<+\s)?)$/ ) {
+        if ( m/^([A-Z])(<(?:<+\s)?)$/ ) {
             ## Push a new sequence onto the stack of those "in-progress"
             my $ldelim_orig;
             ($cmd, $ldelim_orig) = ($1, $2);
@@ -796,15 +790,15 @@ sub parse_text {
                        -ldelim => $ldelim_orig,  -rdelim => $rdelim,
                        -file   => $file,    -line   => $line
                    );
-            (@seq_stack > 1)  and  $seq->nested($seq_stack[-1]);
+            (@seq_stack +> 1)  and  $seq->nested($seq_stack[-1]);
             push @seq_stack, $seq;
         }
         ## Look for sequence ending
-        elsif ( @seq_stack > 1 ) {
+        elsif ( @seq_stack +> 1 ) {
             ## Make sure we match the right kind of closing delimiter
             my ($seq_end, $post_seq) = ("", "");
-            if ( ($ldelim eq '<'   and  /\A(.*?)(>)/s)
-                 or  /\A(.*?)(\s+$rdelim)/s )
+            if ( ($ldelim eq '<'   and  m/\A(.*?)(>)/s)
+                 or  m/\A(.*?)(\s+$rdelim)/s )
             {
                 ## Found end-of-sequence, capture the interior and the
                 ## closing the delimiter, and put the rest back on the
@@ -828,7 +822,7 @@ sub parse_text {
                 $seq_stack[-1]->append($expand_seq ? &$xseq_sub($self,$seq)
                                                    : $seq);
                 ## Remember the current cmd-name and left-delimiter
-                if(@seq_stack > 1) {
+                if(@seq_stack +> 1) {
                     $cmd = $seq_stack[-1]->name;
                     $ldelim = $seq_stack[-1]->ldelim;
                     $rdelim = $seq_stack[-1]->rdelim;
@@ -849,8 +843,8 @@ sub parse_text {
     }
 
     ## Handle unterminated sequences
-    my $errorsub = (@seq_stack > 1) ? $self->errorsub() : undef;
-    while (@seq_stack > 1) {
+    my $errorsub = (@seq_stack +> 1) ? $self->errorsub() : undef;
+    while (@seq_stack +> 1) {
        ($cmd, $file, $line) = ($seq->name, $seq->file_line);
        $ldelim  = $seq->ldelim;
        ($rdelim = $ldelim) =~ tr/</>/;
@@ -924,7 +918,7 @@ sub parse_paragraph {
     my $wantNonPods = $myOpts{'-want_nonPODs'};
 
     ## Update cutting status
-    $myData{_CUTTING} = 0 if $text =~ /^={1,2}\S/;
+    $myData{_CUTTING} = 0 if $text =~ m/^={1,2}\S/;
 
     ## Perform any desired preprocessing if we wanted it this early
     $wantNonPods  and  $text = $self->preprocess_paragraph($text, $line_num);
@@ -959,13 +953,13 @@ sub parse_paragraph {
     ## Look for one of the three types of paragraphs
     my ($pfx, $cmd, $arg, $sep) = ('', '', '', '');
     my $pod_para = undef;
-    if ($text =~ /^(={1,2})(?=\S)/) {
+    if ($text =~ m/^(={1,2})(?=\S)/) {
         ## Looks like a command paragraph. Capture the command prefix used
         ## ("=" or "=="), as well as the command-name, its paragraph text,
         ## and whatever sequence of characters was used to separate them
         $pfx = $1;
         $_ = substr($text, length $pfx);
-        ($cmd, $sep, $text) = split /(\s+)/, $_, 2; 
+        ($cmd, $sep, $text) = split m/(\s+)/, $_, 2; 
         ## If this is a "cut" directive then we dont need to do anything
         ## except return to "cutting" mode.
         if ($cmd eq 'cut') {
@@ -992,7 +986,7 @@ sub parse_paragraph {
         ## A command paragraph
         $self->command($cmd, $text, $line_num, $pod_para);
     }
-    elsif ($text =~ /^\s+/) {
+    elsif ($text =~ m/^\s+/) {
         ## Indented text - must be a verbatim paragraph
         $self->verbatim($text, $line_num, $pod_para);
     }
@@ -1058,14 +1052,14 @@ sub parse_from_filehandle {
 
     ## Use <$fh> instead of $fh->getline where possible (for speed)
     $_ = ref $in_fh;
-    my $tied_fh = (/^(?:GLOB|FileHandle|IO::\w+)$/  or  tied $in_fh);
+    my $tied_fh = (m/^(?:GLOB|FileHandle|IO::\w+)$/  or  tied $in_fh);
 
     ## Read paragraphs line-by-line
-    while (defined ($textline = $tied_fh ? <$in_fh> : $in_fh->getline)) {
+    while (defined ($textline = $tied_fh ? ~< $in_fh : $in_fh->getline)) {
         $textline = $self->preprocess_line($textline, ++$nlines);
         next  unless ((defined $textline)  &&  (length $textline));
 
-        if ((! length $paragraph) && ($textline =~ /^==/)) {
+        if ((! length $paragraph) && ($textline =~ m/^==/)) {
             ## '==' denotes a one-line command paragraph
             $paragraph = $textline;
             $plines    = 1;
@@ -1078,11 +1072,11 @@ sub parse_from_filehandle {
 
         ## See if this line is blank and ends the current paragraph.
         ## If it isnt, then keep iterating until it is.
-        next unless (($textline =~ /^([^\S\r\n]*)[\r\n]*$/)
+        next unless (($textline =~ m/^([^\S\r\n]*)[\r\n]*$/)
                                      && (length $paragraph));
 
         ## Issue a warning about any non-empty blank lines
-        if (length($1) > 0 and $myOpts{'-warnings'} and ! $myData{_CUTTING}) {
+        if (length($1) +> 0 and $myOpts{'-warnings'} and ! $myData{_CUTTING}) {
             my $errorsub = $self->errorsub();
             my $file = $self->input_file();
             my $errmsg = "*** WARNING: line containing nothing but whitespace".
@@ -1155,16 +1149,13 @@ sub parse_from_file {
     my %opts = (ref $_[0] eq 'HASH') ? %{ shift() } : ();
     my ($infile, $outfile) = @_;
     my ($in_fh,  $out_fh);
-    if ($] < 5.006) {
-      ($in_fh,  $out_fh) = (gensym(), gensym());
-    }
     my ($close_input, $close_output) = (0, 0);
     local *myData = $self;
     local *_;
 
     ## Is $infile a filename or a (possibly implied) filehandle
     if (defined $infile && ref $infile) {
-        if (ref($infile) =~ /^(SCALAR|ARRAY|HASH|CODE|REF)$/) {
+        if (ref($infile) =~ m/^(SCALAR|ARRAY|HASH|CODE|REF)$/) {
             croak "Input from $1 reference not supported!\n";
         }
         ## Must be a filehandle-ref (or else assume its a ref to an object
@@ -1173,7 +1164,7 @@ sub parse_from_file {
         $in_fh = $infile;
     }
     elsif (!defined($infile) || !length($infile) || ($infile eq '-')
-        || ($infile =~ /^<&(?:STDIN|0)$/i))
+        || ($infile =~ m/^<&(?:STDIN|0)$/i))
     {
         ## Not a filename, just a string implying STDIN
         $infile ||= '-';
@@ -1183,7 +1174,7 @@ sub parse_from_file {
     else {
         ## We have a filename, open it for reading
         $myData{_INFILE} = $infile;
-        open($in_fh, "< $infile")  or
+        open($in_fh, "<", "$infile")  or
              croak "Can't open $infile for reading: $!\n";
         $close_input = 1;
     }
@@ -1197,7 +1188,7 @@ sub parse_from_file {
     ## Is $outfile a filename, a (possibly implied) filehandle, maybe a ref?
     if (ref $outfile) {
         ## we need to check for ref() first, as other checks involve reading
-        if (ref($outfile) =~ /^(ARRAY|HASH|CODE)$/) {
+        if (ref($outfile) =~ m/^(ARRAY|HASH|CODE)$/) {
             croak "Output to $1 reference not supported!\n";
         }
         elsif (ref($outfile) eq 'SCALAR') {
@@ -1216,7 +1207,7 @@ sub parse_from_file {
         }
     }
     elsif (!defined($outfile) || !length($outfile) || ($outfile eq '-')
-        || ($outfile =~ /^>&?(?:STDOUT|1)$/i))
+        || ($outfile =~ m/^>&?(?:STDOUT|1)$/i))
     {
         if (defined $myData{_TOP_STREAM}) {
             $out_fh = $myData{_OUTPUT};
@@ -1228,7 +1219,7 @@ sub parse_from_file {
             $out_fh  = \*STDOUT;
         }
     }
-    elsif ($outfile =~ /^>&(STDERR|2)$/i) {
+    elsif ($outfile =~ m/^>&(STDERR|2)$/i) {
         ## Not a filename, just a string implying STDERR
         $myData{_OUTFILE} = "<standard error>";
         $out_fh  = \*STDERR;
@@ -1237,7 +1228,7 @@ sub parse_from_file {
         ## We have a filename, open it for writing
         $myData{_OUTFILE} = $outfile;
         (-d $outfile) and croak "$outfile is a directory, not POD input!\n";
-        open($out_fh, "> $outfile")  or
+        open($out_fh, ">", "$outfile")  or
              croak "Can't open $outfile for writing: $!\n";
         $close_output = 1;
     }
@@ -1288,7 +1279,7 @@ is used to issue error messages (this is the default behavior).
 =cut
 
 sub errorsub {
-   return (@_ > 1) ? ($_[0]->{_ERRORSUB} = $_[1]) : $_[0]->{_ERRORSUB};
+   return (@_ +> 1) ? ($_[0]->{_ERRORSUB} = $_[1]) : $_[0]->{_ERRORSUB};
 }
 
 ##---------------------------------------------------------------------------
@@ -1309,7 +1300,7 @@ result.
 =cut
 
 sub cutting {
-   return (@_ > 1) ? ($_[0]->{_CUTTING} = $_[1]) : $_[0]->{_CUTTING};
+   return (@_ +> 1) ? ($_[0]->{_CUTTING} = $_[1]) : $_[0]->{_CUTTING};
 }
 
 ##---------------------------------------------------------------------------
@@ -1585,7 +1576,7 @@ sub _pop_input_stream {
     local *input_stack = $myData{_INPUT_STREAMS};
 
     ## Perform end-of-input and/or end-of-document processing
-    $self->end_input()  if (@input_stack > 0);
+    $self->end_input()  if (@input_stack +> 0);
     $self->end_pod()    if (@input_stack == 1);
 
     ## Restore cutting state to whatever it was before we started
@@ -1595,7 +1586,7 @@ sub _pop_input_stream {
 
     ## Dont forget to reset the input indicators
     my $input_top = undef;
-    if (@input_stack > 0) {
+    if (@input_stack +> 0) {
        $input_top = $myData{_TOP_STREAM} = $input_stack[-1];
        $myData{_INFILE}  = $input_top->name();
        $myData{_INPUT}   = $input_top->handle();

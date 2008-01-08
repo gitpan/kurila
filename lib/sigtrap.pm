@@ -21,7 +21,7 @@ sub import {
   Arg_loop:
     while (@_) {
 	$_ = shift;
-	if (/^[A-Z][A-Z0-9]*$/) {
+	if (m/^[A-Z][A-Z0-9]*$/) {
 	    $saw_sig++;
 	    unless ($untrapped and $SIG{$_} and $SIG{$_} ne 'DEFAULT') {
 		print "Installing handler $handler for $_\n" if $Verbose;
@@ -61,8 +61,8 @@ sub import {
 	elsif ($_ eq 'any') {
 	    $untrapped = 0;
 	}
-	elsif ($_ =~ /^\d/) {
-	    $VERSION >= $_ or croak "sigtrap.pm version $_ required,"
+	elsif ($_ =~ m/^\d/) {
+	    $VERSION +>= $_ or croak "sigtrap.pm version $_ required,"
 		    	    	    	. " but this is only version $VERSION";
 	}
 	else {
@@ -98,9 +98,9 @@ sub handler_traceback {
 	for (@args) {
 	    s/([\'\\])/\\$1/g;
 	    s/([^\0]*)/'$1'/
-	      unless /^(?: -?[\d.]+ | \*[\w:]* )$/x;
-	    s/([\200-\377])/sprintf("M-%c",ord($1)^&^0177)/eg;
-	    s/([\0-\37\177])/sprintf("^%c",ord($1)^^^64)/eg;
+	      unless m/^(?: -?[\d.]+ | \*[\w:]* )$/x;
+	    s/([\200-\377])/{sprintf("M-%c",ord($1)^&^0177)}/g;
+	    s/([\0-\37\177])/{sprintf("^%c",ord($1)^^^64)}/g;
 	    push(@a, $_);
 	}
 	$w = $w ? '@ = ' : '$ = ';
@@ -112,7 +112,7 @@ sub handler_traceback {
 	} elsif (defined $r) {
 	    $s = "eval '$e'";
 	} elsif ($s eq '(eval)') {
-	    $s = "eval {...}";
+	    $s = "eval \{...\}";
 	}
 	$f = "file `$f'" unless $f eq '-e';
 	$mess = "$w$s$a called from $f line $l\n";

@@ -13,7 +13,7 @@ use bytes;
 use Test::More ;
 use CompTestUtils;
  
-use Compress::Zlib 2 ;
+use Compress::Zlib v2 ;
 
 use IO::Compress::Gzip ;
 use IO::Uncompress::Gunzip ;
@@ -37,7 +37,7 @@ BEGIN
 
 my $ver = Compress::Zlib::zlib_version();
 plan skip_all => "gzsetparams needs zlib 1.0.6 or better. You have $ver\n"
-    if ZLIB_VERNUM() < 0x1060 ;
+    if ZLIB_VERNUM() +< 0x1060 ;
 
 plan tests => 51 + $extra ;
 

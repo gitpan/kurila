@@ -3,7 +3,7 @@
 require './test.pl';
 use strict qw(refs subs);
 
-plan(127);
+plan(125);
 
 our ($bar, $foo, $baz, $FOO, $BAR, $BAZ, @ary, @ref,
      @a, @b, @c, @d, $ref, $object, @foo, @bar, @baz,
@@ -55,10 +55,9 @@ $BAR = \$BAZ;
 $BAZ = "hit";
 is ($$$FOO, 'hit');
 
-# test that ref(vstring) makes sense
-my $vstref = \v1;
-is (ref($vstref), "VSTRING", "ref(vstr) eq VSTRING");
-like ( $vstref, qr/VSTRING\(0x[0-9a-f]+\)/, '\vstr is also VSTRING');
+# test that vstring are blessed 'version' objects
+my $vstref = v1;
+is (ref($vstref), "version", "ref(vstr) eq 'version'");
 
 # Test references to real arrays.
 
@@ -152,7 +151,7 @@ is (join('', sort values %$anonhash2), 'BARXYZ');
     my $x = { aap => 'noot', mies => "teun" };
     is("".$x->%, "".%$x);
     my $w = \*foo428;
-    is("" . $w->*, "*main::foo428");
+    is(Symbol::glob_name($w->*), "main::foo428");
     my $v = sub { return $_[0]; };
     is($v->&(55), 55);
 }
@@ -240,7 +239,7 @@ is (scalar grep(ref($_), @baa), 3);
 is (scalar (@bzz), 3);
 
 # also, it can't be an lvalue
-eval '\\($x, $y) = (1, 2);';
+eval '\($x, $y) = (1, 2);';
 like ($@, qr/Can\'t modify.*ref.*in.*assignment/);
 
 # test for proper destruction of lexical objects
@@ -295,7 +294,7 @@ curr_test($test + 2);
     my $i = 0;
     local $SIG{'__DIE__'} = sub {
 	my $m = shift;
-	if ($i++ > 4) {
+	if ($i++ +> 4) {
 	    print "# infinite recursion, bailing\nnot ok $test\n";
 	    exit 1;
         }
@@ -357,11 +356,6 @@ curr_test($test+4);
 is (runperl (switches=>['-l'],
 	     prog=> 'print 1; print qq-*$\*-;print 1;'),
     "1\n*\n*\n1\n");
-
-# bug #21347
-
-runperl(prog => 'sub UNIVERSAL::AUTOLOAD { qr// } a->p' );
-is ($?, 0, 'UNIVERSAL::AUTOLOAD called when freeing qr//');
 
 runperl(prog => 'sub UNIVERSAL::DESTROY { warn } bless \$a, "A"', stderr => 1);
 is ($?, 0, 'warn called inside UNIVERSAL::DESTROY');

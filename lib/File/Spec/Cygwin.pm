@@ -53,7 +53,7 @@ sub catdir {
     my $self = shift;
 
     # Don't create something that looks like a //network/path
-    if ($_[0] and ($_[0] eq '/' or $_[0] eq '\\')) {
+    if ($_[0] and ($_[0] eq '/' or $_[0] eq '\')) {
         shift;
         return $self->SUPER::catdir('', @_);
     }
@@ -114,7 +114,7 @@ sub case_tolerant () {
   }
   my $drive = shift;
   if (! $drive) {
-      my @flags = split(/,/, Cygwin::mount_flags('/cygwin'));
+      my @flags = split(m/,/, Cygwin::mount_flags('/cygwin'));
       my $prefix = pop(@flags);
       if (! $prefix || $prefix eq 'cygdrive') {
           $drive = '/cygdrive/c';
@@ -125,7 +125,7 @@ sub case_tolerant () {
       }
   }
   my $mntopts = Cygwin::mount_flags($drive);
-  if ($mntopts and ($mntopts =~ /,managed/)) {
+  if ($mntopts and ($mntopts =~ m/,managed/)) {
     return 0;
   }
   eval { require Win32API::File; } or return 1;

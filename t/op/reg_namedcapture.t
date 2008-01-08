@@ -7,9 +7,9 @@ print "1..2\n";
 
 # This tests whether glob assignment fails to load the tie.
 *X = *-;
-'X'=~/(?<X>X)/;
+'X'=~m/(?<X>X)/;
 print eval '*X{HASH}{X} || 1' ? "" :"not ","ok ",++$test,"\n";
 
 # And since its a similar case we check %! as well
 *Y = *!;
-print 0<keys(%Y) ? "" :"not ","ok ",++$test,"\n";
+print 0+<keys(%Y) ? "" :"not ","ok ",++$test,"\n";

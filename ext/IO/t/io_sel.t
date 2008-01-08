@@ -1,7 +1,7 @@
 #!./perl -w
 
 BEGIN {
-    unless(grep /blib/, @INC) {
+    unless(grep m/blib/, @INC) {
         chdir 't' if -d 't';
         @INC = '../lib';
     }
@@ -12,7 +12,7 @@ select(STDOUT); $| = 1;
 
 print "1..23\n";
 
-use IO::Select 1.09;
+use IO::Select v1.09;
 
 my $sel = IO::Select->new(\*STDIN);
 $sel->add(4, 5) == 2 or print "not ";
@@ -119,7 +119,7 @@ print "ok 21\n";
 # check warnings
 $SIG{__WARN__} = sub { 
     ++ $w 
-      if $_[0] =~ /^Call to deprecated method 'has_error', use 'has_exception'/ ;
+      if $_[0] =~ m/^Call to deprecated method 'has_error', use 'has_exception'/ ;
     } ;
 $w = 0 ;
 {

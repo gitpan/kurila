@@ -6,11 +6,11 @@ use bytes;
 
 require Exporter ;
 
-use IO::Compress::RawDeflate 2.006 ;
+use IO::Compress::RawDeflate v2.006 ;
 
-use Compress::Raw::Zlib  2.006 ;
-use IO::Compress::Zlib::Constants 2.006 ;
-use IO::Compress::Base::Common  2.006 qw(createSelfTiedObject);
+use Compress::Raw::Zlib  v2.006 ;
+use IO::Compress::Zlib::Constants v2.006 ;
+use IO::Compress::Base::Common  v2.006 qw(createSelfTiedObject);
 
 
 our ($VERSION, @ISA, @EXPORT_OK, %EXPORT_TAGS, $DeflateError);
@@ -89,11 +89,11 @@ sub mkHeader
     $level = 6 
         if $level == Z_DEFAULT_COMPRESSION ;
 
-    if (ZLIB_VERNUM >= 0x1210)
+    if (ZLIB_VERNUM +>= 0x1210)
     {
-        if ($strategy >= Z_HUFFMAN_ONLY || $level < 2)
+        if ($strategy +>= Z_HUFFMAN_ONLY || $level +< 2)
          {  $lflag = ZLIB_FLG_LEVEL_FASTEST }
-        elsif ($level < 6)
+        elsif ($level +< 6)
          {  $lflag = ZLIB_FLG_LEVEL_FAST }
         elsif ($level == 6)
          {  $lflag = ZLIB_FLG_LEVEL_DEFAULT }
@@ -103,7 +103,7 @@ sub mkHeader
     else
     {
         $lflag = ($level - 1) >> 1 ;
-        $lflag = 3 if $lflag > 3 ;
+        $lflag = 3 if $lflag +> 3 ;
     }
 
      #my $wbits = (MAX_WBITS - 8) << 4 ;

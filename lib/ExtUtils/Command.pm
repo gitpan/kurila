@@ -61,7 +61,7 @@ Filenames with * and ? will be glob expanded.
 my $wild_regex = $Is_VMS ? '*%' : '*?';
 sub expand_wildcards
 {
- @ARGV = map(/[$wild_regex]/o ? glob($_) : $_,@ARGV);
+ @ARGV = map(m/[$wild_regex]/o ? glob($_) : $_,@ARGV);
 }
 
 
@@ -76,7 +76,7 @@ Concatenates all files mentioned on command line to STDOUT.
 sub cat ()
 {
  expand_wildcards();
- print while (<>);
+ print while ( ~< *ARGV);
 }
 
 =item eqtime
@@ -155,7 +155,7 @@ sub touch {
     my $t    = time;
     expand_wildcards();
     foreach my $file (@ARGV) {
-        open(FILE,">>$file") || die "Cannot write $file:$!";
+        open(FILE, ">>","$file") || die "Cannot write $file:$!";
         close(FILE);
         utime($t,$t,$file);
     }
@@ -178,7 +178,7 @@ sub mv {
     my @src = @ARGV;
     my $dst = pop @src;
 
-    croak("Too many arguments") if (@src > 1 && ! -d $dst);
+    croak("Too many arguments") if (@src +> 1 && ! -d $dst);
 
     my $nok = 0;
     foreach my $src (@src) {
@@ -204,7 +204,7 @@ sub cp {
     my @src = @ARGV;
     my $dst = pop @src;
 
-    croak("Too many arguments") if (@src > 1 && ! -d $dst);
+    croak("Too many arguments") if (@src +> 1 && ! -d $dst);
 
     my $nok = 0;
     foreach my $src (@src) {
@@ -306,10 +306,10 @@ sub dos2unix {
 
 	my $orig = $_;
 	my $temp = '.dos2unix_tmp';
-	open ORIG, $_ or do { warn "dos2unix can't open $_: $!"; return };
-	open TEMP, ">$temp" or 
+	open ORIG, "<", $_ or do { warn "dos2unix can't open $_: $!"; return };
+	open TEMP, ">", "$temp" or 
 	    do { warn "dos2unix can't create .dos2unix_tmp: $!"; return };
-        while (my $line = <ORIG>) { 
+        while (my $line = ~< *ORIG) { 
             $line =~ s/\015\012/\012/g;
             print TEMP $line;
         }

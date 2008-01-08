@@ -16,7 +16,7 @@ my $db_file;
 BEGIN {
     use Config;
     foreach (qw/DB_File/) {
-        if ($Config{extensions} =~ /\b$_\b/) {
+        if ($Config{extensions} =~ m/\b$_\b/) {
             $db_file = $_;
             last;
         }
@@ -100,12 +100,12 @@ SKIP: {
     # (not at least by that name) that the dl_findfile()
     # could find.
     skip "dl_findfile test not appropriate on $^O", 1
-	if $^O =~ /(win32|vms|openbsd|cygwin)/i;
+	if $^O =~ m/(win32|vms|openbsd|cygwin)/i;
     # Play safe and only try this test if this system
     # looks pretty much Unix-like.
     skip "dl_findfile test not appropriate on $^O", 1
 	unless -d '/usr' && -f '/bin/ls';
-    cmp_ok( scalar @files, '>=', 1, "array should contain one result result or more: libc => (@files)" );
+    cmp_ok( scalar @files, '+>=', 1, "array should contain one result result or more: libc => (@files)" );
 }
 
 # Now try to load well known XS modules
@@ -114,7 +114,7 @@ $extensions =~ s|/|::|g;
 
 for my $module (sort keys %modules) {
     SKIP: {
-        if ($extensions !~ /\b$module\b/) {
+        if ($extensions !~ m/\b$module\b/) {
             delete($modules{$module});
             skip "$module not available", 3;
         }

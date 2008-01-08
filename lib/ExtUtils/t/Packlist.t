@@ -40,7 +40,7 @@ is( ExtUtils::Packlist::FETCH($pl, 'foo'), 'bar', 'check FETCH()' );
 SKIP: {
 	$pl->{data}{bar} = 'baz';
 	skip('not enough keys to test FIRSTKEY', 2)
-      unless keys %{ $pl->{data} } > 2;
+      unless keys %{ $pl->{data} } +> 2;
 
 	# get the first and second key
 	my ($first, $second) = keys %{ $pl->{data} };
@@ -114,7 +114,7 @@ SKIP: {
 	is( $@, '', 'write() should normally succeed' );
 	is( $pl->{packfile}, 'eplist', 'write() should set packfile name' );
 
-	$file_is_ready = open(IN, 'eplist');
+	$file_is_ready = open(IN, "<", 'eplist');
 }
 
 
@@ -130,7 +130,7 @@ like( $@, qr/^Can't open file/, 'read() should croak with bad packfile name' );
 # and more read() tests
 SKIP: {
 	skip("cannot open file for reading: $!", 5) unless $file_is_ready;
-	my $file = do { local $/ = <IN> };
+	my $file = do { local $/ = ~< *IN };
 
 	like( $file, qr/single\n/, 'key with value should be available' );
 	like( $file, qr!/\./abc\n!, 'key with no value should also be present' );

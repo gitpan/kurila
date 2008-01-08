@@ -5,7 +5,7 @@ BEGIN {
     }
 
     use Config;
-    if ($Config::Config{'extensions'} !~ /\bEncode\b/) {
+    if ($Config::Config{'extensions'} !~ m/\bEncode\b/) {
       print "1..0 # Skip: Encode was not built\n";
       exit 0;
     }
@@ -70,7 +70,7 @@ sub source_path {
       last;
     }
   }
-  die "Too few test files (".@testfiles.")" unless @ARGV or @testfiles > 20;
+  die "Too few test files (".@testfiles.")" unless @ARGV or @testfiles +> 20;
 
   @testfiles = @ARGV if @ARGV and !grep !m/\.txt/, @ARGV;
 
@@ -81,11 +81,6 @@ my $HACK = 1;
 #@testfiles = ('nonesuch.txt');
 
 ok 1;
-
-my $skippy =  ($] < 5.008) ? "skip because perl ($]) pre-dates v5.8.0" : 0;
-if($skippy) {
-  print "# This is just perl v$], so I'm skipping many many tests.\n";
-}
 
 {
   my @x = @testfiles;
@@ -126,13 +121,13 @@ foreach my $f (@testfiles) {
   
   die "Null outstring?" unless $outstring;
   
-  next if $f =~ /nonesuch/;
+  next if $f =~ m/nonesuch/;
 
   # foo.xml.out is not a portable filename. foo.xml_out may be a bit more portable
 
-  my $outfilename = ($HACK > 1) ? $wouldxml{$f} : "$wouldxml{$f}_out";
+  my $outfilename = ($HACK +> 1) ? $wouldxml{$f} : "$wouldxml{$f}_out";
   if($HACK) {
-    open OUT, ">$outfilename" or die "Can't write-open $outfilename: $!\n";
+    open OUT, ">", "$outfilename" or die "Can't write-open $outfilename: $!\n";
     binmode(OUT);
     print OUT $outstring;
     close(OUT);
@@ -143,10 +138,10 @@ foreach my $f (@testfiles) {
     next;
   }
   
-  open(IN, "<$xml") or die "Can't read-open $xml: $!";
+  open(IN, "<", "$xml") or die "Can't read-open $xml: $!";
   #binmode(IN);
   local $/;
-  my $xmlsource = <IN>;
+  my $xmlsource = ~< *IN;
   close(IN);
   
   print "# There's errata!\n" if $outstring =~ m/start_line="-321"/;
@@ -165,12 +160,8 @@ foreach my $f (@testfiles) {
     next;
   }
 
-  if($skippy) {
-    skip $skippy, 0;
-  } else {
-    print "#  $outfilename and $xml don't match!\n";
-    ok 0;
-  }
+  print "#  $outfilename and $xml don't match!\n";
+  ok 0;
 
 }
 

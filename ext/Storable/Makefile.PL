@@ -14,7 +14,7 @@ WriteMakefile(
     MAN3PODS            => {},
 # We now ship this in t/
 #    PREREQ_PM           => { 'Test::More' => '0.41' },
-    INSTALLDIRS		=> $] >= 5.007 ? 'perl' : 'site',
+    INSTALLDIRS		=> 'perl',
     VERSION_FROM        => 'Storable.pm',
     dist                => { SUFFIX => 'gz', COMPRESS => 'gzip -f' },
 );
@@ -22,7 +22,7 @@ WriteMakefile(
 my $ivtype = $Config{ivtype};
 
 # I don't know if the VMS folks ever supported long long on 5.6.x
-if ($ivtype and $ivtype eq 'long long' and $^O !~ /^MSWin/) {
+if ($ivtype and $ivtype eq 'long long' and $^O !~ m/^MSWin/) {
   print <<'EOM';
 
 You appear to have a perl configured to use 64 bit integers in its scalar

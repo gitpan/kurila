@@ -12,7 +12,7 @@ use File::Find;
 find(
      sub {
 	 return unless -f;
-	 if (/\.pm$/ && $File::Find::name !~ m:/t/:) { # pm but not in a test
+	 if (m/\.pm$/ && $File::Find::name !~ m:/t/:) { # pm but not in a test
 	     unless (parse_file($_)) {
 		 print "$File::Find::name\n";
 	     }
@@ -24,21 +24,21 @@ sub parse_file {
 
     my $result;
 
-    open(FH,$parsefile) or warn "Could not open '$parsefile': $!";
+    open(FH, "<",$parsefile) or warn "Could not open '$parsefile': $!";
 
     my $inpod = 0;
-    while (<FH>) {
-	$inpod = /^=(?!cut)/ ? 1 : /^=cut/ ? 0 : $inpod;
-	next if $inpod || /^\s*\#/;
+    while ( ~< *FH) {
+	$inpod = m/^=(?!cut)/ ? 1 : m/^=cut/ ? 0 : $inpod;
+	next if $inpod || m/^\s*\#/;
 	chomp;
-	next unless /([\$*])(([\w\:\']*)\bVERSION)\b.*\=/;
+	next unless m/([\$*])(([\w\:\']*)\bVERSION)\b.*\=/;
 	my $eval = qq{
 	    package ExtUtils::MakeMaker::_version;
 	    no strict;
 	    local $1$2;
-	    \$$2=undef; do {
+	    \$$2=undef; do \{
 		$_
-	    }; \$$2
+	    \}; \$$2
 	};
 	no warnings;
 	$result = eval($eval);

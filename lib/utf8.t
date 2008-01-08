@@ -37,21 +37,7 @@ no utf8; # Ironic, no?
 #
 #
 
-plan tests => 37;
-
-{
-    my ($a, $b);
-
-    { use bytes; $a = "\xc3\xa4" }
-    { use utf8;  $b = "\xe4"     }
-
-    my $test = 68;
-
-    ok($a eq $b);
-
-    { use utf8; ok($a eq $b) }
-}
-
+plan tests => 36;
 
 {
     # bug id 20000730.004
@@ -73,7 +59,7 @@ plan tests => 37;
 	{ use bytes; $length_bytes = length($s) }
 	my @regex_chars = $s =~ m/(.)/g;
 	my $regex_chars = @regex_chars;
-	my @split_chars = split //, $s;
+	my @split_chars = split m//, $s;
 	my $split_chars = @split_chars;
 	ok("$length_chars/$regex_chars/$split_chars/$length_bytes" eq
 	   "1/1/1/3");
@@ -93,7 +79,7 @@ plan tests => 37;
 	{ use bytes; $length_bytes = length($s) }
 	my @regex_chars = $s =~ m/(.)/g;
 	my $regex_chars = @regex_chars;
-	my @split_chars = split //, $s;
+	my @split_chars = split m//, $s;
 	my $split_chars = @split_chars;
 	ok("$length_chars/$regex_chars/$split_chars/$length_bytes" eq
 	   "2/2/2/6");
@@ -221,7 +207,7 @@ SKIP: {
 
 {
     fresh_perl_like ('use utf8; utf8::moo()',
-		     qr/Undefined subroutine utf8::moo/, {stderr=>1},
+		     qr/Undefined subroutine &utf8::moo/, {stderr=>1},
 		    "Check Carp is loaded for AUTOLOADing errors")
 }
 

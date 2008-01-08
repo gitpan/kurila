@@ -47,8 +47,7 @@ my %style =
     "(?(#seq)?)#noise#arg(?([#targarg])?)"],
    "debug" =>
    ["#class (#addr)\n\top_next\t\t#nextaddr\n\top_sibling\t#sibaddr\n\t"
-    . "op_ppaddr\tPL_ppaddr[OP_#NAME]\n\top_type\t\t#typenum\n" .
-    ($] > 5.009 ? '' : "\top_seq\t\t#seqnum\n")
+    . "op_ppaddr\tPL_ppaddr[OP_#NAME]\n\top_type\t\t#typenum\n"
     . "\top_flags\t#flagval\n\top_private\t#privval\t#hintsval\n"
     . "(?(\top_first\t#firstaddr\n)?)(?(\top_last\t\t#lastaddr\n)?)"
     . "(?(\top_sv\t\t#svaddr\n)?)",
@@ -149,7 +148,7 @@ sub concise_stashref {
 	*s = $h->{$k};
 	my $coderef = *s{CODE} or next;
 	reset_sequence();
-	print "FUNC: ", *s, "\n";
+	print "FUNC: *", Symbol::glob_name(*s), "\n";
 	my $codeobj = svref_2object($coderef);
 	next unless ref $codeobj eq 'B::CV';
 	eval { concise_cv_obj($order, $codeobj, $k) };
@@ -167,7 +166,7 @@ sub concise_cv_obj {
 
     $curcv = $cv;
 
-    if (ref($cv->XSUBANY) =~ /B::(\w+)/) {
+    if (ref($cv->XSUBANY) =~ m/B::(\w+)/) {
 	print $walkHandle "$name is a constant sub, optimized to a $1\n";
 	return;
     }
@@ -253,8 +252,8 @@ sub compileOpts {
     # set rendering state from options and args
     my (@options,@args);
     if (@_) {
-	@options = grep(/^-/, @_);
-	@args = grep(!/^-/, @_);
+	@options = grep(m/^-/, @_);
+	@args = grep(!m/^-/, @_);
     }
     for my $o (@options) {
 	# mode/order
@@ -276,7 +275,7 @@ sub compileOpts {
 	    $tree_style ^&^= ^~^2;
 	}
 	# sequence numbering
-	elsif ($o =~ /^-base(\d+)$/) {
+	elsif ($o =~ m/^-base(\d+)$/) {
 	    $base = $1;
 	} elsif ($o eq "-bigendian") {
 	    $big_endian = 1;
@@ -296,7 +295,7 @@ sub compileOpts {
 	} elsif ($o eq "-src") {
 	    $show_src = 1;
 	}
-	elsif ($o =~ /^-stash=(.*)/) {
+	elsif ($o =~ m/^-stash=(.*)/) {
 	    my $pkg = $1;
 	    no strict 'refs';
 	    eval "require $pkg" unless %{Symbol::stash($pkg)};
@@ -351,7 +350,7 @@ sub compile {
 			if $banner;
 		    $objref = $objname;
 		} else {
-		    $objname = "main::" . $objname unless $objname =~ /::/;
+		    $objname = "main::" . $objname unless $objname =~ m/::/;
 		    print $walkHandle "$objname:\n";
 		    no strict 'refs';
 		    unless (exists &$objname) {
@@ -381,7 +380,7 @@ my $lastnext;	# remembers op-chain, used to insert gotos
 
 my %opclass = ('OP' => "0", 'UNOP' => "1", 'BINOP' => "2", 'LOGOP' => "|",
 	       'LISTOP' => "@", 'PMOP' => "/", 'SVOP' => "\$", 'GVOP' => "*",
-	       'PVOP' => '"', 'LOOP' => "{", 'COP' => ";", 'PADOP' => "#");
+	       'PVOP' => '"', 'LOOP' => "\{", 'COP' => ";", 'PADOP' => "#");
 
 no warnings 'qw'; # "Possible attempt to put comments..."; use #7
 my @linenoise =
@@ -420,7 +419,7 @@ sub op_flags { # common flags (see BASOP.op_flags in op.h)
 
 sub base_n {
     my $x = shift;
-    return "-" . base_n(-$x) if $x < 0;
+    return "-" . base_n(-$x) if $x +< 0;
     my $str = "";
     do { $str .= substr($chars, $x % $base, 1) } while $x = int($x / $base);
     $str = reverse $str if $big_endian;
@@ -490,16 +489,10 @@ sub walk_exec {
 		my $ar = [];
 		push @$targ, $ar;
 		push @todo, [$op->pmreplstart, $ar];
-	    } elsif ($name =~ /^enter(loop|iter)$/) {
-		if ($] > 5.009) {
-		    $labels{${$op->nextop}} = "NEXT";
-		    $labels{${$op->lastop}} = "LAST";
-		    $labels{${$op->redoop}} = "REDO";
-		} else {
-		    $labels{$op->nextop->seq} = "NEXT";
-		    $labels{$op->lastop->seq} = "LAST";
-		    $labels{$op->redoop->seq} = "REDO";		
-		}
+	    } elsif ($name =~ m/^enter(loop|iter)$/) {
+                $labels{${$op->nextop}} = "NEXT";
+                $labels{${$op->lastop}} = "LAST";
+                $labels{${$op->redoop}} = "REDO";
 	    }
 	}
     }
@@ -514,7 +507,7 @@ sub sequence {
     for (; $$op; $op = $op->next) {
 	last if exists $sequence_num{$$op};
 	my $name = $op->name;
-	if ($name =~ /^(null|scalar|lineseq|scope)$/) {
+	if ($name =~ m/^(null|scalar|lineseq|scope)$/) {
 	    next if $oldop and $ {$op->next};
 	} else {
 	    $sequence_num{$$op} = $seq_max++;
@@ -551,25 +544,26 @@ sub fmt_line {    # generate text-line for op.
     return '' if $hr->{goto} and $hr->{goto} eq '-';	# no goto nowhere
 
     # spec: (?(text1#varText2)?)
-    $text =~ s/\(\?\(([^\#]*?)\#(\w+)([^\#]*?)\)\?\)/
-	$hr->{$2} ? $1.$hr->{$2}.$3 : ""/eg;
+    $text =~ s/\(\?\(([^\#]*?)\#(\w+)([^\#]*?)\)\?\)/{
+	$hr->{$2} ? $1.$hr->{$2}.$3 : ""}/g;
 
     # spec: (x(exec_text;basic_text)x)
-    $text =~ s/\(x\((.*?);(.*?)\)x\)/$order eq "exec" ? $1 : $2/egs;
+    $text =~ s/\(x\((.*?);(.*?)\)x\)/{$order eq "exec" ? $1 : $2}/gs;
 
     # spec: (*(text)*)
-    $text =~ s/\(\*\(([^;]*?)\)\*\)/$1 x $level/egs;
+    $text =~ s/\(\*\(([^;]*?)\)\*\)/{$1 x $level}/gs;
 
     # spec: (*(text1;text2)*)
-    $text =~ s/\(\*\((.*?);(.*?)\)\*\)/$1 x ($level - 1) . $2 x ($level>0)/egs;
+    $text =~ s/\(\*\((.*?);(.*?)\)\*\)/{$1 x ($level - 1) . $2 x ($level+>0)}/gs;
 
     # convert #Var to tag=>val form: Var\t#var
-    $text =~ s/\#([A-Z][a-z]+)(\d+)?/\t\u$1\t\L#$1$2/gs;
+    $text =~ s/\#([A-Z][a-z]+)(\d+)?/{"\t" . ucfist($1) . "\t" . lc("#$1$2")
+}/gs;
 
     # spec: #varN
-    $text =~ s/\#([a-zA-Z]+)(\d+)/sprintf("%-$2s", $hr->{$1})/eg;
+    $text =~ s/\#([a-zA-Z]+)(\d+)/{sprintf("%-$2s", $hr->{$1})}/g;
 
-    $text =~ s/\#([a-zA-Z]+)/$hr->{$1}/eg;	# populate #var's
+    $text =~ s/\#([a-zA-Z]+)/{$hr->{$1}}/g;	# populate #var's
     $text =~ s/[ \t]*~+[ \t]*/ /g;		# squeeze tildes
 
     $text = "# $hr->{src}\n$text" if $show_src and $hr->{src};
@@ -587,7 +581,7 @@ $priv{$_}{128} = "LVINTRO"
        "padav", "padhv", "enteriter");
 $priv{$_}{64} = "REFC" for ("leave", "leavesub", "leavesublv", "leavewrite");
 $priv{"aassign"}{64} = "COMMON";
-$priv{"aassign"}{32} = $] < 5.009 ? "PHASH" : "STATE";
+$priv{"aassign"}{32} = "STATE";
 $priv{"sassign"}{32} = "STATE";
 $priv{"sassign"}{64} = "BKWARD";
 $priv{$_}{64} = "RTIME" for ("match", "subst", "substcont", "qr");
@@ -630,7 +624,7 @@ $priv{"exit"}{128} = "VMS";
 $priv{$_}{2} = "FTACCESS"
   for ("ftrread", "ftrwrite", "ftrexec", "fteread", "ftewrite", "fteexec");
 $priv{"entereval"}{2} = "HAS_HH";
-if ($] >= 5.009) {
+{
   # Stacked filetests are post 5.8.x
   $priv{$_}{4} = "FTSTACKED"
     for ("ftrread", "ftrwrite", "ftrexec", "fteread", "ftewrite", "fteexec",
@@ -661,8 +655,8 @@ our %hints; # used to display each COP's op_hints values
 sub _flags {
     my($hash, $x) = @_;
     my @s;
-    for my $flag (sort {$b <=> $a} keys %$hash) {
-	if ($hash->{$flag} and $x ^&^ $flag and $x >= $flag) {
+    for my $flag (sort {$b <+> $a} keys %$hash) {
+	if ($hash->{$flag} and $x ^&^ $flag and $x +>= $flag) {
 	    $x -= $flag;
 	    push @s, $hash->{$flag};
 	}
@@ -734,7 +728,7 @@ sub fill_srclines {
     open (my $fh, '<', $fullnm)
 	or warn "# $fullnm: $!, (chdirs not supported by this feature yet)\n"
 	and return;
-    my @l = <$fh>;
+    my @l = ~< $fh;
     chomp @l;
     unshift @l, $fullnm; # like @{_<$fullnm} in debug, array starts at 1
     $srclines{$fullnm} = \@l;
@@ -752,7 +746,7 @@ sub concise_op {
 	# targ holds the old type
 	$h{exname} = "ex-" . substr(ppname($h{targ}), 3);
 	$h{extarg} = "";
-    } elsif ($op->name =~ /^leave(sub(lv)?|write)?$/) {
+    } elsif ($op->name =~ m/^leave(sub(lv)?|write)?$/) {
 	# targ potentially holds a reference count
 	if ($op->private ^&^ 64) {
 	    my $refs = "ref" . ($h{targ} != 1 ? "s" : "");
@@ -763,9 +757,6 @@ sub concise_op {
 	if (defined $padname and class($padname) ne "SPECIAL") {
 	    $h{targarg}  = $padname->PVX;
 	    if ($padname->FLAGS ^&^ SVf_FAKE) {
-		if ($] < 5.009) {
-		    $h{targarglife} = "$h{targarg}:FAKE";
-		} else {
 		    # These changes relate to the jumbo closure fix.
 		    # See changes 19939 and 20005
 		    my $fake = '';
@@ -776,7 +767,6 @@ sub concise_op {
 		    $fake .= ':' . $padname->PARENT_PAD_INDEX
 			if $curcv->CvFLAGS ^&^ CVf_ANON;
 		    $h{targarglife} = "$h{targarg}:FAKE:$fake";
-		}
 	    }
 	    else {
 		my $intro = $padname->COP_SEQ_RANGE_LOW - $cop_seq_base;
@@ -858,13 +848,8 @@ sub concise_op {
     }
     $h{seq} = $h{hyphseq} = seq($op);
     $h{seq} = "" if $h{seq} eq "-";
-    if ($] > 5.009) {
-	$h{opt} = $op->opt;
-	$h{label} = $labels{$$op};
-    } else {
-	$h{seqnum} = $op->seq;
-	$h{label} = $labels{$op->seq};
-    }
+    $h{opt} = $op->opt;
+    $h{label} = $labels{$$op};
     $h{next} = $op->next;
     $h{next} = (class($h{next}) eq "NULL") ? "(end)" : seq($h{next});
     $h{nextaddr} = sprintf("%#x", $ {$op->next});
@@ -948,9 +933,9 @@ sub tree {
     for ($i = $#lines; substr($lines[$i], 0, 1) eq " "; $i--) {
 	$lines[$i] = $space . $lines[$i];
     }
-    if ($i > 0) {
+    if ($i +> 0) {
 	$lines[$i] = $last . $lines[$i];
-	while ($i-- > 1) {
+	while ($i-- +> 1) {
 	    if (substr($lines[$i], 0, 1) eq " ") {
 		$lines[$i] = $nokid . $lines[$i];
 	    } else {

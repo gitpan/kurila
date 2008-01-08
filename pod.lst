@@ -129,6 +129,8 @@ h Miscellaneous
 
   perldoc		Look up Perl documentation in Pod format
 
+  kurila17delta         What is new for Perl Kurila 1.7
+  kurila16delta         What is new for Perl Kurila 1.6
   kurila15delta         What is new for Perl Kurila 1.5
   kurila14delta         What is new for Perl Kurila 1.4
   kurila13delta         What is new for Perl Kurila 1.3
@@ -213,7 +215,6 @@ r perlwin32		Perl notes for Windows
 aoh Auxiliary Documentation
 
 ao a2p
-ao c2ph
 ao dprofpp
 ao h2ph
 ao h2xs

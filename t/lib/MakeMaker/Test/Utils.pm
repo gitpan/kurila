@@ -202,7 +202,7 @@ different calling convention than Unix or Windows.
 sub make_macro {
     my($make, $target) = (shift, shift);
 
-    my $is_mms = $make =~ /^MM(K|S)/i;
+    my $is_mms = $make =~ m/^MM(K|S)/i;
 
     my $cmd = $make;
     my $macros = '';
@@ -229,7 +229,7 @@ touched.
 =cut
 
 sub calibrate_mtime {
-    open(FILE, ">calibrate_mtime.tmp") || die $!;
+    open(FILE, ">", "calibrate_mtime.tmp") || die $!;
     print FILE "foo";
     close FILE;
     my($mtime) = (stat('calibrate_mtime.tmp'))[9];
@@ -256,7 +256,7 @@ sub run {
     # Unix can handle 2>&1 and OS/2 from 5.005_54 up.
     # This makes our failure diagnostics nicer to read.
     if( MM->os_flavor_is('Unix') or
-        ($] > 5.00554 and MM->os_flavor_is('OS/2'))
+        (MM->os_flavor_is('OS/2'))
       ) {
         return `$cmd 2>&1`;
     }
@@ -278,7 +278,7 @@ sub setup_mm_test_root {
         # imposed by RMS.  We get around this with a rooted logical, but we
         # can't create logical names with attributes in Perl, so we do it
         # in a DCL subprocess and put it in the job table so the parent sees it.
-        open( MMTMP, '>mmtesttmp.com' ) || 
+        open( MMTMP, ">", 'mmtesttmp.com' ) || 
           die "Error creating command file; $!";
         print MMTMP <<'COMMAND';
 $ MM_TEST_ROOT = F$PARSE("SYS$DISK:[-]",,,,"NO_CONCEAL")-".][000000"-"]["-"].;"+".]"

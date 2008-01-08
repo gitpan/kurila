@@ -164,12 +164,12 @@ print "ok ", $test++,"\n";
 print "not " unless join(':',@ary) eq '3:2:1';
 print "ok ", $test++,"\n";         
 
-print "not " unless $seen{'FETCH'} >= 3;
+print "not " unless $seen{'FETCH'} +>= 3;
 print "ok ", $test++,"\n";
 
 @ary = (1,2,3);
 
-print "not " unless $seen{'STORE'} >= 3;
+print "not " unless $seen{'STORE'} +>= 3;
 print "ok ", $test++,"\n";
 print "not " unless join(':',@ary) eq '1:2:3';
 print "ok ", $test++,"\n";         
@@ -225,7 +225,7 @@ print "ok ", $test++,"\n";
 print "not " unless join(':',@ary) eq '5:6:7:4';
 print "ok ", $test++,"\n";
 
-@ary = split(/:/,'1:2:3');
+@ary = split(m/:/,'1:2:3');
 print "not " unless join(':',@ary) eq '1:2:3';
 print "ok ", $test++,"\n";         
 
@@ -334,7 +334,7 @@ untie @ary;
     tie my @dummy, "NegFetchsize";
     eval { "@dummy"; };
     print "# $@" if $@;
-    print "not " unless $@ =~ /^FETCHSIZE returned a negative value/;
+    print "not " unless $@ =~ m/^FETCHSIZE returned a negative value/;
     print "ok ", $test++, " - croak on negative FETCHSIZE\n";
 }
 

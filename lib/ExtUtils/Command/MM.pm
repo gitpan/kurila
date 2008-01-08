@@ -120,8 +120,8 @@ sub pod2man {
         my ($pod, $man) = splice(@ARGV, 0, 2);
 
         next if ((-e $man) &&
-                 (-M $man < -M $pod) &&
-                 (-M $man < -M "Makefile"));
+                 (-M $man +< -M $pod) &&
+                 (-M $man +< -M "Makefile"));
 
         print "Manifying $man\n";
 
@@ -192,7 +192,7 @@ sub perllocal_install {
 
     # VMS feeds args as a piped file on STDIN since it usually can't
     # fit all the args on a single command line.
-    @ARGV = split /\|/, <STDIN> if $Is_VMS;
+    @ARGV = split m/\|/, ~< *STDIN if $Is_VMS;
 
     my $pod;
     $pod = sprintf <<POD, scalar localtime;

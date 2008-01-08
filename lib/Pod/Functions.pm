@@ -124,14 +124,14 @@ our @Type_Order = qw{
     Time
 };
 
-while (<DATA>) {
+while ( ~< *DATA) {
     chomp;
     s/#.*//;
     next unless $_;
     my($name, $type, $text) = split " ", $_, 3;
     $Type{$name} = $type;
     $Flavor{$name} = $text;
-    for my $t ( split /[,\s]+/, $type ) {
+    for my $t ( split m/[,\s]+/, $type ) {
         push @{$Kinds{$t}}, $name;
     }
 }
@@ -145,9 +145,9 @@ unless (caller) {
 	$typedesc = $Type_Description{$type} . ":";
 
         print form("",
-                   "{[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[}",
+                   "\{[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[\}",
                    $typedesc,
-                   "     {[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[}",
+                   "     \{[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[\}",
                    $list,
                   );
     }

@@ -11,18 +11,13 @@ sub BEGIN {
     if ($ENV{PERL_CORE}){
 	@INC = ('.', '../lib', '../ext/Storable/t');
         require Config;
-        if ($Config::Config{'extensions'} !~ /\bStorable\b/) {
+        if ($Config::Config{'extensions'} !~ m/\bStorable\b/) {
             print "1..0 # Skip: Storable was not built\n";
             exit 0;
         }
     } else {
-	if ($] < 5.005) {
-	    print "1..0 # Skip: No Hash::Util pre 5.005\n";
-	    exit 0;
-	    # And doing this seems on 5.004 seems to create bogus warnings about
-	    # unitialized variables, or coredumps in Perl_pp_padsv
-	} elsif (!eval "require Hash::Util") {
-            if ($@ =~ /Can\'t locate Hash\/Util\.pm in \@INC/s) {
+        if (!eval "require Hash::Util") {
+            if ($@ =~ m/Can\'t locate Hash\/Util\.pm in \@INC/s) {
                 print "1..0 # Skip: No Hash::Util:\n";
                 exit 0;
             } else {

@@ -30,7 +30,7 @@ foreach $DirItem(@Dirs)
 		# Open once in write mode since later files are opened in append mode,
 		# and if there already exists a file with the same name, all further opens
 		# will append to that file!!
-		open(FHW, "> $IntAutoScript") or die "Unable to open the file,  $IntAutoScript  for writing.\n";
+		open(FHW, ">", "$IntAutoScript") or die "Unable to open the file,  $IntAutoScript  for writing.\n";
 		seek(FHW, 0, 0);	# seek to the beginning of the file.
 		close FHW;			# close the file.
 	}
@@ -39,7 +39,7 @@ foreach $DirItem(@Dirs)
 
 print "Generating  t/nwauto.pl ...\n\n\n";
 
-open(FHWA, "> t/nwauto.pl") or die "Unable to open the file,  t/nwauto.pl  for writing.\n";
+open(FHWA, ">", "t/nwauto.pl") or die "Unable to open the file,  t/nwauto.pl  for writing.\n";
 seek(FHWA, 0, 0);	# seek to the beginning of the file.
 
 $version = sprintf("%vd",$^V);
@@ -67,11 +67,11 @@ foreach $FileName(@DirNames)
 		}
 
 		# Write into the intermediary auto script.
-		open(FHW, ">> $IntAutoScript") or die "Unable to open the file,  $IntAutoScript  for appending.\n";
+		open(FHW, ">>", "$IntAutoScript") or die "Unable to open the file,  $IntAutoScript  for appending.\n";
 		seek(FHW, 0, 2);	# seek to the end of the file.
 
 		$pos = tell(FHW);
-		if($pos <= 0)
+		if($pos +<= 0)
 		{
 			print "Generating  $IntAutoScript...\n";
 			print FHW "\n\nprint \"Testing  $DirItem  folder:\\n\\n\\n\"\;\n\n\n";
@@ -97,7 +97,7 @@ foreach $FileName(@DirNames)
 
 		close FHW;			# close the file.
 
-		if($index <= 0)
+		if($index +<= 0)
 		{
 			# The folder is empty and delete the corresponding '.pl' file.
 			unlink($IntAutoScript);
@@ -105,7 +105,7 @@ foreach $FileName(@DirNames)
 		}
 		else
 		{
-			if($pos <= 0)
+			if($pos +<= 0)
 			{	# This logic to make sure that it is written only once.
 				# Only if something is written into the intermediary auto script,
 				# only then make an entry of the intermediary auto script in  nwauto.pl
@@ -156,7 +156,7 @@ foreach $DirItem(@Dirs)
 			$index++;
 		}
 
-		if($index > 0)
+		if($index +> 0)
 		{
 			# The folder not empty.
 
@@ -164,7 +164,7 @@ foreach $DirItem(@Dirs)
 			$IntAutoScript = "t/".$DirItem.".pl";
 
 			# Write into the intermediary auto script.
-			open(FHW, ">> $IntAutoScript") or die "Unable to open the file,  $IntAutoScript  for appending.\n";
+			open(FHW, ">>", "$IntAutoScript") or die "Unable to open the file,  $IntAutoScript  for appending.\n";
 			seek(FHW, 0, 2);	# seek to the end of the file.
 
 			# Write into the intermediary auto script.

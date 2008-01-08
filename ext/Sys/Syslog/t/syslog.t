@@ -19,18 +19,18 @@ use warnings qw(closure deprecated exiting glob io misc numeric once overflow
                 pack portable recursion redefine regexp severe signal substr
                 syntax taint uninitialized unpack untie utf8 void);
 
-my $is_Win32  = $^O =~ /win32/i;
-my $is_Cygwin = $^O =~ /cygwin/i;
+my $is_Win32  = $^O =~ m/win32/i;
+my $is_Cygwin = $^O =~ m/cygwin/i;
 
 # if testing in core, check that the module is at least available
 if ($ENV{PERL_CORE}) {
     plan skip_all => "Sys::Syslog was not build" 
-        unless $Config{'extensions'} =~ /\bSyslog\b/;
+        unless $Config{'extensions'} =~ m/\bSyslog\b/;
 }
 
 # we also need Socket
 plan skip_all => "Socket was not build" 
-    unless $Config{'extensions'} =~ /\bSocket\b/;
+    unless $Config{'extensions'} =~ m/\bSocket\b/;
 
 my $tests;
 plan tests => $tests;
@@ -70,7 +70,7 @@ like( $@, qr/^syslog: expecting argument \$format/,
     "calling syslog() with one empty argument" );
 
 
-my $test_string = "uid $< is testing Perl $] syslog(3) capabilities";
+my $test_string = "uid $< is testing Perl $^V syslog(3) capabilities";
 my $r = 0;
 
 BEGIN { $tests += 8 }
@@ -81,7 +81,7 @@ SKIP: {
 
     # The only known $^O eq 'svr4' that needs this is NCR MP-RAS,
     # but assuming 'stream' in SVR4 is probably not that bad.
-    my $sock_type = $^O =~ /^(solaris|irix|svr4|powerux)$/ ? 'stream' : 'unix';
+    my $sock_type = $^O =~ m/^(solaris|irix|svr4|powerux)$/ ? 'stream' : 'unix';
 
     eval { setlogsock($sock_type) };
     is( $@, '', "setlogsock() called with '$sock_type'" );
@@ -94,9 +94,9 @@ SKIP: {
     SKIP: {
         # openlog()
         $r = eval { openlog('perl', 'ndelay', 'local0') } || 0;
-        skip "can't connect to syslog", 6 if $@ =~ /^no connection to syslog available/;
+        skip "can't connect to syslog", 6 if $@ =~ m/^no connection to syslog available/;
         is( $@, '', "openlog() called with facility 'local0'" );
-        ok( $r, "openlog() should return true: '$r'" );
+        ok( $r, "openlog() should return true" );
 
         # syslog()
         $r = eval { syslog('info', "$test_string by connecting to a $sock_type socket") } || 0;
@@ -117,7 +117,7 @@ my @passed = ();
 for my $sock_type (qw(native eventlog unix pipe stream inet tcp udp)) {
     SKIP: {
         skip "the 'stream' mechanism because a previous mechanism with similar interface succeeded", 20 
-            if $sock_type eq 'stream' and grep {/pipe|unix/} @passed;
+            if $sock_type eq 'stream' and grep {m/pipe|unix/} @passed;
 
         # setlogsock() called with an arrayref
         $r = eval { setlogsock([$sock_type]) } || 0;
@@ -133,13 +133,13 @@ for my $sock_type (qw(native eventlog unix pipe stream inet tcp udp)) {
 
         # openlog() without option NDELAY
         $r = eval { openlog('perl', '', 'local0') } || 0;
-        skip "can't connect to syslog", 16 if $@ =~ /^no connection to syslog available/;
+        skip "can't connect to syslog", 16 if $@ =~ m/^no connection to syslog available/;
         is( $@, '', "[$sock_type] openlog() called with facility 'local0' and without option 'ndelay'" );
         ok( $r, "[$sock_type] openlog() should return true: '$r'" );
 
         # openlog() with the option NDELAY
         $r = eval { openlog('perl', 'ndelay', 'local0') } || 0;
-        skip "can't connect to syslog", 14 if $@ =~ /^no connection to syslog available/;
+        skip "can't connect to syslog", 14 if $@ =~ m/^no connection to syslog available/;
         is( $@, '', "[$sock_type] openlog() called with facility 'local0' with option 'ndelay'" );
         ok( $r, "[$sock_type] openlog() should return true: '$r'" );
 
@@ -187,7 +187,7 @@ BEGIN { $tests += 10 }
 SKIP: {
     skip "not testing setlogsock('stream') on Win32", 10 if $is_Win32;
     skip "the 'unix' mechanism works, so the tests will likely fail with the 'stream' mechanism", 10 
-        if grep {/unix/} @passed;
+        if grep {m/unix/} @passed;
 
     # setlogsock() with "stream" and an undef path
     $r = eval { setlogsock("stream", undef ) } || '';
@@ -222,7 +222,7 @@ SKIP: {
     # setlogsock() with "stream" and a local file
     SKIP: {
         my $logfile = "test.log";
-        open(LOG, ">$logfile") or skip "can't create file '$logfile': $!", 2;
+        open(LOG, ">", "$logfile") or skip "can't create file '$logfile': $!", 2;
         close(LOG);
         $r = eval { setlogsock("stream", $logfile ) } || '';
         is( $@, '', "setlogsock() called, with 'stream' and '$logfile' (file exists)" );

@@ -1,14 +1,12 @@
 package ExtUtils::Constant::Utils;
 
 use strict;
-use vars qw($VERSION @EXPORT_OK @ISA $is_perl56);
+use vars qw($VERSION @EXPORT_OK @ISA);
 use Carp;
 
 @ISA = 'Exporter';
 @EXPORT_OK = qw(C_stringify perl_stringify);
 $VERSION = '0.01';
-
-$is_perl56 = ($] < 5.007 && $] > 5.005_50);
 
 =head1 NAME
 
@@ -44,9 +42,6 @@ sub C_stringify {
   # grr 5.6.1
   confess "Wide character in '$_' intended as a C identifier"
     if tr/\0-\377// != length;
-  # grr 5.6.1 moreso because its regexps will break on data that happens to
-  # be utf8, which includes my 8 bit test cases.
-  $_ = pack 'C*', unpack 'U*', $_ . pack 'U*' if $is_perl56;
   s/\\/\\\\/g;
   s/([\"\'])/\\$1/g;	# Grr. fix perl mode.
   s/\n/\\n/g;		# Ensure newlines don't end up in octal
@@ -55,19 +50,14 @@ sub C_stringify {
   s/\f/\\f/g;
   s/\a/\\a/g;
   if (ord('A') == 193) { # EBCDIC has no ^\0-\177 workalike.
-      s/([[:^print:]])/sprintf "\\%03o", ord $1/ge;
+      s/([[:^print:]])/{sprintf "\\%03o", ord $1}/g;
   } else {
-      s/([^\0-\177])/sprintf "\\%03o", ord $1/ge;
+      s/([^\0-\177])/{sprintf "\\%03o", ord $1}/g;
   }
-  unless ($] < 5.006) {
     # This will elicit a warning on 5.005_03 about [: :] being reserved unless
     # I cheat
     my $cheat = '([[:^print:]])';
-    s/$cheat/sprintf "\\%03o", ord $1/ge;
-  } else {
-    require POSIX;
-    s/([^A-Za-z0-9_])/POSIX::isprint($1) ? $1 : sprintf "\\%03o", ord $1/ge;
-  }
+    s/$cheat/{sprintf "\\%03o", ord $1}/g;
   $_;
 }
 
@@ -89,34 +79,11 @@ sub perl_stringify {
   s/\t/\\t/g;
   s/\f/\\f/g;
   s/\a/\\a/g;
-  unless ($] < 5.006) {
-    if ($] > 5.007) {
-	if (ord('A') == 193) { # EBCDIC has no ^\0-\177 workalike.
-	    s/([[:^print:]])/sprintf "\\x{%X}", ord $1/ge;
-	} else {
-	    s/([^\0-\177])/sprintf "\\x{%X}", ord $1/ge;
-	}
-    } else {
-      # Grr 5.6.1. And I don't think I can use utf8; to force the regexp
-      # because 5.005_03 will fail.
-      # This is grim, but I also can't split on //
-      my $copy;
-      foreach my $index (0 .. length ($_) - 1) {
-        my $char = substr ($_, $index, 1);
-        $copy .= ($char le "\177") ? $char : sprintf "\\x{%X}", ord $char;
-      }
-      $_ = $copy;
-    }
-    # This will elicit a warning on 5.005_03 about [: :] being reserved unless
-    # I cheat
-    my $cheat = '([[:^print:]])';
-    s/$cheat/sprintf "\\%03o", ord $1/ge;
-  } else {
-    # Turns out "\x{}" notation only arrived with 5.6
-    s/([^\0-\177])/sprintf "\\x%02X", ord $1/ge;
-    require POSIX;
-    s/([^A-Za-z0-9_])/POSIX::isprint($1) ? $1 : sprintf "\\%03o", ord $1/ge;
-  }
+  s/([^\0-\177])/{sprintf "\\x\{%X\}", ord $1}/g;
+  # This will elicit a warning on 5.005_03 about [: :] being reserved unless
+  # I cheat
+  my $cheat = '([[:^print:]])';
+  s/$cheat/{sprintf "\\%03o", ord $1}/g;
   $_;
 }
 

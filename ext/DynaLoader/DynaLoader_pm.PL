@@ -30,34 +30,37 @@ sub to_string {
 # The $^O tests test both for $^O and for $Config{osname}.
 # The latter is better for some for cross-compilation setups.
 #
+sub _expansion {
+    my ($op, $os, $expr) = @_;
+    if ($op ne 'eq' and $op ne 'ne') {die "wrong eq-ne arg in $&"};
+    if ($expr =~ m[^(.*?)<<\|\$\^O-$op-$os>>(.*?)$]s) {
+        my ($if,$el) = ($1,$2);
+        if (($op eq 'eq' and ($^O eq $os || $Config{osname} eq $os)) || ($op eq 'ne' and ($^O ne $os || $Config{osname} ne $os))) {
+            return $if
+        }
+        else {
+            return $el
+        }
+    }
+    else {
+        # #if;#endif
+        if (($op eq 'eq' and ($^O eq $os || $Config{osname} eq $os)) || ($op eq 'ne' and ($^O ne $os || $Config{osname} ne $os))) {
+            return $expr
+        }
+        else {
+            return ""
+        }
+    }
+}
+
 sub expand_os_specific {
     my $s = shift;
     for ($s) {
-	s/<<=(.*?)>>/$1/gee;
-	s/<<\$\^O-(eq|ne)-(\w+)>>(.*?)<<\/\$\^O-\1-\2>>/
-	  my ($op, $os, $expr) = ($1,$2,$3);
-	  if ($op ne 'eq' and $op ne 'ne') {die "wrong eq-ne arg in $&"};
-	  if ($expr =~ m[^(.*?)<<\|\$\^O-$op-$os>>(.*?)$]s) {
-	      # #if;#else;#endif
-	      my ($if,$el) = ($1,$2);
-	      if (($op eq 'eq' and ($^O eq $os || $Config{osname} eq $os)) || ($op eq 'ne' and ($^O ne $os || $Config{osname} ne $os))) {
-		  $if
-	      }
-	      else {
-		  $el
-	      }
-	  }
-	  else {
-	      # #if;#endif
-	      if (($op eq 'eq' and ($^O eq $os || $Config{osname} eq $os)) || ($op eq 'ne' and ($^O ne $os || $Config{osname} ne $os))) {
-		  $expr
-	      }
-	      else {
-	      	  ""
-	      }
-	  }
-	/ges;
-	if (/<<(=|\$\^O-)/) {die "bad <<\$^O-eq/ne-osname>> expression.".
+	s/<<=(.*?)>>/{eval $1}/g;
+	s/<<\$\^O-(eq|ne)-(\w+)>>(.*?)<<\/\$\^O-\1-\2>>/{
+           _expansion($1,$2,$3);
+        }/gs;
+	if (m/<<(=|\$\^O-)/) {die "bad <<\$^O-eq/ne-osname>> expression.".
 	    " Unclosed brackets?";
 	}
     }
@@ -65,7 +68,7 @@ sub expand_os_specific {
 }
 
 unlink "DynaLoader.pm" if -f "DynaLoader.pm";
-open OUT, ">DynaLoader.pm" or die $!;
+open OUT, ">", "DynaLoader.pm" or die $!;
 print OUT <<'EOT';
 
 # Generated from DynaLoader_pm.PL
@@ -202,7 +205,7 @@ EOT
 my $env_dl_library_path = <<'EOT';
 if ($ldlibpthname_defined &&
     exists $ENV{$ldlibpthname}) {
-    push(@dl_library_path, split(/$pthsep/, $ENV{$ldlibpthname}));
+    push(@dl_library_path, split(m/$pthsep/, $ENV{$ldlibpthname}));
 }
 
 # E.g. HP-UX supports both its native SHLIB_PATH *and* LD_LIBRARY_PATH.
@@ -210,7 +213,7 @@ if ($ldlibpthname_defined &&
 if ($ldlibpthname_defined &&
     $ldlibpthname ne 'LD_LIBRARY_PATH' &&
     exists $ENV{LD_LIBRARY_PATH}) {
-    push(@dl_library_path, split(/$pthsep/, $ENV{LD_LIBRARY_PATH}));
+    push(@dl_library_path, split(m/$pthsep/, $ENV{LD_LIBRARY_PATH}));
 }
 EOT
 
@@ -295,7 +298,7 @@ sub bootstrap {
     die 'Dynaloaded Perl modules are not available in this build of Perl' if $OS2::is_static;
 
     <</$^O-eq-os2>>
-    my @modparts = split(/::/,$module);
+    my @modparts = split(m/::/,$module);
     my $modfname = $modparts[-1];
 
     # Some systems have restrictions on files names for DLL's etc.

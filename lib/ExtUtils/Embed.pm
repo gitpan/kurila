@@ -74,9 +74,9 @@ sub xsinit {
     print $fh "EXTERN_C void xs_init ($xsinit_proto);\n\n";     
     print $fh &xsi_protos(@mods);
 
-    print $fh "\nEXTERN_C void\nxs_init($xsinit_proto)\n{\n";
+    print $fh "\nEXTERN_C void\nxs_init($xsinit_proto)\n\{\n";
     print $fh &xsi_body(@mods);
-    print $fh "}\n";
+    print $fh "\}\n";
 
 }
 
@@ -109,7 +109,7 @@ sub xsi_body {
     my($pname,@retval,%seen);
     my($dl) = canon('/','DynaLoader');
     push(@retval, "\tchar *file = __FILE__;\n");
-    push(@retval, "\tdXSUB_SYS;\n") if $] > 5.002;
+    push(@retval, "\tdXSUB_SYS;\n");
     push(@retval, "\n");
 
     foreach $_ (@exts){
@@ -134,7 +134,7 @@ sub static_ext {
     unless (scalar @Extensions) {
       my $static_ext = $Config{static_ext};
       $static_ext =~ s/^\s+//;
-      @Extensions = sort split /\s+/, $static_ext;
+      @Extensions = sort split m/\s+/, $static_ext;
 	unshift @Extensions, qw(DynaLoader);
     }
     @Extensions;
@@ -178,15 +178,15 @@ sub ldopts {
        @argv = @ARGV;
        #hmm
        while($_ = shift @argv) {
-	   /^-std$/  && do { $std = 1; next; };
-	   /^--$/    && do { @link_args = @argv; last; };
-	   /^-I(.*)/ && do { $path = $1 || shift @argv; next; };
+	   m/^-std$/  && do { $std = 1; next; };
+	   m/^--$/    && do { @link_args = @argv; last; };
+	   m/^-I(.*)/ && do { $path = $1 || shift @argv; next; };
 	   push(@mods, $_); 
        }
     }
     $std = 1 unless scalar @link_args;
     my $sep = $Config{path_sep} || ':';
-    @path = $path ? split(/\Q$sep/, $path) : @INC;
+    @path = $path ? split(m/\Q$sep/, $path) : @INC;
 
     push(@potential_libs, @link_args)    if scalar @link_args;
     # makemaker includes std libs on windows by default
@@ -199,7 +199,7 @@ sub ldopts {
     my($mod,@ns,$root,$sub,$extra,$archive,@archives);
     print STDERR "Searching (@path) for archives\n" if $Verbose;
     foreach $mod (@mods) {
-	@ns = split(/::|\/|\\/, $mod);
+	@ns = split(m/::|\/|\\/, $mod);
 	$sub = $ns[-1];
 	$root = File::Spec->catdir(@ns);
 	
@@ -209,9 +209,9 @@ sub ldopts {
 	    push @archives, $archive;
 	    if(-e ($extra = File::Spec->catdir($_,"auto",$root,"extralibs.ld"))) {
 		local(*FH); 
-		if(open(FH, $extra)) {
-		    my($libs) = <FH>; chomp $libs;
-		    push @potential_libs, split /\s+/, $libs;
+		if(open(FH, "<", $extra)) {
+		    my($libs) = ~< *FH; chomp $libs;
+		    push @potential_libs, split m/\s+/, $libs;
 		}
 		else {  
 		    warn "Couldn't open '$extra'"; 
@@ -229,8 +229,8 @@ sub ldopts {
     elsif ($^O eq 'os390' && $Config{usedl}) {
 	# Nothing for OS/390 (z/OS) dynamic.
     } else {
-	$libperl = (grep(/^-l\w*perl\w*$/, @link_args))[0]
-	    || ($Config{libperl} =~ /^lib(\w+)(\Q$lib_ext\E|\.\Q$Config{dlext}\E)$/
+	$libperl = (grep(m/^-l\w*perl\w*$/, @link_args))[0]
+	    || ($Config{libperl} =~ m/^lib(\w+)(\Q$lib_ext\E|\.\Q$Config{dlext}\E)$/
 		? "-l$1" : '')
 		|| "-lperl";
     }

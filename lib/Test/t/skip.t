@@ -3,7 +3,7 @@ use strict;
 use Test qw($TESTOUT $TESTERR $ntest plan ok skip); 
 plan tests => 6;
 
-open F, ">skips" or die "open skips: $!";
+open F, ">", "skips" or die "open skips: $!";
 $TESTOUT = *F{IO};
 $TESTERR = *F{IO};
 
@@ -19,15 +19,15 @@ close F;
 $TESTOUT = *STDOUT{IO};
 $TESTERR = *STDERR{IO};
 $ntest = 1;
-open F, "skips" or die "open skips: $!";
+open F, "<", "skips" or die "open skips: $!";
 
 ok $skipped, 1, 'not skipped?';
 
-my @T = <F>;
+my @T = ~< *F;
 chop @T;
-my @expect = split /\n+/, join('',<DATA>);
+my @expect = split m/\n+/, join('', ~< *DATA);
 ok @T, 4;
-for (my $x=0; $x < @T; $x++) {
+for (my $x=0; $x +< @T; $x++) {
     ok $T[$x], $expect[$x];
 }
 

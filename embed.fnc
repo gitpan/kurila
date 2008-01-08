@@ -273,7 +273,6 @@ Ap	|GP*	|gp_ref		|NULLOK GP* gp
 Ap	|GV*	|gv_AVadd	|NN GV* gv
 Ap	|GV*	|gv_HVadd	|NN GV* gv
 Ap	|GV*	|gv_IOadd	|NN GV* gv
-ApR	|GV*	|gv_autoload4	|NULLOK HV* stash|NN const char* name|STRLEN len|I32 method
 Ap	|void	|gv_check	|NN const HV* stash
 Ap	|void	|gv_efullname	|NN SV* sv|NN const GV* gv
 Apmb	|void	|gv_efullname3	|NN SV* sv|NN const GV* gv|NULLOK const char* prefix
@@ -282,12 +281,8 @@ Ap	|GV*	|gv_fetchfile	|NN const char* name
 Ap	|GV*	|gv_fetchfile_flags|NN const char *const name|const STRLEN len\
 				|const U32 flags
 Apd	|GV*	|gv_fetchmeth	|NULLOK HV* stash|NN const char* name|STRLEN len|I32 level
-Apd	|GV*	|gv_fetchmeth_autoload	|NULLOK HV* stash|NN const char* name|STRLEN len|I32 level
-Apdmb	|GV*	|gv_fetchmethod	|NULLOK HV* stash|NN const char* name
-Apd	|GV*	|gv_fetchmethod_autoload|NULLOK HV* stash|NN const char* name|I32 autoload
+Apdb	|GV*	|gv_fetchmethod	|NULLOK HV* stash|NN const char* name
 Ap	|GV*	|gv_fetchpv	|NN const char* name|I32 add|I32 sv_type
-Ap	|void	|gv_fullname	|NN SV* sv|NN const GV* gv
-Apmb	|void	|gv_fullname3	|NN SV* sv|NN const GV* gv|NULLOK const char* prefix
 Ap	|void	|gv_fullname4	|NN SV* sv|NN const GV* gv|NULLOK const char* prefix|bool keepmain
 pMox	|GP *	|newGP		|NN GV *const gv
 Ap	|void	|gv_init	|NN GV* gv|NULLOK HV* stash|NN const char* name|STRLEN len|int multi
@@ -434,7 +429,6 @@ p	|int	|magic_getnkeys	|NN SV* sv|NN MAGIC* mg
 p	|int	|magic_getpack	|NN SV* sv|NN MAGIC* mg
 p	|int	|magic_getpos	|NN SV* sv|NN MAGIC* mg
 p	|int	|magic_getsig	|NN SV* sv|NN MAGIC* mg
-p	|int	|magic_getsubstr|NN SV* sv|NN MAGIC* mg
 p	|int	|magic_gettaint	|NN SV* sv|NN MAGIC* mg
 p	|int	|magic_getuvar	|NN SV* sv|NN MAGIC* mg
 p	|int	|magic_getvec	|NN SV* sv|NN MAGIC* mg
@@ -460,7 +454,6 @@ p	|int	|magic_setpack	|NN SV* sv|NN MAGIC* mg
 p	|int	|magic_setpos	|NN SV* sv|NN MAGIC* mg
 p	|int	|magic_setregexp|NN SV* sv|NN MAGIC* mg
 p	|int	|magic_setsig	|NN SV* sv|NN MAGIC* mg
-p	|int	|magic_setsubstr|NN SV* sv|NN MAGIC* mg
 p	|int	|magic_settaint	|NN SV* sv|NN MAGIC* mg
 p	|int	|magic_setuvar	|NN SV* sv|NN MAGIC* mg
 p	|int	|magic_setvec	|NN SV* sv|NN MAGIC* mg
@@ -774,6 +767,7 @@ Apd	|NV	|scan_bin	|NN const char* start|STRLEN len|NN STRLEN* retlen
 Apd	|NV	|scan_hex	|NN const char* start|STRLEN len|NN STRLEN* retlen
 Ap	|char*	|scan_num	|NN const char* s|NN YYSTYPE *lvalp
 Apd	|NV	|scan_oct	|NN const char* start|STRLEN len|NN STRLEN* retlen
+Apd     |const char*  |parse_escape   |NN const char *s|NN char *d|NN STRLEN *l|NN const char *send
 p	|OP*	|scope		|NULLOK OP* o
 Ap	|char*	|screaminstr	|NN SV *bigstr|NN SV *littlestr|I32 start_shift \
 				|I32 end_shift|NN I32 *oldposp|I32 last
@@ -803,6 +797,7 @@ Amb	|IV	|sv_2iv		|NN SV* sv
 Apd	|IV	|sv_2iv_flags	|NN SV* sv|I32 flags
 Apd	|SV*	|sv_2mortal	|NULLOK SV* sv
 Apd	|NV	|sv_2nv		|NN SV* sv
+pMd	|SV*	|sv_2num	|NN SV* sv
 Amb	|char*	|sv_2pv		|NN SV* sv|NULLOK STRLEN* lp
 Apd	|char*	|sv_2pv_flags	|NN SV* sv|NULLOK STRLEN* lp|I32 flags
 Apd	|char*	|sv_2pvutf8	|NN SV* sv|NULLOK STRLEN* lp
@@ -902,7 +897,6 @@ Apd	|void	|sv_vcatpvfn	|NN SV* sv|NN const char* pat|STRLEN patlen \
 Apd	|void	|sv_vsetpvfn	|NN SV* sv|NN const char* pat|STRLEN patlen \
 				|NULLOK va_list* args|NULLOK SV** svargs|I32 svmax \
 				|NULLOK bool *maybe_tainted
-ApR	|NV	|str_to_version	|NN SV *sv
 Ap	|SV*	|swash_init	|NN const char* pkg|NN const char* name|NN SV* listsv|I32 minbits|I32 none
 Ap	|UV	|swash_fetch	|NN SV *swash|NN const char *ptr|bool do_utf8
 Ap	|void	|taint_env
@@ -1491,9 +1485,8 @@ sR	|char*	|scan_const	|NN char *start
 sR	|char*	|scan_heredoc	|NN char *s
 s	|char*	|scan_ident	|NN char *s|NN const char *send|NN char *dest \
 				|STRLEN destlen|I32 ck_uni
-sR	|char*	|scan_inputsymbol|NN char *start
 sR	|char*	|scan_pat	|NN char *start|I32 type
-sR	|char*	|scan_str	|NN char *start|int keep_quoted|int keep_delims
+sR	|char*	|scan_str	|NN char *start|int keep_quoted|int keep_delims|NN yy_str_info *str_info
 sR	|char*	|scan_subst	|NN char *start
 sR	|char*	|scan_trans	|NN char *start
 s	|char*	|scan_word	|NN char *s|NN char *dest|STRLEN destlen \
@@ -1509,11 +1502,11 @@ s	|void	|force_ident	|NN const char *s|int kind
 s	|void	|incline	|NN const char *s
 s	|int	|intuit_more	|NN char *s
 s	|I32	|lop		|I32 f|int x|NN char *s
-rs	|void	|missingterm	|NULLOK char *s
+rs	|void	|missingterminator	|NULLOK char *s
 s	|void	|no_op		|NN const char *what|NULLOK char *s
 sR	|I32	|sublex_done
 sR	|I32	|sublex_push
-sR	|I32	|sublex_start
+sR	|I32	|sublex_start   |I32 op_type|NULLOK OP *op
 sR	|char *	|filter_gets	|NN SV *sv|NN PerlIO *fp|STRLEN append
 sR	|char *	|tokenize_use	|int is_use|NN char *s
 so	|SV*	|new_constant	|NULLOK const char *s|STRLEN len \
@@ -1521,13 +1514,12 @@ so	|SV*	|new_constant	|NULLOK const char *s|STRLEN len \
 				|NULLOK SV *pv|NULLOK const char *type \
 				|STRLEN typelen
 s	|int	|ao		|int toketype
-s	|const char*|incl_perldb
 #  if defined(PERL_CR_FILTER)
 s	|I32	|cr_textfilter	|int idx|NULLOK SV *sv|int maxlen
 s	|void	|strip_return	|NN SV *sv
 #  endif
 #  if defined(DEBUGGING)
-s	|int	|tokereport	|I32 rv
+s	|int	|tokereport	|I32 rv|NN const YYSTYPE* lvalp
 s	|void	|printbuf	|NN const char* fmt|NN const char* s
 #  endif
 #endif
@@ -1859,7 +1851,7 @@ Apd	|void	|mro_method_changed_in	|NN HV* stash
 p	|void   |boot_core_mro
 Apon	|void	|sys_init	|NN int* argc|NN char*** argv
 Apon	|void	|sys_init3	|NN int* argc|NN char*** argv|NN char*** env
-Apo	|void	|sys_term
+Apon	|void	|sys_term
 
 
 #if defined(PERL_IN_DUMP_C)

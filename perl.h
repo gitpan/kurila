@@ -2653,7 +2653,7 @@ typedef struct clone_params CLONE_PARAMS;
 
 #define PERL_SYS_INIT(argc, argv)	Perl_sys_init(argc, argv)
 #define PERL_SYS_INIT3(argc, argv, env)	Perl_sys_init3(argc, argv, env)
-#define PERL_SYS_TERM()			Perl_sys_term(aTHX)
+#define PERL_SYS_TERM()			Perl_sys_term()
 
 #ifndef PERL_WRITE_MSG_TO_CONSOLE
 #  define PERL_WRITE_MSG_TO_CONSOLE(io, msg, len) PerlIO_write(io, msg, len)
@@ -3071,12 +3071,9 @@ typedef pthread_key_t	perl_key;
     These formats will still work in perl code.   
     See comments in sv.c for futher details.
 
-	-DvdNUMBER=<number> can be used to redefine VDf
-
-	-DvdNUMBER=0 reverts VDf to "vd", as in perl5.8.7,
-	    which works properly but gives compiler warnings
-
     Robin Barker 2005-07-14
+
+    No longer use %1p for VDf = %vd.  RMB 2007-10-19 
 */
 
 #ifndef SVf_
@@ -3097,25 +3094,22 @@ typedef pthread_key_t	perl_key;
 
 #define SVfARG(p) ((void*)(p))
 
-#ifndef vdNUMBER
-#  define vdNUMBER 1
-#endif
- 
-#ifndef VDf
-#  if vdNUMBER 
-#    define VDf STRINGIFY(vdNUMBER) "p"
-#  else
+#ifdef PERL_CORE
+/* not used; but needed for backward compatibilty with XS code? - RMB */ 
+#  undef VDf
+#else
+#  ifndef VDf
 #    define VDf "vd"
 #  endif
 #endif
 
 #ifdef PERL_CORE
 /* not used; but needed for backward compatibilty with XS code? - RMB */ 
+#  undef UVf
+#else
 #  ifndef UVf
 #    define UVf UVuf
 #  endif
-#else
-#  undef UVf
 #endif
 
 #ifdef HASATTRIBUTE_FORMAT
@@ -3752,8 +3746,6 @@ Gid_t getegid (void);
 #define PERL_MAGIC_vec		  'v' /* vec() lvalue */
 #define PERL_MAGIC_vstring	  'V' /* SV was vstring literal */
 #define PERL_MAGIC_utf8		  'w' /* Cached UTF-8 information */
-#define PERL_MAGIC_substr	  'x' /* substr() lvalue */
-#define PERL_MAGIC_substr_utf8	  'X' /* substr() lvalue with UTF-8 */
 #define PERL_MAGIC_defelem	  'y' /* Shadow "foreach" iterator variable /
 					smart parameter vivification */
 #define PERL_MAGIC_arylen	  '#' /* Array length ($#ary) */
@@ -3970,17 +3962,17 @@ typedef Sighandler_t Sigsave_t;
 #endif
 
 #ifdef USE_PERLIO
-EXTERN_C void PerlIO_teardown(pTHX);
+EXTERN_C void PerlIO_teardown();
 # ifdef USE_ITHREADS
 #  define PERLIO_INIT MUTEX_INIT(&PL_perlio_mutex)
 #  define PERLIO_TERM 				\
 	STMT_START {				\
-		PerlIO_teardown(aTHX);		\
+		PerlIO_teardown();		\
 		MUTEX_DESTROY(&PL_perlio_mutex);\
 	} STMT_END
 # else
 #  define PERLIO_INIT
-#  define PERLIO_TERM	PerlIO_teardown(aTHX)
+#  define PERLIO_TERM	PerlIO_teardown()
 # endif
 #else
 #  define PERLIO_INIT
@@ -4500,8 +4492,6 @@ enum {		/* pass one of these to get_vtbl */
     want_vtbl_mglob,
     want_vtbl_nkeys,
     want_vtbl_taint,
-    want_vtbl_substr,
-    want_vtbl_substr_utf8,
     want_vtbl_vec,
     want_vtbl_pos,
     want_vtbl_bm,
@@ -4627,6 +4617,10 @@ typedef struct exitlistentry {
 #if defined(KILL_BY_SIGPRC)
 #  define  FAKE_DEFAULT_SIGNAL_HANDLERS
 #endif
+
+#define PERL_PATCHLEVEL_H_IMPLICIT
+#include "patchlevel.h"
+#undef PERL_PATCHLEVEL_H_IMPLICIT
 
 #ifdef PERL_GLOBAL_STRUCT
 struct perl_vars {
@@ -4967,30 +4961,6 @@ MGVTBL_SET(
     0,
     0,
     0
-);
-
-MGVTBL_SET(
-    PL_vtbl_substr,
-    MEMBER_TO_FPTR(Perl_magic_getsubstr),
-    MEMBER_TO_FPTR(Perl_magic_setsubstr),
-    0,
-    0,
-    0,
-    0,
-    0,
-    0
-);
-
-MGVTBL_SET(
-    PL_vtbl_substr_utf8,
-    MEMBER_TO_FPTR(Perl_magic_getsubstr),
-    MEMBER_TO_FPTR(Perl_magic_setsubstr),
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL
 );
 
 MGVTBL_SET(
@@ -5831,11 +5801,6 @@ extern void moncontrol(int);
 #define NO_ENV_ARRAY_IN_MAIN
 #endif
 
-/* and finally... */
-#define PERL_PATCHLEVEL_H_IMPLICIT
-#include "patchlevel.h"
-#undef PERL_PATCHLEVEL_H_IMPLICIT
-
 /* These are used by Perl_pv_escape() and Perl_pv_pretty() 
  * are here so that they are available throughout the core 
  * NOTE that even though some are for _escape and some for _pretty
@@ -5916,4 +5881,3 @@ extern void moncontrol(int);
 */
 
 #endif /* Include guard */
-

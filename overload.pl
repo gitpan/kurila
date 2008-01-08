@@ -13,18 +13,18 @@ BEGIN {
 use strict;
 
 my (@enums, @names);
-while (<DATA>) {
-  next if /^#/;
-  next if /^$/;
-  my ($enum, $name) = /^(\S+)\s+(\S+)/ or die "Can't parse $_";
+while ( ~< *DATA) {
+  next if m/^#/;
+  next if m/^$/;
+  my ($enum, $name) = m/^(\S+)\s+(\S+)/ or die "Can't parse $_";
   push @enums, $enum;
   push @names, $name;
 }
 
 safer_unlink ('overload.h', 'overload.c');
-die "overload.h: $!" unless open(C, ">overload.c");
+die "overload.h: $!" unless open(C, ">", "overload.c");
 binmode C;
-die "overload.h: $!" unless open(H, ">overload.h");
+die "overload.h: $!" unless open(H, ">", "overload.h");
 binmode H;
 
 sub print_header {
@@ -70,6 +70,7 @@ EOF
 print C <<'EOF';
 
 #define AMG_id2name(id) (PL_AMG_names[id]+1)
+#define AMG_id2namelen(id) (PL_AMG_namelens[id]-1)
 
 char * const PL_AMG_names[NofAMmeth] = {
   /* Names kept in the symbol table.  fallback => "()", the rest has
@@ -84,7 +85,7 @@ print C "    \"$_\",\n" foreach map { s/(["\\"])/\\$1/g; $_ } @names;
 
 print C <<"EOT";
     "$last"
-};
+\};
 EOT
 
 close H or die $!;
@@ -114,10 +115,10 @@ iter		(<>
 int		(int
 
 # These 12 feature in the next switch statement
-lt		(<
-le		(<=
-gt		(>
-ge		(>=
+lt		(+<
+le		(+<=
+gt		(+>
+ge		(+>=
 eq		(==
 ne		(!=
 slt		(lt
@@ -150,7 +151,7 @@ bor		(^|^
 bor_ass		(^|^=
 bxor		(^^^
 bxor_ass	(^^^=
-ncmp		(<=>
+ncmp		(<+>
 scmp		(cmp
 compl		(^~^
 atan2		(atan2

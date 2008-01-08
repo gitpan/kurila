@@ -11,7 +11,7 @@ BEGIN {
 
 BEGIN { require "./test.pl"; }
 
-plan(tests => 60);
+plan(tests => 61);
 
 use Config;
 
@@ -24,12 +24,19 @@ my $r;
 my @tmpfiles = ();
 END { unlink @tmpfiles }
 
+$r = runperl(
+    switches	=> [],
+    stdin	=> 'foo\nbar\nbaz\n',
+    prog	=> 'print qq(<$_>) while ~< *ARGV',
+);
+is( $r, "<foo\n><bar\n><baz\n>", "no switches" );
+
 # Tests for -0
 
 $r = runperl(
     switches	=> [ '-0', ],
     stdin	=> 'foo\0bar\0baz\0',
-    prog	=> 'print qq(<$_>) while <>',
+    prog	=> 'print qq(<$_>) while ~< *ARGV',
 );
 is( $r, "<foo\0><bar\0><baz\0>", "-0" );
 
@@ -50,7 +57,7 @@ is( $r, "foo\0bar\0baz\0", "-0 before a -l" );
 $r = runperl(
     switches	=> [ sprintf("-0%o", ord 'x') ],
     stdin	=> 'fooxbarxbazx',
-    prog	=> 'print qq(<$_>) while <>',
+    prog	=> 'print qq(<$_>) while ~< *ARGV',
 );
 is( $r, "<foox><barx><bazx>", "-0 with octal number" );
 
@@ -80,7 +87,7 @@ my $filename = 'swctest.tmp';
 SKIP: {
     local $TODO = '';   # this one works on VMS
 
-    open my $f, ">$filename" or skip( "Can't write temp file $filename: $!" );
+    open my $f, ">", "$filename" or skip( "Can't write temp file $filename: $!" );
     print $f <<'SWTEST';
 BEGIN { print "block 1\n"; }
 CHECK { print "block 2\n"; }
@@ -97,12 +104,12 @@ SWTEST
     # Because of the stderr redirection, we can't tell reliably the order
     # in which the output is given
     ok(
-	$r =~ /$filename syntax OK/
-	&& $r =~ /\bblock 1\b/
-	&& $r =~ /\bblock 2\b/
-	&& $r !~ /\bblock 3\b/
-	&& $r !~ /\bblock 4\b/
-	&& $r !~ /\bblock 5\b/,
+	$r =~ m/$filename syntax OK/
+	&& $r =~ m/\bblock 1\b/
+	&& $r =~ m/\bblock 2\b/
+	&& $r !~ m/\bblock 3\b/
+	&& $r !~ m/\bblock 4\b/
+	&& $r !~ m/\bblock 5\b/,
 	'-c'
     );
     push @tmpfiles, $filename;
@@ -127,7 +134,7 @@ is( $r, '21-', '-s switch parsing' );
 
 $filename = 'swstest.tmp';
 SKIP: {
-    open my $f, ">$filename" or skip( "Can't write temp file $filename: $!" );
+    open my $f, ">", "$filename" or skip( "Can't write temp file $filename: $!" );
     print $f <<'SWTEST';
 #!perl -s
 BEGIN { print $x,$y; exit }
@@ -144,7 +151,7 @@ SWTEST
 # Bug ID 20011106.084
 $filename = 'swsntest.tmp';
 SKIP: {
-    open my $f, ">$filename" or skip( "Can't write temp file $filename: $!" );
+    open my $f, ">", "$filename" or skip( "Can't write temp file $filename: $!" );
     print $f <<'SWTEST';
 #!perl -sn
 BEGIN { print $x; exit }
@@ -162,7 +169,7 @@ SWTEST
 
 $filename = 'swtest.pm';
 SKIP: {
-    open my $f, ">$filename" or skip( "Can't write temp file $filename: $!",4 );
+    open my $f, ">", "$filename" or skip( "Can't write temp file $filename: $!",4 );
     print $f <<'SWTESTPM';
 package swtest;
 sub import { print map "<$_>", @_ }
@@ -227,7 +234,7 @@ SWTESTPM
     like( $r, qr/^(?!.*(not found|UNKNOWN))./, 'perl -V:re got a result' );
 
     # make sure each line we got matches the re
-    ok( !( grep !/^i\D+size=/, split /^/, $r ), '-V:re correct' );
+    ok( !( grep !m/^i\D+size=/, split m/^/, $r ), '-V:re correct' );
 }
 
 # Tests for -v
@@ -255,7 +262,7 @@ SWTESTPM
 
 # Tests for switches which do not exist
 
-foreach my $switch (split //, "ABbGgHJjKkLNOoQqRrYyZz123456789_")
+foreach my $switch (split m//, "ABbGgHJjKkLNOoQqRrYyZz123456789_")
 {
     local $TODO = '';   # these ones should work on VMS
 
@@ -273,7 +280,7 @@ foreach my $switch (split //, "ABbGgHJjKkLNOoQqRrYyZz123456789_")
 
     sub do_i_unlink { 1 while unlink("file", "file.bak") }
 
-    open(FILE, ">file") or die "$0: Failed to create 'file': $!";
+    open(FILE, ">", "file") or die "$0: Failed to create 'file': $!";
     print FILE <<__EOF__;
 foo yada dada
 bada foo bing
@@ -285,12 +292,12 @@ __EOF__
 
     runperl( switches => ['-pi.bak'], prog => 's/foo/bar/', args => ['file'] );
 
-    open(FILE, "file") or die "$0: Failed to open 'file': $!";
-    chomp(my @file = <FILE>);
+    open(FILE, "<", "file") or die "$0: Failed to open 'file': $!";
+    chomp(my @file = ~< *FILE);
     close FILE;
 
-    open(BAK, "file.bak") or die "$0: Failed to open 'file': $!";
-    chomp(my @bak = <BAK>);
+    open(BAK, "<", "file.bak") or die "$0: Failed to open 'file': $!";
+    chomp(my @bak = ~< *BAK);
     close BAK;
 
     is(join(":", @file),

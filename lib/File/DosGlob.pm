@@ -26,7 +26,7 @@ sub doglob {
         my $tail;
 	next OUTER unless defined $pat and $pat ne '';
 	# if arg is within quotes strip em and do no globbing
-	if ($pat =~ /^"(.*)"\z/s) {
+	if ($pat =~ m/^"(.*)"\z/s) {
 	    $pat = $1;
 	    if ($cond eq 'd') { push(@retval, $pat) if -d $pat }
 	    else              { push(@retval, $pat) if -e $pat }
@@ -35,23 +35,23 @@ sub doglob {
 	# wildcards with a drive prefix such as h:*.pm must be changed
 	# to h:./*.pm to expand correctly
 	if ($pat =~ m|^([A-Za-z]:)[^/\\]|s) {
-	    substr($_,0,2) = $1 . "./";
+	    substr($_,0,2, $1 . "./");
 	}
 	if ($pat =~ m|^(.*)([\\/])([^\\/]*)\z|s) {
 	    ($head, $sepchr, $tail) = ($1,$2,$3);
 	    #print "div: |$head|$sepchr|$tail|\n";
 	    push (@retval, $pat), next OUTER if $tail eq '';
-	    if ($head =~ /[*?]/) {
+	    if ($head =~ m/[*?]/) {
 		@globdirs = doglob('d', $head);
 		push(@retval, doglob($cond, map {"$_$sepchr$tail"} @globdirs)),
 		    next OUTER if @globdirs;
 	    }
-	    $head .= $sepchr if $head eq '' or $head =~ /^[A-Za-z]:\z/s;
+	    $head .= $sepchr if $head eq '' or $head =~ m/^[A-Za-z]:\z/s;
 	    $pat = $tail;
 	}
 	#
 	# If file component has no wildcards, we can avoid opendir
-	unless ($pat =~ /[*?]/) {
+	unless ($pat =~ m/[*?]/) {
 	    $head = '' if $head eq '.';
 	    $head .= $sepchr unless $head eq '' or substr($head,-1) eq $sepchr;
 	    $head .= $pat;
@@ -84,8 +84,8 @@ sub doglob {
 	    # if name does not have a dot in it *and* pattern
 	    # has a dot *and* name is shorter than 9 chars.
 	    #
-	    if (index($e,'.') == -1 and length($e) < 9
-	        and index($pat,'\\.') != -1) {
+	    if (index($e,'.') == -1 and length($e) +< 9
+	        and index($pat,'\.') != -1) {
 		push(@matched, "$head$e"), next INNER if &$matchsub("$e.");
 	    }
 	}
@@ -113,7 +113,7 @@ sub doglob_Mac {
 	my $sepchr = ':';	
 	next OUTER unless defined $_ and $_ ne '';
 	# if arg is within quotes strip em and do no globbing
-	if (/^"(.*)"\z/s) {
+	if (m/^"(.*)"\z/s) {
 	    $_ = $1;
 		# $_ may contain escaped metachars '\*', '\?' and '\'
 	        my $not_esc_arg = $_;
@@ -135,9 +135,9 @@ sub doglob_Mac {
 		# if a '*' or '?' is preceded by an odd count of '\', temporary delete 
 		# it (and its preceding backslashes), i.e. don't treat '\*' and '\?' as 
 		# wildcards
-		$tmp_head =~ s/(\\*)([*?])/$2 x ((length($1) + 1) % 2)/eg;
+		$tmp_head =~ s/(\\*)([*?])/{$2 x ((length($1) + 1) % 2)}/g;
 	
-		if ($tmp_head =~ /[*?]/) { # if there are wildcards ...	
+		if ($tmp_head =~ m/[*?]/) { # if there are wildcards ...	
 		@globdirs = doglob_Mac('d', $head);
 		push(@retval, doglob_Mac($cond, map {"$_$sepchr$tail"} @globdirs)),
 		    next OUTER if @globdirs;
@@ -156,9 +156,9 @@ sub doglob_Mac {
 	# if a '*' or '?' is preceded by an odd count of '\', temporary delete 
 	# it (and its preceding backslashes), i.e. don't treat '\*' and '\?' as 
 	# wildcards
-	$tmp_tail =~ s/(\\*)([*?])/$2 x ((length($1) + 1) % 2)/eg;
+	$tmp_tail =~ s/(\\*)([*?])/{$2 x ((length($1) + 1) % 2)}/g;
 	
-	unless ($tmp_tail =~ /[*?]/) { # if there are wildcards ...
+	unless ($tmp_tail =~ m/[*?]/) { # if there are wildcards ...
 	    $not_esc_head = $head = '' if $head eq ':';
 	    my $not_esc_tail = $_;
 	    # unescape $head and $tail for file operations
@@ -178,10 +178,10 @@ sub doglob_Mac {
 	$_ =~ s:([].+^\-\${}[|]):\\$1:g;
 	# and convert DOS-style wildcards to regex,
 	# but only if they are not escaped
-	$_ =~ s/(\\*)([*?])/$1 . ('.' x ((length($1) + 1) % 2)) . $2/eg;
+	$_ =~ s/(\\*)([*?])/{$1 . ('.' x ((length($1) + 1) % 2)) . $2}/g;
 
 	#print "regex: '$_', head: '$head', unescaped head: '$not_esc_head'\n";
-	my $matchsub = eval 'sub { $_[0] =~ m|^' . $_ . '\\z|ios }';
+	my $matchsub = eval 'sub { $_[0] =~ m|^' . $_ . '\z|ios }';
 	warn($@), next OUTER if $@;
       INNER:
 	for my $e (@leaves) {
@@ -233,7 +233,7 @@ sub _expand_volume {
 	
 	while (@pat) {
 		my $pat = shift @pat;	
-		if ($pat =~ /^([^:]+:)(.*)\z/) { # match a volume name?
+		if ($pat =~ m/^([^:]+:)(.*)\z/) { # match a volume name?
 			my $vol_pat = $1;
 			my $tail = $2;
 			#
@@ -241,7 +241,7 @@ sub _expand_volume {
 			$vol_pat =~ s:([].+^\-\${}[|]):\\$1:g;
 			# and convert DOS-style wildcards to regex,
 			# but only if they are not escaped
-			$vol_pat =~ s/(\\*)([*?])/$1 . ('.' x ((length($1) + 1) % 2)) . $2/eg;
+			$vol_pat =~ s/(\\*)([*?])/{$1 . ('.' x ((length($1) + 1) % 2)) . $2}/g;
 			#print "volume regex: '$vol_pat' \n";
 				
 			foreach my $volume (@mounted_volumes) {
@@ -313,7 +313,7 @@ sub glob {
     $pat = $_ unless defined $pat;
 
     # extract patterns
-    if ($pat =~ /\s/) {
+    if ($pat =~ m/\s/) {
 	require Text::ParseWords;
 	@pat = Text::ParseWords::parse_line('\s+',0,$pat);
     }
@@ -329,7 +329,7 @@ sub glob {
 	my @appendpat = ();
 	for (@pat) {
 	    # There must be a "," I.E. abc{efg} is not what we want.
-	    while ( /^(.*)(?<!\\)\{(.*?)(?<!\\)\,.*?(?<!\\)\}(.*)$/ ) {
+	    while ( m/^(.*)(?<!\\)\{(.*?)(?<!\\)\,.*?(?<!\\)\}(.*)$/ ) {
 		my ($start, $match, $end) = ($1, $2, $3);
 		#print "Got: \n\t$start\n\t$match\n\t$end\n";
 		my $tmp = "$start$match$end";
@@ -340,7 +340,7 @@ sub glob {
 		}
 		push @appendpat, ("$tmp");
 		s/^\Q$start\E(?<!\\)\{\Q$match\E(?<!\\)\,/$start\{/;
-		if ( /^\Q$start\E(?<!\\)\{(?!.*?(?<!\\)\,.*?\Q$end\E$)(.*)(?<!\\)\}\Q$end\E$/ ) {
+		if ( m/^\Q$start\E(?<!\\)\{(?!.*?(?<!\\)\,.*?\Q$end\E$)(.*)(?<!\\)\}\Q$end\E$/ ) {
 		    $match = $1;
 		    #print "GOT: \n\t$start\n\t$match\n\t$end\n\n";
 		    $_ = "$start$match$end";
@@ -361,8 +361,8 @@ sub glob {
 	}
     }
     for ( @pat ) {
-	s/\\{/{/g;
-	s/\\}/}/g;
+	s/\\{/\{/g;
+	s/\\}/\}/g;
 	s/\\,/,/g;
     }
     #print join ("\n", @pat). "\n";

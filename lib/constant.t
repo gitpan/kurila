@@ -16,7 +16,7 @@ END { print STDERR @warnings }
 
 
 use strict;
-use Test::More tests => 97;
+use Test::More tests => 96;
 my $TB = Test::More->builder;
 
 BEGIN { use_ok('constant'); }
@@ -30,7 +30,7 @@ sub deg2rad { PI * $_[0] / 180 }
 
 my $ninety = deg2rad 90;
 
-cmp_ok abs($ninety - 1.5707), '<', 0.0001, '    in math expression';
+cmp_ok abs($ninety - 1.5707), '+<', 0.0001, '    in math expression';
 
 use constant UNDEF1	=> undef;	# the right way
 use constant UNDEF2	=>	;	# the weird way
@@ -72,12 +72,12 @@ is "d e f @{[ DEF ]} d e f", "d e f D E F d e f";
 
 use constant SINGLE	=> "'";
 use constant DOUBLE	=> '"';
-use constant BACK	=> '\\';
+use constant BACK	=> '\';
 my $tt = BACK . SINGLE . DOUBLE ;
-is $tt, q(\\'");
+is $tt, q(\'");
 
-use constant MESS	=> q('"'\\"'"\\);
-is MESS, q('"'\\"'"\\);
+use constant MESS	=> q('"'\"'"\);
+is MESS, q('"'\"'"\);
 is length(MESS), 8;
 
 use constant TRAILING	=> '12 cats';
@@ -103,19 +103,19 @@ is ZERO3, '0.0';
     use constant PI	=> 3.141;
 }
 
-cmp_ok(abs(PI - 3.1416), '<', 0.0001);
+cmp_ok(abs(PI - 3.1416), '+<', 0.0001);
 is Other::PI, 3.141;
 
 use constant E2BIG => $! = 7;
 cmp_ok E2BIG, '==', 7;
 # This is something like "Arg list too long", but the actual message
 # text may vary, so we can't test much better than this.
-cmp_ok length(E2BIG), '>', 6;
+cmp_ok length(E2BIG), '+>', 6;
 
 is @warnings, 0 or diag join "\n", "unexpected warning", @warnings;
 @warnings = ();		# just in case
 undef &PI;
-ok @warnings && ($warnings[0] =~ /Constant sub.* undefined/) or
+ok @warnings && ($warnings[0] =~ m/Constant sub.* undefined/) or
   diag join "\n", "unexpected warning", @warnings;
 shift @warnings;
 
@@ -136,7 +136,7 @@ print $output CCODE->($curr_test+4);
 $TB->current_test($curr_test+4);
 
 eval q{ CCODE->{foo} };
-ok scalar($@ =~ /^Constant is not a HASH/);
+ok scalar($@ =~ m/^Constant is not a HASH/);
 
 
 # Allow leading underscore
@@ -152,11 +152,11 @@ like $@, qr/begins with '__'/;
 # Check on declared() and %declared. This sub should be EXACTLY the
 # same as the one quoted in the docs!
 sub declared ($) {
-    use constant 1.01;              # don't omit this!
+    use constant v1.01;              # don't omit this!
     my $name = shift;
     $name =~ s/^::/main::/;
     my $pkg = caller;
-    my $full_name = $name =~ /::/ ? $name : "${pkg}::$name";
+    my $full_name = $name =~ m/::/ ? $name : "${pkg}::$name";
     $constant::declared{$full_name};
 }
 
@@ -181,7 +181,6 @@ ok $constant::declared{'Other::IN_OTHER_PACK'};
 @warnings = ();
 eval q{
     no warnings;
-    #local $^W if $] < 5.006;
     use warnings 'constant';
     use constant 'BEGIN' => 1 ;
     use constant 'INIT' => 1 ;
@@ -209,7 +208,6 @@ my @Expected_Warnings =
    qr/^Constant name 'UNITCHECK' is a Perl keyword at/,
    qr/^Constant name 'END' is a Perl keyword at/,
    qr/^Constant name 'DESTROY' is a Perl keyword at/,
-   qr/^Constant name 'AUTOLOAD' is a Perl keyword at/,
    qr/^Constant name 'STDIN' is forced into package main:: a/,
    qr/^Constant name 'STDOUT' is forced into package main:: at/,
    qr/^Constant name 'STDERR' is forced into package main:: at/,
@@ -221,20 +219,14 @@ my @Expected_Warnings =
 );
 
 # when run under "make test"
-if (@warnings == 16) {
+if (0+@warnings == 0+@Expected_Warnings) {
     push @warnings, "";
     push @Expected_Warnings, qr/^$/;
 }
 # when run directly: perl -wT -Ilib t/constant.t
-elsif (@warnings == 17) {
+elsif (@warnings == @Expected_Warnings + 1) {
     splice @Expected_Warnings, 1, 0, 
         qr/^Prototype mismatch: sub main::BEGIN \(\) vs none at/;
-}
-# when run directly under 5.6.2: perl -wT -Ilib t/constant.t
-elsif (@warnings == 15) {
-    splice @Expected_Warnings, 1, 1;
-    push @warnings, "", "";
-    push @Expected_Warnings, qr/^$/, qr/^$/;
 }
 else {
     my $rule = " -" x 20;
@@ -243,7 +235,7 @@ else {
     diag $rule, $/;
 }
 
-is @warnings, 17;
+is @warnings, 0+@Expected_Warnings;
 
 for my $idx (0..$#warnings) {
     like $warnings[$idx], $Expected_Warnings[$idx];
@@ -297,7 +289,7 @@ sub zit;
     eval 'use constant zit => 4; 1' or die $@;
 
     # empty prototypes are reported differently in different versions
-    my $no_proto = $] < 5.008 ? "" : ": none";
+    my $no_proto = ": none";
 
     is(scalar @warnings, 1, "1 warning");
     like ($warnings[0], qr/^Prototype mismatch: sub main::zit$no_proto vs \(\)/,

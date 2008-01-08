@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w -I.
 
 use strict;
-our @tests = (split(/\nEND\n/s, <<DONE));
+our @tests = (split(m/\nEND\n/s, <<DONE));
 TEST1
 Cyberdog Information
 
@@ -100,7 +100,7 @@ sub write_file
 
 	local(*F);
 
-	open(F, ">$f") || die "open >$f: $!";
+	open(F, ">", "$f") || die "open >$f: $!";
 	(print F @data) || die "write $f: $!";
 	close(F) || die "close $f: $!";
 	return 1;

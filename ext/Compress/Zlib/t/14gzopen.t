@@ -185,13 +185,13 @@ ok ! $fil->gzeof() ;
 my $line = '';
 for my $i (0 .. @text -2)
 {
-    ok $fil->gzreadline($line) > 0;
+    ok $fil->gzreadline($line) +> 0;
     is $line, $text[$i] ;
     ok ! $fil->gzeof() ;
 }
 
 # now read the last line
-ok $fil->gzreadline($line) > 0;
+ok $fil->gzreadline($line) +> 0;
 is $line, $text[-1] ;
 ok $fil->gzeof() ;
 
@@ -216,7 +216,7 @@ ok $fil = gzopen($name, "rb") ;
 ok ! $fil->gzeof() ;
 my $i = 0 ;
 my @got = ();
-while ($fil->gzreadline($line) > 0) {
+while ($fil->gzreadline($line) +> 0) {
     $got[$i] = $line ;    
     ++ $i ;
 }
@@ -243,7 +243,7 @@ ok ! $fil->gzclose ;
 # now try to read it back in
 ok $fil = gzopen($name, "rb") ;
 @got = () ; $i = 0 ;
-while ($fil->gzreadline($line) > 0) {
+while ($fil->gzreadline($line) +> 0) {
     $got[$i] = $line ;    
     ++ $i ;
 }
@@ -278,15 +278,15 @@ ok ! $fil->gzclose ;
     # now try to read it back in
     ok $fil = gzopen($name, "rb"), '  gzopen for read ok' ;
     ok ! $fil->gzeof(), '    !gzeof' ;
-    cmp_ok $fil->gzreadline($line), '>', 0, '    gzreadline' ;
+    cmp_ok $fil->gzreadline($line), '+>', 0, '    gzreadline' ;
     is $fil->gztell(), length $line1, '    gztell ok' ;
     ok ! $fil->gzeof(), '    !gzeof' ;
     is $line, $line1, '    got expected line' ;
-    cmp_ok $fil->gzread($line, length $line2), '>', 0, '    gzread ok' ;
+    cmp_ok $fil->gzread($line, length $line2), '+>', 0, '    gzread ok' ;
     is $fil->gztell(), length($line1)+length($line2), '    gztell ok' ;
     ok ! $fil->gzeof(), '    !gzeof' ;
     is $line, $line2, '    read expected block' ;
-    cmp_ok $fil->gzread($line, length $line3), '>', 0, '    gzread ok' ;
+    cmp_ok $fil->gzread($line, length $line3), '+>', 0, '    gzread ok' ;
     is $fil->gztell(), length($text), '    gztell ok' ;
     ok   $fil->gzeof(), '    !gzeof' ;
     is $line, $line3, '    read expected block' ;
@@ -301,7 +301,7 @@ ok ! $fil->gzclose ;
     my $hello = "hello" ;
     my $len = length $hello ;
 
-    my $f = IO::File->new( ">$name") ;
+    my $f = IO::File->new( "$name", ">") ;
     ok $f;
 
     my $fil;
@@ -311,7 +311,7 @@ ok ! $fil->gzclose ;
 
     ok ! $fil->gzclose ;
 
-    $f = IO::File->new( "<$name") ;
+    $f = IO::File->new( "$name", "<") ;
     ok $fil = gzopen($name, "rb") ;
 
     my $uncmomp;
@@ -334,7 +334,7 @@ ok ! $fil->gzclose ;
     my $hello = "hello" ;
     my $len = length $hello ;
 
-    open F, ">$name" ;
+    open F, ">", "$name" ;
 
     my $fil;
     ok $fil = gzopen(*F, "wb") ;
@@ -343,7 +343,7 @@ ok ! $fil->gzclose ;
 
     ok ! $fil->gzclose ;
 
-    open F, "<$name" ;
+    open F, "<", "$name" ;
     ok $fil = gzopen(*F, "rb") ;
 
     my $uncmomp;
@@ -359,7 +359,7 @@ ok ! $fil->gzclose ;
 
 }
 
-foreach my $stdio ( ['-', '-'], [*STDIN, *STDOUT])
+foreach my $stdio ( ['-', '-'], [\*STDIN, \*STDOUT])
 {
     my $stdin = $stdio->[0];
     my $stdout = $stdio->[1];
@@ -371,9 +371,9 @@ foreach my $stdio ( ['-', '-'], [*STDIN, *STDOUT])
     my $hello = "hello" ;
     my $len = length $hello ;
 
-    ok open(SAVEOUT, ">&STDOUT"), "  save STDOUT";
+    ok open(SAVEOUT, ">&", \*STDOUT), "  save STDOUT";
     my $dummy = fileno SAVEOUT;
-    ok open(STDOUT, ">$name"), "  redirect STDOUT" ;
+    ok open(STDOUT, ">", "$name"), "  redirect STDOUT" ;
     
     my $status = 0 ;
 
@@ -383,12 +383,12 @@ foreach my $stdio ( ['-', '-'], [*STDIN, *STDOUT])
               ($fil->gzwrite($hello) == $len) &&
               ($fil->gzclose == 0) ;
 
-    open(STDOUT, ">&SAVEOUT");
+    open(STDOUT, ">&", \*SAVEOUT);
 
     ok $status, "  wrote to stdout";
 
-       open(SAVEIN, "<&STDIN");
-    ok open(STDIN, "<$name"), "  redirect STDIN";
+       open(SAVEIN, "<&", \*STDIN);
+    ok open(STDIN, "<", "$name"), "  redirect STDIN";
     $dummy = fileno SAVEIN;
 
     ok $fil = gzopen($stdin, "rb") ;
@@ -401,7 +401,7 @@ foreach my $stdio ( ['-', '-'], [*STDIN, *STDOUT])
     ok ! $fil->gzclose ;
     ok   $fil->gzeof() ;
 
-       open(STDIN, "<&SAVEIN");
+       open(STDIN, "<&", \*SAVEIN);
 
     is $uncomp, $hello ;
 
@@ -420,7 +420,7 @@ foreach my $stdio ( ['-', '-'], [*STDIN, *STDOUT])
         '  gzopen with missing mode fails' ;
 
     # unknown parameters
-    $fil = gzopen($name, "xy") ;
+    $fil = eval { gzopen($name, "xy") };
     ok ! defined $fil, '  gzopen with unknown mode fails' ;
 
     $fil = gzopen($name, "ab") ;
@@ -475,7 +475,7 @@ foreach my $stdio ( ['-', '-'], [*STDIN, *STDOUT])
 
         ok ! -w $name, "  input file not writable";
 
-        my $fil = gzopen($name, "wb") ;
+        my $fil = eval { gzopen($name, "wb") };
         ok !$fil, "  gzopen returns undef" ;
         ok $gzerrno, "  gzerrno ok" or 
             diag " gzerrno $gzerrno\n";
@@ -497,7 +497,7 @@ foreach my $stdio ( ['-', '-'], [*STDIN, *STDOUT])
 
         ok ! -r $name, "  input file not readable";
         $gzerrno = 0;
-        $fil = gzopen($name, "rb") ;
+        $fil = eval { gzopen($name, "rb") };
         ok !$fil, "  gzopen returns undef" ;
         ok $gzerrno, "  gzerrno ok";
         chmod 0777, $name ;

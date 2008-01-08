@@ -145,16 +145,16 @@ sub load_pad {
     return if class($padlist) eq "SPECIAL";
     ($namelistav,$vallistav) = $padlist->ARRAY;
     @namelist = $namelistav->ARRAY;
-    for ($ix = 1; $ix < @namelist; $ix++) {
+    for ($ix = 1; $ix +< @namelist; $ix++) {
 	my $namesv = $namelist[$ix];
 	next if class($namesv) eq "SPECIAL";
-	my ($type, $name) = $namesv->PV =~ /^(.)([^\0]*)(\0.*)?$/;
+	my ($type, $name) = $namesv->PV =~ m/^(.)([^\0]*)(\0.*)?$/;
 	$pad[$ix] = ["(lexical)", $type || '?', $name || '?'];
     }
     if ($Config{useithreads}) {
 	my (@vallist);
 	@vallist = $vallistav->ARRAY;
-	for ($ix = 1; $ix < @vallist; $ix++) {
+	for ($ix = 1; $ix +< @vallist; $ix++) {
 	    my $valsv = $vallist[$ix];
 	    next unless class($valsv) eq "GV";
 	    # these pad GVs don't have corresponding names, so same @pad
@@ -172,7 +172,7 @@ sub xref {
 	warn sprintf("top = [%s, %s, %s]\n", @$top) if $debug_top;
 	warn peekop($op), "\n" if $debug_op;
 	my $opname = $op->name;
-	if ($opname =~ /^(or|and|mapwhile|grepwhile|range|cond_expr)$/) {
+	if ($opname =~ m/^(or|and|mapwhile|grepwhile|range|cond_expr)$/) {
 	    xref($op->other);
 	} elsif ($opname eq "match" || $opname eq "subst") {
 	    xref($op->pmreplstart);
@@ -326,7 +326,7 @@ sub xref_definitions {
     my ($pack, %exclude);
     return if $nodefs;
     $subname = "(definitions)";
-    foreach $pack (qw(B O AutoLoader DynaLoader XSLoader Config DB VMS
+    foreach $pack (qw(B O DynaLoader XSLoader Config DB VMS
 		      strict vars FileHandle Exporter Carp PerlIO::Layer
 		      attributes utf8 warnings)) {
         $exclude{$pack."::"} = 1;
@@ -370,7 +370,7 @@ sub compile {
     my ($option, $opt, $arg);
   OPTION:
     while ($option = shift @options) {
-	if ($option =~ /^-(.)(.*)/) {
+	if ($option =~ m/^-(.)(.*)/) {
 	    $opt = $1;
 	    $arg = $2;
 	} else {
@@ -382,14 +382,14 @@ sub compile {
 	    last OPTION;
 	} elsif ($opt eq "o") {
 	    $arg ||= shift @options;
-	    open(STDOUT, ">$arg") or return "$arg: $!\n";
+	    open(STDOUT, ">", "$arg") or return "$arg: $!\n";
 	} elsif ($opt eq "d") {
 	    $nodefs = 1;
 	} elsif ($opt eq "r") {
 	    $raw = 1;
 	} elsif ($opt eq "D") {
             $arg ||= shift @options;
-	    foreach $arg (split(//, $arg)) {
+	    foreach $arg (split(m//, $arg)) {
 		if ($arg eq "o") {
 		    B->debug(1);
 		} elsif ($arg eq "O") {
@@ -405,7 +405,7 @@ sub compile {
 	    my $objname;
 	    xref_definitions();
 	    foreach $objname (@options) {
-		$objname = "main::$objname" unless $objname =~ /::/;
+		$objname = "main::$objname" unless $objname =~ m/::/;
 		eval "xref_object(\\&$objname)";
 		die "xref_object(\\&$objname) failed: $@" if $@;
 	    }

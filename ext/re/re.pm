@@ -35,7 +35,7 @@ sub setcolor {
 
   my $terminal = Term::Cap->Tgetent({OSPEED => 9600}); # Avoid warning.
   my $props = $ENV{PERL_RE_TC} || 'md,me,so,se,us,ue';
-  my @props = split /,/, $props;
+  my @props = split m/,/, $props;
   my $colors = join "\t", map {$terminal->Tputs($_,1)} @props;
 
   $colors =~ s/\0//g;
@@ -119,7 +119,7 @@ sub bits {
     foreach my $idx (0..$#_){
         my $s=$_[$idx];
         if ($s eq 'Debug' or $s eq 'Debugcolor') {
-            setcolor() if $s =~/color/i;
+            setcolor() if $s =~m/color/i;
             ${^RE_DEBUG_FLAGS} = 0 unless defined ${^RE_DEBUG_FLAGS};
             for my $idx ($idx+1..$#_) {
                 if ($flags{$_[$idx]}) {
@@ -137,7 +137,7 @@ sub bits {
             _load_unload($on ? 1 : ${^RE_DEBUG_FLAGS});
             last;
         } elsif ($s eq 'debug' or $s eq 'debugcolor') {
-	    setcolor() if $s =~/color/i;
+	    setcolor() if $s =~m/color/i;
 	    _load_unload($on);
 	    last;
         } elsif (exists $bitmask{$s}) {

@@ -1,4 +1,5 @@
 package utf8;
+
 use strict;
 use warnings;
 
@@ -17,47 +18,9 @@ our (%PropertyAlias, %PA_reverse, %PropValueAlias, %PVA_reverse, %PVA_abbr_map);
 ## It's a data structure that encodes a set of Unicode characters.
 ##
 
-sub length (_) {
-    BEGIN { utf8::import() }
-    return CORE::length($_[0]);
-}
-
-sub substr ($$;$$) {
-    BEGIN { utf8::import() }
-    return
-	@_ == 2 ? CORE::substr($_[0], $_[1]) :
-	@_ == 3 ? CORE::substr($_[0], $_[1], $_[2]) :
-	          CORE::substr($_[0], $_[1], $_[2], $_[3]) ;
-}
-
-sub ord (_) {
-    BEGIN { utf8::import() }
-    return CORE::ord($_[0]);
-}
-
-sub chr (_) {
-    BEGIN { utf8::import() }
-    return CORE::chr($_[0]);
-}
-
-sub index ($$;$) {
-    BEGIN { utf8::import() }
-    return
-	@_ == 2 ? CORE::index($_[0], $_[1]) :
-	          CORE::index($_[0], $_[1], $_[2]) ;
-}
-
-sub rindex ($$;$) {
-    BEGIN { utf8::import() }
-    return
-	@_ == 2 ? CORE::rindex($_[0], $_[1]) :
-	          CORE::rindex($_[0], $_[1], $_[2]) ;
-}
-
-
 use bytes;
 
-sub SWASHNEW {
+sub SWASHNEW_real {
     my ($class, $type, $list, $minbits, $none) = @_;
     local $^D = 0 if $^D;
 
@@ -110,7 +73,7 @@ sub SWASHNEW {
 
 	    my $caller1 = $type =~ s/(.+)::// ? $1 : caller(1);
 
-	    if (defined $caller1 && $type =~ /^(?:\w+)$/) {
+	    if (defined $caller1 && $type =~ m/^(?:\w+)$/) {
 		my $prop = *{Symbol::fetch_glob("${caller1}::$type")};
 		if (exists &{$prop}) {
 		    no strict 'refs';
@@ -135,7 +98,7 @@ sub SWASHNEW {
 	    ## See if it's in some enumeration.
 	    ##
 	    require "unicore/PVA.pl";
-	    if ($type =~ /^([\w\s]+)[:=]\s*(.*)/) {
+	    if ($type =~ m/^([\w\s]+)[:=]\s*(.*)/) {
 		my ($enum, $val) = (lc $1, lc $2);
 		$enum =~ tr/ _-//d;
 		$val =~ tr/ _-//d;
@@ -188,7 +151,7 @@ sub SWASHNEW {
 
 	    my $caller0 = caller(0);
 
-	    if (defined $caller0 && $type =~ /^To(?:\w+)$/) {
+	    if (defined $caller0 && $type =~ m/^To(?:\w+)$/) {
 		my $map = $caller0 . "::" . $type;
 
 		if (exists &{*{Symbol::fetch_glob($map)}}) {
@@ -205,7 +168,7 @@ sub SWASHNEW {
 	    ## The user-level way to access ToDigit() and ToFold()
 	    ## is to use Unicode::UCD.
             ##
-            if ($type =~ /^To(Digit|Fold|Lower|Title|Upper)$/) {
+            if ($type =~ m/^To(Digit|Fold|Lower|Title|Upper)$/) {
                 $file = "unicore/To/$1.pl";
                 ## would like to test to see if $file actually exists....
                 last GETFILE;
@@ -231,7 +194,7 @@ sub SWASHNEW {
 	    ##
 	    my $found = $Cache{$class, $file};
 	    if ($found and ref($found) eq $class) {
-		print STDERR "Returning cached '$file' for \\p{$type}\n" if DEBUG;
+		print STDERR "Returning cached '$file' for \\p\{$type\}\n" if DEBUG;
 		return $found;
 	    }
 
@@ -246,15 +209,15 @@ sub SWASHNEW {
 
     my $ORIG = $list;
     if ($list) {
-	my @tmp = split(/^/m, $list);
+	my @tmp = split(m/^/m, $list);
 	my %seen;
 	no warnings;
-	$extras = join '', grep /^[^0-9a-fA-F]/, @tmp;
+	$extras = join '', grep m/^[^0-9a-fA-F]/, @tmp;
 	$list = join '',
 	    map  { $_->[1] }
-	    sort { $a->[0] <=> $b->[0] }
-	    map  { /^([0-9a-fA-F]+)/; [ CORE::hex($1), $_ ] }
-	    grep { /^([0-9a-fA-F]+)/ and not $seen{$1}++ } @tmp; # XXX doesn't do ranges right
+	    sort { $a->[0] <+> $b->[0] }
+	    map  { m/^([0-9a-fA-F]+)/; [ CORE::hex($1), $_ ] }
+	    grep { m/^([0-9a-fA-F]+)/ and not $seen{$1}++ } @tmp; # XXX doesn't do ranges right
     }
 
     if ($none) {
@@ -262,43 +225,43 @@ sub SWASHNEW {
 	$list =~ s/\tXXXX$/\t$hextra/mg;
     }
 
-    if ($minbits != 1 && $minbits < 32) { # not binary property
+    if ($minbits != 1 && $minbits +< 32) { # not binary property
 	my $top = 0;
-	while ($list =~ /^([0-9a-fA-F]+)(?:[\t]([0-9a-fA-F]+)?)(?:[ \t]([0-9a-fA-F]+))?/mg) {
+	while ($list =~ m/^([0-9a-fA-F]+)(?:[\t]([0-9a-fA-F]+)?)(?:[ \t]([0-9a-fA-F]+))?/mg) {
 	    my $min = CORE::hex $1;
 	    my $max = defined $2 ? CORE::hex $2 : $min;
 	    my $val = defined $3 ? CORE::hex $3 : 0;
 	    $val += $max - $min if defined $3;
-	    $top = $val if $val > $top;
+	    $top = $val if $val +> $top;
 	}
 	my $topbits =
-	    $top > 0xffff ? 32 :
-	    $top > 0xff ? 16 : 8;
-	$bits = $topbits if $bits < $topbits;
+	    $top +> 0xffff ? 32 :
+	    $top +> 0xff ? 16 : 8;
+	$bits = $topbits if $bits +< $topbits;
     }
 
     my @extras;
     for my $x ($extras) {
 	pos $x = 0;
-	while ($x =~ /^([^0-9a-fA-F\n])(.*)/mg) {
+	while ($x =~ m/^([^0-9a-fA-F\n])(.*)/mg) {
 	    my $char = $1;
 	    my $name = $2;
 	    print STDERR "$1 => $2\n" if DEBUG;
-	    if ($char =~ /[-+!&]/) {
-		my ($c,$t) = split(/::/, $name, 2);	# bogus use of ::, really
+	    if ($char =~ m/[-+!&]/) {
+		my ($c,$t) = split(m/::/, $name, 2);	# bogus use of ::, really
 		my $subobj;
 		if ($c eq 'utf8') {
-		    $subobj = utf8->SWASHNEW($t, "", $minbits, 0);
+		    $subobj = SWASHNEW_real('utf8', $t, "", $minbits, 0);
 		}
 		elsif (exists &$name) {
-		    $subobj = utf8->SWASHNEW($name, "", $minbits, 0);
+		    $subobj = SWASHNEW_real('utf8', $name, "", $minbits, 0);
 		}
-		elsif ($c =~ /^([0-9a-fA-F]+)/) {
-		    $subobj = utf8->SWASHNEW("", $c, $minbits, 0);
+		elsif ($c =~ m/^([0-9a-fA-F]+)/) {
+		    $subobj = SWASHNEW_real('utf8', "", $c, $minbits, 0);
 		}
 		return $subobj unless ref $subobj;
 		push @extras, $name => $subobj;
-		$bits = $subobj->{BITS} if $bits < $subobj->{BITS};
+		$bits = $subobj->{BITS} if $bits +< $subobj->{BITS};
 	    }
 	}
     }

@@ -99,12 +99,12 @@ my %options = (
 # Default is now to first use the native mechanism, so Perl programs 
 # behave like other normal Unix programs, then try other mechanisms.
 my @connectMethods = qw(native tcp udp unix pipe stream console);
-if ($^O =~ /^(freebsd|linux)$/) {
+if ($^O =~ m/^(freebsd|linux)$/) {
     @connectMethods = grep { $_ ne 'udp' } @connectMethods;
 }
 
 # use EventLog on Win32
-my $is_Win32 = $^O =~ /Win32/i;
+my $is_Win32 = $^O =~ m/Win32/i;
 eval "use Sys::Syslog::Win32";
 
 if (not $@) {
@@ -120,21 +120,6 @@ my @fallbackMethods = ();
 my $err_sub = $options{nofatal} ? \&warnings::warnif : \&croak;
 
 
-sub AUTOLOAD {
-    # This AUTOLOAD is used to 'autoload' constants from the constant()
-    # XS function.
-    no strict 'vars';
-    my $constname;
-    ($constname = $AUTOLOAD) =~ s/.*:://;
-    croak "Sys::Syslog::constant() not defined" if $constname eq 'constant';
-    my ($error, $val) = constant($constname);
-    croak $error if $error;
-    no strict 'refs';
-    *{Symbol::fetch_glob($AUTOLOAD)} = sub { $val };
-    goto &{Symbol::fetch_glob($AUTOLOAD)};
-}
-
-
 sub openlog {
     ($ident, my $logopt, $facility) = @_;
 
@@ -143,7 +128,7 @@ sub openlog {
     $logopt   ||= '';
     $facility ||= LOG_USER();
 
-    for my $opt (split /\b/, $logopt) {
+    for my $opt (split m/\b/, $logopt) {
         $options{$opt} = 1 if exists $options{$opt}
     }
 
@@ -284,16 +269,16 @@ sub syslog {
     croak "syslog: expecting argument \$priority" unless defined $priority;
     croak "syslog: expecting argument \$format"   unless defined $mask;
 
-    @words = split(/\W+/, $priority, 2);    # Allow "level" or "level|facility".
+    @words = split(m/\W+/, $priority, 2);    # Allow "level" or "level|facility".
     undef $numpri;
     undef $numfac;
 
     foreach (@words) {
 	$num = xlate($_);		    # Translate word to number.
-	if ($num < 0) {
+	if ($num +< 0) {
 	    croak "syslog: invalid level/facility: $_"
 	}
-	elsif ($num <= &LOG_PRIMASK) {
+	elsif ($num +<= &LOG_PRIMASK) {
 	    croak "syslog: too many levels given: $_" if defined $numpri;
 	    $numpri = $num;
 	    return 0 unless LOG_MASK($numpri) ^&^ $maskpri;
@@ -314,18 +299,18 @@ sub syslog {
 
     connect_log() unless $connected;
 
-    if ($mask =~ /%m/) {
+    if ($mask =~ m/%m/) {
         # escape percent signs for sprintf()
         $error =~ s/%/%%/g if @_;
         # replace %m with $error, if preceded by an even number of percent signs
         $mask =~ s/(?<!%)((?:%%)*)%m/$1$error/g;
     }
 
-    $mask .= "\n" unless $mask =~ /\n$/;
+    $mask .= "\n" unless $mask =~ m/\n$/;
     $message = @_ ? sprintf($mask, @_) : $mask;
 
     # See CPAN-RT#24431. Opened on Apple Radar as bug #4944407 on 2007.01.21
-    chomp $message if $^O =~ /darwin/;
+    chomp $message if $^O =~ m/darwin/;
 
     if ($current_proto eq 'native') {
         $buf = $message;
@@ -352,7 +337,7 @@ sub syslog {
     # want to do at this point is to fallback onto a different
     # connection method.
     while (scalar @fallbackMethods || $syslog_send) {
-	if ($failed && (time - $fail_time) > 60) {
+	if ($failed && (time - $fail_time) +> 60) {
 	    # it's been a while... maybe things have been fixed
 	    @fallbackMethods = ();
 	    disconnect_log();
@@ -396,7 +381,7 @@ sub _syslog_send_console {
 	if ($options{nowait}) {
 	    return 1;
 	} else {
-	    if (waitpid($pid, 0) >= 0) {
+	    if (waitpid($pid, 0) +>= 0) {
 	    	return ($? >> 8);
 	    } else {
 		# it's possible that the caller has other
@@ -405,7 +390,7 @@ sub _syslog_send_console {
 	    }
 	}
     } else {
-        if (open(CONS, ">/dev/console")) {
+        if (open(CONS, ">", "/dev/console")) {
 	    my $ret = print CONS $buf . "\r";  # XXX: should this be \x0A ?
 	    exit $ret if defined $pid;
 	    close CONS;
@@ -447,9 +432,9 @@ sub _syslog_send_native {
 # 
 sub xlate {
     my($name) = @_;
-    return $name+0 if $name =~ /^\s*\d+\s*$/;
+    return $name+0 if $name =~ m/^\s*\d+\s*$/;
     $name = uc $name;
-    $name = "LOG_$name" unless $name =~ /^LOG_/;
+    $name = "LOG_$name" unless $name =~ m/^LOG_/;
     $name = "Sys::Syslog::$name";
     # Can't have just eval { &$name } || -1 because some LOG_XXX may be zero.
     my $value = eval { no strict 'refs'; &{*{Symbol::fetch_glob($name)}} };
@@ -617,7 +602,7 @@ sub connect_pipe {
         return 0;
     }
 
-    if (not open(SYSLOG, ">$syslog_path")) {
+    if (not open(SYSLOG, ">", "$syslog_path")) {
         push @$errs, "can't write to $syslog_path: $!";
         return 0;
     }

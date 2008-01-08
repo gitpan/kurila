@@ -514,14 +514,6 @@ use Cwd 'getcwd';
 use File::Basename ();
 use File::Spec     ();
 
-BEGIN {
-    if ($] < 5.006) {
-        # can't say 'opendir my $dh, $dirname'
-        # need to initialise $dh
-        eval "use Symbol";
-    }
-}
-
 use Exporter ();
 use vars qw($VERSION @ISA @EXPORT);
 $VERSION = '2.01';
@@ -563,10 +555,10 @@ sub _error {
 sub mkpath {
     my $old_style = (
         UNIVERSAL::isa($_[0],'ARRAY')
-        or (@_ == 2 and (defined $_[1] ? $_[1] =~ /\A\d+\z/ : 1))
+        or (@_ == 2 and (defined $_[1] ? $_[1] =~ m/\A\d+\z/ : 1))
         or (@_ == 3
-            and (defined $_[1] ? $_[1] =~ /\A\d+\z/ : 1)
-            and (defined $_[2] ? $_[2] =~ /\A\d+\z/ : 1)
+            and (defined $_[1] ? $_[1] =~ m/\A\d+\z/ : 1)
+            and (defined $_[2] ? $_[2] =~ m/\A\d+\z/ : 1)
         )
     ) ? 1 : 0;
 
@@ -581,7 +573,7 @@ sub mkpath {
         $arg->{mode}    = defined $mode    ? $mode    : 0777;
     }
     else {
-        if (@_ > 0 and UNIVERSAL::isa($_[-1], 'HASH')) {
+        if (@_ +> 0 and UNIVERSAL::isa($_[-1], 'HASH')) {
             $arg = pop @_;
             exists $arg->{mask} and $arg->{mode} = delete $arg->{mask};
             $arg->{mode} = 0777 unless exists $arg->{mode};
@@ -603,7 +595,7 @@ sub _mkpath {
     my(@created,$path);
     foreach $path (@$paths) {
         next unless length($path);
-	$path .= '/' if $^O eq 'os2' and $path =~ /^\w:\z/s; # feature of CRT 
+	$path .= '/' if $^O eq 'os2' and $path =~ m/^\w:\z/s; # feature of CRT 
 	# Logic wants Unix paths, so go with the flow.
 	if ($Is_VMS) {
 	    next if $path eq '/';
@@ -640,10 +632,10 @@ sub _mkpath {
 sub rmtree {
     my $old_style = (
         UNIVERSAL::isa($_[0],'ARRAY')
-        or (@_ == 2 and (defined $_[1] ? $_[1] =~ /\A\d+\z/ : 1))
+        or (@_ == 2 and (defined $_[1] ? $_[1] =~ m/\A\d+\z/ : 1))
         or (@_ == 3
-            and (defined $_[1] ? $_[1] =~ /\A\d+\z/ : 1)
-            and (defined $_[2] ? $_[2] =~ /\A\d+\z/ : 1)
+            and (defined $_[1] ? $_[1] =~ m/\A\d+\z/ : 1)
+            and (defined $_[2] ? $_[2] =~ m/\A\d+\z/ : 1)
         )
     ) ? 1 : 0;
 
@@ -665,7 +657,7 @@ sub rmtree {
         }
     }
     else {
-        if (@_ > 0 and UNIVERSAL::isa($_[-1],'HASH')) {
+        if (@_ +> 0 and UNIVERSAL::isa($_[-1],'HASH')) {
             $arg = pop @_;
             ${$arg->{error}}  = [] if exists $arg->{error};
             ${$arg->{result}} = [] if exists $arg->{result};
@@ -683,7 +675,7 @@ sub rmtree {
         _error($arg, "cannot fetch initial working directory");
         return 0;
     };
-    for ($arg->{cwd}) { /\A(.*)\Z/; $_ = $1 } # untaint
+    for ($arg->{cwd}) { m/\A(.*)\Z/; $_ = $1 } # untaint
 
     @{$arg}{qw(device inode)} = (stat $arg->{cwd})[0,1] or do {
         _error($arg, "cannot stat initial working directory", $arg->{cwd});
@@ -705,8 +697,8 @@ sub _rmtree {
     ROOT_DIR:
     foreach $root (@$paths) {
     	if ($Is_MacOS) {
-            $root  = ":$root" unless $root =~ /:/;
-            $root .= ":"      unless $root =~ /:\z/;
+            $root  = ":$root" unless $root =~ m/:/;
+            $root .= ":"      unless $root =~ m/:\z/;
         }
         else {
             $root =~ s{/\z}{};
@@ -764,7 +756,6 @@ sub _rmtree {
             }
 
             my $d;
-            $d = gensym() if $] < 5.006;
             if (!opendir $d, $curdir) {
                 _error($arg, "cannot opendir", $canon);
                 @files = ();
@@ -774,7 +765,7 @@ sub _rmtree {
 		if (!defined ${*{Symbol::fetch_glob("\cTAINT")}} or ${*{Symbol::fetch_glob("\cTAINT")}}) {
                     # Blindly untaint dir names if taint mode is
                     # active, or any perl < 5.006
-                    @files = map { /\A(.*)\z/s; $1 } readdir $d;
+                    @files = map { m/\A(.*)\z/s; $1 } readdir $d;
                 }
                 else {
 		    @files = readdir $d;

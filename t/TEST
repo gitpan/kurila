@@ -8,8 +8,8 @@
 $| = 1;
 
 # for testing TEST only
-#BEGIN { require '../lib/strict.pm'; strict->import() };
-#BEGIN { require '../lib/warnings.pm'; warnings->import() };
+BEGIN { require '../lib/strict.pm'; strict->import() };
+BEGIN { require '../lib/warnings.pm'; warnings->import() };
 
 # Let tests know they're running in the perl core.  Useful for modules
 # which live dual lives on CPAN.
@@ -23,15 +23,17 @@ our $show_elapsed_time = $ENV{HARNESS_TIMER} || 0;
 {
     my @argv = ();
     foreach my $idx (0..$#ARGV) {
-	push( @argv, $ARGV[$idx] ), next unless $ARGV[$idx] =~ /^-(\S+)$/;
+	push( @argv, $ARGV[$idx] ), next unless $ARGV[$idx] =~ m/^-(\S+)$/;
 	$::core    = 1 if $1 eq 'core';
 	$::verbose = 1 if $1 eq 'v';
 	$::torture = 1 if $1 eq 'torture';
 	$::with_utf8 = 1 if $1 eq 'utf8';
 	$::with_utf16 = 1 if $1 eq 'utf16';
 	$::taintwarn = 1 if $1 eq 'taintwarn';
+	$::failed = 1 if $1 eq 'failed';
+	$::failed = 2 if $1 eq 'ffailed';
 	$ENV{PERL_CORE_MINITEST} = 1 if $1 eq 'minitest';
-	if ($1 =~ /^deparse(,.+)?$/) {
+	if ($1 =~ m/^deparse(,.+)?$/) {
 	    $::deparse = 1;
 	    $::deparse_opts = $1;
 	}
@@ -76,13 +78,13 @@ sub _find_tests {
     opendir DIR, $dir or die "Trouble opening $dir: $!";
     foreach my $f (sort { $a cmp $b } readdir DIR) {
 	next if $f eq $curdir or $f eq $updir or
-	    $f =~ /^(?:CVS|RCS|SCCS|\.svn)$/;
+	    $f =~ m/^(?:CVS|RCS|SCCS|\.svn)$/;
 
 	my $fullpath = File::Spec->catfile($dir, $f);
 
 	_find_tests($fullpath) if -d $fullpath;
 	$fullpath = VMS::Filespec::unixify($fullpath) if $^O eq 'VMS';
-	push @ARGV, $fullpath if $f =~ /\.t$/;
+	push @ARGV, $fullpath if $f =~ m/\.t$/;
     }
 }
 
@@ -90,21 +92,31 @@ sub _quote_args {
     my ($args) = @_;
     my $argstring = '';
 
-    foreach (split(/\s+/,$args)) {
+    foreach (split(m/\s+/,$args)) {
        # In VMS protect with doublequotes because otherwise
        # DCL will lowercase -- unless already doublequoted.
-       $_ = q(").$_.q(") if ($^O eq 'VMS') && !/^\"/ && length($_) > 0;
+       $_ = q(").$_.q(") if ($^O eq 'VMS') && !m/^\"/ && length($_) +> 0;
        $argstring .= ' ' . $_;
     }
     return $argstring;
 }
 
 sub _populate_hash {
-    return map {$_, 1} split /\s+/, $_[0];
+    return map {$_, 1} split m/\s+/, $_[0];
+}
+
+if ($::failed) {
+    # get tests to run from TEST_FAILED
+    open my $fh, "<", "TEST_FAILED";
+    push @ARGV, map { chomp; $_ } ~< $fh;
+    close $fh;
+    if ($::failed +> 1) {
+        @ARGV = ($ARGV[0]);
+    }
 }
 
 unless (@ARGV) {
-    foreach my $dir (qw(base comp cmd run io op uni mro)) {
+    foreach my $dir (qw(base comp cmd run io lex sv op uni mro)) {
 	_find_tests($dir);
     }
     _find_tests("lib") unless $::core;
@@ -115,14 +127,14 @@ unless (@ARGV) {
     my %skip;
     if (-f $configsh) {
 	my (%extensions, %known_extensions);
-	open FH, $configsh or die "Can't open $configsh: $!";
-	while (<FH>) {
-	    if (/^extensions=['"](.*)['"]$/) {
+	open FH, "<", $configsh or die "Can't open $configsh: $!";
+	while ( ~< *FH) {
+	    if (m/^extensions=['"](.*)['"]$/) {
 		# Deliberate string interpolation to avoid triggering possible
 		# $1 resetting bugs.
 		%extensions = _populate_hash ("$1");
 	    }
-	    elsif (/^known_extensions=['"](.*)['"]$/) {
+	    elsif (m/^known_extensions=['"](.*)['"]$/) {
 		%known_extensions = _populate_hash ($1);
 	    }
 	}
@@ -139,9 +151,9 @@ unless (@ARGV) {
 	}
     }
     my $mani = File::Spec->catfile($updir, "MANIFEST");
-    if (open(MANI, $mani)) {
+    if (open(MANI, "<", $mani)) {
 	my $ext_pat = $^O eq 'MSWin32' ? '(?:win32/)?ext' : 'ext';
-	while (<MANI>) { # similar code in t/harness
+	while ( ~< *MANI) { # similar code in t/harness
 	    if (m!^($ext_pat/(\S+)/+(?:[^/\s]+\.t|test\.pl)|lib/\S+?(?:\.t|test\.pl))\s!) {
 		my $t = $1;
 		my $extension = $2;
@@ -163,7 +175,6 @@ unless (@ARGV) {
 	warn "$0: cannot open $mani: $!\n";
     }
     unless ($::core) {
-	_find_tests('Module_Pluggable');
 	_find_tests('pod');
 	_find_tests('japh') if $::torture;
     }
@@ -182,10 +193,10 @@ elsif ($::with_utf16) {
 		my $f = $e ? "v" : "n";
 		push @UARGV, $u;
 		unlink($u);
-		if (open(A, $a)) {
-		    if (open(U, ">$u")) {
+		if (open(A, "<", $a)) {
+		    if (open(U, ">", "$u")) {
 			print U pack("$f", 0xFEFF) if $b;
-			while (<A>) {
+			while ( ~< *A) {
 			    print U pack("$f*", unpack("C*", $_));
 			}
 			close(U);
@@ -224,7 +235,7 @@ EOT
     foreach (@::path_to_name{@tests}) {
 	s/\.\w+\z/./;
 	my $len = length ;
-	$maxlen = $len if $len > $maxlen;
+	$maxlen = $len if $len +> $maxlen;
     }
     # + 3 : we want three dots between the test name and the "ok"
     my $dotdotdot = $maxlen + 3 ;
@@ -236,10 +247,19 @@ EOT
     my $totmax = 0;
     my %failed_tests;
 
+    {
+        # read previously failed tests
+        if (-e 'TEST_FAILED') {
+            open my $fh, "<", "TEST_FAILED" or die;
+            while ( ~< $fh) { chomp; $failed_tests{$_} = 0; }
+            close $fh;
+        }
+    }
+
     while (my $test = shift @tests) {
         my $test_start_time = $show_elapsed_time ? Time::HiRes::time() : 0;
 
-	if ($test =~ /^$/) {
+	if ($test =~ m/^$/) {
 	    next;
 	}
 	if ($type eq 'deparse') {
@@ -264,13 +284,13 @@ EOT
 	# $test = $OVER{$test} if exists $OVER{$test};
 
 	open(SCRIPT,"<",$test) or die "Can't run $test.\n";
-	$_ = <SCRIPT>;
+	$_ = ~< *SCRIPT;
 	close(SCRIPT) unless ($type eq 'deparse');
 	if ($::with_utf16) {
 	    $_ =~ tr/\0//d;
 	}
 	my $switch;
-	if (/#!.*\bperl.*\s-\w*([tT])/) {
+	if (m/#!.*\bperl.*\s-\w*([tT])/) {
 	    $switch = qq{"-$1"};
 	}
 	else {
@@ -286,9 +306,9 @@ EOT
 	my $file_opts = "";
 	if ($type eq 'deparse') {
 	    # Look for #line directives which change the filename
-	    while (<SCRIPT>) {
+	    while ( ~< *SCRIPT) {
 		$file_opts .= ",-f$3$4"
-			if /^#\s*line\s+(\d+)\s+((\w+)|"([^"]+)")/;
+			if m/^#\s*line\s+(\d+)\s+((\w+)|"([^"]+)")/;
 	    }
 	    close(SCRIPT);
 	}
@@ -299,9 +319,9 @@ EOT
 	    my $deparse_cmd =
 		"./perl $testswitch $switch -I../lib -MO=-qq,Deparse,-sv1.,".
 		"-l$::deparse_opts$file_opts ".
-		"$test > $test.dp ".
-		"&& ./perl $testswitch $switch -I../lib $test.dp |";
-	    open(RESULTS, $deparse_cmd)
+		"$test +> $test.dp ".
+		"&& ./perl $testswitch $switch -I../lib $test.dp";
+	    open(RESULTS, "-|", $deparse_cmd)
 		or print "can't deparse '$deparse_cmd': $!.\n";
 	}
 	elsif ($type eq 'perl') {
@@ -317,8 +337,8 @@ EOT
 		$redir = "3>$valgrind_log";
 	    }
 	    my $run = "$perl" . _quote_args("$testswitch $switch $utf8")
-			      . " $test $redir|";
-	    open(RESULTS,$run) or print "can't run '$run': $!.\n";
+			      . " $test $redir";
+	    open(RESULTS,"-|",$run) or print "can't run '$run': $!.\n";
 	}
 	# Our environment may force us to use UTF-8, but we can't be sure that
 	# anything we're reading from will be generating (well formed) UTF-8
@@ -333,24 +353,22 @@ EOT
 	my $trailing_leader = 0;
 	my $max;
 	my %todo;
-	while (<RESULTS>) {
-	    next if /^\s*$/; # skip blank lines
+	while ( ~< *RESULTS) {
+	    next if m/^\s*$/; # skip blank lines
 	    if ($::verbose) {
 		print $_;
 	    }
-	    unless (/^\#/) {
+	    unless (m/^\#/) {
 		if ($trailing_leader) {
 		    # shouldn't be anything following a postfix 1..n
 		    $failure ||= 'FAILED--extra output after trailing 1..n';
-		    last;
 		}
-		if (/^1\.\.([0-9]+)( todo ([\d ]+))?/) {
+		if (m/^1\.\.([0-9]+)( todo ([\d ]+))?/) {
 		    if ($seen_leader) {
 			$failure ||= 'FAILED--seen duplicate leader';
-			last;
 		    }
 		    $max = $1;
-		    %todo = map { $_ => 1 } split / /, $3 if $3;
+		    %todo = map { $_ => 1 } split m/ /, $3 if $3;
 		    $totmax += $max;
 		    $tested_files++;
 		    if ($seen_ok) {
@@ -358,7 +376,6 @@ EOT
 			$trailing_leader = 1;
 			if ($next != $max) {
 			    $failure ||= "FAILED--expected $max tests, saw $next";
-			    last;
 			}
 		    }
 		    else {
@@ -367,7 +384,7 @@ EOT
 		    $seen_leader = 1;
 		}
 		else {
-		    if (/^(not )?ok(?: (\d+))?[^\#]*(\s*\#.*)?/) {
+		    if (m/^(not )?ok(?: (\d+))?[^\#]*(\s*\#.*)?/) {
 			unless ($seen_leader) {
 			    unless ($seen_ok) {
 				$next = 0;
@@ -383,7 +400,7 @@ EOT
 			    # SKIP is essentially the same as TODO for t/TEST
 			    # this still conforms to TAP:
 			    # http://search.cpan.org/dist/Test-Harness/lib/Test/Harness/TAP.pod
-			    $extra and $istodo = $extra =~ /#\s*(?:TODO|SKIP)\b/;
+			    $extra and $istodo = $extra =~ m/#\s*(?:TODO|SKIP)\b/;
 			    $istodo = 1 if $todo{$num};
 
 			    if( $not && !$istodo ) {
@@ -392,18 +409,16 @@ EOT
 			}
 			else {
 			    $failure ||="FAILED--expected test $next, saw test $num";
-			    last;
 			}
 		    }
-		    elsif (/^Bail out!\s*(.*)/i) { # magic words
+		    elsif (m/^Bail out!\s*(.*)/i) { # magic words
 			die "FAILED--Further testing stopped" . ($1 ? ": $1\n" : ".\n");
 		    }
 		    else {
 			# module tests are allowed extra output,
 			# because Test::Harness allows it
-			next if $test =~ /^\W*(ext|lib)\b/;
+			next if $test =~ m/^\W*(ext|lib)\b/;
 			$failure ||= "FAILED--unexpected output at test $next";
-			last;
 		    }
 		}
 	    }
@@ -417,14 +432,14 @@ EOT
 	if ($ENV{PERL_VALGRIND}) {
 	    my @valgrind;
 	    if (-e $valgrind_log) {
-		if (open(V, $valgrind_log)) {
-		    @valgrind = <V>;
+		if (open(V, "<", $valgrind_log)) {
+		    @valgrind = ~< *V;
 		    close V;
 		} else {
 		    warn "$0: Failed to open '$valgrind_log': $!\n";
 		}
 	    }
-	    if ($ENV{VG_OPTS} =~ /cachegrind/) {
+	    if (($ENV{VG_OPTS} || '') =~ m/cachegrind/) {
 		if (rename $valgrind_log, "$test.valgrind") {
 		    $valgrind++;
 		} else {
@@ -436,12 +451,12 @@ EOT
 		my $errors = 0;
 		for my $i (0..$#valgrind) {
 		    local $_ = $valgrind[$i];
-		    if (/^==\d+== ERROR SUMMARY: (\d+) errors? /) {
+		    if (m/^==\d+== ERROR SUMMARY: (\d+) errors? /) {
 			$errors += $1;   # there may be multiple error summaries
-		    } elsif (/^==\d+== LEAK SUMMARY:/) {
+		    } elsif (m/^==\d+== LEAK SUMMARY:/) {
 			for my $off (1 .. 4) {
 			    if ($valgrind[$i+$off] =~
-				/(?:lost|reachable):\s+\d+ bytes in (\d+) blocks/) {
+				m/(?:lost|reachable):\s+\d+ bytes in (\d+) blocks/) {
 				$leaks += $1;
 			    }
 			}
@@ -486,12 +501,13 @@ EOT
 	if (defined $failure) {
 	    print "${te}$failure\n";
 	    $::bad_files++;
-	    if ($test =~ /^base/) {
+	    if ($test =~ m/^base/) {
 		die "Failed a basic test ($test) -- cannot continue.\n";
 	    }
 	    ++$failed_tests{$test};
 	}
 	else {
+            delete $failed_tests{$test};
 	    if ($max) {
 		my $elapsed;
 		if ( $show_elapsed_time ) {
@@ -523,7 +539,7 @@ EOT
 	my $pct = $tested_files ? sprintf("%.2f", ($tested_files - $::bad_files) / $tested_files * 100) : "0.00";
 	my $s = $::bad_files == 1 ? "" : "s";
 	warn "Failed $::bad_files test$s out of $tested_files, $pct% okay.\n";
-	for my $test ( sort keys %failed_tests ) {
+	for my $test ( sort grep { $failed_tests{$_} } keys %failed_tests ) {
 	    print "\t$test\n";
 	}
 	warn <<'SHRDLU_1';
@@ -531,7 +547,7 @@ EOT
 ### them individually and examine any diagnostic messages they produce.
 ### See the INSTALL document's section on "make test".
 SHRDLU_1
-	warn <<'SHRDLU_2' if $good_files / $total_files > 0.8;
+	warn <<'SHRDLU_2' if $good_files / $total_files +> 0.8;
 ### You have a good chance to get more information by running
 ###   ./perl harness
 ### in the 't' directory since most (>=80%) of the tests succeeded.
@@ -562,6 +578,14 @@ SHRDLU_5
 	    }
 	}
     }
+
+    {
+        # write failed tests
+        open my $fh, ">", "TEST_FAILED" or die;
+        print $fh "$_\n" for reverse sort keys %failed_tests;
+        close $fh;
+    }
+
     my ($user,$sys,$cuser,$csys) = times;
     print sprintf("u=%.2f  s=%.2f  cu=%.2f  cs=%.2f  scripts=%d  tests=%d\n",
 	$user,$sys,$cuser,$csys,$tested_files,$totmax);

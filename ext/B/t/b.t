@@ -13,7 +13,7 @@ BEGIN {
 	unshift @INC, 't';
     }
     require Config;
-    if (($Config::Config{'extensions'} !~ /\bB\b/) ){
+    if (($Config::Config{'extensions'} !~ m/\bB\b/) ){
         print "1..0 # Skip -- Perl configured without B module\n";
         exit 0;
     }
@@ -44,7 +44,7 @@ sub hock { "yarrow" }
 package main;
 use vars qw(%Subs);
 local %Subs = ();
-B::walksymtable(\%Testing::Symtable::, 'find_syms', sub { $_[0] =~ /Foo/ },
+B::walksymtable(\%Testing::Symtable::, 'find_syms', sub { $_[0] =~ m/Foo/ },
                 'Testing::Symtable::');
 
 sub B::GV::find_syms {
@@ -172,7 +172,7 @@ is(B::opnumber("chop"), 38, "Testing opnumber with opname (chop)");
     no warnings 'once';
     my $sg = B::sub_generation();
     *UNIVERSAL::hand_waving = sub { };
-    ok( $sg < B::sub_generation(), "sub_generation increments" );
+    ok( $sg +< B::sub_generation(), "sub_generation increments" );
 }
 
 {
@@ -183,5 +183,5 @@ is(B::opnumber("chop"), 38, "Testing opnumber with opname (chop)");
         require overload;
         overload->import( '""' => sub {"What? You want more?!"} );
     }
-    ok( $ag < B::amagic_generation(), "amagic_generation increments" );
+    ok( $ag +< B::amagic_generation(), "amagic_generation increments" );
 }

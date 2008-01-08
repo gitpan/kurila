@@ -16,7 +16,7 @@ use strict;
 # implicit interpreter context argument.
 #
 
-open IN, "embed.fnc" or die $!;
+open IN, "<", "embed.fnc" or die $!;
 
 # walk table providing an array of components in each line to
 # subroutine, printing the result
@@ -32,26 +32,26 @@ sub walk_table (&@) {
     }
     else {
 	safer_unlink $filename;
-	open F, ">$filename" or die "Can't open $filename: $!";
+	open F, ">", "$filename" or die "Can't open $filename: $!";
 	binmode F;
 	$F = \*F;
     }
     print $F $leader if $leader;
     seek IN, 0, 0;		# so we may restart
-    while (<IN>) {
+    while ( ~< *IN) {
 	chomp;
-	next if /^:/;
+	next if m/^:/;
 	while (s|\\\s*$||) {
-	    $_ .= <IN>;
+	    $_ .= ~< *IN;
 	    chomp;
 	}
 	s/\s+$//;
 	my @args;
-	if (/^\s*(#|$)/) {
+	if (m/^\s*(#|$)/) {
 	    @args = $_;
 	}
 	else {
-	    @args = split /\s*\|\s*/, $_;
+	    @args = split m/\s*\|\s*/, $_;
 	}
 	s/\b(NN|NULLOK)\b\s+//g for @args;
 	print $F $function->(@args);
@@ -73,30 +73,30 @@ sub autodoc ($$) { # parse a file and extract documentation info
     my($fh,$file) = @_;
     my($in, $doc, $line);
 FUNC:
-    while (defined($in = <$fh>)) {
-        if ($in=~ /^=head1 (.*)/) {
+    while (defined($in = ~< $fh)) {
+        if ($in=~ m/^=head1 (.*)/) {
             $curheader = $1;
             next FUNC;
         }
 	$line++;
-	if ($in =~ /^=for\s+apidoc\s+(.*?)\s*\n/) {
+	if ($in =~ m/^=for\s+apidoc\s+(.*?)\s*\n/) {
 	    my $proto = $1;
-	    $proto = "||$proto" unless $proto =~ /\|/;
-	    my($flags, $ret, $name, @args) = split /\|/, $proto;
+	    $proto = "||$proto" unless $proto =~ m/\|/;
+	    my($flags, $ret, $name, @args) = split m/\|/, $proto;
 	    my $docs = "";
 DOC:
-	    while (defined($doc = <$fh>)) {
+	    while (defined($doc = ~< $fh)) {
 		$line++;
-		last DOC if $doc =~ /^=\w+/;
+		last DOC if $doc =~ m/^=\w+/;
 		if ($doc =~ m:^\*/$:) {
 		    warn "=cut missing? $file:$line:$doc";;
 		    last DOC;
 		}
 		$docs .= $doc;
 	    }
-	    $docs = "\n$docs" if $docs and $docs !~ /^\n/;
-	    if ($flags =~ /m/) {
-		if ($flags =~ /A/) {
+	    $docs = "\n$docs" if $docs and $docs !~ m/^\n/;
+	    if ($flags =~ m/m/) {
+		if ($flags =~ m/A/) {
 		    $apidocs{$curheader}{$name} = [$flags, $docs, $ret, $file, @args];
 		}
 		else {
@@ -107,7 +107,7 @@ DOC:
 		$docfuncs{$name} = [$flags, $docs, $ret, $file, $curheader, @args];
 	    }
 	    if (defined $doc) {
-		if ($doc =~ /^=(?:for|head)/) {
+		if ($doc =~ m/^=(?:for|head)/) {
 		    $in = $doc;
 		    redo FUNC;
 		}
@@ -124,17 +124,17 @@ sub docout ($$$) { # output the docs for one function
     $name =~ s/\s*$//;
 
     $docs .= "NOTE: this function is experimental and may change or be
-removed without notice.\n\n" if $flags =~ /x/;
+removed without notice.\n\n" if $flags =~ m/x/;
     $docs .= "NOTE: the perl_ form of this function is deprecated.\n\n"
-	if $flags =~ /p/;
+	if $flags =~ m/p/;
 
     print $fh "=item $name\nX<$name>\n$docs";
 
-    if ($flags =~ /U/) { # no usage
+    if ($flags =~ m/U/) { # no usage
 	# nothing
-    } elsif ($flags =~ /s/) { # semicolon ("dTHR;")
+    } elsif ($flags =~ m/s/) { # semicolon ("dTHR;")
 	print $fh "\t\t$name;\n\n";
-    } elsif ($flags =~ /n/) { # no args
+    } elsif ($flags =~ m/n/) { # no args
 	print $fh "\t$ret\t$name\n\n";
     } else { # full usage
 	print $fh "\t$ret\t$name";
@@ -170,33 +170,33 @@ my $file;
 # development trees.
 my $MANIFEST = do {
   local ($/, *FH);
-  open FH, "MANIFEST" or die "Can't open MANIFEST: $!";
-  <FH>;
+  open FH, "<", "MANIFEST" or die "Can't open MANIFEST: $!";
+  ~< *FH;
 };
 
-for $file (($MANIFEST =~ /^(\S+\.c)\t/gm), ($MANIFEST =~ /^(\S+\.h)\t/gm)) {
-    open F, "< $file" or die "Cannot open $file for docs: $!\n";
+for $file (($MANIFEST =~ m/^(\S+\.c)\t/gm), ($MANIFEST =~ m/^(\S+\.h)\t/gm)) {
+    open F, "<", " $file" or die "Cannot open $file for docs: $!\n";
     $curheader = "Functions in file $file\n";
     autodoc(\*F,$file);
     close F or die "Error closing $file: $!\n";
 }
 
 safer_unlink "pod/perlapi.pod";
-open (DOC, ">pod/perlapi.pod") or
+open (DOC, ">", "pod/perlapi.pod") or
 	die "Can't create pod/perlapi.pod: $!\n";
 binmode DOC;
 
 walk_table {	# load documented functions into appropriate hash
-    if (@_ > 1) {
+    if (@_ +> 1) {
 	my($flags, $retval, $func, @args) = @_;
-	return "" unless $flags =~ /d/;
+	return "" unless $flags =~ m/d/;
 	$func =~ s/\t//g; $flags =~ s/p//; # clean up fields from embed.pl
 	$retval =~ s/\t//;
 	my $docref = delete $docfuncs{$func};
 	$seenfuncs{$func} = 1;
 	if ($docref and @$docref) {
-	    if ($flags =~ /A/) {
-		$docref->[0].="x" if $flags =~ /M/;
+	    if ($flags =~ m/A/) {
+		$docref->[0].="x" if $flags =~ m/M/;
 		$apidocs{$docref->[4]}{$func} =
 		    [$docref->[0] . 'A', $docref->[1], $retval, $docref->[3],
 			@args];
@@ -282,7 +282,7 @@ readonly_footer(\*DOC);
 close(DOC) or die "Error closing pod/perlapi.pod: $!";
 
 safer_unlink "pod/perlintern.pod";
-open(GUTS, ">pod/perlintern.pod") or
+open(GUTS, ">", "pod/perlintern.pod") or
 		die "Unable to create pod/perlintern.pod: $!\n";
 binmode GUTS;
 readonly_header(\*GUTS);

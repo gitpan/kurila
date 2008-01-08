@@ -67,8 +67,8 @@ sub parse_from_file {
     and my ($cols) = `stty -a` =~ m/\bcolumns\s+(\d+)/
   ) {
     my $c = $cols * 39 / 40;
-    $cols = $c > $cols - 2 ? $c : $cols -2;
-    $command .= ' -rLL=' . (int $c) . 'n' if $cols > 80;
+    $cols = $c +> $cols - 2 ? $c : $cols -2;
+    $command .= ' -rLL=' . (int $c) . 'n' if $cols +> 80;
   }
 
   if('Pod::Perldoc::IS_Cygwin') {
@@ -123,11 +123,11 @@ sub parse_from_file {
 
 sub ___Do_filter_nroff {
   my $self = shift;
-  my @data = split /\n{2,}/, shift;
+  my @data = split m/\n{2,}/, shift;
   
-  shift @data while @data and $data[0] !~ /\S/; # Go to header
-  shift @data if @data and $data[0] =~ /Contributed\s+Perl/; # Skip header
-  pop @data if @data and $data[-1] =~ /^\w/; # Skip footer, like
+  shift @data while @data and $data[0] !~ m/\S/; # Go to header
+  shift @data if @data and $data[0] =~ m/Contributed\s+Perl/; # Skip header
+  pop @data if @data and $data[-1] =~ m/^\w/; # Skip footer, like
 				# 28/Jan/99 perl 5.005, patch 53 1
   join "\n\n", @data;
 }

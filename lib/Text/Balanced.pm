@@ -6,7 +6,6 @@ use strict;
 package Text::Balanced;
 
 use Exporter;
-use SelfLoader;
 use vars qw { $VERSION @ISA %EXPORT_TAGS };
 
 use version; $VERSION = qv('2.0.0');
@@ -55,7 +54,7 @@ sub _succeed
 {
 	$@ = undef;
 	my ($wantarray,$textref) = splice @_, 0, 2;
-	my ($extrapos, $extralen) = @_>18 ? splice(@_, -2, 2) : (0,0);
+	my ($extrapos, $extralen) = @_+>18 ? splice(@_, -2, 2) : (0,0);
 	my ($startlen, $oppos) = @_[5,6];
 	my $remainderpos = $_[2];
 	if ($wantarray)
@@ -68,7 +67,7 @@ sub _succeed
 		if ($extralen) {	# CORRECT FILLET
 			my $extra = substr($res[0], $extrapos-$oppos, $extralen, "\n");
 			$res[1] = "$extra$res[1]";
-			eval { substr($$textref,$remainderpos,0) = $extra;
+			eval { substr($$textref,$remainderpos,0, $extra);
 			       substr($$textref,$extrapos,$extralen,"\n")} ;
 				#REARRANGE HERE DOC AND FILLET IF POSSIBLE
 			pos($$textref) = $remainderpos-$extralen+1; # RESET \G
@@ -84,7 +83,7 @@ sub _succeed
 		substr($match,$extrapos-$_[0]-$startlen,$extralen,"") if $extralen;
 		my $extra = $extralen
 			? substr($$textref, $extrapos, $extralen)."\n" : "";
-		eval {substr($$textref,$_[4],$_[1]+$_[5])=$extra} ;	#CHOP OUT PREFIX & MATCH, IF POSSIBLE
+		eval {substr($$textref,$_[4],$_[1]+$_[5],$extra)} ;	#CHOP OUT PREFIX & MATCH, IF POSSIBLE
 		pos($$textref) = $_[4];				# RESET \G
 		return $match;
 	}
@@ -95,12 +94,12 @@ sub _succeed
 sub gen_delimited_pat($;$)  # ($delimiters;$escapes)
 {
 	my ($dels, $escs) = @_;
-	return "" unless $dels =~ /\S/;
-	$escs = '\\' unless $escs;
+	return "" unless $dels =~ m/\S/;
+	$escs = '\' unless $escs;
 	$escs .= substr($escs,-1) x (length($dels)-length($escs));
 	my @pat = ();
 	my $i;
-	for ($i=0; $i<length $dels; $i++)
+	for ($i=0; $i+<length $dels; $i++)
 	{
 		my $del = quotemeta substr($dels,$i,1);
 		my $esc = quotemeta substr($escs,$i,1);
@@ -154,9 +153,9 @@ sub extract_bracketed (;$$$)
 	$ldel =~ s/"//g and $qdel .= q{"};
 	$ldel =~ s/`//g and $qdel .= q{`};
 	$ldel =~ s/q//g and $quotelike = 1;
-	$ldel =~ tr/[](){}<>\0-\377/[[(({{<</ds;
+	$ldel =~ tr/[]()\{\}<>\0-\377/[[((\{\{<</ds;
 	my $rdel = $ldel;
-	unless ($rdel =~ tr/[({</])}>/)
+	unless ($rdel =~ tr/[(\{</])\}>/)
         {
 		return _fail $wantarray, $textref,
 			     "Did not find a suitable bracket in delimiter: \"$_[1]\"",
@@ -201,7 +200,7 @@ sub _match_bracketed($$$$$$)	# $textref, $pre, $ldel, $qdel, $quotelike, $rdel
 
 	my @nesting = ( $1 );
 	my $textlen = length $$textref;
-	while (pos $$textref < $textlen)
+	while (pos $$textref +< $textlen)
 	{
 		next if $$textref =~ m/\G\\./gcs;
 
@@ -212,7 +211,7 @@ sub _match_bracketed($$$$$$)	# $textref, $pre, $ldel, $qdel, $quotelike, $rdel
 		elsif ($$textref =~ m/\G($rdel)/gc)
 		{
 			my ($found, $brackettype) = ($1, $1);
-			if ($#nesting < 0)
+			if ($#nesting +< 0)
 			{
 				_failmsg "Unmatched closing bracket: \"$found\"",
 					 pos $$textref;
@@ -220,7 +219,7 @@ sub _match_bracketed($$$$$$)	# $textref, $pre, $ldel, $qdel, $quotelike, $rdel
 			        return;
 			}
 			my $expected = pop(@nesting);
-			$expected =~ tr/({[</)}]>/;
+			$expected =~ tr/\(\{\[\</\)\}\]\>/;
 			if ($expected ne $brackettype)
 			{
 				_failmsg qq{Mismatched closing bracket: expected "$expected" but found "$found"},
@@ -228,7 +227,7 @@ sub _match_bracketed($$$$$$)	# $textref, $pre, $ldel, $qdel, $quotelike, $rdel
 				pos $$textref = $startpos;
 			        return;
 			}
-			last if $#nesting < 0;
+			last if $#nesting +< 0;
 		}
 		elsif ($qdel && $$textref =~ m/\G([$qdel])/gc)
 		{
@@ -245,7 +244,7 @@ sub _match_bracketed($$$$$$)	# $textref, $pre, $ldel, $qdel, $quotelike, $rdel
 
 		else { $$textref =~ m/\G(?:[a-zA-Z0-9]+|.)/gcs }
 	}
-	if ($#nesting>=0)
+	if ($#nesting+>=0)
 	{
 		_failmsg "Unmatched opening bracket(s): "
 				. join("..",@nesting)."..",
@@ -268,7 +267,7 @@ sub _match_bracketed($$$$$$)	# $textref, $pre, $ldel, $qdel, $quotelike, $rdel
 sub _revbracket($)
 {
 	my $brack = reverse $_[0];
-	$brack =~ tr/[({</])}>/;
+	$brack =~ tr/[(\{</])\}>/;
 	return $brack;
 }
 
@@ -328,7 +327,7 @@ sub _match_tagged	# ($$$$$$$)
 	if (!defined $rdel)
 	{
 		$rdelspec = substr($$textref, $-[0], $+[0] - $-[0]);
-		unless ($rdelspec =~ s/\A([[(<{]+)($XMLNAME).*/ quotemeta "$1\/$2". _revbracket($1) /oes)
+		unless ($rdelspec =~ s/\A([[(<\{]+)($XMLNAME).*/{ quotemeta "$1\/$2". _revbracket($1) }/os)
 		{
 			_failmsg "Unable to construct closing tag to match: $rdel",
 				 pos $$textref;
@@ -337,10 +336,10 @@ sub _match_tagged	# ($$$$$$$)
 	}
 	else
 	{
-		$rdelspec = eval "qq{$rdel}" || do {
+		$rdelspec = eval "qq\{$rdel\}" || do {
 			my $del;
 			for (qw,~ ! ^ & * ) _ + - = } ] : " ; ' > . ? / | ',)
-				{ next if $rdel =~ /\Q$_/; $del = $_; last }
+				{ next if $rdel =~ m/\Q$_/; $del = $_; last }
 			unless ($del) {
 				use Carp;
 				croak "Can't interpolate right delimiter $rdel"
@@ -349,7 +348,7 @@ sub _match_tagged	# ($$$$$$$)
 		};
 	}
 
-	while (pos($$textref) < length($$textref))
+	while (pos($$textref) +< length($$textref))
 	{
 		next if $$textref =~ m/\G\\./gc;
 
@@ -501,8 +500,8 @@ sub extract_codeblock (;$$$$$)
 	my $rdel_inner = $ldel_inner;
 	my $rdel_outer = $ldel_outer;
 	my $posbug = pos;
-	for ($ldel_inner, $ldel_outer) { tr/[]()<>{}\0-\377/[[((<<{{/ds }
-	for ($rdel_inner, $rdel_outer) { tr/[]()<>{}\0-\377/]]))>>}}/ds }
+	for ($ldel_inner, $ldel_outer) { tr/[]()<>\{\}\0-\377/[[((<<\{\{/ds }
+	for ($rdel_inner, $rdel_outer) { tr/[]()<>\{\}\0-\377/]]))>>\}\}/ds }
 	for ($ldel_inner, $ldel_outer, $rdel_inner, $rdel_outer)
 	{
 		$_ = '('.join('|',map { quotemeta $_ } split('',$_)).')'
@@ -543,10 +542,10 @@ sub _match_codeblock($$$$$$$)
 		return;
 	}
 	my $closing = $1;
-	   $closing =~ tr/([<{/)]>}/;
+	   $closing =~ tr/([<\{/)]>\}/;
 	my $matched;
 	my $patvalid = 1;
-	while (pos($$textref) < length($$textref))
+	while (pos($$textref) +< length($$textref))
 	{
 		$matched = '';
 		if ($rd && $$textref =~ m#\G(\Q(?)\E|\Q(s?)\E|\Q(s)\E)#gc)
@@ -787,9 +786,9 @@ sub _match_quotelike($$$$)	# ($textref, $prepat, $allow_raw_match)
 	}
 	pos($$textref) = $ld1pos;	# HAVE TO DO THIS BECAUSE LOOKAHEAD BROKEN
 	my ($ldel1, $rdel1) = ("\Q$1","\Q$1");
-	if ($ldel1 =~ /[[(<{]/)
+	if ($ldel1 =~ m/[[(<{]/)
 	{
-		$rdel1 =~ tr/[({</])}>/;
+		$rdel1 =~ tr/[(\{</])\}>/;
 		defined(_match_bracketed($textref,"",$ldel1,"","",$rdel1))
 		|| do { pos $$textref = $startpos; return };
         $ld2pos = pos($$textref);
@@ -797,18 +796,18 @@ sub _match_quotelike($$$$)	# ($textref, $prepat, $allow_raw_match)
 	}
 	else
 	{
-		$$textref =~ /\G$ldel1(?:)[^\\$ldel1]*(\\.[^\\$ldel1]*)*$ldel1/gcs
+		$$textref =~ m/\G$ldel1(?:)[^\\$ldel1]*(\\.[^\\$ldel1]*)*$ldel1/gcs
 		|| do { pos $$textref = $startpos; return };
         $ld2pos = $rd1pos = pos($$textref)-1;
 	}
 
-	my $second_arg = $op =~ /s|tr|y/ ? 1 : 0;
+	my $second_arg = $op =~ m/s|tr|y/ ? 1 : 0;
 	if ($second_arg)
 	{
 		my ($ldel2, $rdel2);
-		if ($ldel1 =~ /[[(<{]/)
+		if ($ldel1 =~ m/[[(<{]/)
 		{
-			unless ($$textref =~ /\G\s*(\S)/gc)	# SHOULD USE LOOKAHEAD
+			unless ($$textref =~ m/\G\s*(\S)/gc)	# SHOULD USE LOOKAHEAD
 			{
 				_failmsg "Missing second block for quotelike $op",
 					 pos $$textref;
@@ -816,7 +815,7 @@ sub _match_quotelike($$$$)	# ($textref, $prepat, $allow_raw_match)
 				return;
 			}
 			$ldel2 = $rdel2 = "\Q$1";
-			$rdel2 =~ tr/[({</])}>/;
+			$rdel2 =~ tr/[(\{</])\}>/;
 		}
 		else
 		{
@@ -824,7 +823,7 @@ sub _match_quotelike($$$$)	# ($textref, $prepat, $allow_raw_match)
 		}
 		$str2pos = $ld2pos+1;
 
-		if ($ldel2 =~ /[[(<{]/)
+		if ($ldel2 =~ m/[[(<{]/)
 		{
 			pos($$textref)--;	# OVERCOME BROKEN LOOKAHEAD 
 			defined(_match_bracketed($textref,"",$ldel2,"","",$rdel2))
@@ -832,7 +831,7 @@ sub _match_quotelike($$$$)	# ($textref, $prepat, $allow_raw_match)
 		}
 		else
 		{
-			$$textref =~ /[^\\$ldel2]*(\\.[^\\$ldel2]*)*$ldel2/gcs
+			$$textref =~ m/[^\\$ldel2]*(\\.[^\\$ldel2]*)*$ldel2/gcs
 			|| do { pos $$textref = $startpos; return };
 		}
 		$rd2pos = pos($$textref)-1;
@@ -878,7 +877,7 @@ sub extract_multiple (;$$$$)	# ($text, $functions_ref, $max_fields, $ignoreunkno
 	#for ($$textref)
 	{
 		my @func = defined $_[1] ? @{$_[1]} : @{$def_func};
-		my $max  = defined $_[2] && $_[2]>0 ? $_[2] : 1_000_000_000;
+		my $max  = defined $_[2] && $_[2]+>0 ? $_[2] : 1_000_000_000;
 		my $igunk = $_[3];
 
 		pos $$textref ||= 0;
@@ -887,7 +886,7 @@ sub extract_multiple (;$$$$)	# ($text, $functions_ref, $max_fields, $ignoreunkno
 		{
 			use Carp;
 			carp "extract_multiple reset maximal count to 1 in scalar context"
-				if $^W && defined($_[2]) && $max > 1;
+				if $^W && defined($_[2]) && $max +> 1;
 			$max = 1
 		}
 
@@ -909,7 +908,7 @@ sub extract_multiple (;$$$$)	# ($text, $functions_ref, $max_fields, $ignoreunkno
 			}
 		}
 
-		FIELD: while (pos($$textref) < length($$textref))
+		FIELD: while (pos($$textref) +< length($$textref))
 		{
 			my ($field, $rem);
 			my @bits;
@@ -951,7 +950,7 @@ sub extract_multiple (;$$$$)	# ($text, $functions_ref, $max_fields, $ignoreunkno
 					next FIELD;
 				}
 			}
-			if ($$textref =~ /\G(.)/gcs)
+			if ($$textref =~ m/\G(.)/gcs)
 			{
 				$unkpos = pos($$textref)-1
 					unless $igunk || defined $unkpos;
@@ -971,7 +970,7 @@ sub extract_multiple (;$$$$)	# ($text, $functions_ref, $max_fields, $ignoreunkno
 	return @fields if wantarray;
 
 	$firstpos ||= 0;
-	eval { substr($$textref,$firstpos,$lastpos-$firstpos)="";
+	eval { substr($$textref,$firstpos,$lastpos-$firstpos,"");
 	       pos $$textref = $firstpos };
 	return $fields[0];
 }

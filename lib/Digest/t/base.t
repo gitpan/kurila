@@ -24,7 +24,7 @@ plan tests => 12;
    sub digest {
 	my $self = shift;
 	my $len = length($$self);
-	my $first = ($len > 0) ? substr($$self, 0, 1) : "X";
+	my $first = ($len +> 0) ? substr($$self, 0, 1) : "X";
 	$$self = "";
 	return sprintf "$first%04d", $len;
    }
@@ -52,12 +52,12 @@ ok($ctx->hexdigest, $EBCDIC ? "86f0f0f0f3" : "6630303033");
 $ctx->add("foo");
 ok($ctx->b64digest, $EBCDIC ? "hvDw8PM" : "ZjAwMDM");
 
-open(F, ">xxtest$$") || die;
+open(F, ">", "xxtest$$") || die;
 binmode(F);
 print F "abc" x 100, "\n";
 close(F) || die;
 
-open(F, "xxtest$$") || die;
+open(F, "<", "xxtest$$") || die;
 $ctx->addfile(*F);
 close(F);
 unlink("xxtest$$") || warn;
@@ -67,7 +67,7 @@ ok($ctx->digest, "a0301");
 eval {
     $ctx->add_bits("1010");
 };
-ok($@ =~ /^Number of bits must be multiple of 8/);
+ok($@ =~ m/^Number of bits must be multiple of 8/);
 
 $ctx->add_bits($EBCDIC ? "11100100" : "01010101");
 ok($ctx->digest, "U0001");
@@ -75,7 +75,7 @@ ok($ctx->digest, "U0001");
 eval {
     $ctx->add_bits("abc", 12);
 };
-ok($@ =~ /^Number of bits must be multiple of 8/);
+ok($@ =~ m/^Number of bits must be multiple of 8/);
 
 $ctx->add_bits("abc", 16);
 ok($ctx->digest, "a0002");

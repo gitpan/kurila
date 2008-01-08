@@ -9,7 +9,7 @@ our ($reopen, $x, $outfile);
 chdir('op') || chdir('t/op') || die "sysio.t: cannot look for myself: $!";
 @INC = '../../lib';
 
-open(I, 'sysio.t') || die "sysio.t: cannot find myself: $!";
+open(I, "<", 'sysio.t') || die "sysio.t: cannot find myself: $!";
 
 $reopen = ($^O eq 'VMS' ||
            $^O eq 'os2' ||
@@ -22,7 +22,7 @@ $x = 'abc';
 
 # should not be able to do negative lengths
 eval { sysread(I, $x, -1) };
-print 'not ' unless ($@ =~ /^Negative length /);
+print 'not ' unless ($@ =~ m/^Negative length /);
 print "ok 1\n";
 
 # $x should be intact
@@ -66,13 +66,13 @@ print "ok 10\n";
 
 $outfile = 'sysio.out';
 
-open(O, ">$outfile") || die "sysio.t: cannot write $outfile: $!";
+open(O, ">", "$outfile") || die "sysio.t: cannot write $outfile: $!";
 
 select(O); $|=1; select(STDOUT);
 
 # cannot write negative lengths
 eval { syswrite(O, $x, -1) };
-print 'not ' unless ($@ =~ /^Negative length /);
+print 'not ' unless ($@ =~ m/^Negative length /);
 print "ok 11\n";
 
 # $x still intact
@@ -85,7 +85,7 @@ print "ok 13\n";
 
 # should not be able to write from after the buffer
 eval { syswrite(O, $x, 1, 3) };
-print 'not ' unless ($@ =~ /^Offset outside string /);
+print 'not ' unless ($@ =~ m/^Offset outside string /);
 print "ok 14\n";
 
 # $x still intact
@@ -94,7 +94,7 @@ print "ok 15\n";
 
 # $outfile still intact
 if ($reopen) {  # must close file to update EOF marker for stat
-  close O; open(O, ">>$outfile") || die "sysio.t: cannot write $outfile: $!";
+  close O; open(O, ">>", "$outfile") || die "sysio.t: cannot write $outfile: $!";
 }
 print 'not ' if (-s $outfile);
 print "ok 16\n";
@@ -102,7 +102,7 @@ print "ok 16\n";
 # should not be able to write from before the buffer
 
 eval { syswrite(O, $x, 1, -4) };
-print 'not ' unless ($@ =~ /^Offset outside string /);
+print 'not ' unless ($@ =~ m/^Offset outside string /);
 print "ok 17\n";
 
 # $x still intact
@@ -111,7 +111,7 @@ print "ok 18\n";
 
 # $outfile still intact
 if ($reopen) {  # must close file to update EOF marker for stat
-  close O; open(O, ">>$outfile") || die "sysio.t: cannot write $outfile: $!";
+  close O; open(O, ">>", "$outfile") || die "sysio.t: cannot write $outfile: $!";
 }
 print 'not ' if (-s $outfile);
 print "ok 19\n";
@@ -132,7 +132,7 @@ print "ok 21\n";
 
 # $outfile should have grown now
 if ($reopen) {  # must close file to update EOF marker for stat
-  close O; open(O, ">>$outfile") || die "sysio.t: cannot write $outfile: $!";
+  close O; open(O, ">>", "$outfile") || die "sysio.t: cannot write $outfile: $!";
 }
 print 'not ' unless (-s $outfile == 2);
 print "ok 22\n";
@@ -147,7 +147,7 @@ print "ok 24\n";
 
 # $outfile should have grown now
 if ($reopen) {  # must close file to update EOF marker for stat
-  close O; open(O, ">>$outfile") || die "sysio.t: cannot write $outfile: $!";
+  close O; open(O, ">>", "$outfile") || die "sysio.t: cannot write $outfile: $!";
 }
 print 'not ' unless (-s $outfile == 4);
 print "ok 25\n";
@@ -162,7 +162,7 @@ print "ok 27\n";
 
 # $outfile should have grown now
 if ($reopen) {  # must close file to update EOF marker for stat
-  close O; open(O, ">>$outfile") || die "sysio.t: cannot write $outfile: $!";
+  close O; open(O, ">>", "$outfile") || die "sysio.t: cannot write $outfile: $!";
 }
 print 'not ' unless (-s $outfile == 7);
 print "ok 28\n";
@@ -177,14 +177,14 @@ print "ok 30\n";
 
 # $outfile should have grown now
 if ($reopen) {  # must close file to update EOF marker for stat
-  close O; open(O, ">>$outfile") || die "sysio.t: cannot write $outfile: $!";
+  close O; open(O, ">>", "$outfile") || die "sysio.t: cannot write $outfile: $!";
 }
 print 'not ' unless (-s $outfile == 10);
 print "ok 31\n";
 
 close(O);
 
-open(I, $outfile) || die "sysio.t: cannot read $outfile: $!";
+open(I, "<", $outfile) || die "sysio.t: cannot read $outfile: $!";
 
 $b = 'xyz';
 
@@ -219,10 +219,10 @@ close(I);
 unlink $outfile;
 
 # Check that utf8 IO doesn't upgrade the scalar
-open(I, ">$outfile") || die "sysio.t: cannot write $outfile: $!";
+open(I, ">", "$outfile") || die "sysio.t: cannot write $outfile: $!";
 # Will skip harmlessly on stdioperl
 eval {binmode STDOUT, ":utf8"};
-die $@ if $@ and $@ !~ /^IO layers \(like ':utf8'\) unavailable/;
+die $@ if $@ and $@ !~ m/^IO layers \(like ':utf8'\) unavailable/;
 
 $a = "\xFF";
 

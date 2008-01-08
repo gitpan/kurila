@@ -4,7 +4,7 @@ our (%Config, $where);
 
 BEGIN {
     eval {my @n = getpwuid 0; setpwent()};
-    if ($@ && $@ =~ /(The \w+ function is unimplemented)/) {
+    if ($@ && $@ =~ m/(The \w+ function is unimplemented)/) {
 	print "1..0 # Skip: $1\n";
 	exit 0;
     }
@@ -21,7 +21,7 @@ BEGIN {
 	foreach my $ypcat (qw(/usr/bin/ypcat /bin/ypcat /etc/ypcat)) {
 	    if (-x $ypcat &&
 		open(PW, "$ypcat passwd 2>/dev/null |") &&
-		defined(<PW>)) {
+		defined( ~< *PW)) {
 		$where = "NIS passwd";
 		undef $reason;
 		last;
@@ -33,7 +33,7 @@ BEGIN {
 	foreach my $nidump (qw(/usr/bin/nidump)) {
 	    if (-x $nidump &&
 		open(PW, "$nidump passwd . 2>/dev/null |") &&
-		defined(<PW>)) {
+		defined( ~< *PW)) {
 		$where = "NetInfo passwd";
 		undef $reason;
 		last;
@@ -43,7 +43,7 @@ BEGIN {
 
     if (not defined $where) {	# Try local.
 	my $PW = "/etc/passwd";
-	if (-f $PW && open(PW, $PW) && defined(<PW>)) {
+	if (-f $PW && open(PW, "<", $PW) && defined( ~< *PW)) {
 	    $where = $PW;
 	    undef $reason;
 	}
@@ -53,7 +53,7 @@ BEGIN {
      foreach my $niscat (qw(/bin/niscat)) {
          if (-x $niscat &&
            open(PW, "$niscat passwd.org_dir 2>/dev/null |") &&
-           defined(<PW>)) {
+           defined( ~< *PW)) {
            $where = "NIS+ $niscat passwd.org_dir";
            undef $reason;
            last;
@@ -84,17 +84,18 @@ print "# where $where\n";
 
 setpwent();
 
-while (<PW>) {
+while ( ~< *PW) {
     chomp;
     # LIMIT -1 so that users with empty shells don't fall off
-    my @s = split /:/, $_, -1;
+    my @s = split m/:/, $_, -1;
     my ($name_s, $passwd_s, $uid_s, $gid_s, $gcos_s, $home_s, $shell_s);
-    if ($^O eq 'darwin') {
+    (my $v) = $Config{osvers} =~ m/^(\d+)/;
+    if ($^O eq 'darwin' && $v +< 9) {
        ($name_s, $passwd_s, $uid_s, $gid_s, $gcos_s, $home_s, $shell_s) = @s[0,1,2,3,7,8,9];
     } else {
        ($name_s, $passwd_s, $uid_s, $gid_s, $gcos_s, $home_s, $shell_s) = @s;
     }
-    next if /^\+/; # ignore NIS includes
+    next if m/^\+/; # ignore NIS includes
     if (@s) {
 	push @{ $seen{$name_s} }, $.;
     } else {
@@ -103,7 +104,7 @@ while (<PW>) {
     }
     if ($n == $max) {
 	local $/;
-	my $junk = <PW>;
+	my $junk = ~< *PW;
 	last;
     }
     # In principle we could whine if @s != 7 but do we know enough

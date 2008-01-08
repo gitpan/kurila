@@ -39,22 +39,22 @@ eval { local $SIG{__DIE__}; require Net::LocalCfg };
 $^O eq 'MacOS' and eval <<TRY_INTERNET_CONFIG;
 use Mac::InternetConfig;
 
-{
+\{
 my %nc = (
-    nntp_hosts      => [ \$InternetConfig{ kICNNTPHost() } ],
-    pop3_hosts      => [ \$InternetConfig{ kICMailAccount() } =~ /\@(.*)/ ],
-    smtp_hosts      => [ \$InternetConfig{ kICSMTPHost() } ],
-    ftp_testhost    => \$InternetConfig{ kICFTPHost() } ? \$InternetConfig{ kICFTPHost()} : undef,
-    ph_hosts        => [ \$InternetConfig{ kICPhHost() }   ],
-    ftp_ext_passive => \$InternetConfig{"646F676F\xA5UsePassiveMode"} || 0,
-    ftp_int_passive => \$InternetConfig{"646F676F\xA5UsePassiveMode"} || 0,
+    nntp_hosts      => [ \$InternetConfig\{ kICNNTPHost() \} ],
+    pop3_hosts      => [ \$InternetConfig\{ kICMailAccount() \} =~ /\@(.*)/ ],
+    smtp_hosts      => [ \$InternetConfig\{ kICSMTPHost() \} ],
+    ftp_testhost    => \$InternetConfig\{ kICFTPHost() \} ? \$InternetConfig\{ kICFTPHost()\} : undef,
+    ph_hosts        => [ \$InternetConfig\{ kICPhHost() \}   ],
+    ftp_ext_passive => \$InternetConfig\{"646F676F\x[A5]UsePassiveMode"\} || 0,
+    ftp_int_passive => \$InternetConfig\{"646F676F\x[A5]UsePassiveMode"\} || 0,
     socks_hosts     => 
-    	\$InternetConfig{ kICUseSocks() }    ? [ \$InternetConfig{ kICSocksHost() }    ] : [],
+    	\$InternetConfig\{ kICUseSocks() \}    ? [ \$InternetConfig\{ kICSocksHost() \}    ] : [],
     ftp_firewall    => 
-    	\$InternetConfig{ kICUseFTPProxy() } ? [ \$InternetConfig{ kICFTPProxyHost() } ] : [],
+    	\$InternetConfig\{ kICUseFTPProxy() \} ? [ \$InternetConfig\{ kICFTPProxyHost() \} ] : [],
 );
-\@NetConfig{keys %nc} = values %nc;
-}
+\@NetConfig\{keys %nc\} = values %nc;
+\}
 TRY_INTERNET_CONFIG
 
 my $file = __FILE__;
@@ -80,7 +80,7 @@ if ($< == $> and !$CONFIGURE) {
 my ($k, $v);
 while (($k, $v) = each %NetConfig) {
   $NetConfig{$k} = [$v]
-    if ($k =~ /_hosts$/ and $k ne "test_hosts" and defined($v) and !ref($v));
+    if ($k =~ m/_hosts$/ and $k ne "test_hosts" and defined($v) and !ref($v));
 }
 
 # Take a hostname and determine if it is inside the firewall
@@ -96,13 +96,13 @@ sub requires_firewall {
   $host = inet_ntoa($host);
 
   if (exists $NetConfig{'local_netmask'}) {
-    my $quad = unpack("N", pack("C*", split(/\./, $host)));
+    my $quad = unpack("N", pack("C*", split(m/\./, $host)));
     my $list = $NetConfig{'local_netmask'};
     $list = [$list] unless ref($list);
     foreach (@$list) {
       my ($net, $bits) = (m#^(\d+\.\d+\.\d+\.\d+)/(\d+)$#) or next;
       my $mask = ^~^0 << (32 - $bits);
-      my $addr = unpack("N", pack("C*", split(/\./, $net)));
+      my $addr = unpack("N", pack("C*", split(m/\./, $net)));
 
       return 0 if (($addr ^&^ $mask) == ($quad ^&^ $mask));
     }

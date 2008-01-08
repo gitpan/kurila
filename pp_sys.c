@@ -883,7 +883,7 @@ PP(pp_untie)
     if ((mg = SvTIED_mg(sv, how))) {
 	SV * const obj = SvRV(SvTIED_obj(sv, mg));
         if (obj) {
-	    GV * const gv = gv_fetchmethod_autoload(SvSTASH(obj), "UNTIE", FALSE);
+	    GV * const gv = gv_fetchmethod(SvSTASH(obj), "UNTIE");
 	    CV *cv;
 	    if (gv && isGV(gv) && (cv = GvCV(gv))) {
 	       PUSHMARK(SP);
@@ -1110,7 +1110,7 @@ PP(pp_select)
 
     if (!egv)
 	egv = PL_defoutgv;
-    XPUSHs( egv ? sv_mortalcopy((SV*)egv) : &PL_sv_undef );
+    XPUSHs( egv ? sv_2mortal(newRV_inc((SV*)egv)) : &PL_sv_undef );
 
     if (newdefout) {
 	if (!GvIO(newdefout))
@@ -1385,8 +1385,7 @@ PP(pp_sysread)
     /* Allocating length + offset + 1 isn't perfect in the case of reading
        bytes from a byte file handle into a UTF8 buffer, but it won't harm us
        unduly.
-       (should be 2 * length + offset + 1, or possibly something longer if
-       PL_encoding is true) */
+       (should be 2 * length + offset + 1) */
     buffer  = SvGROW(bufsv, (STRLEN)(length+offset+1));
     if (offset > 0 && (Sock_size_t)offset > bufsize) { /* Zero any newly allocated space */
     	Zero(buffer+bufsize, offset-bufsize, char);

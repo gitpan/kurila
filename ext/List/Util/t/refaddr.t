@@ -6,7 +6,7 @@ BEGIN {
 	@INC = '../lib';
 	require Config; Config->import;
 	keys %Config; # Silence warning
-	if ($Config{extensions} !~ /\bList\/Util\b/) {
+	if ($Config{extensions} !~ m/\bList\/Util\b/) {
 	    print "1..0 # Skip: List::Util was not built\n";
 	    exit 0;
 	}
@@ -30,7 +30,7 @@ foreach $v (undef, 10, 'string') {
 
 foreach $r ({}, \$t, [], \*F, sub {}) {
   my $n = "$r";
-  $n =~ /0x(\w+)/;
+  $n =~ m/0x(\w+)/;
   my $addr = do { local $^W; hex $1 };
   my $before = ref($r);
   is( refaddr($r), $addr, $n);
@@ -68,11 +68,6 @@ package MyTie;
 
 sub TIEHANDLE { bless {} }
 sub DESTROY {}
-
-sub AUTOLOAD {
-  warn "$AUTOLOAD called";
-  exit 1; # May be in an eval
-}
 
 package Hash3;
 

@@ -8,7 +8,7 @@ BEGIN {
 
 plan(tests => 6);
 
-open(TRY,'>Comp.try') || (die "Can't open temp file.");
+open(TRY, ">",'Comp.try') || (die "Can't open temp file.");
 
 my $x = 'now is the time
 for all good men
@@ -28,10 +28,10 @@ is($x, $y,  'test data is sane');
 print TRY $x;
 close TRY or die "Could not close: $!";
 
-open(TRY,'Comp.try') || (die "Can't reopen temp file.");
+open(TRY, "<",'Comp.try') || (die "Can't reopen temp file.");
 my $count = 0;
 my $z = '';
-while (<TRY>) {
+while ( ~< *TRY) {
     $z .= $_;
     $count = $count + 1;
 }

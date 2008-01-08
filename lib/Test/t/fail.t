@@ -4,7 +4,7 @@ use vars qw($Expect);
 use Test qw($TESTOUT $TESTERR $ntest ok skip plan); 
 plan tests => 14;
 
-open F, ">fails";
+open F, ">", "fails";
 $TESTOUT = *F{IO};
 $TESTERR = *F{IO};
 
@@ -36,20 +36,20 @@ $TESTOUT = *STDOUT{IO};
 $TESTERR = *STDERR{IO};
 $ntest = 1;
 
-open F, "fails";
+open F, "<", "fails";
 my $O;
-while (<F>) { $O .= $_; }
+while ( ~< *F) { $O .= $_; }
 close F;
 unlink "fails";
 
-ok join(' ', map { m/(\d+)/; $1 } grep /^not ok/, split /\n+/, $O),
+ok join(' ', map { m/(\d+)/; $1 } grep m/^not ok/, split m/\n+/, $O),
     join(' ', 1..13);
 
-my @got = split /not ok \d+\n/, $O;
+my @got = split m/not ok \d+\n/, $O;
 shift @got;
 
 $Expect =~ s/\n+$//;
-my @expect = split /\n\n/, $Expect;
+my @expect = split m/\n\n/, $Expect;
 
 
 sub commentless {
@@ -60,7 +60,7 @@ sub commentless {
 }
 
 
-for (my $x=0; $x < @got; $x++) {
+for (my $x=0; $x +< @got; $x++) {
     ok commentless($got[$x]), commentless($expect[$x]."\n");
 }
 
@@ -87,7 +87,7 @@ BEGIN {
 #   Expected: '1' (\@list=0,0)
 
 # Test 8 got: 'segmentation fault' ($0 at line 25)
-#   Expected: qr{bongo}
+#   Expected: qr\{bongo\}
 
 # Failed test 9 in $0 at line 27
 

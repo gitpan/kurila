@@ -15,6 +15,7 @@ use Fatal qw|open close|;
 
 use Convert;
 
+my $from = 1.5;
 
 sub p5convert {
     my ($input, $expected) = @_;
@@ -29,6 +30,15 @@ sub p5convert {
 
 #t_parenthesis();
 #t_change_deref();
+#t_anon_hash();
+t_string_block();
+die;
+t_force_m();
+t_pointy_op();
+t_lvalue_subs();
+t_use_pkg_version();
+t_vstring();
+
 t_intuit_more();
 t_change_deref_method();
 t_remove_useversion();
@@ -305,6 +315,10 @@ use version v0.2;
 "foo$\value"
 ----------
 "foo$\value"
+==========
+100.200.300
+----------
+"\x{64}\x{c8}\x{12c}"
 END
 }
 
@@ -542,5 +556,153 @@ for (1..2) { }
 (@a)[1]
 ----
 (@a)[1]
+END
+}
+
+sub t_use_pkg_version {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+BEGIN {
+    $Foo::VERSION = 0.9;
+    $INC{'Foo.pm'} = 1;
+}
+use Foo 0.9;
+----
+BEGIN {
+    $Foo::VERSION = 0.9;
+    $INC{'Foo.pm'} = 1;
+}
+use Foo v0.9;
+====
+END
+}
+
+sub t_lvalue_subs {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+substr($a, 2) = "bar";
+----
+substr($a, 2, undef, "bar");
+====
+substr($a, 2, 3) = "bar";
+----
+substr($a, 2, 3, "bar");
+====
+$a = substr($a, 2);
+----
+$a = substr($a, 2);
+====
+$a = "foobar";
+substr($a, 2) = "bar";
+----
+$a = "foobar";
+substr($a, 2, undef, "bar");
+====
+END
+}
+
+sub t_force_m {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+$a =~ //;
+----
+$a =~ m//;
+====
+$a =~ m//;
+$a =~ m**;
+----
+$a =~ m//;
+$a =~ m**;
+====
+split //, "foo";
+----
+split m//, "foo";
+END
+}
+
+sub t_pointy_op {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+my $fh;
+my $x = <$fh>;
+----
+my $fh;
+my $x = ~< $fh;
+====
+my @x = <FH>;
+----
+my @x = ~< *FH;
+====
+<>;
+----
+ ~< *ARGV;
+====
+$a=<F>;
+----
+$a= ~< *F;
+====
+$a .= <F>;
+----
+$a .= ~< *F;
+====
+3 < 4;
+----
+3 +< 4;
+====
+3 <= 4;
+3 > 4;
+3 >= 4;
+----
+3 +<= 4;
+3 +> 4;
+3 +>= 4;
+====
+3 <=> 4;
+----
+3 <+> 4;
+====
+use integer;
+3<=>4;
+3<4;
+3>4;
+----
+use integer;
+3<+>4;
+3+<4;
+3+>4;
+====
+END
+}
+
+sub t_anon_hash {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+{ foo => 'bar' };
+----
+< foo => 'bar' >;
+====
+{};
+----
+<>;
+====
+END
+
+}
+
+sub t_string_block {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+"foo { ";
+'foo { ';
+----
+"foo \{ ";
+'foo { ';
+====
+<<"FOO";
+{
+FOO
+----
+<<"FOO";
+\{
+FOO
+====
+"\$ {"
+----
+"\$ \{"
+====
 END
 }

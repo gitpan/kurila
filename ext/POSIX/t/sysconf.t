@@ -17,7 +17,7 @@ use POSIX;
 use Scalar::Util qw(looks_like_number);
 
 sub check(@) {
-    grep { eval "&$_;1" or $@!~/vendor has not defined POSIX macro/ } @_
+    grep { eval "&$_;1" or $@!~m/vendor has not defined POSIX macro/ } @_
 }       
 
 my @path_consts = check qw(
@@ -97,7 +97,7 @@ SKIP: {
 
     -c $TTY
 	or skip("$TTY not a character file", $n);
-    open(TTY, $TTY)
+    open(TTY, "<", $TTY)
 	or skip("failed to open $TTY: $!", $n);
     -t *TTY
 	or skip("TTY ($TTY) not a terminal file", $n);

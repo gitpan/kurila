@@ -21,7 +21,7 @@ my $Perl = which_perl();
 $|=1;
 
 my @prgs = ();
-while(<DATA>) { 
+while( ~< *DATA) { 
     if(m/^#{8,}\s*(.*)/) { 
         push @prgs, ['', $1];
     }
@@ -39,11 +39,11 @@ foreach my $prog (@prgs) {
 	$switch = $1;
     }
 
-    my($prog,$expected) = split(/\nEXPECT\n/, $raw_prog);
+    my($prog,$expected) = split(m/\nEXPECT\n/, $raw_prog);
     $prog .= "\n";
     $expected = '' unless defined $expected;
 
-    if ($prog =~ /^\# SKIP: (.+)/m) {
+    if ($prog =~ m/^\# SKIP: (.+)/m) {
 	if (eval $1) {
 	    ok(1, "Skip: $1");
 	    next;
@@ -57,7 +57,7 @@ foreach my $prog (@prgs) {
 
 __END__
 ########
-$a = ":="; split /($a)/o, "a:=b:=c"; print "@_"
+$a = ":="; split m/($a)/o, "a:=b:=c"; print "@_"
 EXPECT
 a := b := c
 ########
@@ -83,9 +83,9 @@ $x=0x0eabcd; print $x->ref;
 EXPECT
 Can't call method "ref" without a package or object reference at - line 1.
 ########
-chop ($str .= <DATA>);
+chop ($str .= ~< *DATA);
 ########
-$x=2;$y=3;$x<$y ? $x : $y += 23;print $x;
+$x=2;$y=3;$x+<$y ? $x : $y += 23;print $x;
 EXPECT
 25
 ########
@@ -93,7 +93,7 @@ eval 'sub bar {print "In bar"}';
 ########
 system './perl -ne "print if eof" /dev/null' unless $^O eq 'MacOS'
 ########
-chop($file = <DATA>);
+chop($file = ~< *DATA);
 ########
 package N;
 sub new {my ($obj,$n)=@_; bless \$n}  
@@ -114,7 +114,7 @@ quotemeta ""
 ########
 for ("ABCDE") {
  &sub;
-s/./&sub($&)/eg;
+s/./{&sub($&)}/g;
 print;}
 sub sub {local($_) = @_;
 $_ x 4;}
@@ -139,7 +139,7 @@ print scalar ("foo","bar")
 EXPECT
 bar
 ########
-sub by_number { $a <=> $b; };# inline function for sort below
+sub by_number { $a <+> $b; };# inline function for sort below
 $as_ary{0}="a0";
 @ordered_array=sort by_number keys(%as_ary);
 ########
@@ -230,7 +230,7 @@ BEGIN failed--compilation aborted at - line 1.
     local(*FOO);
     tie(*FOO,'foo');
     print FOO "sentence.", "reversed", "a", "is", "This";
-    print "-- ", <FOO>, " --\n";
+    print "-- ", (~< *FOO), " --\n";
     my($buf,$len,$offset);
     $buf = "string";
     $len = 10; $offset = 1;
@@ -252,7 +252,7 @@ EXPECT
 ########
 # used to attach defelem magic to all immortal values,
 # which made restore of local $_ fail.
-foo(2>1);
+foo(2+>1);
 sub foo { bar() for @_;  }
 sub bar { local $_; }
 print "ok\n";
@@ -269,11 +269,11 @@ print "ok\n" if (1E2<<1 == 200 and 3E4<<3 == 240000);
 EXPECT
 ok
 ########
-print "ok\n" if ("\0" lt "\xFF");
+print "ok\n" if ("\0" lt "\x[FF]");
 EXPECT
 ok
 ########
-open(H,$^O eq 'MacOS' ? ':run:fresh_perl.t' : 'run/fresh_perl.t'); # must be in the 't' directory
+open(H,"<",$^O eq 'MacOS' ? ':run:fresh_perl.t' : 'run/fresh_perl.t'); # must be in the 't' directory
 stat(H);
 print "ok\n" if (-e _ and -f _ and -r _);
 EXPECT
@@ -348,16 +348,6 @@ sub foo { local $_ = shift; split; @_ }
 @x = foo(' x  y  z ');
 print "you die joe!\n" unless "@x" eq 'x y z';
 ########
-/(?{"{"})/	# Check it outside of eval too
-EXPECT
-Sequence (?{...}) not terminated or not {}-balanced in regex; marked by <-- HERE in m/(?{ <-- HERE "{"})/ at - line 1.
-########
-/(?{"{"}})/	# Check it outside of eval too
-EXPECT
-Unmatched right curly bracket at (re_eval 1) line 1, at end of line
-syntax error at (re_eval 1) line 1, near ""{"}"
-Compilation failed in regexp at - line 1.
-########
 BEGIN { @ARGV = qw(a b c d e) }
 BEGIN { print "argv <@ARGV>\nbegin <",shift,">\n" }
 END { print "end <",shift,">\nargv <@ARGV>\n" }
@@ -374,7 +364,7 @@ argv <e>
 -l
 # fdopen from a system descriptor to a system descriptor used to close
 # the former.
-open STDERR, '>&=STDOUT' or die $!;
+open STDERR, '>&=', 'STDOUT' or die $!;
 select STDOUT; $| = 1; print fileno STDOUT or die $!;
 select STDERR; $| = 1; print fileno STDERR or die $!;
 EXPECT
@@ -447,47 +437,6 @@ foo
 bar
 BEGIN failed--compilation aborted at - line 8.
 ########
-package X;
-@ISA='Y';
-sub new {
-    my $class = shift;
-    my $self = { };
-    bless $self, $class;
-    my $init = shift;
-    $self->foo($init);
-    print "new", $init;
-    return $self;
-}
-sub DESTROY {
-    my $self = shift;
-    print "DESTROY", $self->foo;
-}
-package Y;
-sub attribute {
-    my $self = shift;
-    my $var = shift;
-    if (@_ == 0) {
-	return $self->{$var};
-    } elsif (@_ == 1) {
-	$self->{$var} = shift;
-    }
-}
-sub AUTOLOAD {
-    $AUTOLOAD =~ /::([^:]+)$/;
-    my $method = $1;
-    splice @_, 1, 0, $method;
-    goto &attribute;
-}
-package main;
-my $x = X->new(1);
-for (2..3) {
-    my $y = X->new($_);
-    print $y->foo;
-}
-print $x->foo;
-EXPECT
-new1new22DESTROY2new33DESTROY31DESTROY1
-########
 re();
 sub re {
     my $re = join '', eval 'qr/(??{ $obj->method })/';
@@ -542,7 +491,7 @@ Modification of a read-only value attempted at - line 2.
 ########
 print qw(ab a\b a\\b);
 EXPECT
-aba\ba\b
+aba\ba\\b
 ########
 # lexicals declared after the myeval() definition should not be visible
 # within it
@@ -581,7 +530,7 @@ EXPECT
 ########
 # core dump in 20000716.007
 -w
-"x" =~ /(\G?x)?/;
+"x" =~ m/(\G?x)?/;
 ########
 # Bug 20010515.004
 my @h = 1 .. 10;
@@ -597,7 +546,7 @@ OK
 ########
 # Bug 20010506.041
 use utf8;
-"abcd\x{1234}" =~ /(a)(b[c])(d+)?/i and print "ok\n";
+"abcd\x{1234}" =~ m/(a)(b[c])(d+)?/i and print "ok\n";
 EXPECT
 ok
 ########
@@ -621,7 +570,7 @@ Bar=ARRAY(0x...)
 ######## (?{...}) compilation bounces on PL_rs
 -0
 {
-  /(?{ $x })/;
+  m/(?{ $x })/;
   # {
 }
 BEGIN { print "ok\n" }
@@ -633,8 +582,8 @@ $foo = \-f "blah";
 print "ok" if ref $foo && !$$foo;
 EXPECT
 ok
-######## [ID 20011128.159] 'X' =~ /\X/ segfault in 5.6.1
-print "ok" if 'X' =~ /\X/;
+######## [ID 20011128.159] 'X' =~ m/\X/ segfault in 5.6.1
+print "ok" if 'X' =~ m/\X/;
 EXPECT
 ok
 ######## segfault in 5.6.1 within peep()
@@ -645,7 +594,6 @@ EXPECT
 123456789
 ######## example from Camel 5, ch. 15, pp.406 (with my)
 # SKIP: ord "A" == 193 # EBCDIC
-use strict;
 use utf8;
 my $人 = 2; # 0xe4 0xba 0xba: U+4eba, "human" in CJK ideograph
 $人++; # a child is born
@@ -654,7 +602,6 @@ EXPECT
 3
 ######## example from Camel 5, ch. 15, pp.406 (with our)
 # SKIP: ord "A" == 193 # EBCDIC
-use strict;
 use utf8;
 our $人 = 2; # 0xe4 0xba 0xba: U+4eba, "human" in CJK ideograph
 $人++; # a child is born
@@ -671,7 +618,6 @@ EXPECT
 3
 ######## example from Camel 5, ch. 15, pp.406 (with use vars)
 # SKIP: ord "A" == 193 # EBCDIC
-use strict;
 use utf8;
 use vars qw($人);
 $人 = 2; # 0xe4 0xba 0xba: U+4eba, "human" in CJK ideograph
@@ -690,14 +636,14 @@ print $x;
 EXPECT
 ok 1
 ######## [ID 20020623.009] nested eval/sub segfaults
-$eval = eval 'sub { eval "sub { %S }" }';
+$eval = eval 'sub { eval "sub \{ %S \}" }';
 $eval->({});
 ######## [perl #20667] unicode regex vs non-unicode regex
 $toto = 'Hello';
-$toto =~ /\w/; # this line provokes the problem!
+$toto =~ m/\w/; # this line provokes the problem!
 $name = 'A B';
 # utf8::upgrade($name) if @ARGV;
-if ($name =~ /(\p{IsUpper}) (\p{IsUpper})/u){
+if ($name =~ m/(\p{IsUpper}) (\p{IsUpper})/u){
     print "It's good! >$1< >$2<\n";
 } else {
     print "It's not good...\n";
@@ -762,7 +708,7 @@ $SIG{__WARN__} = sub { $@ = shift };
 use Encode;
 use utf8;
 my $t = "\x[E9]";
-$t =~ s/([^a])//ge;
+$t =~ s/([^a])/{''}/g;
 $@ =~ s/ at .*/ at/;
 print $@;
 print "Good" if $t eq "\x[E9]";

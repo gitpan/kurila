@@ -23,8 +23,8 @@ our @EXPORT_OK = qw(minus_c ppname save_BEGINs
 		parents comppadlist sv_undef compile_stats timing_info
 		begin_av init_av check_av end_av regex_padav dowarn defstash
 		curstash warnhook diehook inc_gv @optype @specialsv_name
+                unitcheck_av
 		);
-push @EXPORT_OK, qw(unitcheck_av) if $] > 5.009;
 
 sub OPf_KIDS ();
 use strict;
@@ -38,7 +38,7 @@ use strict;
 @B::PVNV::ISA = qw(B::PVIV B::NV);
 @B::PVMG::ISA = 'B::PVNV';
 # Change in the inheritance hierarchy post 5.9.0
-@B::PVLV::ISA = $] > 5.009 ? 'B::GV' : 'B::PVMG';
+@B::PVLV::ISA = 'B::GV';
 @B::BM::ISA = 'B::PVMG';
 @B::AV::ISA = 'B::PVMG';
 @B::GV::ISA = 'B::PVMG';
@@ -66,8 +66,8 @@ sub B::GV::SAFENAME {
   # The regex below corresponds to the isCONTROLVAR macro
   # from toke.c
 
-  $name =~ s/^([\cA-\cZ\c\\c[\c]\c?\c_\c^])/"^".
-	chr( utf8::unicode_to_native( 64 ^^^ ord($1) ))/e;
+  $name =~ s/^([\cA-\cZ\c\\c[\c]\c?\c_\c^])/{"^".
+	chr( utf8::unicode_to_native( 64 ^^^ ord($1) ))}/;
 
   # When we say unicode_to_native we really mean ascii_to_native,
   # which matters iff this is a non-ASCII platform (EBCDIC).
@@ -177,37 +177,37 @@ sub walkoptree_exec {
 	$op->?$method($level);
 	$ppname = $op->name;
 	if ($ppname =~
-	    /^(d?or(assign)?|and(assign)?|mapwhile|grepwhile|entertry|range|cond_expr)$/)
+	    m/^(d?or(assign)?|and(assign)?|mapwhile|grepwhile|entertry|range|cond_expr)$/)
 	{
-	    print $prefix, uc($1), " => {\n";
+	    print $prefix, uc($1), " => \{\n";
 	    walkoptree_exec($op->other, $method, $level + 1);
-	    print $prefix, "}\n";
+	    print $prefix, "\}\n";
 	} elsif ($ppname eq "match" || $ppname eq "subst") {
 	    my $pmreplstart = $op->pmreplstart;
 	    if ($$pmreplstart) {
-		print $prefix, "PMREPLSTART => {\n";
+		print $prefix, "PMREPLSTART => \{\n";
 		walkoptree_exec($pmreplstart, $method, $level + 1);
-		print $prefix, "}\n";
+		print $prefix, "\}\n";
 	    }
 	} elsif ($ppname eq "substcont") {
-	    print $prefix, "SUBSTCONT => {\n";
+	    print $prefix, "SUBSTCONT => \{\n";
 	    walkoptree_exec($op->other->pmreplstart, $method, $level + 1);
-	    print $prefix, "}\n";
+	    print $prefix, "\}\n";
 	    $op = $op->other;
 	} elsif ($ppname eq "enterloop") {
-	    print $prefix, "REDO => {\n";
+	    print $prefix, "REDO => \{\n";
 	    walkoptree_exec($op->redoop, $method, $level + 1);
-	    print $prefix, "}\n", $prefix, "NEXT => {\n";
+	    print $prefix, "\}\n", $prefix, "NEXT => \{\n";
 	    walkoptree_exec($op->nextop, $method, $level + 1);
-	    print $prefix, "}\n", $prefix, "LAST => {\n";
+	    print $prefix, "\}\n", $prefix, "LAST => \{\n";
 	    walkoptree_exec($op->lastop,  $method, $level + 1);
-	    print $prefix, "}\n";
+	    print $prefix, "\}\n";
 	} elsif ($ppname eq "subst") {
 	    my $replstart = $op->pmreplstart;
 	    if ($$replstart) {
-		print $prefix, "SUBST => {\n";
+		print $prefix, "SUBST => \{\n";
 		walkoptree_exec($replstart, $method, $level + 1);
-		print $prefix, "}\n";
+		print $prefix, "\}\n";
 	    }
 	}
     }
@@ -222,7 +222,7 @@ sub walksymtable {
     $prefix = '' unless defined $prefix;
     while (($sym, $ref) = each %$symref) {
         $fullname = "*main::".$prefix.$sym;
-	if ($sym =~ /::$/) {
+	if ($sym =~ m/::$/) {
 	    $sym = $prefix . $sym;
 	    if ($sym ne "main::" && $sym ne "<none>::" && &$recurse($sym)) {
                walksymtable(\%{*{Symbol::fetch_glob($fullname)}}, $method, $recurse, $sym);
@@ -286,13 +286,13 @@ sub walksymtable {
 	my $default = $section->default;
 
 	seek($output_fh, 0, 0);
-	while (<$output_fh>) {
+	while ( ~< $output_fh) {
 	    chomp;
 	    s/^(.*?)\t//;
 	    if ($1 eq $name) {
-		s{(s\\_[0-9a-f]+)} {
+		s{(s\\_[0-9a-f]+)} {{
 		    exists($sym->{$1}) ? $sym->{$1} : $default;
-		}ge;
+		}}g;
 		printf $fh $format, $_;
 	    }
 	}

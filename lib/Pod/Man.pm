@@ -113,7 +113,7 @@ sub new {
 }
 
 # Translate a font string into an escape.
-sub toescape { (length ($_[0]) > 1 ? '\f(' : '\f') . $_[0] }
+sub toescape { (length ($_[0]) +> 1 ? '\f(' : '\f') . $_[0] }
 
 # Determine which fonts the user wishes to use and store them in the object.
 # Regular, italic, bold, and bold-italic are constants, but the fixed width
@@ -126,7 +126,7 @@ sub init_fonts {
     # are the right length.
     for (qw/fixed fixedbold fixeditalic fixedbolditalic/) {
         my $font = $$self{$_};
-        if (defined ($font) && (length ($font) < 1 || length ($font) > 2)) {
+        if (defined ($font) && (length ($font) +< 1 || length ($font) +> 2)) {
             croak qq(roff font should be 1 or 2 chars, not "$font");
         }
     }
@@ -161,8 +161,8 @@ sub init_quotes {
         $$self{LQUOTE} = $$self{RQUOTE} = '';
     } elsif (length ($$self{quotes}) == 1) {
         $$self{LQUOTE} = $$self{RQUOTE} = $$self{quotes};
-    } elsif ($$self{quotes} =~ /^(.)(.)$/
-             || $$self{quotes} =~ /^(..)(..)$/) {
+    } elsif ($$self{quotes} =~ m/^(.)(.)$/
+             || $$self{quotes} =~ m/^(..)(..)$/) {
         $$self{LQUOTE} = $1;
         $$self{RQUOTE} = $2;
     } else {
@@ -182,13 +182,7 @@ sub init_page {
 
     # We used to try first to get the version number from a local binary, but
     # we shouldn't need that any more.  Get the version from the running Perl.
-    # Work a little magic to handle subversions correctly under both the
-    # pre-5.6 and the post-5.6 version numbering schemes.
-    my @version = ($] =~ /^(\d+)\.(\d{3})(\d{0,3})$/);
-    $version[2] ||= 0;
-    $version[2] *= 10 ** (3 - length $version[2]);
-    for (@version) { $_ += 0 }
-    my $version = join ('.', @version);
+    my $version = $^V;
 
     # Set the defaults for page titles and indentation if the user didn't
     # override anything.
@@ -227,7 +221,7 @@ sub init_page {
 # according to the current formatting instructions as we do.
 sub _handle_text {
     my ($self, $text) = @_;
-    DEBUG > 3 and print "== $text\n";
+    DEBUG +> 3 and print "== $text\n";
     my $tag = $$self{PENDING}[-1];
     $$tag[2] .= $self->format_text ($$tag[1], $text);
 }
@@ -247,7 +241,7 @@ sub method_for_element {
 # text and nested elements.  Otherwise, if start_element is defined, call it.
 sub _handle_element_start {
     my ($self, $element, $attrs) = @_;
-    DEBUG > 3 and print "++ $element (<", join ('> <', %$attrs), ">)\n";
+    DEBUG +> 3 and print "++ $element (<", join ('> <', %$attrs), ">)\n";
     my $method = $self->method_for_element ($element);
 
     # If we have a command handler, we need to accumulate the contents of the
@@ -255,7 +249,7 @@ sub _handle_element_start {
     # <Para> so that IN_NAME isn't still set for the first heading after the
     # NAME heading.
     if ($self->can ("cmd_$method")) {
-        DEBUG > 2 and print "<$element> starts saving a tag\n";
+        DEBUG +> 2 and print "<$element> starts saving a tag\n";
         $$self{IN_NAME} = 0 if ($element ne 'Para');
 
         # How we're going to format embedded text blocks depends on the tag
@@ -265,12 +259,12 @@ sub _handle_element_start {
         my $formatting = $$self{PENDING}[-1][1];
         $formatting = $self->formatting ($formatting, $element);
         push (@{ $$self{PENDING} }, [ $attrs, $formatting, '' ]);
-        DEBUG > 4 and print "Pending: [", pretty ($$self{PENDING}), "]\n";
+        DEBUG +> 4 and print "Pending: [", pretty ($$self{PENDING}), "]\n";
     } elsif ($self->can ("start_$method")) {
         my $method = 'start_' . $method;
         $self->?$method ($attrs, '');
     } else {
-        DEBUG > 2 and print "No $method start method, skipping\n";
+        DEBUG +> 2 and print "No $method start method, skipping\n";
     }
 }
 
@@ -279,20 +273,20 @@ sub _handle_element_start {
 # an end_ method for the element, call that.
 sub _handle_element_end {
     my ($self, $element) = @_;
-    DEBUG > 3 and print "-- $element\n";
+    DEBUG +> 3 and print "-- $element\n";
     my $method = $self->method_for_element ($element);
 
     # If we have a command handler, pull off the pending text and pass it to
     # the handler along with the saved attribute hash.
     if ($self->can ("cmd_$method")) {
-        DEBUG > 2 and print "</$element> stops saving a tag\n";
+        DEBUG +> 2 and print "</$element> stops saving a tag\n";
         my $tag = pop @{ $$self{PENDING} };
-        DEBUG > 4 and print "Popped: [", pretty ($tag), "]\n";
-        DEBUG > 4 and print "Pending: [", pretty ($$self{PENDING}), "]\n";
+        DEBUG +> 4 and print "Popped: [", pretty ($tag), "]\n";
+        DEBUG +> 4 and print "Pending: [", pretty ($$self{PENDING}), "]\n";
         my $method = 'cmd_' . $method;
         my $text = $self->?$method ($$tag[0], $$tag[2]);
         if (defined $text) {
-            if (@{ $$self{PENDING} } > 1) {
+            if (@{ $$self{PENDING} } +> 1) {
                 $$self{PENDING}[-1][2] .= $text;
             } else {
                 $self->output ($text);
@@ -302,7 +296,7 @@ sub _handle_element_end {
         my $method = 'end_' . $method;
         $self->?$method ();
     } else {
-        DEBUG > 2 and print "No $method end method, skipping\n";
+        DEBUG +> 2 and print "No $method end method, skipping\n";
     }
 }
 
@@ -350,9 +344,9 @@ sub format_text {
     # <Data> blocks.
     if ($convert) {
         if (ASCII) {
-            $text =~ s/(\\|[^\x00-\x7F])/$ESCAPES{ord ($1)} || "X"/eg;
+            $text =~ s/(\\|[^\x{00}-\x{7F}])/{$ESCAPES{ord ($1)} || "X"}/g;
         } else {
-            $text =~ s/(\\)/$ESCAPES{ord ($1)} || "X"/eg;
+            $text =~ s/(\\)/{$ESCAPES{ord ($1)} || "X"}/g;
         }
     }
 
@@ -419,7 +413,7 @@ sub quote_literal {
 sub guesswork {
     my $self = shift;
     local $_ = shift;
-    DEBUG > 5 and print "   Guesswork called on [$_]\n";
+    DEBUG +> 5 and print "   Guesswork called on [$_]\n";
 
     # By the time we reach this point, all hypens will be escaped by adding a
     # backslash.  We want to undo that escaping if they're part of regular
@@ -434,19 +428,19 @@ sub guesswork {
         ( (?: [a-zA-Z\']+ \\-)+ )
         ( [a-zA-Z\']+ ) (?= [\)\".?!,;:]* (?:\s|\Z|\\\ ) )
         \b
-    } {
+    } {{
         my ($prefix, $hyphen, $main, $suffix) = ($1, $2, $3, $4);
         $hyphen ||= '';
         $main =~ s/\\-/-/g;
         $prefix . $hyphen . $main . $suffix;
-    }egx;
+    }}gx;
 
     # Translate "--" into a real em-dash if it's used like one.  This means
     # that it's either surrounded by whitespace, it follows a regular word, or
     # it occurs between two regular words.
     if ($$self{MAGIC_EMDASH}) {
-        s{          (\s) \\-\\- (\s)                } { $1 . '\*(--' . $2 }egx;
-        s{ (\b[a-zA-Z]+) \\-\\- (\s|\Z|[a-zA-Z]+\b) } { $1 . '\*(--' . $2 }egx;
+        s{          (\s) \\-\\- (\s)                } {{ $1 . '\*(--' . $2 }}gx;
+        s{ (\b[a-zA-Z]+) \\-\\- (\s|\Z|[a-zA-Z]+\b) } {{ $1 . '\*(--' . $2 }}gx;
     }
 
     # Make words in all-caps a little bit smaller; they look better that way.
@@ -463,9 +457,9 @@ sub guesswork {
             ( ^ | [\s\(\"\'\`\[\{<>] | \\\  )                   # (1)
             ( [A-Z] [A-Z] (?: [/A-Z+:\d_\$&] | \\- )* )         # (2)
             (?= [\s>\}\]\(\)\'\".?!,;] | \\*\(-- | \\\  | $ )   # (3)
-        } {
+        } {{
             $1 . '\s-1' . $2 . '\s0'
-        }egx;
+        }}gx;
     }
 
     # Note that from this point forward, we have to adjust for \s-1 and \s-0
@@ -480,9 +474,9 @@ sub guesswork {
         s{
             ( \b | \\s-1 )
             ( [A-Za-z_] ([:\w] | \\s-?[01])+ \(\) )
-        } {
+        } {{
             $1 . '\f(IS' . $2 . '\f(IE'
-        }egx;
+        }}gx;
     }
 
     # Change references to manual pages to put the page name in italics but
@@ -497,9 +491,9 @@ sub guesswork {
             ( \b | \\s-1 )
             ( [A-Za-z_] (?:[.:\w] | \\- | \\s-?[01])+ )
             ( \( \d [a-z]* \) )
-        } {
+        } {{
             $1 . '\f(IS' . $2 . '\f(IE\|' . $3
-        }egx;
+        }}gx;
     }
 
     # Convert simple Perl variable references to a fixed-width font.  Be
@@ -510,16 +504,16 @@ sub guesswork {
            ( ^ | \s+ )
            ( [\$\@%] [\w:]+ )
            (?! \( )
-        } {
+        } {{
             $1 . '\f(FS' . $2 . '\f(FE'
-        }egx;
+        }}gx;
     }
 
     # Fix up double quotes.  Unfortunately, we miss this transformation if the
     # quoted text contains any code with formatting codes and there's not much
     # we can effectively do about that, which makes it somewhat unclear if
     # this is really a good idea.
-    s{ \" ([^\"]+) \" } { '\*(L"' . $1 . '\*(R"' }egx;
+    s{ \" ([^\"]+) \" } {{ '\*(L"' . $1 . '\*(R"' }}gx;
 
     # Make C++ into \*(C+, which is a squinched version.
     if ($$self{MAGIC_CPP}) {
@@ -527,7 +521,7 @@ sub guesswork {
     }
 
     # Done.
-    DEBUG > 5 and print "   Guesswork returning [$_]\n";
+    DEBUG +> 5 and print "   Guesswork returning [$_]\n";
     return $_;
 }
 
@@ -559,7 +553,7 @@ sub mapfonts {
     my $last = '\fR';
     $text =~ s<
         \\f\((.)(.)
-    > <
+    > <{
         my $sequence = '';
         my $f;
         if ($last ne '\fR') { $sequence = '\fP' }
@@ -572,7 +566,7 @@ sub mapfonts {
             $last = $f;
             $sequence;
         }
-    >gxe;
+    }>gx;
     return $text;
 }
 
@@ -587,10 +581,10 @@ sub textmapfonts {
     my %magic = (F => \$fixed, B => \$bold, I => \$italic);
     $text =~ s<
         \\f\((.)(.)
-    > <
+    > <{
         ${ $magic{$1} } += ($2 eq 'S') ? 1 : -1;
         $$self{FONTS}{ ($fixed && 1) . ($bold && 1) . ($italic && 1) };
-    >gxe;
+    }>gx;
     return $text;
 }
 
@@ -610,7 +604,7 @@ sub switchquotes {
     # confuses the .SH macros and the like no end.  Expand them ourselves.
     # Also separate troff from nroff if there are any fixed-width fonts in use
     # to work around problems with Solaris nroff.
-    my $c_is_quote = ($$self{LQUOTE} =~ /\"/) || ($$self{RQUOTE} =~ /\"/);
+    my $c_is_quote = ($$self{LQUOTE} =~ m/\"/) || ($$self{RQUOTE} =~ m/\"/);
     my $fixedpat = join '|', @{ $$self{FONTS} }{'100', '101', '110', '111'};
     $fixedpat =~ s/\\/\\\\/g;
     $fixedpat =~ s/\(/\\\(/g;
@@ -667,9 +661,9 @@ sub protect {
 # body.
 sub makespace {
     my ($self) = @_;
-    $self->output (".PD\n") if $$self{ITEMS} > 1;
+    $self->output (".PD\n") if $$self{ITEMS} +> 1;
     $$self{ITEMS} = 0;
-    $self->output ($$self{INDENT} > 0 ? ".Sp\n" : ".PP\n")
+    $self->output ($$self{INDENT} +> 0 ? ".Sp\n" : ".PP\n")
         if $$self{NEEDSPACE};
 }
 
@@ -734,7 +728,7 @@ sub start_document {
     }
     my $date = $$self{date} || $self->devise_date;
     $self->preamble ($name, $section, $date)
-        unless $self->bare_output or DEBUG > 9;
+        unless $self->bare_output or DEBUG +> 9;
 
     # Initialize a few per-document variables.
     $$self{INDENT}    = 0;      # Current indentation level.
@@ -764,7 +758,7 @@ sub devise_title {
     my ($self) = @_;
     my $name = $self->source_filename || '';
     my $section = $$self{section} || 1;
-    $section = 3 if (!$$self{section} && $name =~ /\.pm\z/i);
+    $section = 3 if (!$$self{section} && $name =~ m/\.pm\z/i);
     $name =~ s/\.p(od|[lm])\z//i;
 
     # If the section isn't 3, then the name defaults to just the basename of
@@ -782,7 +776,7 @@ sub devise_title {
     # and strip off an initial component of "lib" or "blib/lib" since that's
     # what ExtUtils::MakeMaker creates.  splitdir requires at least File::Spec
     # 0.8.
-    if ($section !~ /^3/) {
+    if ($section !~ m/^3/) {
         require File::Basename;
         $name = uc File::Basename::basename ($name);
     } else {
@@ -791,21 +785,21 @@ sub devise_title {
         my @dirs = File::Spec->splitdir ($dirs);
         my $cut = 0;
         my $i;
-        for ($i = 0; $i < scalar @dirs; $i++) {
-            if ($dirs[$i] eq 'lib' && $i+1 < scalar(@dirs) && $dirs[$i + 1] =~ /perl/) {
+        for ($i = 0; $i +< scalar @dirs; $i++) {
+            if ($dirs[$i] eq 'lib' && $i+1 +< scalar(@dirs) && $dirs[$i + 1] =~ m/perl/) {
                 $cut = $i + 2;
                 last;
-            } elsif ($dirs[$i] =~ /perl/) {
+            } elsif ($dirs[$i] =~ m/perl/) {
                 $cut = $i + 1;
                 $cut++ if $dirs[$i + 1] eq 'lib';
                 last;
             }
         }
-        if ($cut > 0) {
+        if ($cut +> 0) {
             splice (@dirs, 0, $cut);
-            shift @dirs if ($dirs[0] =~ /^(site|vendor)(_perl)?$/);
-            shift @dirs if ($dirs[0] =~ /^[\d.]+$/);
-            shift @dirs if ($dirs[0] =~ /^(.*-$^O|$^O-.*|$^O)$/);
+            shift @dirs if ($dirs[0] =~ m/^(site|vendor)(_perl)?$/);
+            shift @dirs if ($dirs[0] =~ m/^[\d.]+$/);
+            shift @dirs if ($dirs[0] =~ m/^(.*-$^O|$^O-.*|$^O)$/);
         }
         shift @dirs if $dirs[0] eq 'lib';
         splice (@dirs, 0, 2) if ($dirs[0] eq 'blib' && $dirs[1] eq 'lib');
@@ -853,7 +847,7 @@ sub preamble {
     # If name or section contain spaces, quote them (section really never
     # should, but we may as well be cautious).
     for ($name, $section) {
-        if (/\s/) {
+        if (m/\s/) {
             s/\"/\"\"/g;
             $_ = '"' . $_ . '"';
         }
@@ -935,7 +929,7 @@ sub cmd_verbatim {
     my ($self, $attrs, $text) = @_;
 
     # Ignore an empty verbatim paragraph.
-    return unless $text =~ /\S/;
+    return unless $text =~ m/\S/;
 
     # Force exactly one newline at the end and strip unwanted trailing
     # whitespace at the end.
@@ -945,13 +939,13 @@ sub cmd_verbatim {
     # we'll pass to .Vb as its parameter.  This tells *roff to keep that many
     # lines together.  We don't want to tell *roff to keep huge blocks
     # together.
-    my @lines = split (/\n/, $text);
+    my @lines = split (m/\n/, $text);
     my $unbroken = 0;
     for (@lines) {
-        last if /^\s*$/;
+        last if m/^\s*$/;
         $unbroken++;
     }
-    $unbroken = 10 if ($unbroken > 12 && !$$self{MAGIC_VNOPAGEBREAK_LIMIT});
+    $unbroken = 10 if ($unbroken +> 12 && !$$self{MAGIC_VNOPAGEBREAK_LIMIT});
 
     # Prepend a null token to each line.
     $text =~ s/^/\\&/gm;
@@ -987,7 +981,7 @@ sub heading_common {
 
     # This should never happen; it means that we have a heading after =item
     # without an intervening =back.  But just in case, handle it anyway.
-    if ($$self{ITEMS} > 1) {
+    if ($$self{ITEMS} +> 1) {
         $$self{ITEMS} = 0;
         $self->output (".PD\n");
     }
@@ -1006,7 +1000,7 @@ sub cmd_head1 {
     my ($self, $attrs, $text) = @_;
     $text =~ s/\\s-?\d//g;
     $text = $self->heading_common ($text, $$attrs{start_line});
-    my $isname = ($text eq 'NAME' || $text =~ /\(NAME\)/);
+    my $isname = ($text eq 'NAME' || $text =~ m/\(NAME\)/);
     $self->output ($self->switchquotes ('.SH', $self->mapfonts ($text)));
     $self->outindex ('Header', $text) unless $isname;
     $$self{NEEDSPACE} = 0;
@@ -1084,11 +1078,11 @@ sub over_common_start {
     my ($self, $type, $attrs) = @_;
     my $line = $$attrs{start_line};
     my $indent = $$attrs{indent};
-    DEBUG > 3 and print " Starting =over $type (line $line, indent ",
+    DEBUG +> 3 and print " Starting =over $type (line $line, indent ",
         ($indent || '?'), "\n";
 
     # Find the indentation level.
-    unless (defined ($indent) && $indent =~ /^[-+]?\d{1,4}\s*$/) {
+    unless (defined ($indent) && $indent =~ m/^[-+]?\d{1,4}\s*$/) {
         $indent = $$self{indent};
     }
 
@@ -1096,7 +1090,7 @@ sub over_common_start {
     # pending indentation for the last level that we saw and haven't acted on
     # yet.  SHIFTS is the stack of indentations that we've actually emitted
     # code for.
-    if (@{ $$self{SHIFTS} } < @{ $$self{INDENTS} }) {
+    if (@{ $$self{SHIFTS} } +< @{ $$self{INDENTS} }) {
         $self->output (".RS $$self{INDENT}\n");
         push (@{ $$self{SHIFTS} }, $$self{INDENT});
     }
@@ -1118,19 +1112,19 @@ sub over_common_start {
 # .RE and then a new .RS to unconfuse *roff.
 sub over_common_end {
     my ($self) = @_;
-    DEBUG > 3 and print " Ending =over\n";
+    DEBUG +> 3 and print " Ending =over\n";
     $$self{INDENT} = pop @{ $$self{INDENTS} };
     pop @{ $$self{ITEMTYPES} };
 
     # If we emitted code for that indentation, end it.
-    if (@{ $$self{SHIFTS} } > @{ $$self{INDENTS} }) {
+    if (@{ $$self{SHIFTS} } +> @{ $$self{INDENTS} }) {
         $self->output (".RE\n");
         pop @{ $$self{SHIFTS} };
     }
 
     # If we're still in an indentation, *roff will have now lost track of the
     # right depth of that indentation, so fix that.
-    if (@{ $$self{INDENTS} } > 0) {
+    if (@{ $$self{INDENTS} } +> 0) {
         $self->output (".RE\n");
         $self->output (".RS $$self{INDENT}\n");
     }
@@ -1157,7 +1151,7 @@ sub end_over_block  { $_[0]->over_common_end }
 sub item_common {
     my ($self, $type, $attrs, $text) = @_;
     my $line = $$attrs{start_line};
-    DEBUG > 3 and print "  $type item (line $line): $text\n";
+    DEBUG +> 3 and print "  $type item (line $line): $text\n";
 
     # Clean up the text.  We want to end up with two variables, one ($text)
     # which contains any body text after taking out the item portion, and
@@ -1173,7 +1167,7 @@ sub item_common {
         $item = $text;
         $item =~ s/\s*\n\s*/ /g;
         $text = '';
-        $index = $item if ($item =~ /\w/);
+        $index = $item if ($item =~ m/\w/);
     }
 
     # Take care of the indentation.  If shifts and indents are equal, close

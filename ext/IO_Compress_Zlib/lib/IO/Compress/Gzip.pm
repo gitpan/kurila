@@ -7,12 +7,12 @@ use warnings;
 use bytes;
 
 
-use IO::Compress::RawDeflate 2.006 ;
+use IO::Compress::RawDeflate v2.006 ;
 
-use Compress::Raw::Zlib  2.006 ;
-use IO::Compress::Base::Common  2.006 qw(:Status :Parse createSelfTiedObject);
-use IO::Compress::Gzip::Constants 2.006 ;
-use IO::Compress::Zlib::Extra 2.006 ;
+use Compress::Raw::Zlib  v2.006 ;
+use IO::Compress::Base::Common  v2.006 qw(:Status :Parse createSelfTiedObject);
+use IO::Compress::Gzip::Constants v2.006 ;
+use IO::Compress::Zlib::Extra v2.006 ;
 
 BEGIN
 {
@@ -108,11 +108,11 @@ sub ckParams
                 
             return $self->saveErrorString(undef, "Null Character found in Name",
                                                 Z_DATA_ERROR)
-                if $strict && $name =~ /\x00/ ;
+                if $strict && $name =~ m/\x00/ ;
 
             return $self->saveErrorString(undef, "Non ISO 8859-1 Character found in Name",
                                                 Z_DATA_ERROR)
-                if $strict && $name =~ /$GZIP_FNAME_INVALID_CHAR_RE/o ;
+                if $strict && $name =~ m/$GZIP_FNAME_INVALID_CHAR_RE/o ;
         }
 
         if ($got->parsed('Comment') && defined $got->value('Comment')) {
@@ -120,18 +120,18 @@ sub ckParams
 
             return $self->saveErrorString(undef, "Null Character found in Comment",
                                                 Z_DATA_ERROR)
-                if $strict && $comment =~ /\x00/ ;
+                if $strict && $comment =~ m/\x00/ ;
 
             return $self->saveErrorString(undef, "Non ISO 8859-1 Character found in Comment",
                                                 Z_DATA_ERROR)
-                if $strict && $comment =~ /$GZIP_FCOMMENT_INVALID_CHAR_RE/o;
+                if $strict && $comment =~ m/$GZIP_FCOMMENT_INVALID_CHAR_RE/o;
         }
 
         if ($got->parsed('OS_Code') ) {
             my $value = $got->value('OS_Code');
 
             return $self->saveErrorString(undef, "OS_Code must be between 0 and 255, got '$value'")
-                if $value < 0 || $value > 255 ;
+                if $value +< 0 || $value +> 255 ;
             
         }
 

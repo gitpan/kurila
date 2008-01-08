@@ -1,7 +1,7 @@
 #!./perl -w
 
 BEGIN {
-    unless(grep /blib/, @INC) {
+    unless(grep m/blib/, @INC) {
         chdir 't' if -d 't';
         @INC = '../lib' if -d '../lib';
     }
@@ -13,7 +13,7 @@ use Config;
  
 BEGIN {
     if(-d "lib" && -f "TEST") {
-        if ($Config{'extensions'} !~ /\bDB_File\b/ ) {
+        if ($Config{'extensions'} !~ m/\bDB_File\b/ ) {
             print "1..0 # Skip: DB_File was not built\n";
             exit 0;
         }
@@ -57,7 +57,7 @@ sub ok
         my $class = shift ;
         my $filename = shift ;
 	my $fh = gensym ;
-	open ($fh, ">$filename") || die "Cannot open $filename: $!" ;
+	open ($fh, ">", "$filename") || die "Cannot open $filename: $!" ;
 	my $real_stdout = select($fh) ;
 	return bless [$fh, $real_stdout ] ;
 
@@ -74,8 +74,8 @@ sub docat
 {
     my $file = shift;
     local $/ = undef;
-    open(CAT,$file) || die "Cannot open $file:$!";
-    my $result = <CAT>;
+    open(CAT, "<",$file) || die "Cannot open $file:$!";
+    my $result = ~< *CAT;
     close(CAT);
     normalise($result) ;
     return $result;
@@ -195,9 +195,9 @@ ok(14, $dbh->{bfname} == 1234 );
 
 # Check that an invalid entry is caught both for store & fetch
 eval '$dbh->{fred} = 1234' ;
-ok(15, $@ =~ /^DB_File::RECNOINFO::STORE - Unknown element 'fred' at/ );
+ok(15, $@ =~ m/^DB_File::RECNOINFO::STORE - Unknown element 'fred' at/ );
 eval 'my $q = $dbh->{fred}' ;
-ok(16, $@ =~ /^DB_File::RECNOINFO::FETCH - Unknown element 'fred' at/ );
+ok(16, $@ =~ m/^DB_File::RECNOINFO::FETCH - Unknown element 'fred' at/ );
 
 # Now check the interface to RECNOINFO
 
@@ -405,7 +405,7 @@ unlink $Dfile;
     my $filename = "xyz" ;
     my %x ;
     eval { tie %x, 'DB_File', $filename, O_RDWR^|^O_CREAT, 0640, $DB_RECNO ; } ;
-    ok(71, $@ =~ /^DB_File can only tie an array to a DB_RECNO database/) ;
+    ok(71, $@ =~ m/^DB_File can only tie an array to a DB_RECNO database/) ;
     unlink $filename ;
 }
 
@@ -417,7 +417,7 @@ unlink $Dfile;
    use warnings ;
    use strict ;
 
-   open(FILE, ">SubDB.pm") or die "Cannot open SubDB.pm: $!\n" ;
+   open(FILE, ">", "SubDB.pm") or die "Cannot open SubDB.pm: $!\n" ;
    print FILE <<'EOM' ;
 
    package SubDB ;
@@ -758,7 +758,7 @@ EOM
    $db->filter_store_key (sub { $_ = $h[0] }) ;
 
    eval '$h[1] = 1234' ;
-   ok(146, $@ =~ /^recursion detected in filter_store_key at/ );
+   ok(146, $@ =~ m/^recursion detected in filter_store_key at/ );
    
    undef $db ;
    ok(147, safeUntie \@h);
@@ -884,7 +884,7 @@ EOM
 
     # now print the records in reverse order
     print "\nREVERSE\n" ;
-    for ($i = $H->length - 1 ; $i >= 0 ; -- $i)
+    for ($i = $H->length - 1 ; $i +>= 0 ; -- $i)
       { print "$i: $h[$i]\n" }
 
     # same again, but use the API functions instead
@@ -1212,10 +1212,10 @@ exit unless $FA ;
     my $offset ;
     $a = '';
     splice(@a, $offset);
-    ok(182, $a =~ /^Use of uninitialized value /);
+    ok(182, $a =~ m/^Use of uninitialized value /);
     $a = '';
     splice(@tied, $offset);
-    ok(183, $a =~ /^Use of uninitialized value in splice/);
+    ok(183, $a =~ m/^Use of uninitialized value in splice/);
 
     no warnings 'uninitialized';
     $a = '';
@@ -1230,10 +1230,10 @@ exit unless $FA ;
     my $length ;
     $a = '';
     splice(@a, 0, $length);
-    ok(186, $a =~ /^Use of uninitialized value /);
+    ok(186, $a =~ m/^Use of uninitialized value /);
     $a = '';
     splice(@tied, 0, $length);
-    ok(187, $a =~ /^Use of uninitialized value in splice/);
+    ok(187, $a =~ m/^Use of uninitialized value in splice/);
 
     no warnings 'uninitialized';
     $a = '';
@@ -1247,10 +1247,10 @@ exit unless $FA ;
     use warnings;
     $a = '';
     splice(@a, 3);
-    my $splice_end_array = ($a =~ /^splice\(\) offset past end of array/);
+    my $splice_end_array = ($a =~ m/^splice\(\) offset past end of array/);
     $a = '';
     splice(@tied, 3);
-    ok(190, !$splice_end_array || $a =~ /^splice\(\) offset past end of array/);
+    ok(190, !$splice_end_array || $a =~ m/^splice\(\) offset past end of array/);
 
     no warnings 'misc';
     $a = '';
@@ -1497,7 +1497,6 @@ sub test_splice {
 	
 	if (defined $sw and defined $msw) {
 	    $msw =~ s/ \(.+\)$//;
-	    $msw =~ s/ in splice$// if $] < 5.006;
 	    if ($sw ne $msw) {
 		return "different warning: '$sw' vs '$msw'";
 	    }
@@ -1513,8 +1512,8 @@ sub test_splice {
     undef $H;
     untie @h;
     
-    open(TEXT, $tmp) or die "cannot open $tmp: $!";
-    @h = <TEXT>; normalise @h; chomp @h;
+    open(TEXT, "<", $tmp) or die "cannot open $tmp: $!";
+    @h = ~< *TEXT; normalise @h; chomp @h;
     close TEXT or die "cannot close $tmp: $!";
     return('list is different when re-read from disk: '
 	   . Dumper(\@array) . ' vs ' . Dumper(\@h))
@@ -1545,7 +1544,7 @@ sub list_diff {
     my ($a, $b) = @_;
     my @a = @$a; my @b = @$b;
     return 1 if (scalar @a) != (scalar @b);
-    for (my $i = 0; $i < @a; $i++) {
+    for (my $i = 0; $i +< @a; $i++) {
 	my ($ae, $be) = ($a[$i], $b[$i]);
 	if (defined $ae and defined $be) {
 	    return 1 if $ae ne $be;
@@ -1572,8 +1571,8 @@ sub rand_test {
     my @contexts = qw<list scalar void>;
     my $context = $contexts[int(rand @contexts)];
     return [ rand_list(),
-	     (rand() < 0.5) ? (int(rand(20)) - 10) : undef,
-	     (rand() < 0.5) ? (int(rand(20)) - 10) : undef,
+	     (rand() +< 0.5) ? (int(rand(20)) - 10) : undef,
+	     (rand() +< 0.5) ? (int(rand(20)) - 10) : undef,
 	     rand_list(),
 	     $context ];
 }
@@ -1583,7 +1582,7 @@ sub rand_list {
     die 'usage: rand_list()' if @_;
     my @r;
 
-    while (rand() > 0.1 * (scalar @r + 1)) {
+    while (rand() +> 0.1 * (scalar @r + 1)) {
 	push @r, rand_word();
     }
     return \@r;
@@ -1594,7 +1593,7 @@ sub rand_word {
     die 'usage: rand_word()' if @_;
     my $r = '';
     my @chars = qw<a b c d e f g h i j k l m n o p q r s t u v w x y z>;
-    while (rand() > 0.1 * (length($r) + 1)) {
+    while (rand() +> 0.1 * (length($r) + 1)) {
 	$r .= $chars[int(rand(scalar @chars))];
     }
     return $r;

@@ -7,7 +7,7 @@
     print STDIN "abc" ;
 
   Filehandle %s opened only for output		[pp_print]
-    $a = <STDOUT> ;
+    $a = ~< *STDOUT ;
 
   print() on closed filehandle %s		[pp_print]
     close STDIN ; print STDIN "abc" ;
@@ -26,12 +26,12 @@
 
   Filehandle %s opened only for output		[Perl_do_readline] 
   	open (FH, ">./xcv") ;
-	my $a = <FH> ;
+	my $a = ~< *FH ;
 
   glob failed (can't start child: %s)		[Perl_do_readline] <<TODO
 
   readline() on closed filehandle %s		[Perl_do_readline]
-    close STDIN ; $a = <STDIN>;
+    close STDIN ; $a = ~< *STDIN;
 
   readline() on closed filehandle %s		[Perl_do_readline]
     readline(NONESUCH);
@@ -39,10 +39,10 @@
   glob failed (child exited with status %d%s)	[Perl_do_readline] <<TODO
 
   Deep recursion on subroutine \"%s\"		[Perl_sub_crush_depth]
-    sub fred { fred() if $a++ < 200} fred()
+    sub fred { fred() if $a++ +< 200} fred()
 
   Deep recursion on anonymous subroutine 	[Perl_sub_crush_depth]
-    $a = sub { &$a if $a++ < 200} &$a
+    $a = sub { &$a if $a++ +< 200} &$a
 
   Use of reference "%s" as array index [pp_aelem]
     $x[\1]
@@ -67,12 +67,12 @@ use warnings 'io' ;
 # 1 and 2 are opened read/write on the tty, and the IO layers may reflect this.
 # So we must make our own file handle that is read only.
 my $file = "./xcv" ; unlink $file ;
-open (FH, ">$file") or die $! ;
+open (FH, ">", "$file") or die $! ;
 close FH or die $! ;
 die "There is no file $file" unless -f $file ;
-open (FH, "<$file") or die $! ;
+open (FH, "<", "$file") or die $! ;
 print FH "anc" ;
-open(FOO, "<&FH") or die $! ;
+open(FOO, "<&", "FH") or die $! ;
 print FOO "anc" ;
 no warnings 'io' ;
 print FH "anc" ;
@@ -121,13 +121,13 @@ print() on closed filehandle at - line 7.
 # pp_hot.c [pp_print]
 package foo;
 use warnings 'closed';
-open my $fh1, "nonexistent";
+open my $fh1, "<", "nonexistent";
 print $fh1 42;
-open $fh2, "nonexistent";
+open $fh2, "<", "nonexistent";
 print $fh2 42;
-open $bar::fh3, "nonexistent";
+open $bar::fh3, "<", "nonexistent";
 print $bar::fh3 42;
-open bar::FH4, "nonexistent";
+open bar::FH4, "<", "nonexistent";
 print bar::FH4 42;
 EXPECT
 print() on closed filehandle $fh1 at - line 5.
@@ -171,12 +171,12 @@ Reference found where even-sized list expected at - line 3.
 ########
 # pp_hot.c [Perl_do_readline]
 use warnings 'closed' ;
-close STDIN        ; $a = <STDIN> ;
-opendir STDIN, "." ; $a = <STDIN> ;
+close STDIN        ; $a = ~< *STDIN ;
+opendir STDIN, "." ; $a = ~< *STDIN ;
 closedir STDIN;
 no warnings 'closed' ;
-opendir STDIN, "." ; $a = <STDIN> ;
-$a = <STDIN> ;
+opendir STDIN, "." ; $a = ~< *STDIN ;
+$a = ~< *STDIN ;
 EXPECT
 readline() on closed filehandle STDIN at - line 3.
 readline() on closed filehandle STDIN at - line 4.
@@ -185,18 +185,18 @@ readline() on closed filehandle STDIN at - line 4.
 # pp_hot.c [Perl_do_readline]
 use warnings 'io' ;
 my $file = "./xcv" ; unlink $file ;
-open (FH, ">$file") or die $! ;
-my $a = <FH> ;
+open (FH, ">", "$file") or die $! ;
+my $a = ~< *FH ;
 no warnings 'io' ;
-$a = <FH> ;
+$a = ~< *FH ;
 use warnings 'io' ;
-open(FOO, ">&FH") or die $! ;
-$a = <FOO> ;
+open(FOO, ">&", "FH") or die $! ;
+$a = ~< *FOO ;
 no warnings 'io' ;
-$a = <FOO> ;
+$a = ~< *FOO ;
 use warnings 'io' ;
-$a = <FOO> ;
-$a = <FH> ;
+$a = ~< *FOO ;
+$a = ~< *FH ;
 close (FH) or die $! ;
 close (FOO) or die $! ;
 unlink $file ;
@@ -210,11 +210,11 @@ Filehandle FH opened only for output at - line 15.
 use warnings 'recursion' ;
 sub fred 
 { 
-    fred() if $a++ < 200
+    fred() if $a++ +< 200
 } 
 {
   local $SIG{__WARN__} = sub {
-    die "ok\n" if $_[0] =~ /^Deep recursion on subroutine "main::fred"/
+    die "ok\n" if $_[0] =~ m/^Deep recursion on subroutine "main::fred"/
   };
   fred();
 }
@@ -225,11 +225,11 @@ ok
 no warnings 'recursion' ;
 sub fred 
 { 
-    fred() if $a++ < 200
+    fred() if $a++ +< 200
 } 
 {
   local $SIG{__WARN__} = sub {
-    die "ok\n" if $_[0] =~ /^Deep recursion on subroutine "main::fred"/
+    die "ok\n" if $_[0] =~ m/^Deep recursion on subroutine "main::fred"/
   };
   fred();
 }
@@ -240,7 +240,7 @@ EXPECT
 use warnings 'recursion' ;
 $b = sub 
 { 
-    &$b if $a++ < 200
+    &$b if $a++ +< 200
 }  ;
 
 &$b ;
@@ -251,7 +251,7 @@ Deep recursion on anonymous subroutine at - line 5.
 no warnings 'recursion' ;
 $b = sub 
 { 
-    &$b if $a++ < 200
+    &$b if $a++ +< 200
 }  ;
 
 &$b ;

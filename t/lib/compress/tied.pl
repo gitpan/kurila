@@ -11,23 +11,12 @@ our ($BadPerl, $UncompressClass);
  
 BEGIN 
 { 
-    plan(skip_all => "Tied Filehandle needs Perl 5.005 or better" )
-        if $] < 5.005 ;
-
     # use Test::NoWarnings, if available
     my $extra = 0 ;
     $extra = 1
         if eval { require Test::NoWarnings ;  'Test::NoWarnings'->import(); 1 };
 
-    my $tests ;
-    $BadPerl = ($] >= 5.006 and $] <= 5.008) ;
-
-    if ($BadPerl) {
-        $tests = 241 ;
-    }
-    else {
-        $tests = 249 ;
-    }
+    my $tests = 249 ;
 
     plan tests => $tests + $extra ;
 
@@ -51,7 +40,7 @@ sub myGZreadFile
 
     my $data ;
     $data = $init if defined $init ;
-    1 while $fil->read($data) > 0;
+    1 while $fil->read($data) +> 0;
 
     $fil->close ;
     return $data ;
@@ -66,9 +55,6 @@ sub run
     my $UnError         = getErrorRef($UncompressClass);
 
     {
-        next if $BadPerl ;
-
-
         title "Testing $CompressClass";
 
             
@@ -83,13 +69,12 @@ sub run
         eval { read($gz, $buff, 1) } ;
         like $@, mkErr("^read Not Available: File opened only for output");
 
-        eval { <$gz>  } ;
+        eval { ~< $gz  } ;
         like $@, mkErr("^readline Not Available: File opened only for output");
 
     }
 
     {
-        next if $BadPerl;
         $UncompressClass = getInverse($CompressClass);
 
         title "Testing $UncompressClass";
@@ -150,10 +135,7 @@ sub run
             my $foo = "1234567890";
             
             ok syswrite($io, $foo, length($foo)) == length($foo) ;
-            if ( $] < 5.6 )
-              { is $io->syswrite($foo, length $foo), length $foo }
-            else
-              { is $io->syswrite($foo), length $foo }
+            is $io->syswrite($foo), length $foo;
             ok $io->syswrite($foo, length($foo)) == length $foo;
             ok $io->write($foo, length($foo), 5) == 5;
             ok $io->write("xxx\n", 100, -1) == 1;
@@ -201,7 +183,7 @@ EOT
             
                 ok ! $io->eof;
                 is $io->tell(), 0 ;
-                my @lines = <$io>;
+                my @lines = ~< $io;
                 is @lines, 6
                     or print "# Got " . scalar(@lines) . " lines, expected 6\n" ;
                 is $lines[1], "of a paragraph\n" ;
@@ -213,7 +195,7 @@ EOT
 
                 ok ! ( defined($io->getline)  ||
                           (@tmp = $io->getlines) ||
-                          defined(<$io>)         ||
+                          defined( ~< $io)         ||
                           defined($io->getc)     ||
                           read($io, $buf, 100)   != 0) ;
             }
@@ -229,7 +211,7 @@ EOT
             
                 $io = $UncompressClass->new($name);
                 ok ! $io->eof;
-                my $line = <$io>;
+                my $line = ~< $io;
                 ok $line eq $str;
                 ok $io->eof;
             }
@@ -238,7 +220,7 @@ EOT
                 local $/ = "";  # paragraph mode
                 my $io = $UncompressClass->new($name);
                 ok ! $io->eof;
-                my @lines = <$io>;
+                my @lines = ~< $io;
                 ok $io->eof;
                 ok @lines == 2 
                     or print "# Got " . scalar(@lines) . " lines, expected 2\n" ;
@@ -254,7 +236,7 @@ EOT
                 my $no = 0;
                 my $err = 0;
                 ok ! $io->eof;
-                while (<$io>) {
+                while ( ~< $io) {
                     push(@lines, $_);
                     $err++ if $. != ++$no;
                 }
@@ -277,10 +259,8 @@ EOT
                 my $io = $UncompressClass->new($name);
             
 
-                if (! $BadPerl) {
-                    eval { read($io, $buf, -1) } ;
-                    like $@, mkErr("length parameter is negative");
-                }
+                eval { read($io, $buf, -1) } ;
+                like $@, mkErr("length parameter is negative");
 
                 is read($io, $buf, 0), 0, "Requested 0 bytes" ;
 
@@ -330,7 +310,7 @@ EOT
                 ok defined $io;
                 ok ! $io->eof;
                 ok $io->tell() == 0 ;
-                my @lines = <$io>;
+                my @lines = ~< $io;
                 ok @lines == 6; 
                 ok $lines[1] eq "of a paragraph\n" ;
                 ok join('', @lines) eq $str ;
@@ -341,7 +321,7 @@ EOT
 
                 ok ! ( defined($io->getline)  ||
                           (@tmp = $io->getlines) ||
-                          defined(<$io>)         ||
+                          defined( ~< $io)         ||
                           defined($io->getc)     ||
                           read($io, $buf, 100)   != 0) ;
             }
@@ -357,7 +337,7 @@ EOT
             
                 $io = $UncompressClass->new($name);
                 ok ! $io->eof;
-                my $line = <$io>;
+                my $line = ~< $io;
                 ok $line eq $str;
                 ok $io->eof;
             }
@@ -366,7 +346,7 @@ EOT
                 local $/ = "";  # paragraph mode
                 my $io = $UncompressClass->new($name);
                 ok ! $io->eof;
-                my @lines = <$io>;
+                my @lines = ~< $io;
                 ok $io->eof;
                 ok @lines == 2 
                     or print "# exected 2 lines, got " . scalar(@lines) . "\n";
@@ -382,7 +362,7 @@ EOT
                 my $no = 0;
                 my $err = 0;
                 ok ! $io->eof;
-                while (<$io>) {
+                while ( ~< $io) {
                     push(@lines, $_);
                     $err++ if $. != ++$no;
                 }
@@ -471,11 +451,11 @@ EOT
                         is $io->tell(), 0;
 
                         if ($append) {
-                            1 while $io->read($buf, $bufsize) > 0;
+                            1 while $io->read($buf, $bufsize) +> 0;
                         }
                         else {
                             my $tmp ;
-                            $buf .= $tmp while $io->read($tmp, $bufsize) > 0 ;
+                            $buf .= $tmp while $io->read($tmp, $bufsize) +> 0 ;
                         }
                         is length $buf, length $str;
                         ok $buf eq $str ;

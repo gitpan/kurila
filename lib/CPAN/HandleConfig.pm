@@ -138,7 +138,7 @@ sub edit {
         # one day I used randomize_urllist for a boolean, so we must
         # list them explicitly --ak
         if (0) {
-        } elsif ($o =~ /^(wait_list|urllist|dontload_list)$/) {
+        } elsif ($o =~ m/^(wait_list|urllist|dontload_list)$/) {
 
             #
             # ARRAYS
@@ -182,7 +182,7 @@ sub edit {
                     $CPAN::META->{dontload_hash} = {};
                 }
             }
-        } elsif ($o =~ /_hash$/) {
+        } elsif ($o =~ m/_hash$/) {
 
             #
             # HASHES
@@ -289,7 +289,7 @@ Please specify a filename where to save the configuration or try
     }
 
     my $msg;
-    $msg = <<EOF unless $configpm =~ /MyConfig/;
+    $msg = <<EOF unless $configpm =~ m/MyConfig/;
 
 # This is CPAN.pm's systemwide configuration file. This file provides
 # defaults for users, and the values can be changed in a per-user
@@ -300,7 +300,7 @@ EOF
     $msg ||= "\n";
     my($fh) = FileHandle->new;
     rename $configpm, "$configpm~" if -f $configpm;
-    open $fh, ">$configpm" or
+    open $fh, ">", "$configpm" or
         $CPAN::Frontend->mydie("Couldn't open >$configpm: $!");
     $fh->print(qq[$msg\$CPAN::Config = \{\n]);
     foreach (sort keys %$CPAN::Config) {
@@ -316,7 +316,7 @@ EOF
         );
     }
 
-    $fh->print("};\n1;\n__END__\n");
+    $fh->print("\};\n1;\n__END__\n");
     close $fh;
 
     #$mode = 0444 | ( $mode & 0111 ? 0111 : 0 );
@@ -354,7 +354,7 @@ sub neatvalue {
         last unless defined $key; # cautious programming in case (undef,undef) is true
         push(@m,"q[$key]=>".$self->neatvalue($val)) ;
     }
-    return "{ ".join(', ',@m)." }";
+    return "\{ ".join(', ',@m)." \}";
 }
 
 sub defaults {
@@ -369,7 +369,7 @@ sub defaults {
     my $done;
     for my $config (qw(CPAN/MyConfig.pm CPAN/Config.pm)) {
         if ($INC{$config}) {
-            CPAN->debug("INC{'$config'}[$INC{$config}]") if $CPAN::DEBUG;
+            CPAN->debug("INC\{'$config'\}[$INC{$config}]") if $CPAN::DEBUG;
             CPAN::Shell->_reload_this($config,{reloforce => 1});
             $CPAN::Frontend->myprint("'$INC{$config}' reread\n");
             last;
@@ -425,8 +425,8 @@ else: quote it with the correct quote type for the box we're on
 
         if ($quote ne ' '
             and defined($command )
-            and $command =~ /\s/
-            and $command !~ /[$quote]/) {
+            and $command =~ m/\s/
+            and $command !~ m/[$quote]/) {
             return qq<$use_quote$command$use_quote>
         }
         return $command;
@@ -629,7 +629,7 @@ sub cpl {
     if (
         defined($words[2])
         and
-        $words[2] =~ /list$/
+        $words[2] =~ m/list$/
         and
         (
         @words == 3
@@ -637,7 +637,7 @@ sub cpl {
         @words == 4 && length($word)
         )
        ) {
-        return grep /^\Q$word\E/, qw(splice shift unshift pop push);
+        return grep m/^\Q$word\E/, qw(splice shift unshift pop push);
     } elsif (defined($words[2])
              and
              $words[2] eq "init"
@@ -645,10 +645,10 @@ sub cpl {
             (
              @words == 3
              ||
-             @words >= 4 && length($word)
+             @words +>= 4 && length($word)
             )) {
-        return sort grep /^\Q$word\E/, keys %keys;
-    } elsif (@words >= 4) {
+        return sort grep m/^\Q$word\E/, keys %keys;
+    } elsif (@words +>= 4) {
         return ();
     }
     my %seen;
@@ -656,7 +656,7 @@ sub cpl {
         keys %can,
             keys %$CPAN::Config,
                 keys %keys;
-    return grep /^\Q$word\E/, @o_conf;
+    return grep m/^\Q$word\E/, @o_conf;
 }
 
 sub prefs_lookup {
@@ -673,32 +673,6 @@ sub prefs_lookup {
         $CPAN::Frontend->mywarn("Warning: $what not yet officially ".
                                 "supported for distroprefs, doing a normal lookup");
         return $CPAN::Config->{$what};
-    }
-}
-
-
-{
-    package
-        CPAN::Config; ####::###### #hide from indexer
-    # note: J. Nick Koston wrote me that they are using
-    # CPAN::Config->commit although undocumented. I suggested
-    # CPAN::Shell->o("conf","commit") even when ugly it is at least
-    # documented
-
-    # that's why I added the CPAN::Config class with autoload and
-    # deprecated warning
-
-    use strict;
-    use vars qw($AUTOLOAD $VERSION);
-    $VERSION = sprintf "%.2f", substr(q$Rev: 2212 $,4)/100;
-
-    # formerly CPAN::HandleConfig was known as CPAN::Config
-    sub AUTOLOAD {
-        my $class = shift; # e.g. in dh-make-perl: CPAN::Config
-        my($l) = $AUTOLOAD;
-        $CPAN::Frontend->mywarn("Dispatching deprecated method '$l' to CPAN::HandleConfig\n");
-        $l =~ s/.*:://;
-        CPAN::HandleConfig->?$l(@_);
     }
 }
 

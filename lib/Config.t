@@ -14,9 +14,9 @@ use strict;
 
 # Some (safe?) bets.
 
-ok(keys %Config > 500, "Config has more than 500 entries");
+ok(keys %Config +> 500, "Config has more than 500 entries");
 
-my ($first) = Config::config_sh() =~ /^(\S+)=/m;
+my ($first) = Config::config_sh() =~ m/^(\S+)=/m;
 die "Can't find first entry in Config::config_sh()" unless defined $first;
 print "# First entry is '$first'\n";
 
@@ -160,12 +160,12 @@ foreach my $pain ($first, @virtual) {
 # This little bit of evil is to avoid a @ in the program, in case it confuses
 # shell 1 liners. Perl 1 rules.
 my ($path, $ver, @orig_inc)
-  = split /\n/,
+  = split m/\n/,
     runperl (nolib=>1,
-	     prog=>'print qq{$^X\n$]\n}; print qq{$_\n} while $_ = shift INC');
+	     prog=>'print qq{$^X\n$^V\n}; print qq{$_\n} while $_ = shift INC');
 
-die "This perl is $] at $^X; other perl is $ver (at $path) "
-  . '- failed to find this perl' unless $] eq $ver;
+die "This perl is $^V at $^X; other perl is $ver (at $path) "
+  . '- failed to find this perl' unless $^V eq $ver;
 
 my %orig_inc;
 @orig_inc{@orig_inc} = ();

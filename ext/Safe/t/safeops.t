@@ -13,7 +13,7 @@ BEGIN {
 }
 use Config;
 BEGIN {
-    if ($Config{'extensions'} !~ /\bOpcode\b/ && $Config{'osname'} ne 'VMS') {
+    if ($Config{'extensions'} !~ m/\bOpcode\b/ && $Config{'osname'} ne 'VMS') {
         print "1..0\n"; exit 0;
     }
 }
@@ -26,20 +26,20 @@ use Safe;
 my @op;
 my %code;
 
-while (<DATA>) {
+while ( ~< *DATA) {
     chomp;
-    die "Can't match $_" unless /^([a-z_0-9]+)\t+(.*)/;
+    die "Can't match $_" unless m/^([a-z_0-9]+)\t+(.*)/;
     $code{$1} = $2;
 }
 
 open my $fh, '<', '../opcode.pl' or die "Can't open opcode.pl: $!";
-while (<$fh>) {
-    last if /^__END__/;
+while ( ~< $fh) {
+    last if m/^__END__/;
 }
-while (<$fh>) {
+while ( ~< $fh) {
     chomp;
-    next if !$_ or /^#/;
-    my ($op, $opname) = split /\t+/;
+    next if !$_ or m/^#/;
+    my ($op, $opname) = split m/\t+/;
     push @op, [$op, $opname, $code{$op}];
 }
 close $fh;
@@ -48,8 +48,7 @@ plan(tests => scalar @op);
 
 sub testop {
     my ($op, $opname, $code) = @_;
-    pass("$op : skipped") and return if $code =~ /^SKIP/;
-    pass("$op : skipped") and return if $code =~ m://: && $] < 5.009; # no dor
+    pass("$op : skipped") and return if $code =~ m/^SKIP/;
     my $c = Safe->new();
     $c->deny_only($op);
     $c->reval($code);
@@ -83,7 +82,7 @@ padsv		SKIP my $x
 padav		SKIP my @x
 padhv		SKIP my %x
 padany		SKIP (not implemented)
-pushre		SKIP split /foo/
+pushre		SKIP split m/foo/
 rv2gv		*x
 rv2sv		$x
 av2arylen	$#x
@@ -95,12 +94,12 @@ srefgen		SKIP \$x
 ref		ref
 bless		bless
 backtick	qx/ls/
-readline	<FH>
-rcatline	SKIP (set by optimizer) $x .= <F>
+readline	~< *FH
+rcatline	SKIP (set by optimizer) $x .= ~< *F
 regcmaybe	SKIP (internal)
 regcreset	SKIP (internal)
 regcomp		SKIP (internal)
-match		/foo/
+match		m/foo/
 qr		qr/foo/
 subst		s/foo/bar/
 substcont	SKIP (set by optimizer)
@@ -139,19 +138,19 @@ concat		$x . $y
 stringify	"$x"
 left_shift	$x << 1
 right_shift	$x >> 1
-lt		$x < $y
+lt		$x +< $y
 i_lt		SKIP (set by optimizer)
-gt		$x > $y
+gt		$x +> $y
 i_gt		SKIP (set by optimizer)
-le		$i <= $y
+le		$i +<= $y
 i_le		SKIP (set by optimizer)
-ge		$i >= $y
+ge		$i +>= $y
 i_ge		SKIP (set by optimizer)
 eq		$x == $y
 i_eq		SKIP (set by optimizer)
 ne		$x != $y
 i_ne		SKIP (set by optimizer)
-ncmp		$i <=> $y
+ncmp		$i <+> $y
 i_ncmp		SKIP (set by optimizer)
 slt		$x lt $y
 sgt		$x gt $y
@@ -207,7 +206,7 @@ helem		$h{kEy}
 hslice		@h{kEy}
 unpack		unpack
 pack		pack
-split		split /foo/
+split		split m/foo/
 join		join $a, @b
 list		@x = (1,2)
 lslice		SKIP @x[1,2]

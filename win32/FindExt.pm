@@ -84,7 +84,7 @@ sub is_static
 sub find_ext
 {
     opendir my $dh, '.';
-    my @items = grep { !/^\.\.?$/ } readdir $dh;
+    my @items = grep { !m/^\.\.?$/ } readdir $dh;
     closedir $dh;
     for my $xxx (@items) {
         if ($xxx ne "DynaLoader") {
@@ -93,7 +93,7 @@ sub find_ext
             } elsif (-f "$xxx/Makefile.PL") {
                 $ext{"$_[0]$xxx"} = 'nonxs';
             } else {
-                if (-d $xxx && @_ < 10) {
+                if (-d $xxx && @_ +< 10) {
                     chdir $xxx;
                     find_ext("$_[0]$xxx/", @_);
                     chdir "..";

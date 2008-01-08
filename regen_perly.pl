@@ -36,14 +36,14 @@ use strict;
 
 my $bison = 'bison';
 
-if (@ARGV >= 2 and $ARGV[0] eq '-b') {
+if (@ARGV +>= 2 and $ARGV[0] eq '-b') {
     shift;
     $bison = shift;
 }
 
 my $y_file = shift || 'perly.y';
 
-usage unless @ARGV==0 && $y_file =~ /\.y$/;
+usage unless @ARGV==0 && $y_file =~ m/\.y$/;
 
 (my $h_file    = $y_file) =~ s/\.y$/.h/;
 (my $act_file  = $y_file) =~ s/\.y$/.act/;
@@ -66,7 +66,7 @@ die "$0: must be run on an ASCII system\n" unless ord 'A' == 65;
 # the test below to allow that version too. DAPM Feb 04.
 
 my $version = `$bison -V`;
-unless ($version =~ /\b(1\.875[a-z]?|2\.[013])\b/) { die <<EOF; }
+unless ($version =~ m/\b(1\.875[a-z]?|2\.[013])\b/) { die <<EOF; }
 
 You have the wrong version of bison in your path; currently 1.875
 2.0, 2.1 or 2.3 is required.  Try installing
@@ -79,9 +79,9 @@ EOF
 # creates $tmpc_file and $tmph_file
 my_system("$bison -d -o $tmpc_file $y_file");
 
-open CTMPFILE, $tmpc_file or die "Can't open $tmpc_file: $!\n";
+open CTMPFILE, "<", $tmpc_file or die "Can't open $tmpc_file: $!\n";
 my $clines;
-{ local $/; $clines = <CTMPFILE>; }
+{ local $/; $clines = ~< *CTMPFILE; }
 die "failed to read $tmpc_file: length mismatch\n"
     unless length $clines == -s $tmpc_file;
 close CTMPFILE;
@@ -91,13 +91,13 @@ my ($actlines, $tablines) = extract($clines);
 $tablines .= make_type_tab($y_file, $tablines);
 
 chmod 0644, $act_file;
-open ACTFILE, ">$act_file" or die "can't open $act_file: $!\n";
+open ACTFILE, ">", "$act_file" or die "can't open $act_file: $!\n";
 print ACTFILE $actlines;
 close ACTFILE;
 chmod 0444, $act_file;
 
 chmod 0644, $tab_file;
-open TABFILE, ">$tab_file" or die "can't open $tab_file: $!\n";
+open TABFILE, ">", "$tab_file" or die "can't open $tab_file: $!\n";
 print TABFILE $tablines;
 close TABFILE;
 chmod 0444, $tab_file;
@@ -108,17 +108,17 @@ unlink $tmpc_file;
 # C<#line 30 "perly.y"> confuses the Win32 resource compiler and the
 # C<#line 188 "perlytmp.h"> gets picked up by make depend, so remove them.
 
-open TMPH_FILE, $tmph_file or die "Can't open $tmph_file: $!\n";
+open TMPH_FILE, "<", $tmph_file or die "Can't open $tmph_file: $!\n";
 chmod 0644, $h_file;
-open H_FILE, ">$h_file" or die "Can't open $h_file: $!\n";
+open H_FILE, ">", "$h_file" or die "Can't open $h_file: $!\n";
 my $endcore_done = 0;
-while (<TMPH_FILE>) {
+while ( ~< *TMPH_FILE) {
     print H_FILE "#ifdef PERL_CORE\n" if $. == 1;
-    if (!$endcore_done and /YYSTYPE_IS_DECLARED/) {
+    if (!$endcore_done and m/YYSTYPE_IS_DECLARED/) {
 	print H_FILE "#endif /* PERL_CORE */\n";
 	$endcore_done = 1;
     }
-    next if /^#line \d+ ".*"/;
+    next if m/^#line \d+ ".*"/;
     print H_FILE $_;
 }
 close TMPH_FILE;
@@ -220,12 +220,12 @@ sub make_type_tab {
     my %types;
     my $default_token;
     open my $fh, '<', $y_file or die "Can't open $y_file: $!\n";
-    while (<$fh>) {
-	if (/(\$\d+)\s*=/) {
+    while ( ~< $fh) {
+	if (m/(\$\d+)\s*=/) {
 	    warn "$y_file:$.: dangerous assignment to $1: $_";
 	}
 
-	if (/__DEFAULT__/) {
+	if (m/__DEFAULT__/) {
 	    m{(\w+) \s* ; \s* /\* \s* __DEFAULT__}x
 		or die "$y_file: can't parse __DEFAULT__ line: $_";
 	    die "$y_file: duplicate __DEFAULT__ line: $_"
@@ -234,7 +234,7 @@ sub make_type_tab {
 	    next;
 	}
 
-	next unless /^%(token|type)/;
+	next unless m/^%(token|type)/;
 	s/^%(token|type)\s+<(\w+)>\s+//
 	    or die "$y_file: unparseable token/type line: $_";
 	$tokens{$_} = $2 for (split ' ', $_);
@@ -243,7 +243,7 @@ sub make_type_tab {
     die "$y_file: no __DEFAULT__ token defined\n" unless $default_token;
     $types{$default_token} = 1;
 
-    $tablines =~ /^\Qstatic const char *const yytname[] =\E\n
+    $tablines =~ m/^\Qstatic const char *const yytname[] =\E\n
 	    {\n
 	    (.*?)
 	    ^};
@@ -251,20 +251,20 @@ sub make_type_tab {
 	or die "Can't extract yytname[] from table string\n";
     my $fields = $1;
     $fields =~ s{"([^"]+)"}
-		{ "toketype_" .
+		{{ "toketype_" .
 		    (defined $tokens{$1} ? $tokens{$1} : $default_token)
-		}ge;
+		}}g;
     $fields =~ s/, \s* 0 \s* $//x
 	or die "make_type_tab: couldn't delete trailing ',0'\n";
 
     return 
-	  "\ntypedef enum {\n\t"
+	  "\ntypedef enum \{\n\t"
 	. join(", ", map "toketype_$_", sort keys %types)
-	. "\n} toketypes;\n\n"
+	. "\n\} toketypes;\n\n"
 	. "/* type of each token/terminal */\n"
-	. "static const toketypes yy_type_tab[] =\n{\n"
+	. "static const toketypes yy_type_tab[] =\n\{\n"
 	. $fields
-	. "\n};\n";
+	. "\n\};\n";
 }
 
 

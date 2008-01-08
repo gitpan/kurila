@@ -217,7 +217,7 @@ sub ask_yn {
 
             ### if you supplied the default as a boolean, rather than y/n
             ### transform it to a y/n now
-            $args->{default} = $args->{default} =~ /\d/ 
+            $args->{default} = $args->{default} =~ m/\d/ 
                                 ? { 0 => 'n', 1 => 'y' }->{ $args->{default} }
                                 : $args->{default};
         
@@ -232,7 +232,7 @@ sub ask_yn {
 
     my $rv = $term->_tt_readline( %$args, prompt_add => $prompt_add );
     
-    return $rv =~ /^y/i ? 1 : 0;
+    return $rv =~ m/^y/i ? 1 : 0;
 }
 
 
@@ -311,7 +311,7 @@ sub _tt_readline {
 
         ### if we're allowed to give multiple answers, split
         ### the answer on whitespace
-        my @answers = $multi ? split(/\s+/, $answer) : $answer;
+        my @answers = $multi ? split(m/\s+/, $answer) : $answer;
 
         ### the return value list
         my @rv;
@@ -322,7 +322,7 @@ sub _tt_readline {
                 
                 ### a digit implies a multiple choice question, 
                 ### a non-digit is an open answer
-                if( $answer =~ /\D/ ) {
+                if( $answer =~ m/\D/ ) {
                     push @rv, $answer if allow( $answer, $allow );
                 } else {
 
@@ -330,7 +330,7 @@ sub _tt_readline {
                     ### the choices, because humans want to start counting
                     ### at 1, not at 0 
                     push @rv, $choices->[ $answer - 1 ] 
-                        if $answer > 0 && defined $choices->[ $answer - 1];
+                        if $answer +> 0 && defined $choices->[ $answer - 1];
                 }    
             }
      
@@ -410,16 +410,16 @@ sub parse_options {
     ) {
         my $match = $1;
 
-        if( $match =~ /^([-\w]+)=("|')(.+?)\2$/ ) {
+        if( $match =~ m/^([-\w]+)=("|')(.+?)\2$/ ) {
             $return->{$1} = $3;
 
-        } elsif( $match =~ /^([-\w]+)=(\S+)$/ ) {
+        } elsif( $match =~ m/^([-\w]+)=(\S+)$/ ) {
             $return->{$1} = $2;
 
-        } elsif( $match =~ /^no-?([-\w]+)$/i ) {
+        } elsif( $match =~ m/^no-?([-\w]+)$/i ) {
             $return->{$1} = 0;
 
-        } elsif ( $match =~ /^([-\w]+)$/ ) {
+        } elsif ( $match =~ m/^([-\w]+)$/ ) {
             $return->{$1} = 1;
 
         } else {

@@ -159,7 +159,7 @@ sub split_command {
             if( !length $arg_str ) {
                 $arg_str .= $next_arg_str
             }
-            elsif( length($arg_str) + length($next_arg_str) > $len_left ) {
+            elsif( length($arg_str) + length($next_arg_str) +> $len_left ) {
                 unshift @args, @next_args;
                 last;
             }
@@ -179,9 +179,9 @@ sub split_command {
 sub _expand_macros {
     my($self, $cmd) = @_;
 
-    $cmd =~ s{\$\((\w+)\)}{
+    $cmd =~ s{\$\((\w+)\)}{{
         defined $self->{$1} ? $self->{$1} : "\$($1)"
-    }e;
+    }};
     return $cmd;
 }
 
@@ -206,7 +206,7 @@ sub echo {
     $appending ||= 0;
 
     my @cmds = map { '$(NOECHO) $(ECHO) '.$self->quote_literal($_) } 
-               split /\n/, $text;
+               split m/\n/, $text;
     if( $file ) {
         my $redirect = $appending ? '>>' : '>';
         $cmds[0] .= " $redirect $file";
@@ -421,12 +421,12 @@ sub clean {
 
     my($self, %attribs) = @_;
     my @m;
-    push(@m, '
-# Delete temporary files but do not touch installed files. We don\'t delete
+    push(@m, q|
+# Delete temporary files but do not touch installed files. We don't delete
 # the Makefile here so a later make realclean still has a makefile to use.
 
 clean :: clean_subdirs
-');
+|);
 
     my @files = values %{$self->{XS}}; # .c files from *.xs files
     my @dirs  = qw(blib);
@@ -449,7 +449,7 @@ clean :: clean_subdirs
         # Use @dirs because we don't know what's in here.
         push @dirs, ref $attribs{FILES}                ?
                         @{$attribs{FILES}}             :
-                        split /\s+/, $attribs{FILES}   ;
+                        split m/\s+/, $attribs{FILES}   ;
     }
 
     push(@files, qw[$(MAKE_APERL_FILE) 
@@ -824,7 +824,7 @@ sub realclean {
             push @dirs, @{ $attribs{FILES} };
         }
         else {
-            push @dirs, split /\s+/, $attribs{FILES};
+            push @dirs, split m/\s+/, $attribs{FILES};
         }
     }
 
@@ -1030,7 +1030,7 @@ sub init_INST {
 	}
     }
 
-    my @parentdir = split(/::/, $self->{PARENT_NAME});
+    my @parentdir = split(m/::/, $self->{PARENT_NAME});
     $self->{INST_LIBDIR}      = $self->catdir('$(INST_LIB)',     @parentdir);
     $self->{INST_ARCHLIBDIR}  = $self->catdir('$(INST_ARCHLIB)', @parentdir);
     $self->{INST_AUTODIR}     = $self->catdir('$(INST_LIB)', 'auto', 
@@ -1249,7 +1249,7 @@ sub init_INSTALL_from_PREFIX {
         foreach my $var (keys %lib_layouts) {
             my $Installvar = uc "install$var";
 
-            if( $var =~ /arch/ ) {
+            if( $var =~ m/arch/ ) {
                 $self->{$Installvar} ||= 
                   $self->catdir($self->{LIB}, $Config{archname});
             }
@@ -1269,7 +1269,7 @@ sub init_INSTALL_from_PREFIX {
         my($s, $t, $d, $style) = @{$layout}{qw(s t d style)};
         my $r = '$('.$type2prefix{$t}.')';
 
-        print STDERR "Prefixing $var\n" if $Verbose >= 2;
+        print STDERR "Prefixing $var\n" if $Verbose +>= 2;
 
         my $installvar = "install$var";
         my $Installvar = uc $installvar;
@@ -1279,7 +1279,7 @@ sub init_INSTALL_from_PREFIX {
         $self->prefixify($installvar, $s, $r, $d);
 
         print STDERR "  $Installvar == $self->{$Installvar}\n" 
-          if $Verbose >= 2;
+          if $Verbose +>= 2;
     }
 
     # Generate these if they weren't figured out.
@@ -1611,34 +1611,6 @@ sub test_via_script {
 }
 
 
-=head3 tool_autosplit
-
-Defines a simple perl call that runs autosplit. May be deprecated by
-pm_to_blib soon.
-
-=cut
-
-sub tool_autosplit {
-    my($self, %attribs) = @_;
-
-    my $maxlen = $attribs{MAXLEN} ? '$$AutoSplit::Maxlen=$attribs{MAXLEN};' 
-                                  : '';
-
-    my $asplit = $self->oneliner(sprintf <<'PERL_CODE', $maxlen);
-use AutoSplit; %s autosplit($$ARGV[0], $$ARGV[1], 0, 1, 1)
-PERL_CODE
-
-    return sprintf <<'MAKE_FRAG', $asplit;
-# Usage: $(AUTOSPLITFILE) FileToSplit AutoDirToSplitInto
-AUTOSPLITFILE = %s
-
-MAKE_FRAG
-
-}
-
-
-
-
 =head2 File::Spec wrappers
 
 ExtUtils::MM_Any is a subclass of File::Spec.  The methods noted here
@@ -1731,7 +1703,7 @@ installation.
 sub libscan {
     my($self,$path) = @_;
     my($dirs,$file) = ($self->splitpath($path))[1,2];
-    return '' if grep /^(?:RCS|CVS|SCCS|\.svn|_darcs)$/, 
+    return '' if grep m/^(?:RCS|CVS|SCCS|\.svn|_darcs)$/, 
                      $self->splitdir($dirs), $file;
 
     return $path;

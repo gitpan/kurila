@@ -12,9 +12,9 @@ use strict;
 use warnings;
 
 my ($cSH, $ch, @ch, %ch) = ("config_h.SH");
-open $ch, "<$cSH" or die "Cannot open $cSH: $!\n";
+open $ch, "<", "$cSH" or die "Cannot open $cSH: $!\n";
 {   local $/ = "\n\n";
-    @ch = <$ch>;
+    @ch = ~< $ch;
     close  $ch;
     }
 
@@ -46,7 +46,7 @@ do {
 	ch_index;
 	foreach my $dep (@{$dep{$sym}}) {
 	    print STDERR "Check if $sym\t($ch{$sym}) precedes $dep\t($ch{$dep})\n";
-	    $ch{$sym} < $ch{$dep} and next;
+	    $ch{$sym} +< $ch{$dep} and next;
 	    my $ch = splice @ch, $ch{$sym}, 1;
 	    splice @ch, $ch{$dep}, 0, $ch;
 	    $changed++;
@@ -66,7 +66,7 @@ for (grep m{echo .Extracting \$CONFIG_H} => @ch) {
 push @ch, ";;\nesac\n";
 
 
-open  $ch, "> $cSH" or die "Cannot write $cSH: $!\n";
+open  $ch, ">", "$cSH" or die "Cannot write $cSH: $!\n";
 print $ch <<EOW;
 # THIS IS A GENERATED FILE
 # DO NOT HAND-EDIT

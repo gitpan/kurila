@@ -119,10 +119,10 @@ our @ISA = qw(Exporter);
 our @EXPORT = qw(collate_xfrm setlocale LC_COLLATE);
 our @EXPORT_OK = qw();
 
-use overload qw(
-fallback	1
-cmp		collate_cmp
-);
+use overload (
+              'fallback'	=> 1,
+              'cmp'		=> \&collate_cmp,
+             );
 
 our($LOCALE, $C);
 
@@ -130,7 +130,7 @@ our $please_use_I18N_Collate_even_if_deprecated = 0;
 sub new {
   my $new = $_[1];
 
-  if (warnings::enabled() && $] >= 5.003_06) {
+  if (warnings::enabled()) {
     unless ($please_use_I18N_Collate_even_if_deprecated) {
       warnings::warn <<___EOD___;
 ***
@@ -178,8 +178,8 @@ sub collate_xfrm {
   my $s = $_[0];
   my $x = '';
   
-  for (split(/(\000+)/, $s)) {
-    $x .= (/^\000/) ? $_ : strxfrm("$_\000");
+  for (split(m/(\000+)/, $s)) {
+    $x .= (m/^\000/) ? $_ : strxfrm("$_\000");
   }
 
   $x;

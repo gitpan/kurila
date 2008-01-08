@@ -7,9 +7,9 @@ use warnings;
 use bytes;
 
 
-use IO::Compress::Base 2.006 ;
-use IO::Compress::Base::Common  2.006 qw(:Status createSelfTiedObject);
-use IO::Compress::Adapter::Deflate  2.006 ;
+use IO::Compress::Base v2.006 ;
+use IO::Compress::Base::Common  v2.006 qw(:Status createSelfTiedObject);
+use IO::Compress::Adapter::Deflate  v2.006 ;
 
 require Exporter ;
 
@@ -143,8 +143,8 @@ sub getZlibParams
 {
     my $self = shift ;
 
-    use IO::Compress::Base::Common  2.006 qw(:Parse);
-    use Compress::Raw::Zlib  2.006 qw(Z_DEFLATED Z_DEFAULT_COMPRESSION Z_DEFAULT_STRATEGY);
+    use IO::Compress::Base::Common  v2.006 qw(:Parse);
+    use Compress::Raw::Zlib  v2.006 qw(Z_DEFLATED Z_DEFAULT_COMPRESSION Z_DEFAULT_STRATEGY);
 
     
     return (
@@ -211,7 +211,7 @@ sub createMerge
 
 
     if ( $outType eq 'buffer') 
-      { substr( ${ *$self->{Buffer} }, $end_offset) = '' }
+      { substr( ${ *$self->{Buffer} }, $end_offset, undef, '') }
     elsif ($outType eq 'handle' || $outType eq 'filename') {
         *$self->{FH} = *$inf->{FH} ;
         delete *$inf->{FH};

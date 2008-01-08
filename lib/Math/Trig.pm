@@ -9,7 +9,7 @@ package Math::Trig;
 
 use strict;
 
-use Math::Complex 1.36;
+use Math::Complex v1.36;
 use Math::Complex qw(:trig :pi);
 
 use vars qw($VERSION $PACKAGE @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS);
@@ -157,7 +157,7 @@ sub great_circle_direction {
 	     (cos($lat0) * sin($distance)));
 
     $direction = pi2 - $direction
-	if sin($theta1 - $theta0) < 0;
+	if sin($theta1 - $theta0) +< 0;
 
     return rad2rad($direction);
 }
@@ -208,7 +208,7 @@ sub great_circle_destination {
 
     my $dir1 = great_circle_bearing($theta1, $phi1, $theta0, $phi0) + pi;
 
-    $dir1 -= pi2 if $dir1 > pi2;
+    $dir1 -= pi2 if $dir1 +> pi2;
 
     return ($theta1, $phi1, $dir1);
 }

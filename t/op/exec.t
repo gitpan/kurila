@@ -28,13 +28,13 @@ SKIP: {
     skip("bug/feature of pdksh", 2) if $^O eq 'os2';
 
     my $tnum = curr_test();
-    $exit = system qq{$Perl -le "print q{ok $tnum - interp system(EXPR)"}};
+    $exit = system qq{$Perl -le "print q\{ok $tnum - interp system(EXPR)"\}};
     next_test();
     is( $exit, 0, '  exited 0' );
 }
 
 my $tnum = curr_test();
-$exit = system qq{$Perl -le "print q{ok $tnum - split & direct system(EXPR)"}};
+$exit = system qq{$Perl -le "print q\{ok $tnum - split & direct system(EXPR)"\}};
 next_test();
 is( $exit, 0, '  exited 0' );
 
@@ -43,7 +43,7 @@ is( $exit, 0, '  exited 0' );
 my $quote = $Is_VMS || $Is_Win32 ? '"' : '';
 $tnum = curr_test();
 $exit = system $Perl, '-le', 
-               "${quote}print q{ok $tnum - system(PROG, LIST)}${quote}";
+               "${quote}print q<ok $tnum - system(PROG, LIST)>${quote}";
 next_test();
 is( $exit, 0, '  exited 0' );
 
@@ -51,7 +51,7 @@ is( $exit, 0, '  exited 0' );
 # Some basic piped commands.  Some OS's have trouble with "helpfully"
 # putting newlines on the end of piped output.  So we split this into
 # newline insensitive and newline sensitive tests.
-my $echo_out = `$Perl -e "print 'ok'" | $Perl -le "print <STDIN>"`;
+my $echo_out = `$Perl -e "print 'ok'" | $Perl -le "print ~< *STDIN"`;
 $echo_out =~ s/\n\n/\n/g;
 is( $echo_out, "ok\n", 'piped echo emulation');
 
@@ -63,16 +63,16 @@ is( $echo_out, "ok\n", 'piped echo emulation');
     is( scalar `$Perl -e "print 'ok'"`,
         "ok", 'no extra newlines on ``' );
 
-    is( scalar `$Perl -e "print 'ok'" | $Perl -e "print <STDIN>"`, 
+    is( scalar `$Perl -e "print 'ok'" | $Perl -e "print ~< *STDIN"`, 
         "ok", 'no extra newlines on pipes');
 
-    is( scalar `$Perl -le "print 'ok'" | $Perl -le "print <STDIN>"`, 
+    is( scalar `$Perl -le "print 'ok'" | $Perl -le "print ~< *STDIN"`, 
         "ok\n\n", 'doubled up newlines');
 
-    is( scalar `$Perl -e "print 'ok'" | $Perl -le "print <STDIN>"`, 
+    is( scalar `$Perl -e "print 'ok'" | $Perl -le "print ~< *STDIN"`, 
         "ok\n", 'extra newlines on inside pipes');
 
-    is( scalar `$Perl -le "print 'ok'" | $Perl -e "print <STDIN>"`, 
+    is( scalar `$Perl -le "print 'ok'" | $Perl -e "print ~< *STDIN"`, 
         "ok\n", 'extra newlines on outgoing pipes');
 
     {
@@ -94,9 +94,9 @@ unless( ok($rc == 255 << 8 or $rc == -1 or $rc == 256 or $rc == 512) ) {
     print "# \$rc == $rc\n";
 }
 
-unless ( ok( $! == 2  or  $! =~ /\bno\b.*\bfile/i or  
-             $! == 13 or  $! =~ /permission denied/i or
-             $! == 22 or  $! =~ /invalid argument/i  ) ) {
+unless ( ok( $! == 2  or  $! =~ m/\bno\b.*\bfile/i or  
+             $! == 13 or  $! =~ m/permission denied/i or
+             $! == 22 or  $! =~ m/invalid argument/i  ) ) {
     printf "# \$! eq %d, '%s'\n", $!, $!;
 }
 
@@ -113,7 +113,7 @@ END
 
 TODO: {
     my $tnum = curr_test();
-    if( $^O =~ /Win32/ ) {
+    if( $^O =~ m/Win32/ ) {
         print "not ok $tnum - exec failure doesn't terminate process " .
               "# TODO Win32 exec failure waits for user input\n";
         next_test();

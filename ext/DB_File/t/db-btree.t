@@ -1,7 +1,7 @@
 #!./perl -w
 
 BEGIN {
-    unless(grep /blib/, @INC) {
+    unless(grep m/blib/, @INC) {
         chdir 't' if -d 't';
         @INC = '../lib' if -d '../lib';
     }
@@ -13,7 +13,7 @@ use Config;
  
 BEGIN {
     if(-d "lib" && -f "TEST") {
-        if ($Config{'extensions'} !~ /\bDB_File\b/ ) {
+        if ($Config{'extensions'} !~ m/\bDB_File\b/ ) {
             print "1..0 # Skip: DB_File was not built\n";
             exit 0;
         }
@@ -23,7 +23,7 @@ BEGIN {
 BEGIN
 {
     if ($^O eq 'darwin'
-	&& (split(/\./, $Config{osvers}))[0] < 7 # Mac OS X 10.3 == Darwin 7
+	&& (split(m/\./, $Config{osvers}))[0] +< 7 # Mac OS X 10.3 == Darwin 7
 	&& $Config{db_version_major} == 1
 	&& $Config{db_version_minor} == 0
 	&& $Config{db_version_patch} == 0) {
@@ -57,7 +57,7 @@ sub lexical
     my(@a) = unpack ("C*", $a) ;
     my(@b) = unpack ("C*", $b) ;
 
-    my $len = (@a > @b ? @b : @a) ;
+    my $len = (@a +> @b ? @b : @a) ;
     my $i = 0 ;
 
     foreach $i ( 0 .. $len -1) {
@@ -76,7 +76,7 @@ sub lexical
         my $class = shift ;
         my $filename = shift ;
 	my $fh = gensym ;
-	open ($fh, ">$filename") || die "Cannot open $filename: $!" ;
+	open ($fh, ">", "$filename") || die "Cannot open $filename: $!" ;
 	my $real_stdout = select($fh) ;
 	return bless [$fh, $real_stdout ] ;
 
@@ -93,8 +93,8 @@ sub docat
 { 
     my $file = shift;
     local $/ = undef ;
-    open(CAT,$file) || die "Cannot open $file: $!";
-    my $result = <CAT>;
+    open(CAT, "<",$file) || die "Cannot open $file: $!";
+    my $result = ~< *CAT;
     close(CAT);
     $result = normalise($result) ;
     return $result ;
@@ -129,8 +129,8 @@ sub safeUntie
 
 
 my $db185mode =  ($DB_File::db_version == 1 && ! $DB_File::db_185_compat) ;
-my $null_keys_allowed = ($DB_File::db_ver < 2.004010 
-				|| $DB_File::db_ver >= 3.1 );
+my $null_keys_allowed = ($DB_File::db_ver +< 2.004010 
+				|| $DB_File::db_ver +>= 3.1 );
 
 my $Dfile = "dbbtree.tmp";
 unlink $Dfile;
@@ -169,9 +169,9 @@ ok(14, $dbh->{maxkeypage} == 1234 );
 
 # Check that an invalid entry is caught both for store & fetch
 eval '$dbh->{fred} = 1234' ;
-ok(15, $@ =~ /^DB_File::BTREEINFO::STORE - Unknown element 'fred' at/ ) ;
+ok(15, $@ =~ m/^DB_File::BTREEINFO::STORE - Unknown element 'fred' at/ ) ;
 eval 'my $q = $dbh->{fred}' ;
-ok(16, $@ =~ /^DB_File::BTREEINFO::FETCH - Unknown element 'fred' at/ ) ;
+ok(16, $@ =~ m/^DB_File::BTREEINFO::FETCH - Unknown element 'fred' at/ ) ;
 
 # Now check the interface to BTREE
 
@@ -297,13 +297,13 @@ ok(30, $result) ;
 
 # check cache overflow and numeric keys and contents
 my $ok = 1;
-for ($i = 1; $i < 200; $i++) { $h{$i + 0} = $i + 0; }
-for ($i = 1; $i < 200; $i++) { $ok = 0 unless $h{$i} == $i; }
+for ($i = 1; $i +< 200; $i++) { $h{$i + 0} = $i + 0; }
+for ($i = 1; $i +< 200; $i++) { $ok = 0 unless $h{$i} == $i; }
 ok(31, $ok);
 
 ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,$atime,$mtime,$ctime,
    $blksize,$blocks) = stat($Dfile);
-ok(32, $size > 0 );
+ok(32, $size +> 0 );
 
 @h{0..200} = 200..400;
 my @foo = @h{0..200};
@@ -538,13 +538,13 @@ my $Dfile3 = "btree3" ;
 my $dbh1 = DB_File::BTREEINFO->new() ;
 $dbh1->{compare} = sub { 
 	no warnings 'numeric' ;
-	$_[0] <=> $_[1] } ; 
+	$_[0] <+> $_[1] } ; 
  
 my $dbh2 = DB_File::BTREEINFO->new() ;
 $dbh2->{compare} = sub { $_[0] cmp $_[1] } ;
  
 my $dbh3 = DB_File::BTREEINFO->new() ;
-$dbh3->{compare} = sub { length $_[0] <=> length $_[1] } ;
+$dbh3->{compare} = sub { length $_[0] <+> length $_[1] } ;
  
  
 my (%g, %k);
@@ -556,10 +556,10 @@ my @Keys = qw( 0123 12 -1234 9 987654321 def  ) ;
 my (@srt_1, @srt_2, @srt_3);
 { 
   no warnings 'numeric' ;
-  @srt_1 = sort { $a <=> $b } @Keys ; 
+  @srt_1 = sort { $a <+> $b } @Keys ; 
 }
 @srt_2 = sort { $a cmp $b } @Keys ;
-@srt_3 = sort { length $a <=> length $b } @Keys ;
+@srt_3 = sort { length $a <+> length $b } @Keys ;
  
 foreach (@Keys) {
     $h{$_} = 1 ;
@@ -623,7 +623,7 @@ unlink $Dfile1 ;
     my $filename = "xyz" ;
     my @x ;
     eval { tie @x, 'DB_File', $filename, O_RDWR^|^O_CREAT, 0640, $DB_BTREE ; } ;
-    ok(90, $@ =~ /^DB_File can only tie an associative array to a DB_BTREE database/) ;
+    ok(90, $@ =~ m/^DB_File can only tie an associative array to a DB_BTREE database/) ;
     unlink $filename ;
 }
 
@@ -635,7 +635,7 @@ unlink $Dfile1 ;
    use warnings ;
    use strict ;
 
-   open(FILE, ">SubDB.pm") or die "Cannot open SubDB.pm: $!\n" ;
+   open(FILE, ">", "SubDB.pm") or die "Cannot open SubDB.pm: $!\n" ;
    print FILE <<'EOM' ;
 
    package SubDB ;
@@ -904,7 +904,7 @@ EOM
    $db->filter_store_key (sub { $_ = $h{$_} }) ;
 
    eval '$h{1} = 1234' ;
-   ok(146, $@ =~ /^recursion detected in filter_store_key at/ );
+   ok(146, $@ =~ m/^recursion detected in filter_store_key at/ );
    
    undef $db ;
    untie %h;
@@ -932,7 +932,7 @@ EOM
     sub Compare
     {
         my ($key1, $key2) = @_ ;
-        "\L$key1" cmp "\L$key2" ;
+        (lc "$key1") cmp (lc "$key2") ;
     }
 
     # specify the Perl sub that will do the comparison
@@ -1354,7 +1354,7 @@ EOM
     my $db ;
     ok(156, $db = tie(%h, 'DB_File', $Dfile, O_RDWR^|^O_CREAT, 0640, $DB_BTREE ) );
     $db->filter_fetch_key (sub { $_ =~ s/^Beta_/Alpha_/ if defined $_}) ;
-    $db->filter_store_key (sub { $bad_key = 1 if /^Beta_/ ; $_ =~ s/^Alpha_/Beta_/}) ;
+    $db->filter_store_key (sub { $bad_key = 1 if m/^Beta_/ ; $_ =~ s/^Alpha_/Beta_/}) ;
 
     $h{'Alpha_ABC'} = 2 ;
     $h{'Alpha_DEF'} = 5 ;
@@ -1384,10 +1384,10 @@ EOM
     my $dbh = DB_File::BTREEINFO->new() ;
 
     eval { $dbh->{compare} = 2 };
-    ok(162, $@ =~ /^Key 'compare' not associated with a code reference at/);
+    ok(162, $@ =~ m/^Key 'compare' not associated with a code reference at/);
 
     eval { $dbh->{prefix} = 2 };
-    ok(163, $@ =~ /^Key 'prefix' not associated with a code reference at/);
+    ok(163, $@ =~ m/^Key 'prefix' not associated with a code reference at/);
 
 }
 
@@ -1444,7 +1444,7 @@ ok(165,1);
     $hash2{xyz} = 2;
     $hash2{abcde} = 5;
 
-    ok(168, $h1_count > 0);
+    ok(168, $h1_count +> 0);
     ok(169, $h1_count == $h2_count);
 
     ok(170, safeUntie \%hash1);
@@ -1648,7 +1648,7 @@ ok(165,1);
       or print "# Caught warning [$warned]\n" ;
     $warned = '';
 
-    my $no_NULL = ($DB_File::db_ver >= 2.003016 && $DB_File::db_ver < 3.001) ;
+    my $no_NULL = ($DB_File::db_ver +>= 2.003016 && $DB_File::db_ver +< 3.001) ;
     print "# db_ver $DB_File::db_ver\n";
     $value = '' ;
     $db->get(undef, $value) ;

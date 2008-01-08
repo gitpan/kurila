@@ -1,7 +1,7 @@
 BEGIN {
     require './test.pl';
 }
-plan tests=>69;
+plan tests=>66;
 
 our ($nolv, @array2, %hash2, $blah, $o, $x0, $x1, $xxx,
      $newvar, $nnewvar, $str, $x, @p, @ary);
@@ -12,7 +12,7 @@ sub b : lvalue { ${\shift} }
 my $out = a(b());		# Check that temporaries are allowed.
 is(ref $out, 'main'); # Not reached if error.
 
-my @out = grep /main/, a(b()); # Check that temporaries are allowed.
+my @out = grep m/main/, a(b()); # Check that temporaries are allowed.
 cmp_ok(scalar @out, '==', 1); # Not reached if error.
 
 my $in;
@@ -370,10 +370,6 @@ $a = \&lv1nn;
 $a->() = 8;
 is($nnewvar, '8');
 
-eval 'sub AUTOLOAD : lvalue { $newvar }';
-foobar() = 12;
-is($newvar, "12");
-
 {
 my %hash; my @array;
 sub alv : lvalue { $array[1] }
@@ -430,11 +426,6 @@ sub hslice : lvalue { @hash{"c", "b"} }
 is(join("/",@hash{"c","a","b"}), "CISC/Alpha/BogoMIPS");
 }
 
-$str = "Hello, world!";
-sub sstr : lvalue { substr($str, 1, 4) }
-sstr() = "i";
-is($str, "Hi, world!");
-
 $str = "Made w/ JavaScript";
 sub veclv : lvalue { vec($str, 2, 32) }
 if (ord('A') != 193) {
@@ -448,7 +439,7 @@ is($str, "Made w/ PerlScript");
 sub position : lvalue { pos }
 @p = ();
 $_ = "fee fi fo fum";
-while (/f/g) {
+while (m/f/g) {
     push @p, position;
     position() += 6;
 }
@@ -542,13 +533,3 @@ TODO: {
     is($line, "zeroonetwothree");
 }
 
-{
-    package Foo;
-    sub AUTOLOAD :lvalue { no strict 'refs'; *{Symbol::fetch_glob($AUTOLOAD)} };
-    package main;
-    my $foo = bless {},"Foo";
-    my $result;
-    $foo->bar = sub { $result = "bar" };
-    $foo->bar;
-    is ($result, 'bar', "RT #41550");
-}

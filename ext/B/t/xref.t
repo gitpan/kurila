@@ -8,7 +8,7 @@ BEGIN {
 	unshift @INC, 't';
     }
     require Config;
-    if (($Config::Config{'extensions'} !~ /\bB\b/) ){
+    if (($Config::Config{'extensions'} !~ m/\bB\b/) ){
         print "1..0 # Skip -- Perl configured without B module\n";
         exit 0;
     }
@@ -24,30 +24,30 @@ use_ok( 'B::Xref' );
 
 my $file = 'xreftest.out';
 
-open SAVEOUT, ">&STDOUT" or diag $!;
+open SAVEOUT, ">&", \*STDOUT or diag $!;
 close STDOUT;
 # line 100
 our $compilesub = B::Xref::compile("-o$file");
 ok( ref $compilesub eq 'CODE', "compile() returns a coderef ($compilesub)" );
 $compilesub->(); # Compile this test script
 close STDOUT;
-open STDOUT, ">&SAVEOUT" or diag $!;
+open STDOUT, ">&", \*SAVEOUT or diag $!;
 
 # Now parse the output
 # line 200
 my ($curfile, $cursub, $curpack) = ('') x 3;
 our %xreftable = ();
-open XREF, $file or die "# Can't open $file: $!\n";
-while (<XREF>) {
+open XREF, "<", $file or die "# Can't open $file: $!\n";
+while ( ~< *XREF) {
     chomp;
-    if (/^File (.*)/) {
+    if (m/^File (.*)/) {
 	$curfile = $1;
-    } elsif (/^  Subroutine (.*)/) {
+    } elsif (m/^  Subroutine (.*)/) {
 	$cursub = $1;
-    } elsif (/^    Package (.*)/) {
+    } elsif (m/^    Package (.*)/) {
 	$curpack = $1;
-    } elsif ($curpack eq '?' && /^      (".*")  +(.*)/
-	    or /^      (\S+)\s+(.*)/) {
+    } elsif ($curpack eq '?' && m/^      (".*")  +(.*)/
+	    or m/^      (\S+)\s+(.*)/) {
 	$xreftable{$curfile}{$cursub}{$curpack}{$1} = $2;
     }
 }

@@ -7,7 +7,7 @@ BEGIN {
 	@INC = '../lib';
 	require Config; Config->import;
 	# Don't bother if there are no quad offsets.
-	if ($Config{lseeksize} < 8) {
+	if ($Config{lseeksize} +< 8) {
 		print "1..0 # Skip: no 64-bit file offsets\n";
 		exit(0);
 	}
@@ -147,9 +147,9 @@ print "# syswrite failed: $! (syswrite returned ",
 my $close     = close BIG;
 print "# close failed: $!\n" unless $close;
 unless($syswrite && $close) {
-    if ($! =~/too large/i) {
+    if ($! =~m/too large/i) {
 	explain("writing past 2GB failed: process limits?");
-    } elsif ($! =~ /quota/i) {
+    } elsif ($! =~ m/quota/i) {
 	explain("filesystem quota limits?");
     } else {
 	explain("error: $!");
@@ -176,7 +176,7 @@ sub offset ($$) {
     my $offset_is = eval $offset_will_be;
     unless ($offset_is == $offset_want) {
         print "# bad offset $offset_is, want $offset_want\n";
-	my ($offset_func) = ($offset_will_be =~ /^(\w+)/);
+	my ($offset_func) = ($offset_will_be =~ m/^(\w+)/);
 	if (unpack("L", pack("L", $offset_want)) == $offset_is) {
 	    print "# 32-bit wraparound suspected in $offset_func() since\n";
 	    print "# $offset_want cast into 32 bits equals $offset_is.\n";
@@ -263,7 +263,7 @@ bye(); # does the necessary cleanup
 END {
     # unlink may fail if applied directly to a large file
     # be paranoid about leaving 5 gig files lying around
-    open(BIG, ">big"); # truncate
+    open(BIG, ">", "big"); # truncate
     close(BIG);
     1 while unlink "big"; # standard portable idiom
 }

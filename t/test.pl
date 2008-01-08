@@ -58,8 +58,8 @@ END {
 # messages
 sub _diag {
     return unless @_;
-    my @mess = map { /^#/ ? "$_\n" : "# $_\n" }
-               map { split /\n/ } @_;
+    my @mess = map { m/^#/ ? "$_\n" : "# $_\n" }
+               map { split m/\n/ } @_;
     my $fh = $TODO ? *STDOUT : *STDERR;
     print $fh @mess;
 
@@ -119,6 +119,7 @@ sub ok ($@) {
 
 sub _q {
     my $x = shift;
+    return "GLOB('" . Symbol::glob_name($x) . ")" if ref \$x eq "GLOB";
     return 'undef' unless defined $x;
     my $q = $x;
     $q =~ s/\\/\\\\/g;
@@ -133,7 +134,7 @@ sub _qq {
 
 # keys are the codes \n etc map to, values are 2 char strings such as \n
 my %backslash_escape;
-foreach my $x (split //, 'nrtfa\\\'"') {
+foreach my $x (split m//, q|nrtfa\'"|) {
     $backslash_escape{ord eval "\"\\$x\""} = "\\$x";
 }
 # A way to display scalars containing control characters and Unicode.
@@ -144,13 +145,13 @@ sub display {
         if (defined $x and not ref $x) {
             my $y = '';
             foreach my $c (unpack("U*", $x)) {
-                if ($c > 255) {
-                    $y .= sprintf "\\x{%x}", $c;
+                if ($c +> 255) {
+                    $y .= sprintf "\\x\{%x\}", $c;
                 } elsif ($backslash_escape{$c}) {
                     $y .= $backslash_escape{$c};
                 } else {
                     my $z = chr $c; # Maybe we can get away with a literal...
-                    $z = sprintf "\\%03o", $c if $z =~ /[[:^print:]]/;
+                    $z = sprintf "\\%03o", $c if $z =~ m/[[:^print:]]/;
                     $y .= $z;
                 }
             }
@@ -170,7 +171,11 @@ sub is ($$@) {
         # undef only matches undef
         $pass = !defined $got && !defined $expected;
     }
-    else {
+    elsif (ref \$got eq "GLOB") {
+        "GLOB('" . Symbol::glob_name($got) . ')';
+        $got = "GLOB('" . Symbol::glob_name($got) . ')';
+        $pass = 0;
+    } else {
         $pass = $got eq $expected;
     }
 
@@ -241,7 +246,7 @@ sub within ($$$@) {
     } elsif ($got !~ tr/0-9// or $expected !~ tr/0-9// or $range !~ tr/0-9//) {
         # This is a fail
         unshift @mess, "# got, expected and range must be numeric\n";
-    } elsif ($range < 0) {
+    } elsif ($range +< 0) {
         # This is also a fail
         unshift @mess, "# range must not be negative\n";
     } elsif ($range == 0) {
@@ -249,10 +254,10 @@ sub within ($$$@) {
         $pass = $got == $expected;
     } elsif ($expected == 0) {
         # If expected is 0, treat range as absolute
-        $pass = ($got <= $range) && ($got >= - $range);
+        $pass = ($got +<= $range) && ($got +>= - $range);
     } else {
         my $diff = $got - $expected;
-        $pass = abs ($diff / $expected) < $range;
+        $pass = abs ($diff / $expected) +< $range;
     }
     unless ($pass) {
         if ($got eq $expected) {
@@ -272,12 +277,12 @@ sub unlike ($$@) { like_yn (1,@_) }; # 1 for un-
 sub like_yn ($$$@) {
     my ($flip, $got, $expected, $name, @mess) = @_;
     my $pass;
-    $pass = $got =~ /$expected/ if !$flip;
-    $pass = $got !~ /$expected/ if $flip;
+    $pass = $got =~ m/$expected/ if !$flip;
+    $pass = $got !~ m/$expected/ if $flip;
     unless ($pass) {
 	unshift(@mess, "#      got '$got'\n",
 		$flip
-		? "# expected !~ /$expected/\n" : "# expected /$expected/\n");
+		? "# expected !~ m/$expected/\n" : "# expected m/$expected/\n");
     }
     local $Level = $Level + 1;
     _ok($pass, _where(), $name, @mess);
@@ -406,7 +411,7 @@ sub _quote_args {
     foreach (@$args) {
 	# In VMS protect with doublequotes because otherwise
 	# DCL will lowercase -- unless already doublequoted.
-       $_ = q(").$_.q(") if $is_vms && !/^\"/ && length($_) > 0;
+       $_ = q(").$_.q(") if $is_vms && !m/^\"/ && length($_) +> 0;
 	$$runperl .= ' ' . $_;
     }
 }
@@ -491,7 +496,7 @@ sub _create_runperl { # Create the string to qx in runperl().
 	_quote_args(\$runperl, $args{args});
     }
     $runperl .= ' 2>&1'          if  $args{stderr} && !$is_macos;
-    $runperl .= " \xB3 Dev:Null" if !$args{stderr} &&  $is_macos;
+    $runperl .= " \x[B3] Dev:Null" if !$args{stderr} &&  $is_macos;
     if ($args{verbose}) {
 	my $runperldisplay = $runperl;
 	$runperldisplay =~ s/\n/\n\#/g;
@@ -527,14 +532,14 @@ sub runperl {
 	my @keys = grep {exists $ENV{$_}} qw(CDPATH IFS ENV BASH_ENV);
 	local @ENV{@keys} = ();
 	# Untaint, plus take out . and empty string:
-	local $ENV{'DCL$PATH'} = $1 if $is_vms && ($ENV{'DCL$PATH'} =~ /(.*)/s);
-	$ENV{PATH} =~ /(.*)/s;
+	local $ENV{'DCL$PATH'} = $1 if $is_vms && ($ENV{'DCL$PATH'} =~ m/(.*)/s);
+	$ENV{PATH} =~ m/(.*)/s;
 	local $ENV{PATH} =
 	    join $sep, grep { $_ ne "" and $_ ne "." and -d $_ and
 		($is_mswin or $is_vms or !(stat && (stat '_')[2]^&^0022)) }
 		    split quotemeta ($sep), $1;
 
-	$runperl =~ /(.*)/s;
+	$runperl =~ m/(.*)/s;
 	$runperl = $1;
 
 	$result = `$runperl`;
@@ -576,7 +581,7 @@ sub which_perl {
 	# We could do File::Spec->abs2rel() but that does getcwd()s,
 	# which is a bit heavyweight to do here.
 
-	if ($Perl =~ /^perl\Q$exe\E$/i) {
+	if ($Perl =~ m/^perl\Q$exe\E$/i) {
 	    my $perl = "perl$exe";
 	    eval "require File::Spec";
 	    if ($@) {
@@ -590,7 +595,7 @@ sub which_perl {
 	# Build up the name of the executable file from the name of
 	# the command.
 
-	if ($Perl !~ /\Q$exe\E$/i) {
+	if ($Perl !~ m/\Q$exe\E$/i) {
 	    $Perl .= $exe;
 	}
 
@@ -629,7 +634,7 @@ sub _fresh_perl {
     $runperl_args->{progfile} = $tmpfile;
     $runperl_args->{stderr} = 1;
 
-    open TEST, ">$tmpfile" or die "Cannot open $tmpfile: $!";
+    open TEST, ">", "$tmpfile" or die "Cannot open $tmpfile: $!";
 
     # VMS adjustments
     if( $^O eq 'VMS' ) {
@@ -674,8 +679,8 @@ sub _fresh_perl {
     # Use the first line of the program as a name if none was given
     unless( $name ) {
         my $first_line;
-        ($first_line, $name) = $prog =~ /^((.{1,50}).*)/;
-        $name .= '...' if length $first_line > length $name;
+        ($first_line, $name) = $prog =~ m/^((.{1,50}).*)/;
+        $name .= '...' if length $first_line +> length $name;
     }
 
     _ok($pass, _where(), "fresh_perl - $name");
@@ -706,7 +711,7 @@ sub fresh_perl_like {
     local $Level = 2;
     _fresh_perl($prog,
 		sub { @_ ?
-			  $_[0] =~ (ref $expected ? $expected : /$expected/) :
+			  $_[0] =~ (ref $expected ? $expected : m/$expected/) :
 		          $expected },
 		$runperl_args, $name);
 }
@@ -750,7 +755,7 @@ sub isa_ok ($$;$) {
         local($@, $!);  # eval sometimes resets $!
         my $rslt = eval { $object->isa($class) };
         if( $@ ) {
-            if( $@ =~ /^Can't call method "isa" on unblessed reference/ ) {
+            if( $@ =~ m/^Can't call method "isa" on unblessed reference/ ) {
                 if( !UNIVERSAL::isa($object, $class) ) {
                     my $ref = ref $object;
                     $diag = "$obj_name isn't a '$class' it's a '$ref'";

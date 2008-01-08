@@ -40,26 +40,10 @@ sub get_attr {
     return $Fattr->{$_[0]};
 }
 
-if ($] < 5.009) {
-    *get_fields = sub {
-        # Shut up a possible typo warning.
-        () = \%{*{Symbol::fetch_glob($_[0].'::FIELDS')}};
-        my $f = \%{*{Symbol::fetch_glob($_[0].'::FIELDS')}};
-
-        # should be centralized in fields? perhaps
-        # fields::mk_FIELDS_be_OK. Peh. As long as %{ $package . '::FIELDS' }
-        # is used here anyway, it doesn't matter.
-        bless $f, 'pseudohash' if (ref($f) ne 'pseudohash');
-
-        return $f;
-    }
-}
-else {
-    *get_fields = sub {
-        # Shut up a possible typo warning.
-        () = \%{*{Symbol::fetch_glob($_[0].'::FIELDS')}};
-        return \%{*{Symbol::fetch_glob($_[0].'::FIELDS')}};
-    }
+sub get_fields {
+    # Shut up a possible typo warning.
+    () = \%{*{Symbol::fetch_glob($_[0].'::FIELDS')}};
+    return \%{*{Symbol::fetch_glob($_[0].'::FIELDS')}};
 }
 
 sub import {
@@ -91,7 +75,7 @@ sub import {
                 eval "require $base";
                 # Only ignore "Can't locate" errors from our eval require.
                 # Other fatal errors (syntax etc) must be reported.
-                die if $@ && $@ !~ /^Can't locate .*? at \(eval /;
+                die if $@ && $@ !~ m/^Can't locate .*? at \(eval /;
                 unless (%{*{Symbol::fetch_glob("$base\::")}}) {
                     require Carp;
                     local $" = " ";

@@ -202,14 +202,8 @@ if ($^O eq 'os2') {
 
 # If loading the XS stuff doesn't work, we can fall back to pure perl
 eval {
-  if ( $] >= 5.006 ) {
     require XSLoader;
     XSLoader::load( __PACKAGE__, $VERSION );
-  } else {
-    require DynaLoader;
-    push @ISA, 'DynaLoader';
-    __PACKAGE__->bootstrap( $VERSION );
-  }
 };
 
 # Must be after the DynaLoader stuff:
@@ -415,7 +409,7 @@ sub fastcwd_ {
     if ($^O eq 'apollo') { $path = "/".$path; }
     # At this point $path may be tainted (if tainting) and chdir would fail.
     # Untaint it then check that we landed where we started.
-    $path =~ /^(.*)\z/s		# untaint
+    $path =~ m/^(.*)\z/s		# untaint
 	&& CORE::chdir($1) or return undef;
     ($cdev, $cino) = stat('.');
     die "Unstable directory path, current directory changed unexpectedly"
@@ -585,8 +579,8 @@ sub fast_abs_path {
 
     # Detaint else we'll explode in taint mode.  This is safe because
     # we're not doing anything dangerous with it.
-    ($path) = $path =~ /(.*)/;
-    ($cwd)  = $cwd  =~ /(.*)/;
+    ($path) = $path =~ m/(.*)/;
+    ($cwd)  = $cwd  =~ m/(.*)/;
 
     unless (-e $path) {
  	_croak("$path: No such file or directory");
@@ -707,9 +701,9 @@ sub _qnx_abs_path {
     my $path = @_ ? shift : '.';
     local *REALPATH;
 
-    defined( open(REALPATH, '-|') || exec '/usr/bin/fullpath', '-t', $path ) or
+    defined( open(REALPATH, "-|", '-') || exec '/usr/bin/fullpath', '-t', $path ) or
       die "Can't open /usr/bin/fullpath: $!";
-    my $realpath = <REALPATH>;
+    my $realpath = ~< *REALPATH;
     close REALPATH;
     chomp $realpath;
     return $realpath;

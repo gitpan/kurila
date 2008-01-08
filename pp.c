@@ -329,8 +329,6 @@ PP(pp_rv2cv)
 	if (CvCLONE(cv))
 	    cv = (CV*)sv_2mortal((SV*)cv_clone(cv));
 	if ((PL_op->op_private & OPpLVAL_INTRO)) {
-	    if (gv && GvCV(gv) == cv && (gv = gv_autoload4(GvSTASH(gv), GvNAME(gv), GvNAMELEN(gv), FALSE)))
-		cv = GvCV(gv);
 	    if (!CvLVALUE(cv))
 		DIE(aTHX_ "Can't modify non-lvalue subroutine call");
 	}
@@ -863,28 +861,30 @@ PP(pp_postdec)
 
 PP(pp_pow)
 {
-    dVAR; dSP; dATARGET;
+    dVAR; dSP; dATARGET; SV *svl, *svr;
 #ifdef PERL_PRESERVE_IVUV
     bool is_int = 0;
 #endif
     tryAMAGICbin(pow,opASSIGN);
+    svl = sv_2num(TOPm1s);
+    svr = sv_2num(TOPs);
 #ifdef PERL_PRESERVE_IVUV
     /* For integer to integer power, we do the calculation by hand wherever
        we're sure it is safe; otherwise we call pow() and try to convert to
        integer afterwards. */
     {
-	SvIV_please(TOPs);
-	if (SvIOK(TOPs)) {
-	    SvIV_please(TOPm1s);
-	    if (SvIOK(TOPm1s)) {
+	SvIV_please(svr);
+	if (SvIOK(svr)) {
+	    SvIV_please(svl);
+	    if (SvIOK(svl)) {
 		UV power;
 		bool baseuok;
 		UV baseuv;
 
-		if (SvUOK(TOPs)) {
-		    power = SvUVX(TOPs);
+		if (SvUOK(svr)) {
+		    power = SvUVX(svr);
 		} else {
-		    const IV iv = SvIVX(TOPs);
+		    const IV iv = SvIVX(svr);
 		    if (iv >= 0) {
 			power = iv;
 		    } else {
@@ -892,11 +892,11 @@ PP(pp_pow)
 		    }
 		}
 
-		baseuok = SvUOK(TOPm1s);
+		baseuok = SvUOK(svl);
 		if (baseuok) {
-		    baseuv = SvUVX(TOPm1s);
+		    baseuv = SvUVX(svl);
 		} else {
-		    const IV iv = SvIVX(TOPm1s);
+		    const IV iv = SvIVX(svl);
 		    if (iv >= 0) {
 			baseuv = iv;
 			baseuok = TRUE; /* effectively it's a UV now */
@@ -931,7 +931,7 @@ PP(pp_pow)
 		    }
                     SP--;
                     SETn( result );
-                    SvIV_please(TOPs);
+                    SvIV_please(svr);
                     RETURN;
 		} else {
 		    register unsigned int highbit = 8 * sizeof(UV);
@@ -980,7 +980,9 @@ PP(pp_pow)
   float_it:
 #endif    
     {
-	dPOPTOPnnrl;
+	NV right = SvNV(svr);
+	NV left  = SvNV(svl);
+	(void)POPs;
 
 #if defined(USE_LONG_DOUBLE) && defined(HAS_AIX_POWL_NEG_BASE_BUG)
     /*
@@ -1024,7 +1026,7 @@ PP(pp_pow)
 
 #ifdef PERL_PRESERVE_IVUV
 	if (is_int)
-	    SvIV_please(TOPs);
+	    SvIV_please(svr);
 #endif
 	RETURN;
     }
@@ -1032,18 +1034,21 @@ PP(pp_pow)
 
 PP(pp_multiply)
 {
-    dVAR; dSP; dATARGET; tryAMAGICbin(mult,opASSIGN);
+    dVAR; dSP; dATARGET; SV *svl, *svr;
+    tryAMAGICbin(mult,opASSIGN);
+    svl = sv_2num(TOPm1s);
+    svr = sv_2num(TOPs);
 #ifdef PERL_PRESERVE_IVUV
-    SvIV_please(TOPs);
-    if (SvIOK(TOPs)) {
+    SvIV_please(svr);
+    if (SvIOK(svr)) {
 	/* Unless the left argument is integer in range we are going to have to
 	   use NV maths. Hence only attempt to coerce the right argument if
 	   we know the left is integer.  */
 	/* Left operand is defined, so is it IV? */
-	SvIV_please(TOPm1s);
-	if (SvIOK(TOPm1s)) {
-	    bool auvok = SvUOK(TOPm1s);
-	    bool buvok = SvUOK(TOPs);
+	SvIV_please(svl);
+	if (SvIOK(svl)) {
+	    bool auvok = SvUOK(svl);
+	    bool buvok = SvUOK(svr);
 	    const UV topmask = (~ (UV)0) << (4 * sizeof (UV));
 	    const UV botmask = ~((~ (UV)0) << (4 * sizeof (UV)));
 	    UV alow;
@@ -1052,9 +1057,9 @@ PP(pp_multiply)
 	    UV bhigh;
 
 	    if (auvok) {
-		alow = SvUVX(TOPm1s);
+		alow = SvUVX(svl);
 	    } else {
-		const IV aiv = SvIVX(TOPm1s);
+		const IV aiv = SvIVX(svl);
 		if (aiv >= 0) {
 		    alow = aiv;
 		    auvok = TRUE; /* effectively it's a UV now */
@@ -1063,9 +1068,9 @@ PP(pp_multiply)
 		}
 	    }
 	    if (buvok) {
-		blow = SvUVX(TOPs);
+		blow = SvUVX(svr);
 	    } else {
-		const IV biv = SvIVX(TOPs);
+		const IV biv = SvIVX(svr);
 		if (biv >= 0) {
 		    blow = biv;
 		    buvok = TRUE; /* effectively it's a UV now */
@@ -1139,11 +1144,13 @@ PP(pp_multiply)
 		    }
 		} /* product_middle too large */
 	    } /* ahigh && bhigh */
-	} /* SvIOK(TOPm1s) */
-    } /* SvIOK(TOPs) */
+	} /* SvIOK(svl) */
+    } /* SvIOK(svr) */
 #endif
     {
-      dPOPTOPnnrl;
+      NV right = SvNV(svr);
+      NV left  = SvNV(svl);
+      (void)POPs;
       SETn( left * right );
       RETURN;
     }
@@ -1151,7 +1158,10 @@ PP(pp_multiply)
 
 PP(pp_divide)
 {
-    dVAR; dSP; dATARGET; tryAMAGICbin(div,opASSIGN);
+    dVAR; dSP; dATARGET; SV *svl, *svr;
+    tryAMAGICbin(div,opASSIGN);
+    svl = sv_2num(TOPm1s);
+    svr = sv_2num(TOPs);
     /* Only try to do UV divide first
        if ((SLOPPYDIVIDE is true) or
            (PERL_PRESERVE_IVUV is true and one or both SV is a UV too large
@@ -1174,20 +1184,20 @@ PP(pp_divide)
 #endif
 
 #ifdef PERL_TRY_UV_DIVIDE
-    SvIV_please(TOPs);
-    if (SvIOK(TOPs)) {
-        SvIV_please(TOPm1s);
-        if (SvIOK(TOPm1s)) {
-            bool left_non_neg = SvUOK(TOPm1s);
-            bool right_non_neg = SvUOK(TOPs);
+    SvIV_please(svr);
+    if (SvIOK(svr)) {
+        SvIV_please(svl);
+        if (SvIOK(svl)) {
+            bool left_non_neg = SvUOK(svl);
+            bool right_non_neg = SvUOK(svr);
             UV left;
             UV right;
 
             if (right_non_neg) {
-                right = SvUVX(TOPs);
+                right = SvUVX(svr);
             }
 	    else {
-		const IV biv = SvIVX(TOPs);
+		const IV biv = SvIVX(svr);
                 if (biv >= 0) {
                     right = biv;
                     right_non_neg = TRUE; /* effectively it's a UV now */
@@ -1205,10 +1215,10 @@ PP(pp_divide)
                 DIE(aTHX_ "Illegal division by zero");
 
             if (left_non_neg) {
-                left = SvUVX(TOPm1s);
+                left = SvUVX(svl);
             }
 	    else {
-		const IV aiv = SvIVX(TOPm1s);
+		const IV aiv = SvIVX(svl);
                 if (aiv >= 0) {
                     left = aiv;
                     left_non_neg = TRUE; /* effectively it's a UV now */
@@ -1256,7 +1266,9 @@ PP(pp_divide)
     } /* right wasn't SvIOK */
 #endif /* PERL_TRY_UV_DIVIDE */
     {
-	dPOPPOPnnrl;
+	NV right = SvNV(svr);
+	NV left  = SvNV(svl);
+	(void)POPs;(void)POPs;
 #if defined(NAN_COMPARE_BROKEN) && defined(Perl_isnan)
 	if (! Perl_isnan(right) && right == 0.0)
 #else
@@ -1280,14 +1292,15 @@ PP(pp_modulo)
 	bool dright_valid = FALSE;
 	NV dright = 0.0;
 	NV dleft  = 0.0;
-
-        SvIV_please(TOPs);
-        if (SvIOK(TOPs)) {
-            right_neg = !SvUOK(TOPs);
+        SV * svl;
+        SV * const svr = sv_2num(TOPs);
+        SvIV_please(svr);
+        if (SvIOK(svr)) {
+            right_neg = !SvUOK(svr);
             if (!right_neg) {
-                right = SvUVX(POPs);
+                right = SvUVX(svr);
             } else {
-		const IV biv = SvIVX(POPs);
+		const IV biv = SvIVX(svr);
                 if (biv >= 0) {
                     right = biv;
                     right_neg = FALSE; /* effectively it's a UV now */
@@ -1297,7 +1310,7 @@ PP(pp_modulo)
             }
         }
         else {
-	    dright = POPn;
+	    dright = SvNV(svr);
 	    right_neg = dright < 0;
 	    if (right_neg)
 		dright = -dright;
@@ -1308,18 +1321,20 @@ PP(pp_modulo)
                 use_double = TRUE;
             }
 	}
+	sp--;
 
         /* At this point use_double is only true if right is out of range for
            a UV.  In range NV has been rounded down to nearest UV and
            use_double false.  */
-        SvIV_please(TOPs);
-	if (!use_double && SvIOK(TOPs)) {
-            if (SvIOK(TOPs)) {
-                left_neg = !SvUOK(TOPs);
+        svl = sv_2num(TOPs);
+        SvIV_please(svl);
+	if (!use_double && SvIOK(svl)) {
+            if (SvIOK(svl)) {
+                left_neg = !SvUOK(svl);
                 if (!left_neg) {
-                    left = SvUVX(POPs);
+                    left = SvUVX(svl);
                 } else {
-		    const IV aiv = SvIVX(POPs);
+		    const IV aiv = SvIVX(svl);
                     if (aiv >= 0) {
                         left = aiv;
                         left_neg = FALSE; /* effectively it's a UV now */
@@ -1330,7 +1345,7 @@ PP(pp_modulo)
             }
         }
 	else {
-	    dleft = POPn;
+	    dleft = SvNV(svl);
 	    left_neg = dleft < 0;
 	    if (left_neg)
 		dleft = -dleft;
@@ -1358,6 +1373,7 @@ PP(pp_modulo)
                 }
             }
         }
+	sp--;
 	if (use_double) {
 	    NV dans;
 
@@ -1520,13 +1536,16 @@ PP(pp_repeat)
 
 PP(pp_subtract)
 {
-    dVAR; dSP; dATARGET; bool useleft; tryAMAGICbin(subtr,opASSIGN);
-    useleft = USE_LEFT(TOPm1s);
+    dVAR; dSP; dATARGET; bool useleft; SV *svl, *svr;
+    tryAMAGICbin(subtr,opASSIGN);
+    svl = sv_2num(TOPm1s);
+    svr = sv_2num(TOPs);
+    useleft = USE_LEFT(svl);
 #ifdef PERL_PRESERVE_IVUV
     /* See comments in pp_add (in pp_hot.c) about Overflow, and how
        "bad things" happen if you rely on signed integers wrapping.  */
-    SvIV_please(TOPs);
-    if (SvIOK(TOPs)) {
+    SvIV_please(svr);
+    if (SvIOK(svr)) {
 	/* Unless the left argument is integer in range we are going to have to
 	   use NV maths. Hence only attempt to coerce the right argument if
 	   we know the left is integer.  */
@@ -1540,12 +1559,12 @@ PP(pp_subtract)
 	    /* left operand is undef, treat as zero.  */
 	} else {
 	    /* Left operand is defined, so is it IV? */
-	    SvIV_please(TOPm1s);
-	    if (SvIOK(TOPm1s)) {
-		if ((auvok = SvUOK(TOPm1s)))
-		    auv = SvUVX(TOPm1s);
+	    SvIV_please(svl);
+	    if (SvIOK(svl)) {
+		if ((auvok = SvUOK(svl)))
+		    auv = SvUVX(svl);
 		else {
-		    register const IV aiv = SvIVX(TOPm1s);
+		    register const IV aiv = SvIVX(svl);
 		    if (aiv >= 0) {
 			auv = aiv;
 			auvok = 1;	/* Now acting as a sign flag.  */
@@ -1560,12 +1579,12 @@ PP(pp_subtract)
 	    bool result_good = 0;
 	    UV result;
 	    register UV buv;
-	    bool buvok = SvUOK(TOPs);
+	    bool buvok = SvUOK(svr);
 	
 	    if (buvok)
-		buv = SvUVX(TOPs);
+		buv = SvUVX(svr);
 	    else {
-		register const IV biv = SvIVX(TOPs);
+		register const IV biv = SvIVX(svr);
 		if (biv >= 0) {
 		    buv = biv;
 		    buvok = 1;
@@ -1622,15 +1641,16 @@ PP(pp_subtract)
 	}
     }
 #endif
-    useleft = USE_LEFT(TOPm1s);
     {
-	dPOPnv;
+	NV value = SvNV(svr);
+	(void)POPs;
+
 	if (!useleft) {
 	    /* left operand is undef, treat as zero - value */
 	    SETn(-value);
 	    RETURN;
 	}
-	SETn( TOPn - value );
+	SETn( SvNV(svl) - value );
 	RETURN;
     }
 }
@@ -2308,7 +2328,7 @@ PP(pp_negate)
 {
     dVAR; dSP; dTARGET; tryAMAGICun(neg);
     {
-	dTOPss;
+	SV * const sv = sv_2num(TOPs);
 	const int flags = SvFLAGS(sv);
 	SvGETMAGIC(sv);
 	if ((flags & SVf_IOK) || ((flags & (SVp_IOK | SVp_NOK)) == SVp_IOK)) {
@@ -2753,25 +2773,12 @@ PP(pp_int)
 {
     dVAR; dSP; dTARGET; tryAMAGICun(int);
     {
-      dTOPss;
-      IV iv;
+      SV * const sv = sv_2num(TOPs);
+      const IV iv = SvIV(sv);
       /* XXX it's arguable that compiler casting to IV might be subtly
 	 different from modf (for numbers inside (IV_MIN,UV_MAX)) in which
 	 else preferring IV has introduced a subtle behaviour change bug. OTOH
 	 relying on floating point to be accurate is a bug.  */
-
-      while (SvAMAGIC(sv)) {
-	SV *tsv = AMG_CALLun(sv,numer);
-	if (!tsv)
-	    break;
-	if (SvROK(tsv) && SvRV(tsv) == SvRV(sv)) {
-	    SETu(PTR2UV(SvRV(sv)));
-	    RETURN;
-	}
-	else
-	    sv = tsv;
-      }
-      iv = SvIV(sv); /* attempt to convert to IV if possible. */
 
       if (!SvOK(sv)) {
         SETu(0);
@@ -2781,9 +2788,6 @@ PP(pp_int)
 	    SETu(SvUV(sv));
 	else
 	    SETi(iv);
-      }
-      else if (SvROK(sv)) {
-	    SETu(PTR2UV(SvRV(sv)));
       }
       else {
 	  const NV value = SvNV(sv);
@@ -2810,15 +2814,17 @@ PP(pp_abs)
 {
     dVAR; dSP; dTARGET; tryAMAGICun(abs);
     {
+      SV * const sv = sv_2num(TOPs);
       /* This will cache the NV value if string isn't actually integer  */
-      const IV iv = TOPi;
+      const IV iv = SvIV(sv);
 
-      if (!SvOK(TOPs))
+      if (!SvOK(sv)) {
         SETu(0);
-      else if (SvIOK(TOPs)) {
+      }
+      else if (SvIOK(sv)) {
 	/* IVX is precise  */
-	if (SvIsUV(TOPs)) {
-	  SETu(TOPu);	/* force it to be numeric only */
+	if (SvIsUV(sv)) {
+	  SETu(SvUV(sv));	/* force it to be numeric only */
 	} else {
 	  if (iv >= 0) {
 	    SETi(iv);
@@ -2833,7 +2839,7 @@ PP(pp_abs)
 	  }
 	}
       } else{
-	const NV value = TOPn;
+	const NV value = SvNV(sv);
 	if (value < 0.0)
 	  SETn(-value);
 	else
@@ -2917,12 +2923,12 @@ PP(pp_substr)
     I32 pos;
     I32 rem;
     I32 fail;
-    const I32 lvalue = PL_op->op_flags & OPf_MOD || LVRET;
     const char *tmps;
     SV *repl_sv = NULL;
     const char *repl = NULL;
     STRLEN repl_len;
     const int num_args = PL_op->op_private & 7;
+    bool has_len = FALSE;
 
     SvTAINTED_off(TARG);			/* decontaminate */
     if (num_args > 2) {
@@ -2930,7 +2936,13 @@ PP(pp_substr)
 	    repl_sv = POPs;
 	    repl = SvPV_const(repl_sv, repl_len);
 	}
-	len = POPi;
+	if (SvOK(TOPs)) {
+	    len = POPi;
+	    has_len = TRUE;
+	}
+	else {
+	    (void)POPs;
+	}
     }
     pos = POPi;
     sv = POPs;
@@ -2943,7 +2955,7 @@ PP(pp_substr)
     if (pos >= 0) {
 	rem = curlen-pos;
 	fail = rem;
-	if (num_args > 2) {
+	if (has_len) {
 	    if (len < 0) {
 		rem += len;
 		if (rem < 0)
@@ -2955,7 +2967,7 @@ PP(pp_substr)
     }
     else {
 	pos += curlen;
-	if (num_args < 3)
+	if ( ! has_len )
 	    rem = curlen;
 	else if (len >= 0) {
 	    rem = pos+len;
@@ -2973,22 +2985,16 @@ PP(pp_substr)
 	rem -= pos;
     }
     if (fail < 0) {
-	if (lvalue || repl)
+	if (repl)
 	    Perl_croak(aTHX_ "substr outside of string");
 	if (ckWARN(WARN_SUBSTR))
 	    Perl_warner(aTHX_ packWARN(WARN_SUBSTR), "substr outside of string");
 	RETPUSHUNDEF;
     }
     else {
-	const I32 upos = pos;
-	const I32 urem = rem;
 	if (IN_CODEPOINTS)
 	    sv_pos_u2b(sv, &pos, &rem);
 	tmps += pos;
-	/* use a mortal for LVs because they can have an extended lifetime */
-	if (lvalue) {
-	    TARG = sv_newmortal();
-	}
 
 	sv_setpvn(TARG, tmps, rem);
 #ifdef USE_LOCALE_COLLATE
@@ -3000,33 +3006,6 @@ PP(pp_substr)
 	    sv_insert(sv, pos, rem, repl, repl_len);
 	    if (repl_sv_copy)
 		SvREFCNT_dec(repl_sv_copy);
-	}
-	else if (lvalue) {		/* it's an lvalue! */
-	    if (!SvGMAGICAL(sv)) {
-		if (SvROK(sv)) {
-		    SvPV_force_nolen(sv);
-		    if (ckWARN(WARN_SUBSTR))
-			Perl_warner(aTHX_ packWARN(WARN_SUBSTR),
-				"Attempt to use reference as lvalue in substr");
-		}
-		if (isGV_with_GP(sv))
-		    SvPV_force_nolen(sv);
-		else if (SvOK(sv))	/* is it defined ? */
-		    (void)SvPOK_only(sv);
-		else
-		    sv_setpvn(sv,"",0);	/* avoid lexical reincarnation */
-	    }
-
-	    if (SvTYPE(TARG) < SVt_PVLV) {
-		sv_upgrade(TARG, SVt_PVLV);
-		sv_magic(TARG, NULL, PERL_MAGIC_substr, NULL, 0);
-	    }
-
-	    LvTYPE(TARG) = IN_CODEPOINTS ? 'X' : 'x';
-	    LvTARG(TARG) = SvREFCNT_inc_simple(sv);
-	    LvTARGOFF(TARG) = upos;
-	    LvTARGLEN(TARG) = urem;
-
 	}
     }
     SPAGAIN;
@@ -3765,8 +3744,8 @@ PP(pp_hslice)
               * element by using EXISTS and DELETE if possible.
               * Fallback to FETCH and STORE otherwise */
              && (stash = SvSTASH(SvRV(SvTIED_obj((SV*)hv, mg))))
-             && gv_fetchmethod_autoload(stash, "EXISTS", TRUE)
-             && gv_fetchmethod_autoload(stash, "DELETE", TRUE));
+             && gv_fetchmethod(stash, "EXISTS")
+             && gv_fetchmethod(stash, "DELETE"));
     }
 
     while (++MARK <= SP) {

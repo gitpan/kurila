@@ -5,7 +5,6 @@ use vars qw(@ISA @EXPORT $VERSION $MUST_REBOOT %Config);
 $VERSION = '1.44';
 $VERSION = eval $VERSION;
 
-use AutoSplit;
 use Carp ();
 use Config qw(%Config);
 use Cwd qw(cwd);
@@ -124,7 +123,7 @@ sub _chmod($$;$) {
     my ( $mode, $item, $verbose )=@_;
     $verbose ||= 0;
     if (chmod $mode, $item) {
-        print "chmod($mode, $item)\n" if $verbose > 1;
+        print "chmod($mode, $item)\n" if $verbose +> 1;
     } else {
         my $err="$!";
         _warnonce "WARNING: Failed chmod($mode, $item): $err\n"
@@ -337,16 +336,16 @@ sub _get_install_skip {
     my ( $skip, $verbose )= @_;
     if ($ENV{EU_INSTALL_IGNORE_SKIP}) {
         print "EU_INSTALL_IGNORE_SKIP is set, ignore skipfile settings\n"
-            if $verbose>2;
+            if $verbose+>2;
         return [];
     }
     if ( ! defined $skip ) {
         print "Looking for install skip list\n"
-            if $verbose>2;
+            if $verbose+>2;
         for my $file ( 'INSTALL.SKIP', $ENV{EU_INSTALL_SITE_SKIPFILE} ) {
             next unless $file;
             print "\tChecking for $file\n"
-                if $verbose>2;
+                if $verbose+>2;
             if (-e $file) {
                 $skip= $file;
                 last;
@@ -356,12 +355,12 @@ sub _get_install_skip {
     if ($skip && !ref $skip) {
         print "Reading skip patterns from '$skip'.\n"
             if $verbose;
-        if (open my $fh,$skip ) {
+        if (open my $fh, "<",$skip ) {
             my @patterns;
-            while (<$fh>) {
+            while ( ~< $fh) {
                 chomp;
-                next if /^\s*(?:#|$)/;
-                print "\tSkip pattern: $_\n" if $verbose>3;
+                next if m/^\s*(?:#|$)/;
+                print "\tSkip pattern: $_\n" if $verbose+>3;
                 push @patterns, $_;
             }
             $skip= \@patterns;
@@ -371,14 +370,14 @@ sub _get_install_skip {
         }
     } elsif ( UNIVERSAL::isa($skip,'ARRAY') ) {
         print "Using array for skip list\n"
-            if $verbose>2;
+            if $verbose+>2;
     } elsif ($verbose) {
         print "No skip list found.\n"
-            if $verbose>1;
+            if $verbose+>1;
         $skip= [];
     }
     warn "Got @{[0+@$skip]} skip patterns.\n"
-        if $verbose>3;
+        if $verbose+>3;
     return $skip
 }
 
@@ -470,7 +469,7 @@ writable.
 
 sub _mkpath {
     my ($dir,$show,$mode,$verbose,$fake)=@_;
-    if ( $verbose && $verbose > 1 && ! -d $dir) {
+    if ( $verbose && $verbose +> 1 && ! -d $dir) {
         $show= 1;
         printf "mkpath(%s,%d,%#o)\n", $dir, $show, $mode;
     }
@@ -512,7 +511,7 @@ Dies if the copy fails.
 
 sub _copy {
     my ( $from, $to, $verbose, $nonono)=@_;
-    if ($verbose && $verbose>1) {
+    if ($verbose && $verbose+>1) {
         printf "copy(%s,%s)\n", $from, $to;
     }
     if (!$nonono) {
@@ -610,9 +609,9 @@ sub install { #XXX OS-SPECIFIC
             my $sourcefile = File::Spec->catfile($sourcedir, $origfile);
 
             for my $pat (@$skip) {
-                if ( $sourcefile=~/$pat/ ) {
+                if ( $sourcefile=~m/$pat/ ) {
                     print "Skipping $targetfile (filtered)\n"
-                        if $verbose>1;
+                        if $verbose+>1;
                     return;
                 }
             }
@@ -652,7 +651,7 @@ sub install { #XXX OS-SPECIFIC
         my $realtarget= $targetfile;
         if ($diff) {
             if (-f $targetfile) {
-                print "_unlink_or_rename($targetfile)\n" if $verbose>1;
+                print "_unlink_or_rename($targetfile)\n" if $verbose+>1;
                 $targetfile= _unlink_or_rename( $targetfile, 'tryhard', 'install' )
                     unless $nonono;
             } elsif ( ! -d $targetdir ) {
@@ -661,8 +660,8 @@ sub install { #XXX OS-SPECIFIC
             print "Installing $targetfile\n";
             _copy( $sourcefile, $targetfile, $verbose, $nonono, );
             #XXX OS-SPECIFIC
-            print "utime($atime,$mtime,$targetfile)\n" if $verbose>1;
-            utime($atime,$mtime + $Is_VMS,$targetfile) unless $nonono>1;
+            print "utime($atime,$mtime,$targetfile)\n" if $verbose+>1;
+            utime($atime,$mtime + $Is_VMS,$targetfile) unless $nonono+>1;
 
 
             $mode = 0444 ^|^ ( $mode ^&^ 0111 ? 0111 : 0 );
@@ -816,7 +815,7 @@ Consider its use discouraged.
 =cut
 
 sub install_default {
-  @_ < 2 or Carp::croak("install_default should be called with 0 or 1 argument");
+  @_ +< 2 or Carp::croak("install_default should be called with 0 or 1 argument");
   my $FULLEXT = @_ ? shift : $ARGV[0];
   defined $FULLEXT or die "Do not know to where to write install log";
   my $INST_LIB = File::Spec->catdir($Curdir,"blib","lib");
@@ -917,7 +916,7 @@ sub inc_uninstall {
         } else {
             $diff++;
         }
-        print "#$file and $targetfile differ\n" if $diff && $verbose > 1;
+        print "#$file and $targetfile differ\n" if $diff && $verbose +> 1;
 
         next if !$diff or $targetfile eq $ignore;
         if ($nonono) {
@@ -950,8 +949,8 @@ Filter $src using $cmd into $dest.
 sub run_filter {
     my ($cmd, $src, $dest) = @_;
     local(*CMD, *SRC);
-    open(CMD, "|$cmd >$dest") || die "Cannot fork: $!";
-    open(SRC, $src)           || die "Cannot open $src: $!";
+    open(CMD, '|-', "$cmd >$dest") || die "Cannot fork: $!";
+    open(SRC, "<", $src)           || die "Cannot open $src: $!";
     my $buf;
     my $sz = 1024;
     while (my $len = sysread(SRC, $buf, $sz)) {
@@ -985,7 +984,7 @@ sub pm_to_blib {
 
     _mkpath($autodir,0,0755);
     while(my($from, $to) = each %$fromto) {
-        if( -f $to && -s $from == -s $to && -M $to < -M $from ) {
+        if( -f $to && -s $from == -s $to && -M $to +< -M $from ) {
             print "Skip $to (unchanged)\n";
             next;
         }
@@ -996,7 +995,7 @@ sub pm_to_blib {
         #    -- RAM, 03/01/2001
 
         my $need_filtering = defined $pm_filter && length $pm_filter &&
-                             $from =~ /\.pm$/;
+                             $from =~ m/\.pm$/;
 
         if (!$need_filtering && 0 == compare($from,$to)) {
             print "Skip $to (unchanged)\n";
@@ -1018,31 +1017,8 @@ sub pm_to_blib {
         my($mode,$atime,$mtime) = (stat $from)[2,8,9];
         utime($atime,$mtime+$Is_VMS,$to);
         _chmod(0444 ^|^ ( $mode ^&^ 0111 ? 0111 : 0 ),$to);
-        next unless $from =~ /\.pm$/;
-        _autosplit($to,$autodir);
     }
 }
-
-
-=begin _private
-
-=item _autosplit
-
-From 1.0307 back, AutoSplit will sometimes leave an open filehandle to
-the file being split.  This causes problems on systems with mandatory
-locking (ie. Windows).  So we wrap it and close the filehandle.
-
-=end _private
-
-=cut
-
-sub _autosplit { #XXX OS-SPECIFIC
-    my $retval = autosplit(@_);
-    close *AutoSplit::IN if defined *AutoSplit::IN{IO};
-
-    return $retval;
-}
-
 
 package ExtUtils::Install::Warn;
 
@@ -1058,14 +1034,14 @@ sub DESTROY {
         my $self = shift;
         my($file,$i,$plural);
         foreach $file (sort keys %$self) {
-            $plural = @{$self->{$file}} > 1 ? "s" : "";
+            $plural = @{$self->{$file}} +> 1 ? "s" : "";
             print "## Differing version$plural of $file found. You might like to\n";
             for (0..$#{$self->{$file}}) {
                 print "rm ", $self->{$file}[$_], "\n";
                 $i++;
             }
         }
-        $plural = $i>1 ? "all those files" : "this file";
+        $plural = $i+>1 ? "all those files" : "this file";
         my $inst = (_invokant() eq 'ExtUtils::MakeMaker')
                  ? ( $Config::Config{make} || 'make' ).' install UNINST=1'
                  : './Build install uninst=1';
@@ -1094,7 +1070,7 @@ sub _invokant {
 
     my $builder;
     my $top = pop @stack;
-    if ($top =~ /^Build/i || exists($INC{'Module/Build.pm'})) {
+    if ($top =~ m/^Build/i || exists($INC{'Module/Build.pm'})) {
         $builder = 'Module::Build';
     } else {
         $builder = 'ExtUtils::MakeMaker';

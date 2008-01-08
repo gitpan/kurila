@@ -1,10 +1,5 @@
 #!/usr/bin/perl -w
 
-my $Has_PH;
-BEGIN {
-    $Has_PH = $] < 5.009;
-}
-
 use strict;
 use Test::More tests => 15;
 
@@ -55,16 +50,11 @@ foreach (Foo->new) {
 
 {
     local $SIG{__WARN__} = sub {
-        return if $_[0] =~ /^Pseudo-hashes are deprecated/ 
+        return if $_[0] =~ m/^Pseudo-hashes are deprecated/ 
     };
     my $phash;
     eval { $phash = fields::phash(name => "Joe", rank => "Captain") };
-    if( $Has_PH ) {
-        is( $phash->{rank}, "Captain" );
-    }
-    else {
-        like $@, qr/^Pseudo-hashes have been removed from Perl/;
-    }
+    like $@, qr/^Pseudo-hashes have been removed from Perl/;
 }
 
 

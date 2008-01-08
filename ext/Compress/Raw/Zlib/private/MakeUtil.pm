@@ -33,9 +33,9 @@ sub MY::libscan
     my $path = shift;
 
     return undef
-        if $path =~ /(~|\.bak|_bak)$/ ||
-           $path =~ /\..*\.sw(o|p)$/  ||
-           $path =~ /\B\.svn\b/;
+        if $path =~ m/(~|\.bak|_bak)$/ ||
+           $path =~ m/\..*\.sw(o|p)$/  ||
+           $path =~ m/\B\.svn\b/;
 
     return $path;
 }
@@ -50,10 +50,10 @@ sub MY::postamble
     my $postamble = '
 
 MyTrebleCheck:
-	@echo Checking for $$^W in files: '. "@files" . '
-	@perl -ne \'						\
+	@echo Checking for $$^W in files: '. "@files" . q|
+	@perl -ne '						\
 	    exit 1 if /^\s*local\s*\(\s*\$$\^W\s*\)/;		\
-         \' ' . " @files || " . '				\
+         ' | . " @files || " . '				\
 	(echo found unexpected $$^W ; exit 1)
 	@echo All is ok.
 
@@ -75,25 +75,25 @@ sub getPerlFiles
         $prefix = $1
             if $manifest =~ m#^(.*/)#;
 
-        open M, "<$manifest"
+        open M, "<", "$manifest"
             or die "Cannot open '$manifest': $!\n";
-        while (<M>)
+        while ( ~< *M)
         {
             chomp ;
-            next if /^\s*#/ || /^\s*$/ ;
+            next if m/^\s*#/ || m/^\s*$/ ;
 
             s/^\s+//;
             s/\s+$//;
 
-            /^(\S+)\s*(.*)$/;
+            m/^(\S+)\s*(.*)$/;
 
             my ($file, $rest) = ($1, $2);
 
-            if ($file =~ /\.(pm|pl|t)$/ and $file !~ /MakeUtil.pm/)
+            if ($file =~ m/\.(pm|pl|t)$/ and $file !~ m/MakeUtil.pm/)
             {
                 push @files, "$prefix$file";
             }
-            elsif ($rest =~ /perl/i)
+            elsif ($rest =~ m/perl/i)
             {
                 push @files, "$prefix$file";
             }
@@ -127,18 +127,13 @@ sub UpDowngrade
 
     my $caller = (caller(1))[3] || '';
 
-    if ($caller =~ /downgrade/)
+    if ($caller =~ m/downgrade/)
     {
         $downgrade = 1;
     }
-    elsif ($caller =~ /upgrade/)
+    elsif ($caller =~ m/upgrade/)
     {
         $upgrade = 1;
-    }
-    else
-    {
-        $do_downgrade = 1
-            if $] < 5.006001 ;
     }
 
 #    else
@@ -158,7 +153,6 @@ sub UpDowngrade
                             s/^(\s*)(use\s+warnings)/${1}local (\$^W) = 1; #$2/ ;
                         };
     }
-    #elsif ($] >= 5.006001 || $upgrade) {
     elsif ($upgrade) {
         # From: local ($^W) = 1; # use|no warnings "blah"
         # To:   use|no warnings "blah"
@@ -169,26 +163,25 @@ sub UpDowngrade
 
     if ($downgrade || $do_downgrade) {
         $our_sub = sub {
-	    if ( /^(\s*)our\s+\(\s*([^)]+\s*)\)/ ) {
+	    if ( m/^(\s*)our\s+\(\s*([^)]+\s*)\)/ ) {
                 my $indent = $1;
-                my $vars = join ' ', split /\s*,\s*/, $2;
+                my $vars = join ' ', split m/\s*,\s*/, $2;
                 $_ = "${indent}use vars qw($vars);\n";
             }
-	    elsif ( /^(\s*)((use|no)\s+(bytes|utf8)\s*;.*)$/)
+	    elsif ( m/^(\s*)((use|no)\s+(bytes|utf8)\s*;.*)$/)
             {
                 $_ = "$1# $2\n";
             }
           };
     }
-    #elsif ($] >= 5.006000 || $upgrade) {
     elsif ($upgrade) {
         $our_sub = sub {
-	    if ( /^(\s*)use\s+vars\s+qw\((.*?)\)/ ) {
+	    if ( m/^(\s*)use\s+vars\s+qw\((.*?)\)/ ) {
                 my $indent = $1;
                 my $vars = join ', ', split ' ', $2;
                 $_ = "${indent}our ($vars);\n";
             }
-	    elsif ( /^(\s*)#\s*((use|no)\s+(bytes|utf8)\s*;.*)$/)
+	    elsif ( m/^(\s*)#\s*((use|no)\s+(bytes|utf8)\s*;.*)$/)
             {
                 $_ = "$1$2\n";
             }
@@ -226,9 +219,9 @@ sub doUpDown
     local ($^I) = ($^O eq 'VMS') ? "_bak" : ".bak";
     local (@ARGV) = shift;
  
-    while (<>)
+    while ( ~< *ARGV)
     {
-        print, last if /^__(END|DATA)__/ ;
+        print, last if m/^__(END|DATA)__/ ;
 
         &{ $our_sub }() if $our_sub ;
         &{ $warn_sub }() if $warn_sub ;
@@ -237,7 +230,7 @@ sub doUpDown
 
     return if eof ;
 
-    while (<>)
+    while ( ~< *ARGV)
       { print }
 }
 
@@ -259,11 +252,11 @@ sub doUpDownViaCopy
     my @keep = ();
 
     {
-        open F, "<$file"
+        open F, "<", "$file"
             or die "Cannot open $file: $!\n" ;
-        while (<F>)
+        while ( ~< *F)
         {
-            if (/^__(END|DATA)__/)
+            if (m/^__(END|DATA)__/)
             {
                 push @keep, $_;
                 last ;
@@ -276,14 +269,14 @@ sub doUpDownViaCopy
 
         if (! eof F)
         {
-            while (<F>)
+            while ( ~< *F)
               { push @keep, $_ }
         }
         close F;
     }
 
     {
-        open F, ">$file"
+        open F, ">", "$file"
             or die "Cannot open $file: $!\n";
         print F @keep ;
         close F;

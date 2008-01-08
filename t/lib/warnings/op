@@ -21,16 +21,16 @@
 
      Applying %s to %s will act on scalar(%s)
 	my $a ; my @a = () ; my %a = () ; my $b = \@a ; my $c = \%a ;
-	@a =~ /abc/ ;
+	@a =~ m/abc/ ;
 	@a =~ s/a/b/ ;
 	@a =~ tr/a/b/ ;
-	@$b =~ /abc/ ;
+	@$b =~ m/abc/ ;
 	@$b =~ s/a/b/ ;
 	@$b =~ tr/a/b/ ;
-	%a =~ /abc/ ;
+	%a =~ m/abc/ ;
 	%a =~ s/a/b/ ;
 	%a =~ tr/a/b/ ;
-	%$c =~ /abc/ ;
+	%$c =~ m/abc/ ;
 	%$c =~ s/a/b/ ;
 	%$c =~ tr/a/b/ ;
 
@@ -45,8 +45,8 @@
        use warnings 'bareword'; my $x = print(ABC || 1);
  
      Value of %s may be \"0\"; use \"defined\" 
-	$x = 1 if $x = <FH> ;
-	$x = 1 while $x = <FH> ;
+	$x = 1 if $x = ~< *FH ;
+	$x = 1 while $x = ~< *FH ;
 
      Subroutine fred redefined at -e line 1.
        sub fred{1;} sub fred{1;}
@@ -79,9 +79,6 @@
      	(Maybe you should just omit the defined()?)
 	my %h ; defined %h ;
     
-     /---/ should probably be written as "---"
-        join(/---/, @foo);
-
     %s() called too early to check prototype		[Perl_peep]
         fred() ; sub fred ($$) {}
 
@@ -539,31 +536,31 @@ Useless use of a constant in void context at - line 4.
 #
 use warnings 'misc' ;
 my $a ; my @a = () ; my %a = () ; my $b = \@a ; my $c = \%a ;
-@a =~ /abc/ ;
+@a =~ m/abc/ ;
 @a =~ s/a/b/ ;
 @a =~ tr/a/b/ ;
-@$b =~ /abc/ ;
+@$b =~ m/abc/ ;
 @$b =~ s/a/b/ ;
 @$b =~ tr/a/b/ ;
-%a =~ /abc/ ;
+%a =~ m/abc/ ;
 %a =~ s/a/b/ ;
 %a =~ tr/a/b/ ;
-%$c =~ /abc/ ;
+%$c =~ m/abc/ ;
 %$c =~ s/a/b/ ;
 %$c =~ tr/a/b/ ;
 {
 no warnings 'misc' ;
 my $a ; my @a = () ; my %a = () ; my $b = \@a ; my $c = \%a ;
-@a =~ /abc/ ;
+@a =~ m/abc/ ;
 @a =~ s/a/b/ ;
 @a =~ tr/a/b/ ;
-@$b =~ /abc/ ;
+@$b =~ m/abc/ ;
 @$b =~ s/a/b/ ;
 @$b =~ tr/a/b/ ;
-%a =~ /abc/ ;
+%a =~ m/abc/ ;
 %a =~ s/a/b/ ;
 %a =~ tr/a/b/ ;
-%$c =~ /abc/ ;
+%$c =~ m/abc/ ;
 %$c =~ s/a/b/ ;
 %$c =~ tr/a/b/ ;
 }
@@ -625,10 +622,10 @@ Bareword found in conditional at - line 3.
 --FILE--
 # op.c
 use warnings 'misc' ;
-open FH, "<abc" ;
-$x = 1 if $x = <FH> ;
+open FH, "<", "abc" ;
+$x = 1 if $x = ~< *FH ;
 no warnings 'misc' ;
-$x = 1 if $x = <FH> ;
+$x = 1 if $x = ~< *FH ;
 EXPECT
 Value of <HANDLE> construct can be "0"; test with defined() at - line 4.
 ########
@@ -679,8 +676,8 @@ Value of readdir() operator can be "0"; test with defined() at - line 4.
 ########
 # op.c
 use warnings 'misc';
-open FH, "<abc";
-($_ = <FH>) // ($_ = 1);
+open FH, "<", "abc";
+($_ = ~< *FH) // ($_ = 1);
 opendir DH, ".";
 %a = (1,2,3,4) ;
 EXPECT
@@ -812,12 +809,6 @@ Prototype mismatch: sub main::fred () vs ($) at - line 4.
 Prototype mismatch: sub main::freD () vs ($) at - line 11.
 Prototype mismatch: sub main::FRED () vs ($) at - line 14.
 ########
-# op.c
-use warnings 'syntax' ;
-join /---/, 'x', 'y', 'z';
-EXPECT
-/---/ should probably be written as "---" at - line 3.
-########
 # op.c [Perl_peep]
 use warnings 'prototype' ;
 fred() ; 
@@ -894,9 +885,9 @@ Useless use of unshift with no values at - line 5.
 # op.c
 # 20020401 mjd@plover.com at suggestion of jfriedl@yahoo.com
 use warnings 'regexp';
-split /blah/g, "blah";
+split m/blah/g, "blah";
 no warnings 'regexp';
-split /blah/g, "blah";
+split m/blah/g, "blah";
 EXPECT
 Use of /g modifier is meaningless in split at - line 4.
 ########
@@ -904,20 +895,20 @@ Use of /g modifier is meaningless in split at - line 4.
 use warnings 'precedence';
 $a = $b ^&^ $c == $d;
 $a = $b ^^^ $c != $d;
-$a = $b ^|^ $c > $d;
-$a = $b < $c ^&^ $d;
-$a = $b >= $c ^^^ $d;
-$a = $b <= $c ^|^ $d;
-$a = $b <=> $c ^&^ $d;
+$a = $b ^|^ $c +> $d;
+$a = $b +< $c ^&^ $d;
+$a = $b +>= $c ^^^ $d;
+$a = $b +<= $c ^|^ $d;
+$a = $b <+> $c ^&^ $d;
 $a ^&^= $b == $c; $a ^|^= $b == $c; $a ^^^= $b == $c; # shouldn't warn
 no warnings 'precedence';
 $a = $b ^&^ $c == $d;
 $a = $b ^^^ $c != $d;
-$a = $b ^|^ $c > $d;
-$a = $b < $c ^&^ $d;
-$a = $b >= $c ^^^ $d;
-$a = $b <= $c ^|^ $d;
-$a = $b <=> $c ^&^ $d;
+$a = $b ^|^ $c +> $d;
+$a = $b +< $c ^&^ $d;
+$a = $b +>= $c ^^^ $d;
+$a = $b +<= $c ^|^ $d;
+$a = $b <+> $c ^&^ $d;
 EXPECT
 Possible precedence problem on bitwise ^&^ operator at - line 3.
 Possible precedence problem on bitwise ^^^ operator at - line 4.
@@ -932,19 +923,19 @@ use integer;
 use warnings 'precedence';
 $a = $b ^&^ $c == $d;
 $a = $b ^^^ $c != $d;
-$a = $b ^|^ $c > $d;
-$a = $b < $c ^&^ $d;
-$a = $b >= $c ^^^ $d;
-$a = $b <= $c ^|^ $d;
-$a = $b <=> $c ^&^ $d;
+$a = $b ^|^ $c +> $d;
+$a = $b +< $c ^&^ $d;
+$a = $b +>= $c ^^^ $d;
+$a = $b +<= $c ^|^ $d;
+$a = $b <+> $c ^&^ $d;
 no warnings 'precedence';
 $a = $b ^&^ $c == $d;
 $a = $b ^^^ $c != $d;
-$a = $b ^|^ $c > $d;
-$a = $b < $c ^&^ $d;
-$a = $b >= $c ^^^ $d;
-$a = $b <= $c ^|^ $d;
-$a = $b <=> $c ^&^ $d;
+$a = $b ^|^ $c +> $d;
+$a = $b +< $c ^&^ $d;
+$a = $b +>= $c ^^^ $d;
+$a = $b +<= $c ^|^ $d;
+$a = $b <+> $c ^&^ $d;
 EXPECT
 Possible precedence problem on bitwise ^&^ operator at - line 4.
 Possible precedence problem on bitwise ^^^ operator at - line 5.
@@ -1001,7 +992,7 @@ local($x ||= 1);	# OP_ORASSIGN
 local($x //= 1);	# OP_DORASSIGN
 local($a[0]);		# OP_AELEMFAST		ok
 
-local(substr($x,0,1));	# OP_SUBSTR
+                 	# OP_SUBSTR
 local(pos($x));		# OP_POS
 local(vec($x,0,1));	# OP_VEC
 local($a[$b]);		# OP_AELEM		ok
@@ -1020,9 +1011,9 @@ Useless localization of subtraction (-) at - line 17.
 Useless localization of concatenation (.) or string at - line 18.
 Useless localization of left bitshift (<<) at - line 19.
 Useless localization of right bitshift (>>) at - line 20.
-Useless localization of bitwise and (&) at - line 21.
-Useless localization of bitwise xor (^) at - line 22.
-Useless localization of bitwise or (|) at - line 23.
+Useless localization of bitwise and (^&^) at - line 21.
+Useless localization of bitwise xor (^^^) at - line 22.
+Useless localization of bitwise or (^|^) at - line 23.
 Useless localization of integer multiplication (*) at - line 26.
 Useless localization of integer division (/) at - line 27.
 Useless localization of integer modulus (%) at - line 28.
@@ -1034,7 +1025,6 @@ Useless localization of scalar assignment at - line 42.
 Useless localization of logical and assignment (&&=) at - line 43.
 Useless localization of logical or assignment (||=) at - line 44.
 Useless localization of defined or assignment (//=) at - line 45.
-Useless localization of substr at - line 48.
 Useless localization of match position at - line 49.
 Useless localization of vec at - line 50.
 ########

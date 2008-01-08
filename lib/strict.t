@@ -20,16 +20,16 @@ my @prgs = () ;
 
 foreach (sort glob($^O eq 'MacOS' ? ":lib:strict:*" : "lib/strict/*")) {
 
-    next if -d || /(~|\.orig|,v)$/;
+    next if -d || m/(~|\.orig|,v)$/;
 
-    open F, "<$_" or die "Cannot open $_: $!\n" ;
-    while (<F>) {
-	last if /^__END__/ ;
+    open F, "<", "$_" or die "Cannot open $_: $!\n" ;
+    while ( ~< *F) {
+	last if m/^__END__/ ;
     }
 
     {
         local $/ = undef;
-        @prgs = (@prgs, split "\n########\n", <F>) ;
+        @prgs = (@prgs, split "\n########\n", ~< *F) ;
     }
     close F or die "Could not close: $!" ;
 }
@@ -45,19 +45,19 @@ for (@prgs){
     if (s/^\s*-\w+//){
         $switch = $&;
     }
-    my($prog,$expected) = split(/\nEXPECT\n/, $_);
-    if ( $prog =~ /--FILE--/) {
-        my(@files) = split(/\n--FILE--\s*([^\s\n]*)\s*\n/, $prog) ;
+    my($prog,$expected) = split(m/\nEXPECT\n/, $_);
+    if ( $prog =~ m/--FILE--/) {
+        my(@files) = split(m/\n--FILE--\s*([^\s\n]*)\s*\n/, $prog) ;
 	shift @files ;
 	die "Internal error test $i didn't split into pairs, got " . 
 		scalar(@files) . "[" . join("%%%%", @files) ."]\n"
 	    if @files % 2 ;
-	while (@files > 2) {
+	while (@files +> 2) {
 	    my $filename = shift @files ;
 	    my $code = shift @files ;
 	    $code =~ s|\./abc|:abc|g if $^O eq 'MacOS';
     	    push @temps, $filename ;
-	    open F, ">$filename" or die "Cannot open $filename: $!\n" ;
+	    open F, ">", "$filename" or die "Cannot open $filename: $!\n" ;
 	    print F $code ;
 	    close F or die "Could not close: $!" ;
 	}
@@ -65,7 +65,7 @@ for (@prgs){
 	$prog = shift @files ;
 	$prog =~ s|\./abc|:abc|g if $^O eq 'MacOS';
     }
-    open TEST, ">$tmpfile" or die "Could not open: $!";
+    open TEST, ">", "$tmpfile" or die "Could not open: $!";
     print TEST $prog,"\n";
     close TEST or die "Could not close: $!";
     my $results = $Is_MSWin32 ?
@@ -87,7 +87,7 @@ for (@prgs){
     if ( $results =~ s/^SKIPPED\n//) {
 	print "$results\n" ;
     }
-    elsif (($prefix and $results !~ /^\Q$expected/) or
+    elsif (($prefix and $results !~ m/^\Q$expected/) or
 	   (!$prefix and $results ne $expected)){
         print STDERR "PROG: $switch\n$prog\n";
         print STDERR "EXPECTED:\n$expected\n";
@@ -100,17 +100,17 @@ for (@prgs){
 }
 
 eval qq(use strict 'garbage');
-print +($@ =~ /^Unknown 'strict' tag\(s\) 'garbage'/)
+print +($@ =~ m/^Unknown 'strict' tag\(s\) 'garbage'/)
 	? "ok ".++$i."\n" : "not ok ".++$i."\t# $@";
 
 eval qq(no strict 'garbage');
-print +($@ =~ /^Unknown 'strict' tag\(s\) 'garbage'/)
+print +($@ =~ m/^Unknown 'strict' tag\(s\) 'garbage'/)
 	? "ok ".++$i."\n" : "not ok ".++$i."\t# $@";
 
 eval qq(use strict qw(foo bar));
-print +($@ =~ /^Unknown 'strict' tag\(s\) 'foo bar'/)
+print +($@ =~ m/^Unknown 'strict' tag\(s\) 'foo bar'/)
 	? "ok ".++$i."\n" : "not ok ".++$i."\t# $@";
 
 eval qq(no strict qw(foo bar));
-print +($@ =~ /^Unknown 'strict' tag\(s\) 'foo bar'/)
+print +($@ =~ m/^Unknown 'strict' tag\(s\) 'foo bar'/)
 	? "ok ".++$i."\n" : "not ok ".++$i."\t# $@";

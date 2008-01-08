@@ -44,71 +44,71 @@ $VERSION = '2.02';
     'gt'        =>    '>',      # right chevron, greater-than
     'quot'      =>    '"',      # double quote
 
-    "Aacute"    =>    "\xC1",   # capital A, acute accent
-    "aacute"    =>    "\xE1",   # small a, acute accent
-    "Acirc"     =>    "\xC2",   # capital A, circumflex accent
-    "acirc"     =>    "\xE2",   # small a, circumflex accent
-    "AElig"     =>    "\xC6",   # capital AE diphthong (ligature)
-    "aelig"     =>    "\xE6",   # small ae diphthong (ligature)
-    "Agrave"    =>    "\xC0",   # capital A, grave accent
-    "agrave"    =>    "\xE0",   # small a, grave accent
-    "Aring"     =>    "\xC5",   # capital A, ring
-    "aring"     =>    "\xE5",   # small a, ring
-    "Atilde"    =>    "\xC3",   # capital A, tilde
-    "atilde"    =>    "\xE3",   # small a, tilde
-    "Auml"      =>    "\xC4",   # capital A, dieresis or umlaut mark
-    "auml"      =>    "\xE4",   # small a, dieresis or umlaut mark
-    "Ccedil"    =>    "\xC7",   # capital C, cedilla
-    "ccedil"    =>    "\xE7",   # small c, cedilla
-    "Eacute"    =>    "\xC9",   # capital E, acute accent
-    "eacute"    =>    "\xE9",   # small e, acute accent
-    "Ecirc"     =>    "\xCA",   # capital E, circumflex accent
-    "ecirc"     =>    "\xEA",   # small e, circumflex accent
-    "Egrave"    =>    "\xC8",   # capital E, grave accent
-    "egrave"    =>    "\xE8",   # small e, grave accent
-    "ETH"       =>    "\xD0",   # capital Eth, Icelandic
-    "eth"       =>    "\xF0",   # small eth, Icelandic
-    "Euml"      =>    "\xCB",   # capital E, dieresis or umlaut mark
-    "euml"      =>    "\xEB",   # small e, dieresis or umlaut mark
-    "Iacute"    =>    "\xCD",   # capital I, acute accent
-    "iacute"    =>    "\xED",   # small i, acute accent
-    "Icirc"     =>    "\xCE",   # capital I, circumflex accent
-    "icirc"     =>    "\xEE",   # small i, circumflex accent
-    "Igrave"    =>    "\xCD",   # capital I, grave accent
-    "igrave"    =>    "\xED",   # small i, grave accent
-    "Iuml"      =>    "\xCF",   # capital I, dieresis or umlaut mark
-    "iuml"      =>    "\xEF",   # small i, dieresis or umlaut mark
-    "Ntilde"    =>    "\xD1",   # capital N, tilde
-    "ntilde"    =>    "\xF1",   # small n, tilde
-    "Oacute"    =>    "\xD3",   # capital O, acute accent
-    "oacute"    =>    "\xF3",   # small o, acute accent
-    "Ocirc"     =>    "\xD4",   # capital O, circumflex accent
-    "ocirc"     =>    "\xF4",   # small o, circumflex accent
-    "Ograve"    =>    "\xD2",   # capital O, grave accent
-    "ograve"    =>    "\xF2",   # small o, grave accent
-    "Oslash"    =>    "\xD8",   # capital O, slash
-    "oslash"    =>    "\xF8",   # small o, slash
-    "Otilde"    =>    "\xD5",   # capital O, tilde
-    "otilde"    =>    "\xF5",   # small o, tilde
-    "Ouml"      =>    "\xD6",   # capital O, dieresis or umlaut mark
-    "ouml"      =>    "\xF6",   # small o, dieresis or umlaut mark
-    "szlig"     =>    "\xDF",   # small sharp s, German (sz ligature)
-    "THORN"     =>    "\xDE",   # capital THORN, Icelandic
-    "thorn"     =>    "\xFE",   # small thorn, Icelandic
-    "Uacute"    =>    "\xDA",   # capital U, acute accent
-    "uacute"    =>    "\xFA",   # small u, acute accent
-    "Ucirc"     =>    "\xDB",   # capital U, circumflex accent
-    "ucirc"     =>    "\xFB",   # small u, circumflex accent
-    "Ugrave"    =>    "\xD9",   # capital U, grave accent
-    "ugrave"    =>    "\xF9",   # small u, grave accent
-    "Uuml"      =>    "\xDC",   # capital U, dieresis or umlaut mark
-    "uuml"      =>    "\xFC",   # small u, dieresis or umlaut mark
-    "Yacute"    =>    "\xDD",   # capital Y, acute accent
-    "yacute"    =>    "\xFD",   # small y, acute accent
-    "yuml"      =>    "\xFF",   # small y, dieresis or umlaut mark
+    "Aacute"    =>    "\x{C1}",   # capital A, acute accent
+    "aacute"    =>    "\x{E1}",   # small a, acute accent
+    "Acirc"     =>    "\x{C2}",   # capital A, circumflex accent
+    "acirc"     =>    "\x{E2}",   # small a, circumflex accent
+    "AElig"     =>    "\x{C6}",   # capital AE diphthong (ligature)
+    "aelig"     =>    "\x{E6}",   # small ae diphthong (ligature)
+    "Agrave"    =>    "\x{C0}",   # capital A, grave accent
+    "agrave"    =>    "\x{E0}",   # small a, grave accent
+    "Aring"     =>    "\x{C5}",   # capital A, ring
+    "aring"     =>    "\x{E5}",   # small a, ring
+    "Atilde"    =>    "\x{C3}",   # capital A, tilde
+    "atilde"    =>    "\x{E3}",   # small a, tilde
+    "Auml"      =>    "\x{C4}",   # capital A, dieresis or umlaut mark
+    "auml"      =>    "\x{E4}",   # small a, dieresis or umlaut mark
+    "Ccedil"    =>    "\x{C7}",   # capital C, cedilla
+    "ccedil"    =>    "\x{E7}",   # small c, cedilla
+    "Eacute"    =>    "\x{C9}",   # capital E, acute accent
+    "eacute"    =>    "\x{E9}",   # small e, acute accent
+    "Ecirc"     =>    "\x{CA}",   # capital E, circumflex accent
+    "ecirc"     =>    "\x{EA}",   # small e, circumflex accent
+    "Egrave"    =>    "\x{C8}",   # capital E, grave accent
+    "egrave"    =>    "\x{E8}",   # small e, grave accent
+    "ETH"       =>    "\x{D0}",   # capital Eth, Icelandic
+    "eth"       =>    "\x{F0}",   # small eth, Icelandic
+    "Euml"      =>    "\x{CB}",   # capital E, dieresis or umlaut mark
+    "euml"      =>    "\x{EB}",   # small e, dieresis or umlaut mark
+    "Iacute"    =>    "\x{CD}",   # capital I, acute accent
+    "iacute"    =>    "\x{ED}",   # small i, acute accent
+    "Icirc"     =>    "\x{CE}",   # capital I, circumflex accent
+    "icirc"     =>    "\x{EE}",   # small i, circumflex accent
+    "Igrave"    =>    "\x{CD}",   # capital I, grave accent
+    "igrave"    =>    "\x{ED}",   # small i, grave accent
+    "Iuml"      =>    "\x{CF}",   # capital I, dieresis or umlaut mark
+    "iuml"      =>    "\x{EF}",   # small i, dieresis or umlaut mark
+    "Ntilde"    =>    "\x{D1}",   # capital N, tilde
+    "ntilde"    =>    "\x{F1}",   # small n, tilde
+    "Oacute"    =>    "\x{D3}",   # capital O, acute accent
+    "oacute"    =>    "\x{F3}",   # small o, acute accent
+    "Ocirc"     =>    "\x{D4}",   # capital O, circumflex accent
+    "ocirc"     =>    "\x{F4}",   # small o, circumflex accent
+    "Ograve"    =>    "\x{D2}",   # capital O, grave accent
+    "ograve"    =>    "\x{F2}",   # small o, grave accent
+    "Oslash"    =>    "\x{D8}",   # capital O, slash
+    "oslash"    =>    "\x{F8}",   # small o, slash
+    "Otilde"    =>    "\x{D5}",   # capital O, tilde
+    "otilde"    =>    "\x{F5}",   # small o, tilde
+    "Ouml"      =>    "\x{D6}",   # capital O, dieresis or umlaut mark
+    "ouml"      =>    "\x{F6}",   # small o, dieresis or umlaut mark
+    "szlig"     =>    "\x{DF}",   # small sharp s, German (sz ligature)
+    "THORN"     =>    "\x{DE}",   # capital THORN, Icelandic
+    "thorn"     =>    "\x{FE}",   # small thorn, Icelandic
+    "Uacute"    =>    "\x{DA}",   # capital U, acute accent
+    "uacute"    =>    "\x{FA}",   # small u, acute accent
+    "Ucirc"     =>    "\x{DB}",   # capital U, circumflex accent
+    "ucirc"     =>    "\x{FB}",   # small u, circumflex accent
+    "Ugrave"    =>    "\x{D9}",   # capital U, grave accent
+    "ugrave"    =>    "\x{F9}",   # small u, grave accent
+    "Uuml"      =>    "\x{DC}",   # capital U, dieresis or umlaut mark
+    "uuml"      =>    "\x{FC}",   # small u, dieresis or umlaut mark
+    "Yacute"    =>    "\x{DD}",   # capital Y, acute accent
+    "yacute"    =>    "\x{FD}",   # small y, acute accent
+    "yuml"      =>    "\x{FF}",   # small y, dieresis or umlaut mark
 
-    "lchevron"  =>    "\xAB",   # left chevron (double less than)
-    "rchevron"  =>    "\xBB",   # right chevron (double greater than)
+    "lchevron"  =>    "\x{AB}",   # left chevron (double less than)
+    "rchevron"  =>    "\x{BB}",   # right chevron (double greater than)
 );
 
 
@@ -159,8 +159,8 @@ sub verbatim {
     return if $$self{EXCLUDE};
     $self->item if defined $$self{ITEM};
     local $_ = shift;
-    return if /^\s*$/;
-    s/^(\s*\S+)/(' ' x $$self{MARGIN}) . $1/gme;
+    return if m/^\s*$/;
+    s/^(\s*\S+)/{(' ' x $$self{MARGIN}) . $1}/gm;
     $self->output ($_);
 }
 
@@ -197,20 +197,21 @@ sub textblock {
               >
           )+
         )
-    } {
+    } {{
         local $_ = $1;
         s%L</([^>]+)>%$1%g;
-        my @items = split /(?:,?\s+(?:and\s+)?)/;
+        my @items = split m/(?:,?\s+(?:and\s+)?)/;
         my $string = "the ";
         my $i;
-        for ($i = 0; $i < @items; $i++) {
+        for ($i = 0; $i +< @items; $i++) {
             $string .= $items[$i];
-            $string .= ", " if @items > 2 && $i != $#items;
+            $string .= ", " if @items +> 2 && $i != $#items;
             $string .= " and " if ($i == $#items - 1);
         }
         $string .= " entries elsewhere in this document";
         $string;
-    }gex;
+    
+}}gx;
 
     # Now actually interpolate and output the paragraph.
     $_ = $self->interpolate ($_, $line);
@@ -264,7 +265,7 @@ sub interior_sequence {
 sub preprocess_paragraph {
     my $self = shift;
     local $_ = shift;
-    1 while s/^(.*?)(\t+)/$1 . ' ' x (length ($2) * 8 - length ($1) % 8)/me;
+    1 while s/^(.*?)(\t+)/{$1 . ' ' x (length ($2) * 8 - length ($1) % 8)}/m;
     $_;
 }
 
@@ -323,7 +324,7 @@ sub cmd_head3 {
 sub cmd_over {
     my $self = shift;
     local $_ = shift;
-    unless (/^[-+]?\d+\s+$/) { $_ = $$self{indent} }
+    unless (m/^[-+]?\d+\s+$/) { $_ = $$self{indent} }
     push (@{ $$self{INDENTS} }, $$self{MARGIN});
     $$self{MARGIN} += ($_ + 0);
 }
@@ -352,7 +353,7 @@ sub cmd_item {
 sub cmd_begin {
     my $self = shift;
     local $_ = shift;
-    my ($kind) = /^(\S+)/ or return;
+    my ($kind) = m/^(\S+)/ or return;
     if ($kind eq 'text') {
         $$self{VERBATIM} = 1;
     } else {
@@ -401,7 +402,7 @@ sub seq_l {
     s/\s+/ /g;
 
     # If we were given any explicit text, just output it.
-    if (/^([^|]+)\|/) { return $1 }
+    if (m/^([^|]+)\|/) { return $1 }
 
     # Okay, leading and trailing whitespace isn't important; get rid of it.
     s/^\s+//;
@@ -412,22 +413,22 @@ sub seq_l {
     # something looking like L<manpage(section)>.  The latter is an
     # enhancement over the original Pod::Text.
     my ($manpage, $section) = ('', $_);
-    if (/^(?:https?|ftp|news):/) {
+    if (m/^(?:https?|ftp|news):/) {
         # a URL
         return $_;
-    } elsif (/^"\s*(.*?)\s*"$/) {
+    } elsif (m/^"\s*(.*?)\s*"$/) {
         $section = '"' . $1 . '"';
     } elsif (m/^[-:.\w]+(?:\(\S+\))?$/) {
         ($manpage, $section) = ($_, '');
     } elsif (m%/%) {
-        ($manpage, $section) = split (/\s*\/\s*/, $_, 2);
+        ($manpage, $section) = split (m/\s*\/\s*/, $_, 2);
     }
 
     my $text = '';
     # Now build the actual output text.
     if (!length $section) {
         $text = "the $manpage manpage" if length $manpage;
-    } elsif ($section =~ /^[:\w]+(?:\(\))?/) {
+    } elsif ($section =~ m/^[:\w]+(?:\(\))?/) {
         $text .= 'the ' . $section . ' entry';
         $text .= (length $manpage) ? " in the $manpage manpage"
                                    : " elsewhere in this document";
@@ -465,17 +466,17 @@ sub item {
     unless (defined $indent) { $indent = $$self{indent} }
     my $space = ' ' x $indent;
     $space =~ s/^ /:/ if $$self{alt};
-    if (!$_ || /^\s+$/ || ($$self{MARGIN} - $indent < length ($tag) + 1)) {
+    if (!$_ || m/^\s+$/ || ($$self{MARGIN} - $indent +< length ($tag) + 1)) {
         my $margin = $$self{MARGIN};
         $$self{MARGIN} = $indent;
         my $output = $self->reformat ($tag);
         $output =~ s/\n*$/\n/;
         $self->output ($output);
         $$self{MARGIN} = $margin;
-        $self->output ($self->reformat ($_)) if /\S/;
+        $self->output ($self->reformat ($_)) if m/\S/;
     } else {
         $_ = $self->reformat ($_);
-        s/^ /:/ if ($$self{alt} && $indent > 0);
+        s/^ /:/ if ($$self{alt} && $indent +> 0);
         my $tagspace = ' ' x length $tag;
         s/^($space)$tagspace/$1$tag/ or warn "Bizarre space in item";
         $self->output ($_);
@@ -497,7 +498,7 @@ sub wrap {
     my $output = '';
     my $spaces = ' ' x $$self{MARGIN};
     my $width = $$self{width} - $$self{MARGIN};
-    while (length > $width) {
+    while (length +> $width) {
         if (s/^([^\n]{0,$width})\s+// || s/^([^\n]{$width})//) {
             $output .= $spaces . $1 . "\n";
         } else {
@@ -544,10 +545,10 @@ sub pod2text {
     # This is really ugly; I hate doing option parsing in the middle of a
     # module.  But the old Pod::Text module supported passing flags to its
     # entry function, so handle -a and -<number>.
-    while ($_[0] =~ /^-/) {
+    while ($_[0] =~ m/^-/) {
         my $flag = shift;
         if    ($flag eq '-a')       { push (@args, alt => 1)    }
-        elsif ($flag =~ /^-(\d+)$/) { push (@args, width => $1) }
+        elsif ($flag =~ m/^-(\d+)$/) { push (@args, width => $1) }
         else {
             unshift (@_, $flag);
             last;
@@ -563,7 +564,7 @@ sub pod2text {
     # open will handle the <&STDIN case automagically.
     if (defined $_[1]) {
         local *IN;
-        unless (open (IN, $_[0])) {
+        unless (open (IN, "<", $_[0])) {
             croak ("Can't open $_[0] for reading: $!\n");
             return;
         }

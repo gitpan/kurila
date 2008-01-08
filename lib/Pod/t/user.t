@@ -28,20 +28,20 @@ ok(1);
 # the DATA filehandle and store it in a scalar.
 # Do this until we read an =pod
 my @reference;
-while (my $line = <DATA>) {
-  last if $line =~ /^=pod/;
+while (my $line = ~< *DATA) {
+  last if $line =~ m/^=pod/;
   push(@reference,$line);
 }
 
 my $user_preamble = <<PRE;
 
-\\documentclass{article}
+\\documentclass\{article\}
 
-\\begin{document}
+\\begin\{document\}
 PRE
 
 my $user_postamble = <<POST;
-\\end{document}
+\\end\{document\}
 
 POST
 
@@ -55,7 +55,7 @@ my $parser = Pod::LaTeX->new(%params);
 ok($parser);
 
 # Create an output file
-open(OUTFH, "> test.tex" ) or die "Unable to open test tex file: $!\n";
+open(OUTFH, ">", "test.tex" ) or die "Unable to open test tex file: $!\n";
 
 # Read from the DATA filehandle and write to a new output file
 # Really want to write this to a scalar
@@ -64,13 +64,13 @@ $parser->parse_from_filehandle(\*DATA,\*OUTFH);
 close(OUTFH) or die "Error closing OUTFH test.tex: $!\n";
 
 # Now read in OUTFH and compare
-open(INFH, "< test.tex") or die "Unable to read test tex file: $!\n";
-my @output = <INFH>;
+open(INFH, "<", "test.tex") or die "Unable to read test tex file: $!\n";
+my @output = ~< *INFH;
 
 ok(@output, @reference);
 
 for my $i (0..$#reference) {
-  next if $reference[$i] =~ /^%%/; # skip timestamp comments
+  next if $reference[$i] =~ m/^%%/; # skip timestamp comments
   ok($output[$i], $reference[$i]);
 }
 

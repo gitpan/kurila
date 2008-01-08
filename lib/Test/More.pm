@@ -170,7 +170,7 @@ sub import_extra {
 
     my @other = ();
     my $idx = 0;
-    while( $idx <= $#{$list} ) {
+    while( $idx +<= $#{$list} ) {
         my $item = $list->[$idx];
 
         if( defined $item and $item eq 'no_diag' ) {
@@ -538,7 +538,7 @@ sub isa_ok ($$;$) {
         # We can't use UNIVERSAL::isa because we want to honor isa() overrides
         my($rslt, $error) = $tb->_try(sub { $object->isa($class) });
         if( $error ) {
-            if( $error =~ /^Can't call method "isa" on unblessed reference/ ) {
+            if( $error =~ m/^Can't call method "isa" on unblessed reference/ ) {
                 # Its an unblessed reference
                 if( !UNIVERSAL::isa($object, $class) ) {
                     my $ref = ref $object;
@@ -660,7 +660,7 @@ sub use_ok ($;@) {
 
     local($@,$!,$SIG{__DIE__});   # isolate eval
 
-    if( @imports == 1 and $imports[0] =~ /^\d+(?:\.\d+)?$/ ) {
+    if( @imports == 1 and $imports[0] =~ m/^v\d+(?:\.\d+)?$/ ) {
         # probably a version check.  Perl needs to see the bare number
         # for it to work with non-Exporter based modules.
         eval <<USE;
@@ -739,7 +739,7 @@ sub _is_module_name {
     # End with an alphanumeric.
     # The rest is an alphanumeric or ::
     $module =~ s/\b::\b//g;
-    $module =~ /^[a-zA-Z]\w*$/;
+    $module =~ m/^[a-zA-Z]\w*$/;
 }
 
 =back
@@ -837,14 +837,14 @@ sub _format_stack {
         my $idx  = $entry->{'idx'};
         if( $type eq 'HASH' ) {
             $var .= "->" unless $did_arrow++;
-            $var .= "{$idx}";
+            $var .= "\{$idx\}";
         }
         elsif( $type eq 'ARRAY' ) {
             $var .= "->" unless $did_arrow++;
             $var .= "[$idx]";
         }
         elsif( $type eq 'REF' ) {
-            $var = "\${$var}";
+            $var = "\$\{$var\}";
         }
     }
 
@@ -1004,7 +1004,7 @@ sub skip {
         $how_many = 1;
     }
 
-    if( defined $how_many and $how_many =~ /\D/ ) {
+    if( defined $how_many and $how_many =~ m/\D/ ) {
         _carp "skip() was passed a non-numeric number of tests.  Did you get the arguments backwards?";
         $how_many = 1;
     }
@@ -1188,10 +1188,10 @@ sub _eq_array  {
     return 1 if $a1 eq $a2;
 
     my $ok = 1;
-    my $max = $#$a1 > $#$a2 ? $#$a1 : $#$a2;
+    my $max = $#$a1 +> $#$a2 ? $#$a1 : $#$a2;
     for (0..$max) {
-        my $e1 = $_ > $#$a1 ? $DNE : $a1->[$_];
-        my $e2 = $_ > $#$a2 ? $DNE : $a2->[$_];
+        my $e1 = $_ +> $#$a1 ? $DNE : $a1->[$_];
+        my $e2 = $_ +> $#$a2 ? $DNE : $a2->[$_];
 
         push @Data_Stack, { type => 'ARRAY', idx => $_, vals => [$e1, $e2] };
         $ok = _deep_check($e1,$e2);
@@ -1318,7 +1318,7 @@ sub _eq_hash {
     return 1 if $a1 eq $a2;
 
     my $ok = 1;
-    my $bigger = keys %$a1 > keys %$a2 ? $a1 : $a2;
+    my $bigger = keys %$a1 +> keys %$a2 ? $a1 : $a2;
     foreach my $k (keys %$bigger) {
         my $e1 = exists $a1->{$k} ? $a1->{$k} : $DNE;
         my $e2 = exists $a2->{$k} ? $a2->{$k} : $DNE;

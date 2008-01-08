@@ -4,7 +4,7 @@ BEGIN {
     chdir 't' if -d 't';
     @INC = '../lib';
     require Config; Config->import;
-    if ($Config{'extensions'} !~ /\bSocket\b/ && 
+    if ($Config{'extensions'} !~ m/\bSocket\b/ && 
         !(($^O eq 'VMS') && $Config{d_socket})) {
 	print "1..0\n";
 	exit 0;
@@ -46,7 +46,7 @@ if (socket(T, PF_INET, SOCK_STREAM, IPPROTO_TCP)) {
 	$read = sysread(T,$buff,10);	# Connection may be granted, then closed!
 	arm(0);
 
-	while ($read > 0 && length($buff) < 5) {
+	while ($read +> 0 && length($buff) +< 5) {
 	    # adjust for fact that TCP doesn't guarantee size of reads/writes
 	    arm(5);
 	    $read = sysread(T,$buff,10,length($buff));
@@ -90,7 +90,7 @@ if( socket(S, PF_INET,SOCK_STREAM, IPPROTO_TCP) ){
 	$read = sysread(S,$buff,10);	# Connection may be granted, then closed!
 	arm(0);
 
-	while ($read > 0 && length($buff) < 5) {
+	while ($read +> 0 && length($buff) +< 5) {
 	    # adjust for fact that TCP doesn't guarantee size of reads/writes
 	    arm(5);
 	    $read = sysread(S,$buff,10,length($buff));
@@ -114,7 +114,7 @@ else {
 
 # warnings
 $SIG{__WARN__} = sub {
-    ++ $w if $_[0] =~ /^6-ARG sockaddr_in call is deprecated/ ;
+    ++ $w if $_[0] =~ m/^6-ARG sockaddr_in call is deprecated/ ;
 } ;
 $w = 0 ;
 sockaddr_in(1,2,3,4,5,6) ;
@@ -139,7 +139,7 @@ print ((inet_ntoa("\x{a}\x{14}\x{1e}\x{28}") eq "10.20.30.40") ? "ok 11\n" : "no
 }
 				     
 eval { inet_ntoa("\x{a}\x{14}\x{1e}\x{190}") };
-print (($@ =~ /^Bad arg length for Socket::inet_ntoa, length is 5, should be 4/) ? "ok 14\n" : "not ok 14\n");
+print (($@ =~ m/^Bad arg length for Socket::inet_ntoa, length is 5, should be 4/) ? "ok 14\n" : "not ok 14\n");
 
 if (sockaddr_family(pack_sockaddr_in(100,inet_aton("10.250.230.10"))) == AF_INET) {
     print "ok 15\n";
@@ -148,7 +148,7 @@ if (sockaddr_family(pack_sockaddr_in(100,inet_aton("10.250.230.10"))) == AF_INET
 }
 
 eval { sockaddr_family("") };
-print (($@ =~ /^Bad arg length for Socket::sockaddr_family, length is 0, should be at least \d+/) ? "ok 16\n" : "not ok 16\n");
+print (($@ =~ m/^Bad arg length for Socket::sockaddr_family, length is 0, should be at least \d+/) ? "ok 16\n" : "not ok 16\n");
 
 if ($^O eq 'linux') {
     # see if we can handle abstract sockets

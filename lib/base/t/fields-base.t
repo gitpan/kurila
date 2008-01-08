@@ -1,17 +1,11 @@
 #!/usr/bin/perl -w
 
-my ($Has_PH, $Field);
-BEGIN { 
-    $Has_PH = $] < 5.009;
-    $Field = $Has_PH ? "pseudo-hash field" : "class field";
-}
-
 my $W;
 
 BEGIN {
     $W = 0;
     $SIG{__WARN__} = sub {
-        if ($_[0] =~ /^Hides field '.*?' in base class/) {
+        if ($_[0] =~ m/^Hides field '.*?' in base class/) {
             $W++;
         }
         else {

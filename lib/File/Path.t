@@ -112,8 +112,8 @@ is($count, $removed, "removed directory safe mode");
 # existence of E is neither here nor there
 $dir = catdir($tmp_base, 'E', updir(), 'Y');
 @created =mkpath($dir);
-cmp_ok(scalar(@created), '>=', 1, "made one or more dirs because of ..");
-cmp_ok(scalar(@created), '<=', 2, "made less than two dirs because of ..");
+cmp_ok(scalar(@created), '+>=', 1, "made one or more dirs because of ..");
+cmp_ok(scalar(@created), '+<=', 2, "made less than two dirs because of ..");
 ok( -d catdir($tmp_base, 'Y'), "directory after parent" );
 
 @created = mkpath(catdir(curdir(), $tmp_base));
@@ -204,7 +204,7 @@ else {
 # see what happens if a file exists where we want a directory
 SKIP: {
     my $entry = catdir($tmp_base, "file");
-    skip "Cannot create $entry", 4 unless open OUT, "> $entry";
+    skip "Cannot create $entry", 4 unless open OUT, ">", " $entry";
     print OUT "test file, safe to delete\n", scalar(localtime), "\n";
     close OUT;
     ok(-e $entry, "file exists in place of directory");
@@ -371,7 +371,7 @@ cannot restore permissions to \d+ for [^:]+: .* at \1 line \2},
 
     SKIP: {
         $file = catdir($dir2, "file");
-        skip "Cannot create $file", 2 unless open OUT, "> $file";
+        skip "Cannot create $file", 2 unless open OUT, ">", " $file";
         print OUT "test file, safe to delete\n", scalar(localtime), "\n";
         close OUT;
 
@@ -396,7 +396,7 @@ SKIP: {
     is( scalar(@$error), 9, 'safe is better' );
     for (@$error) {
         ($file, $message) = each %$_;
-        if ($file =~  /[123]\z/) {
+        if ($file =~  m/[123]\z/) {
             is(index($message, 'cannot remove directory: '), 0, "failed to remove $file with rmdir")
                 or diag($message);
         }

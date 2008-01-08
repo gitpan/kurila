@@ -60,7 +60,7 @@ sub _doit {
 	  unless ($^O eq 'MSWin32') {
             fcntl($handle, Fcntl::F_SETFD(), 1) or croak "fcntl: $!";
 	  }
-          $fh = $rw ? ${*$me}[0] : ${*$me}[1];
+          $fh = $rw ? $me->*->[0] : $me->*->[1];
         } else {
           shift;
           $fh = $rw ? $me->reader() : $me->writer(); # close the other end
@@ -75,7 +75,7 @@ sub _doit {
     
           $io->fdopen($save, $mode);
           $save->close or croak "Cannot close $!";
-          croak "IO::Pipe: Cannot spawn-NOWAIT: $err" if not $pid or $pid < 0;
+          croak "IO::Pipe: Cannot spawn-NOWAIT: $err" if not $pid or $pid +< 0;
           return $pid;
         } else {
           exec @_ or
@@ -90,31 +90,31 @@ sub _doit {
 }
 
 sub reader {
-    @_ >= 1 or croak 'usage: $pipe->reader( [SUB_COMMAND_ARGS] )';
+    @_ +>= 1 or croak 'usage: $pipe->reader( [SUB_COMMAND_ARGS] )';
     my $me = shift;
 
     return undef
 	unless(ref($me) || ref($me = $me->new));
 
-    my $fh  = ${*$me}[0];
+    my $fh  = $me->*->[0];
     my $pid;
     $pid = $me->_doit(0, $fh, @_)
         if(@_);
 
-    close ${*$me}[1];
+    close($me->*->[1]);
     bless $me, ref($fh);
     *$me = *$fh;          # Alias self to handle
     $me->fdopen($fh->fileno,"r")
 	unless defined($me->fileno);
     bless $fh;                  # Really wan't un-bless here
-    ${*$me}{'io_pipe_pid'} = $pid
+    $me->*->$->{'io_pipe_pid'} = $pid
         if defined $pid;
 
     $me;
 }
 
 sub writer {
-    @_ >= 1 or croak 'usage: $pipe->writer( [SUB_COMMAND_ARGS] )';
+    @_ +>= 1 or croak 'usage: $pipe->writer( [SUB_COMMAND_ARGS] )';
     my $me = shift;
 
     return undef

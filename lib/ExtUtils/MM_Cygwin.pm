@@ -49,8 +49,8 @@ sub cflags {
     return '' unless $self->needs_linking();
 
     my $base = $self->SUPER::cflags($libperl);
-    foreach (split /\n/, $base) {
-        /^(\S*)\s*=\s*(\S*)$/ and $self->{$1} = $2;
+    foreach (split m/\n/, $base) {
+        m/^(\S*)\s*=\s*(\S*)$/ and $self->{$1} = $2;
     };
     $self->{CCFLAGS} .= " -DUSEIMPORTLIB" if ($Config{useshrplib} eq 'true');
 
@@ -86,9 +86,7 @@ sub init_linker {
 
     if ($Config{useshrplib} eq 'true') {
         my $libperl = '$(PERL_INC)' .'/'. "$Config{libperl}";
-        if( $] >= 5.006002 ) {
-            $libperl =~ s/a$/dll.a/;
-        }
+        $libperl =~ s/a$/dll.a/;
         $self->{PERL_ARCHIVE} = $libperl;
     } else {
         $self->{PERL_ARCHIVE} = 

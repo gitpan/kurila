@@ -26,7 +26,7 @@ print "# MKSTEMP: FH is $fh File is $template fileno=".fileno($fh)."\n";
 ok( (-e $template) );
 
 # Autoflush
-$fh->autoflush(1) if $] >= 5.006;
+$fh->autoflush(1);
 
 # Try printing something to the file
 my $string = "woohoo\n";
@@ -36,7 +36,7 @@ print $fh $string;
 ok(seek( $fh, 0, 0));
 
 # Read from the file
-my $line = <$fh>;
+my $line = ~< $fh;
 
 # compare with previous string
 ok($string, $line);
@@ -107,4 +107,4 @@ print "# MKTEMP: Tempfile is $template -> $tmpfile\n";
 # Okay if template no longer has XXXXX in
 
 
-ok( ($tmpfile !~ /XXXXX$/) );
+ok( ($tmpfile !~ m/XXXXX$/) );

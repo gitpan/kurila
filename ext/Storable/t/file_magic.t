@@ -399,7 +399,7 @@ store({}, $file);
     is($info->{version_nv}, Storable::BIN_WRITE_VERSION_NV, "version_nv match");
     is($info->{major}, 2, "sane major");
     ok($info->{minor}, "have minor");
-    ok($info->{minor} >= Storable::BIN_WRITE_MINOR, "large enough minor");
+    ok($info->{minor} +>= Storable::BIN_WRITE_MINOR, "large enough minor");
 
     ok(!$info->{netorder}, "no netorder");
 
@@ -409,10 +409,7 @@ store({}, $file);
         map {$_ => 5.004} qw(byteorder intsize longsize)
     );
     for my $attr (keys %attrs) {
-        SKIP: {
-            skip "attribute $attr not available on this version of Perl", 1 if $attrs{$attr} > $];
-            is($info->{$attr}, $Config{$attr}, "$attr match Config");
-        }
+        is($info->{$attr}, $Config{$attr}, "$attr match Config");
     }
 }
 
@@ -427,7 +424,7 @@ nstore({}, $file);
     is($info->{version_nv}, Storable::BIN_WRITE_VERSION_NV, "version_nv match");
     is($info->{major}, 2, "sane major");
     ok($info->{minor}, "have minor");
-    ok($info->{minor} >= Storable::BIN_WRITE_MINOR, "large enough minor");
+    ok($info->{minor} +>= Storable::BIN_WRITE_MINOR, "large enough minor");
 
     ok($info->{netorder}, "no netorder");
     for (qw(byteorder intsize longsize ptrsize nvsize)) {
@@ -437,7 +434,7 @@ nstore({}, $file);
 
 for my $test (@tests) {
     my($data, $expected) = @$test;
-    open(FH, ">$file") || die "Can't create $file: $!";
+    open(FH, ">", "$file") || die "Can't create $file: $!";
     binmode(FH);
     print FH $data;
     close(FH) || die "Can't write $file: $!";

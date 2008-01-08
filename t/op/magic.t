@@ -34,7 +34,7 @@ sub skip {
     return 1;
 }
 
-print "1..58\n";
+print "1..57\n";
 
 my $Is_MSWin32  = $^O eq 'MSWin32';
 my $Is_NetWare  = $^O eq 'NetWare';
@@ -56,14 +56,14 @@ my $PERL = $ENV{PERL}
 eval '$ENV{"FOO"} = "hi there";';	# check that ENV is inited inside eval
 # cmd.exe will echo 'variable=value' but 4nt will echo just the value
 # -- Nikola Knezevic
-if ($Is_MSWin32)  { ok `set FOO` =~ /^(?:FOO=)?hi there$/; }
+if ($Is_MSWin32)  { ok `set FOO` =~ m/^(?:FOO=)?hi there$/; }
 elsif ($Is_MacOS) { ok "1 # skipped", 1; }
 elsif ($Is_VMS)   { ok `write sys\$output f\$trnlnm("FOO")` eq "hi there\n"; }
 else              { ok `echo \$FOO` eq "hi there\n"; }
 
 unlink 'ajslkdfpqjsjfk';
 $! = 0;
-open(FOO,'ajslkdfpqjsjfk');
+open(FOO, "<",'ajslkdfpqjsjfk');
 ok $!, $!;
 close FOO; # just mention it, squelch used-only-once
 
@@ -76,7 +76,7 @@ else {
   # We use a pipe rather than system() because the VMS command buffer
   # would overflow with a command that long.
 
-    open( CMDPIPE, "| $PERL");
+    open( CMDPIPE, "|-", "$PERL");
 
     print CMDPIPE <<'END';
 
@@ -99,7 +99,7 @@ END
 
     close CMDPIPE;
 
-    open( CMDPIPE, "| $PERL");
+    open( CMDPIPE, "|-", "$PERL");
     print CMDPIPE <<'END';
 
     { package X;
@@ -136,10 +136,10 @@ END
 my @val1 = @ENV{keys(%ENV)};
 my @val2 = values(%ENV);
 ok join(':',@val1) eq join(':',@val2);
-ok @val1 > 1;
+ok @val1 +> 1;
 
 # regex vars
-'foobarbaz' =~ /b(a)r/;
+'foobarbaz' =~ m/b(a)r/;
 ok $` eq 'foo', $`;
 ok $& eq 'bar', $&;
 ok $' eq 'baz', $';
@@ -178,9 +178,9 @@ else {
 eval { die "foo\n" };
 ok $@ eq "foo\n", $@;
 
-ok $$ > 0, $$;
+ok $$ +> 0, $$;
 eval { $$++ };
-ok $@ =~ /^Modification of a read-only value attempted/;
+ok $@ =~ m/^Modification of a read-only value attempted/;
 
 our ($wd, $script);
 
@@ -246,12 +246,12 @@ EOX
     }
     if ($^O eq 'os390' or $^O eq 'posix-bc' or $^O eq 'vmesa') {  # no shebang
 	$headmaybe = <<EOH ;
-    eval 'exec ./perl -S \$0 \${1+"\$\@"}'
+    eval 'exec ./perl -S \$0 \$\{1+"\$\@"\}'
         if 0;
 EOH
     }
     my $s1 = "\$^X is $perl, \$0 is $script\n";
-    ok open(SCRIPT, ">$script"), $!;
+    ok open(SCRIPT, ">", "$script"), $!;
     ok print(SCRIPT $headmaybe . <<EOB . $middlemaybe . <<'EOF' . $tailmaybe), $!;
 #!$wd/perl
 EOB
@@ -275,9 +275,8 @@ EOF
 }
 
 # $], $^O, $^T
-ok $] >= 5.00319, $];
 ok $^O;
-ok $^T > 850000000, $^T;
+ok $^T +> 850000000, $^T;
 
 # Test change 25062 is working
 my $orig_osname = $^O;
@@ -308,12 +307,12 @@ else {
 	$0 = "bar";
 # cmd.exe will echo 'variable=value' but 4nt will echo just the value
 # -- Nikola Knezevic
-       ok ($Is_MSWin32 ? (`set __NoNeSuCh` =~ /^(?:__NoNeSuCh=)?foo$/)
+       ok ($Is_MSWin32 ? (`set __NoNeSuCh` =~ m/^(?:__NoNeSuCh=)?foo$/)
 			    : (`echo \$__NoNeSuCh` eq "foo\n") );
-	if ($^O =~ /^(linux|freebsd)$/ &&
-	    open CMDLINE, "/proc/$$/cmdline") {
-	    chomp(my $line = scalar <CMDLINE>);
-	    my $me = (split /\0/, $line)[0];
+	if ($^O =~ m/^(linux|freebsd)$/ &&
+	    open CMDLINE, '<', "/proc/$$/cmdline") {
+	    chomp(my $line = scalar ~< *CMDLINE);
+	    my $me = (split m/\0/, $line)[0];
 	    ok($me eq $0, 'altering $0 is effective (testing with /proc/)');
 	    close CMDLINE;
             # perlbug #22811
@@ -336,7 +335,7 @@ else {
 	       # be stored in the proc struct and then used by ps(1),
 	       # no matter what characters we use to pad the argv[].
 	       # (And if we use \0:s, they are shown as spaces.)  Sigh.
-               || $ps =~ /^x\s*$/
+               || $ps =~ m/^x\s*$/
 	       # FreeBSD cannot get rid of both the leading "perl :"
 	       # and the trailing " (perl)": some FreeBSD versions
 	       # can get rid of the first one.
@@ -395,7 +394,7 @@ if ($Is_miniperl) {
     undef %{Symbol::stash("Errno")};
     delete $INC{"Errno.pm"};
 
-    open(FOO, "nonesuch"); # Generate ENOENT
+    open(FOO, "<", "nonesuch"); # Generate ENOENT
     no strict 'refs';
     my %errs = %{*{Symbol::fetch_glob("!")}}; # Cause Errno.pm to be loaded at run-time
     ok ${*{Symbol::fetch_glob("!")}}{ENOENT};
@@ -403,7 +402,7 @@ if ($Is_miniperl) {
 
 ok $^S == 0 && defined $^S;
 eval { ok $^S == 1 };
-eval " BEGIN { ok ! defined \$^S } ";
+eval " BEGIN \{ ok ! defined \$^S \} ";
 ok $^S == 0 && defined $^S;
 
 ok ${^TAINT} == 0;
@@ -413,7 +412,7 @@ ok ${^TAINT} == 0;
 # 5.6.1 had a bug: @+ and @- were not properly interpolated
 # into double-quoted strings
 # 20020414 mjd-perl-patch+@plover.com
-"I like pie" =~ /(I) (like) (pie)/;
+"I like pie" =~ m/(I) (like) (pie)/;
 ok "@-" eq  "0 0 2 7";
 ok "@+" eq "10 1 6 10";
 
@@ -439,7 +438,7 @@ ok "@+" eq "10 1 6 10";
 {
     my $x;
     sub f {
-	"abc" =~ /(.)./;
+	"abc" =~ m/(.)./;
 	$x = "@+";
 	return @+;
     };
@@ -469,5 +468,5 @@ else {
 # Can not do this test on VMS, EPOC, and SYMBIAN according to comments
 # in mg.c/Perl_magic_clear_all_env()
 #
-    skip('Can\'t make assignment to \%ENV on this system') for 1..3;
+    skip(q|Can't make assignment to \%ENV on this system|) for 1..3;
 }

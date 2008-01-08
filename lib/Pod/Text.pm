@@ -27,7 +27,7 @@ package Pod::Text;
 
 use strict;
 use utf8;
-use vars qw(@ISA @EXPORT %ESCAPES $VERSION);
+use vars qw(@ISA @EXPORT $VERSION);
 
 use Carp qw(carp croak);
 use Exporter ();
@@ -103,8 +103,8 @@ sub new {
         $$self{LQUOTE} = $$self{RQUOTE} = '';
     } elsif (length ($$self{opt_quotes}) == 1) {
         $$self{LQUOTE} = $$self{RQUOTE} = $$self{opt_quotes};
-    } elsif ($$self{opt_quotes} =~ /^(.)(.)$/
-             || $$self{opt_quotes} =~ /^(..)(..)$/) {
+    } elsif ($$self{opt_quotes} =~ m/^(.)(.)$/
+             || $$self{opt_quotes} =~ m/^(..)(..)$/) {
         $$self{LQUOTE} = $1;
         $$self{RQUOTE} = $2;
     } else {
@@ -185,7 +185,7 @@ sub _handle_element_end {
         my $method = 'cmd_' . $method;
         my $text = $self->?$method (@$tag);
         if (defined $text) {
-            if (@{ $$self{PENDING} } > 1) {
+            if (@{ $$self{PENDING} } +> 1) {
                 $$self{PENDING}[-1][1] .= $text;
             } else {
                 $self->output ($text);
@@ -211,7 +211,7 @@ sub wrap {
     my $output = '';
     my $spaces = ' ' x $$self{MARGIN};
     my $width = $$self{opt_width} - $$self{MARGIN};
-    while (length > $width) {
+    while (length +> $width) {
         if (s/^([^\n]{0,$width})[ \t]+// || s/^([^\n]{$width})//) {
             $output .= $spaces . $1 . "\n";
         } else {
@@ -297,31 +297,31 @@ sub item {
     my $indent = $$self{INDENTS}[-1];
     $indent = $$self{opt_indent} unless defined $indent;
     my $margin = ' ' x $$self{opt_margin};
-    my $fits = ($$self{MARGIN} - $indent >= length ($tag) + 1);
+    my $fits = ($$self{MARGIN} - $indent +>= length ($tag) + 1);
 
     # If the tag doesn't fit, or if we have no associated text, print out the
     # tag separately.  Otherwise, put the tag in the margin of the paragraph.
-    if (!$text || $text =~ /^\s+$/ || !$fits) {
+    if (!$text || $text =~ m/^\s+$/ || !$fits) {
         my $realindent = $$self{MARGIN};
         $$self{MARGIN} = $indent;
         my $output = $self->reformat ($tag);
-        $output =~ s/^$margin /$margin:/ if ($$self{opt_alt} && $indent > 0);
+        $output =~ s/^$margin /$margin:/ if ($$self{opt_alt} && $indent +> 0);
         $output =~ s/\n*$/\n/;
 
         # If the text is just whitespace, we have an empty item paragraph;
         # this can result from =over/=item/=back without any intermixed
         # paragraphs.  Insert some whitespace to keep the =item from merging
         # into the next paragraph.
-        $output .= "\n" if $text && $text =~ /^\s*$/;
+        $output .= "\n" if $text && $text =~ m/^\s*$/;
 
         $self->output ($output);
         $$self{MARGIN} = $realindent;
-        $self->output ($self->reformat ($text)) if ($text && $text =~ /\S/);
+        $self->output ($self->reformat ($text)) if ($text && $text =~ m/\S/);
     } else {
         my $space = ' ' x $indent;
         $space =~ s/^$margin /$margin:/ if $$self{opt_alt};
         $text = $self->reformat ($text);
-        $text =~ s/^$margin /$margin:/ if ($$self{opt_alt} && $indent > 0);
+        $text =~ s/^$margin /$margin:/ if ($$self{opt_alt} && $indent +> 0);
         my $tagspace = ' ' x length $tag;
         $text =~ s/^($space)$tagspace/$1$tag/ or warn "Bizarre space in item";
         $self->output ($text);
@@ -346,8 +346,8 @@ sub cmd_para {
 sub cmd_verbatim {
     my ($self, $attrs, $text) = @_;
     $self->item if defined $$self{ITEM};
-    return if $text =~ /^\s*$/;
-    $text =~ s/^(\n*)(\s*\S+)/$1 . (' ' x $$self{MARGIN}) . $2/gme;
+    return if $text =~ m/^\s*$/;
+    $text =~ s/^(\n*)(\s*\S+)/{$1 . (' ' x $$self{MARGIN}) . $2}/gm;
     $text =~ s/\s*$/\n\n/;
     $self->output ($text);
     return '';
@@ -374,7 +374,7 @@ sub heading {
     $self->item ("\n\n") if defined $$self{ITEM};
     $text =~ s/\s+$//;
     if ($$self{opt_alt}) {
-        my $closemark = reverse (split (//, $marker));
+        my $closemark = reverse (split (m//, $marker));
         my $margin = ' ' x $$self{opt_margin};
         $self->output ("\n" . "$margin$marker $text $closemark" . "\n\n");
     } else {
@@ -422,7 +422,7 @@ sub over_common_start {
 
     # Find the indentation level.
     my $indent = $$attrs{indent};
-    unless (defined ($indent) && $indent =~ /^\s*[-+]?\d{1,4}\s*$/) {
+    unless (defined ($indent) && $indent =~ m/^\s*[-+]?\d{1,4}\s*$/) {
         $indent = $$self{opt_indent};
     }
 
@@ -550,10 +550,10 @@ sub pod2text {
     # This is really ugly; I hate doing option parsing in the middle of a
     # module.  But the old Pod::Text module supported passing flags to its
     # entry function, so handle -a and -<number>.
-    while ($_[0] =~ /^-/) {
+    while ($_[0] =~ m/^-/) {
         my $flag = shift;
         if    ($flag eq '-a')       { push (@args, alt => 1)    }
-        elsif ($flag =~ /^-(\d+)$/) { push (@args, width => $1) }
+        elsif ($flag =~ m/^-(\d+)$/) { push (@args, width => $1) }
         else {
             unshift (@_, $flag);
             last;
@@ -570,7 +570,7 @@ sub pod2text {
     if (defined $_[1]) {
         my @fhs = @_;
         local *IN;
-        unless (open (IN, $fhs[0])) {
+        unless (open (IN, "<", $fhs[0])) {
             croak ("Can't open $fhs[0] for reading: $!\n");
             return;
         }

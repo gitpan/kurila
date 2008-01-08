@@ -8,8 +8,8 @@ __END__
 def
 --FILE--
 # taint.c
-open(FH, "<abc") ;
-$a = <FH> ;
+open(FH, "<", "abc") ;
+$a = ~< *FH ;
 close FH ;
 chdir $a ;
 print "xxx\n" ;
@@ -21,8 +21,8 @@ Insecure dependency in chdir while running with -T switch at - line 5.
 def
 --FILE--
 # taint.c
-open(FH, "<abc") ;
-$a = <FH> ;
+open(FH, "<", "abc") ;
+$a = ~< *FH ;
 close FH ;
 chdir $a;
 no warnings 'taint' ;
@@ -42,8 +42,8 @@ yyy
 def
 --FILE--
 # taint.c
-open(FH, "<abc") ;
-$a = <FH> ;
+open(FH, "<", "abc") ;
+$a = ~< *FH ;
 close FH ;
 chdir $a;
 no warnings 'taint' ;

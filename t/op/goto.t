@@ -8,7 +8,7 @@ BEGIN {
 
 use warnings;
 use strict;
-plan tests => 58;
+plan tests => 57;
 our $TODO;
 
 our $foo;
@@ -58,7 +58,7 @@ sub bar {
 exit;
 
 FINALE:
-is(curr_test(), 16, 'FINALE');
+is(curr_test(), 15, 'FINALE');
 
 # does goto LABEL handle block contexts correctly?
 # note that this scope-hopping differs from last & next,
@@ -193,7 +193,7 @@ f1();
 # erroneous popping of the inner BLOCK context
 
 undef $ok;
-for ($count=0; $count<2; $count++) {
+for ($count=0; $count+<2; $count++) {
     my $x = 1;
     goto LABEL29;
     LABEL29:
@@ -203,7 +203,7 @@ is($ok, 1, 'goto in for(;;) with continuation');
 
 # bug #22299 - goto in require doesn't find label
 
-open my $f, ">goto01.pm" or die;
+open my $f, ">", "goto01.pm" or die;
 print $f <<'EOT';
 package goto01;
 goto YYY;
@@ -285,16 +285,6 @@ $::LINE = __LINE__ + 1;
   sub start	{ push @_, 1, "foo", {}; goto &show; }
   for (1..3)	{ $i = $_; start(bless([$_]), 'bar'); }
 }
-
-sub auto {
-    goto &loadit;
-}
-
-sub AUTOLOAD { $ok = 1 if "@_" eq "foo" }
-
-$ok = 0;
-auto("foo");
-ok($ok, 'autoload');
 
 {
     my $wherever = 'FINALE';
@@ -415,14 +405,14 @@ a32039();
     my $r = runperl(
 		stderr => 1,
 		prog =>
-'for ($_=0;$_<3;$_++){A: if($_==1){next} if($_==2){$_++;goto A}}print qq(ok\n)'
+'for ($_=0;$_+<3;$_++){A: if($_==1){next} if($_==2){$_++;goto A}}print qq(ok\n)'
     );
     is($r, "ok\n", 'next and goto');
 
     $r = runperl(
 		stderr => 1,
 		prog =>
-'for ($_=0;$_<3;$_++){A: if($_==1){$_++;redo} if($_==2){$_++;goto A}}print qq(ok\n)'
+'for ($_=0;$_+<3;$_++){A: if($_==1){$_++;redo} if($_==2){$_++;goto A}}print qq(ok\n)'
     );
     is($r, "ok\n", 'redo and goto');
 }

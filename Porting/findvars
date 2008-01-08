@@ -2,15 +2,15 @@
 
 $pat = '';
 # construct word list
-while (<DATA>) {
+while ( ~< *DATA) {
   chomp;
   next unless $_;
   $pat .= "$_|";
 }
-chop $pat if $pat =~ /\|$/;
+chop $pat if $pat =~ m/\|$/;
 
 # grep
-while (<>) {
+while ( ~< *ARGV) {
     print "$ARGV\:$.\:$_" if s/\b($pat)\b/#$1#/og;
 # this variant might useful if the transformation is more complicated
 #    if (/^(.*?)\b($pat)\b(.*)$/o) {

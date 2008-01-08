@@ -29,7 +29,7 @@ sub casetest {
 				   "$base.pl");
     my $simple = do $file or die $@;
     my %simple;
-    for my $i (split(/\n/, $simple)) {
+    for my $i (split(m/\n/, $simple)) {
 	my ($k, $v) = split(' ', $i);
 	$simple{$k} = $v;
     }
@@ -53,9 +53,9 @@ sub casetest {
     exit(1) if $both;
 
     my %none;
-    for my $i (map { ord } split //,
-	       "\e !\"#\$%&'()+,-./0123456789:;<=>?\@[\\]^_{|}~\b") {
-	next if pack("U0U", $i) =~ /\w/;
+    for my $i (map { ord } split m//,
+	       "\e !\"#\$%&'()+,-./0123456789:;<=>?\@[\\]^_\{|\}~\b") {
+	next if pack("U0U", $i) =~ m/\w/;
 	$none{$i}++ unless $seen{$i};
     }
     print "# ", scalar keys %none, " noncase mappings\n";
@@ -82,9 +82,6 @@ sub casetest {
 
     for my $i (sort keys %$spec) {
 	my $w = unidump($spec->{$i});
-	if (ord('A') == 193 && $i eq "\x8A\x73") {
-	    $w = '0178'; # It's a Latin small Y with diaeresis and not a Latin small letter sharp 's'.
-	}
         #my $c = substr $i, 0, 1;
 	my $h = unidump($i);
 	foreach my $func (@funcs) {
@@ -124,7 +121,7 @@ sub casetest {
 		#
 		# 0130 -> 0069 0307 (00D1 0307)
 		#
-		if ($h =~ /^(0130|0149|01F0|1E96|1E97|1E98|1E99|1E9A)$/) {
+		if ($h =~ m/^(0130|0149|01F0|1E96|1E97|1E98|1E99|1E9A)$/) {
 		    $e =~ s/004E/002B/; # N
 		    $e =~ s/004A/00A2/; # J
 		    $e =~ s/0048/00E7/; # H
@@ -144,7 +141,7 @@ sub casetest {
 	}
     }
 
-    for my $i (sort { $a <=> $b } keys %none) {
+    for my $i (sort { $a <+> $b } keys %none) {
 	my $w = $i = sprintf "%04X", $i;
 	my $c = pack "U0U", hex $i;
 	foreach my $func (@funcs) {

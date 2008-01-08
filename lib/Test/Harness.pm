@@ -66,7 +66,7 @@ if ( $ENV{HARNESS_STRAPS_CLASS} ) {
     die 'Set HARNESS_STRAP_CLASS, singular, not HARNESS_STRAPS_CLASS';
 }
 my $HARNESS_STRAP_CLASS  = $ENV{HARNESS_STRAP_CLASS} || 'Test::Harness::Straps';
-if ( $HARNESS_STRAP_CLASS =~ /\.pm$/ ) {
+if ( $HARNESS_STRAP_CLASS =~ m/\.pm$/ ) {
     # "Class" is actually a filename, that should return the
     # class name as its true return value.
     $HARNESS_STRAP_CLASS = require $HARNESS_STRAP_CLASS;
@@ -446,7 +446,7 @@ sub execute_tests {
         }
         else {
             # List unrun tests as failures.
-            if ($test{'next'} <= $test{max}) {
+            if ($test{'next'} +<= $test{max}) {
                 push @{$test{failed}}, $test{'next'}..$test{max};
             }
             # List overruns as failures.
@@ -573,11 +573,11 @@ sub _leader_width {
     my $maxlen = 0;
     my $maxsuflen = 0;
     foreach (@_) {
-        my $suf    = /\.(\w+)$/ ? $1 : '';
+        my $suf    = m/\.(\w+)$/ ? $1 : '';
         my $len    = length;
         my $suflen = length $suf;
-        $maxlen    = $len    if $len    > $maxlen;
-        $maxsuflen = $suflen if $suflen > $maxsuflen;
+        $maxlen    = $len    if $len    +> $maxlen;
+        $maxsuflen = $suflen if $suflen +> $maxsuflen;
     }
     # + 3 : we want three dots between the test name and the "ok"
     return $maxlen + 3 - $maxsuflen;
@@ -661,7 +661,7 @@ sub header_handler {
     $self->{_seen_header}++;
 
     warn "1..M can only appear at the beginning or end of tests\n"
-      if $totals->seen && ($totals->max < $totals->seen);
+      if $totals->seen && ($totals->max +< $totals->seen);
 };
 
 sub test_handler {
@@ -686,10 +686,10 @@ sub test_handler {
         _print_ml("NOK $curr/$max");
     }
 
-    if( $curr > $next ) {
+    if( $curr +> $next ) {
         print "Test output counter mismatch [test $curr]\n";
     }
-    elsif( $curr < $next ) {
+    elsif( $curr +< $next ) {
         print "Confused test output: test $curr answered after ".
               "test ", $next - 1, "\n";
     }
@@ -722,7 +722,7 @@ sub _bonusmsg {
     my($tot) = @_;
 
     my $bonusmsg = '';
-    $bonusmsg = (" ($tot->{bonus} subtest".($tot->{bonus} > 1 ? 's' : '').
+    $bonusmsg = (" ($tot->{bonus} subtest".($tot->{bonus} +> 1 ? 's' : '').
                " UNEXPECTEDLY SUCCEEDED)")
         if $tot->{bonus};
 
@@ -781,7 +781,7 @@ sub _create_fmts {
     my $failed_str = shift;
     my $failedtests = shift;
 
-    my ($type) = split /\s/,$failed_str;
+    my ($type) = split m/\s/,$failed_str;
     my $short = substr($type,0,4);
     my $total = $short eq 'Pass' ? 'TODOs' : 'Total';
     my $middle_str = " Stat Wstat $total $short  ";
@@ -791,14 +791,14 @@ sub _create_fmts {
     my $max_namelen = length($failed_str);
     foreach my $script (keys %$failedtests) {
         my $namelen = length $failedtests->{$script}->{name};
-        $max_namelen = $namelen if $namelen > $max_namelen;
+        $max_namelen = $namelen if $namelen +> $max_namelen;
     }
 
     my $list_len = $Columns - length($middle_str) - $max_namelen;
-    if ($list_len < length($list_str)) {
+    if ($list_len +< length($list_str)) {
         $list_len = length($list_str);
         $max_namelen = $Columns - length($middle_str) - $list_len;
-        if ($max_namelen < length($failed_str)) {
+        if ($max_namelen +< length($failed_str)) {
             $max_namelen = length($failed_str);
             $Columns = $max_namelen + length($middle_str) + $list_len;
         }
@@ -810,11 +810,11 @@ sub _create_fmts {
                   . "-" x $Columns
                   . "\n";
 
-    my $fmt1 =  "{" . "<" x ($max_namelen - 1) . "}"
-              . "  {>>} {>>>>} {>>>>} {>>>}  "
-              . "{" . "<" x ($list_len - 1) . "}";
-    my $fmt2 =  " " x ($Columns - $list_len - 2) . "{"
-              . "[" x ($list_len - 1) . "}";
+    my $fmt1 =  "\{" . "<" x ($max_namelen - 1) . "\}"
+              . "  \{>>\} \{>>>>\} \{>>>>\} \{>>>\}  "
+              . "\{" . "<" x ($list_len - 1) . "\}";
+    my $fmt2 =  " " x ($Columns - $list_len - 2) . "\{"
+              . "[" x ($list_len - 1) . "\}";
 
     return($fmt_top, $fmt1, $fmt2);
 }
@@ -825,7 +825,7 @@ sub _canondetail {
     my $type = shift;
     my @detail = @_;
     my %seen;
-    @detail = sort {$a <=> $b} grep !$seen{$_}++, @detail;
+    @detail = sort {$a <+> $b} grep !$seen{$_}++, @detail;
     my $detail = @detail;
     my @result = ();
     my @canon = ();
@@ -835,7 +835,7 @@ sub _canondetail {
     my $uc_type = uc($type);
     if (@detail) {
         for (@detail, $detail[-1]) { # don't forget the last one
-            if ($_ > $last+1 || $_ == $last) {
+            if ($_ +> $last+1 || $_ == $last) {
                 push @canon, ($min == $last) ? $last : "$min-$last";
                 $min = $_;
             }
@@ -851,7 +851,7 @@ sub _canondetail {
     }
 
     return (join("", @result), $canon)
-        if $type=~/todo/i;
+        if $type=~m/todo/i;
     push @result, "\t$type $detail/$max tests, ";
     if ($max) {
 	push @result, sprintf("%.2f",100*(1-$detail/$max)), "% okay";
@@ -859,7 +859,7 @@ sub _canondetail {
     else {
 	push @result, "?% okay";
     }
-    my $ender = 's' x ($skipped > 1);
+    my $ender = 's' x ($skipped +> 1);
     if ($skipped) {
         my $good = $max - $detail - $skipped;
 	my $skipmsg = " (less $skipped skipped test$ender: $good okay, ";

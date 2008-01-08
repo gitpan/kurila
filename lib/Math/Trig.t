@@ -28,7 +28,7 @@ BEGIN {
 
 plan(tests => 69);
 
-use Math::Trig 1.03;
+use Math::Trig v1.03;
 
 my $pip2 = pi / 2;
 
@@ -46,7 +46,7 @@ sub near ($$;$) {
     my $e = defined $_[2] ? $_[2] : $eps;
     my $d = $_[1] ? abs($_[0]/$_[1] - 1) : abs($_[0]);
     print "# near? $_[0] $_[1] : $d : $e\n";
-    $_[1] ? ($d < $e) : abs($_[0]) < $e;
+    $_[1] ? ($d +< $e) : abs($_[0]) +< $e;
 }
 
 $x = 0.9;
@@ -60,7 +60,7 @@ $x = asin(2);
 is(ref $x, 'Math::Complex');
 
 # avoid using Math::Complex here
-$x =~ /^([^-]+)(-[^i]+)i$/;
+$x =~ m/^([^-]+)(-[^i]+)i$/;
 ($y, $z) = ($1, $2);
 ok(near($y,  1.5707963267949));
 ok(near($z, -1.31695789692482));

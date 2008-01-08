@@ -42,47 +42,47 @@ EOT
 
 use Search::Dict;
 
-open(DICT, "+>dict-$$") or die "Can't create dict-$$: $!";
+open(DICT, "+>", "dict-$$") or die "Can't create dict-$$: $!";
 binmode DICT;			# To make length expected one.
 print DICT $DICT;
 
 my $pos = look *DICT, "Ababa";
-chomp(my $word = <DICT>);
-print "not " if $pos < 0 || $word ne "Ababa";
+chomp(my $word = ~< *DICT);
+print "not " if $pos +< 0 || $word ne "Ababa";
 print "ok 1\n";
 
-if (ord('a') > ord('A') ) {  # ASCII
+if (ord('a') +> ord('A') ) {  # ASCII
 
     $pos = look *DICT, "foo";
-    chomp($word = <DICT>);
+    chomp($word = ~< *DICT);
 
     print "not " if $pos != length($DICT);  # will search to end of file
     print "ok 2\n";
 
     my $pos = look *DICT, "abash";
-    chomp($word = <DICT>);
-    print "not " if $pos < 0 || $word ne "abash";
+    chomp($word = ~< *DICT);
+    print "not " if $pos +< 0 || $word ne "abash";
     print "ok 3\n";
 
 }
 else { # EBCDIC systems e.g. os390
 
     $pos = look *DICT, "FOO";
-    chomp($word = <DICT>);
+    chomp($word = ~< *DICT);
 
     print "not " if $pos != length($DICT);  # will search to end of file
     print "ok 2\n";
 
     my $pos = look *DICT, "Abba";
-    chomp($word = <DICT>);
-    print "not " if $pos < 0 || $word ne "Abba";
+    chomp($word = ~< *DICT);
+    print "not " if $pos +< 0 || $word ne "Abba";
     print "ok 3\n";
 }
 
 $pos = look *DICT, "aarhus", 1, 1;
-chomp($word = <DICT>);
+chomp($word = ~< *DICT);
 
-print "not " if $pos < 0 || $word ne "Aarhus";
+print "not " if $pos +< 0 || $word ne "Aarhus";
 print "ok 4\n";
 
 close DICT or die "cannot close";

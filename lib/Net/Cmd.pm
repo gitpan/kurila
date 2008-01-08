@@ -21,21 +21,6 @@ BEGIN {
   }
 }
 
-BEGIN {
-  if (!eval { require utf8 }) {
-    *is_utf8 = sub { 0 };
-  }
-  elsif (eval { utf8::is_utf8(undef); 1 }) {
-    *is_utf8 = \&utf8::is_utf8;
-  }
-  elsif (eval { require Encode; Encode::is_utf8(undef); 1 }) {
-    *is_utf8 = \&Encode::is_utf8;
-  }
-  else {
-    *is_utf8 = sub { $_[0] =~ /[^\x00-\xff]/ };
-  }
-}
-
 $VERSION = "2.29";
 @ISA     = qw(Exporter);
 @EXPORT  = qw(CMD_INFO CMD_OK CMD_MORE CMD_REJECT CMD_ERROR CMD_PENDING);
@@ -59,7 +44,7 @@ sub toebcdic {
   unless (exists ${*$cmd}{'net_cmd_asciipeer'}) {
     my $string    = $_[0];
     my $ebcdicstr = $tr->toebcdic($string);
-    ${*$cmd}{'net_cmd_asciipeer'} = $string !~ /^\d+/ && $ebcdicstr =~ /^\d+/;
+    ${*$cmd}{'net_cmd_asciipeer'} = $string !~ m/^\d+/ && $ebcdicstr =~ m/^\d+/;
   }
 
   ${*$cmd}{'net_cmd_asciipeer'}
@@ -217,7 +202,7 @@ sub command {
     my $str = join(
       " ",
       map {
-        /\n/
+        m/\n/
           ? do { my $n = $_; $n =~ tr/\n/ /; $n }
           : $_;
         } @_
@@ -246,7 +231,7 @@ sub ok {
   @_ == 1 or croak 'usage: $obj->ok()';
 
   my $code = $_[0]->code;
-  0 < $code && $code < 400;
+  0 +< $code && $code +< 400;
 }
 
 
@@ -283,7 +268,7 @@ sub getline {
     my $rout;
 
     my $select_ret = select($rout = $rin, undef, undef, $timeout);
-    if ($select_ret > 0) {
+    if ($select_ret +> 0) {
       unless (sysread($cmd, $buf = "", 1024)) {
         carp(ref($cmd) . ": Unexpected EOF on command channel")
           if $cmd->debug;
@@ -291,9 +276,9 @@ sub getline {
         return undef;
       }
 
-      substr($buf, 0, 0) = $partial;    ## prepend from last sysread
+      substr($buf, 0, 0, $partial);    ## prepend from last sysread
 
-      my @buf = split(/\015?\012/, $buf, -1);    ## break into lines
+      my @buf = split(m/\015?\012/, $buf, -1);    ## break into lines
 
       $partial = pop @buf;
 
@@ -377,7 +362,7 @@ sub read_until_dot {
     $cmd->debug_print(0, $str)
       if ($cmd->debug ^&^ 4);
 
-    last if ($str =~ /^\.\r?\n/o);
+    last if ($str =~ m/^\.\r?\n/o);
 
     $str =~ s/^\.\././o;
 
@@ -406,7 +391,7 @@ sub datasend {
   return 1 unless length $line;
 
   if ($cmd->debug) {
-    foreach my $b (split(/\n/, $line)) {
+    foreach my $b (split(m/\n/, $line)) {
       $cmd->debug_print(1, "$b\n");
     }
   }
@@ -419,12 +404,12 @@ sub datasend {
     $first_ch = "\012" if $line =~ s/^\012//;
   }
   elsif ($last_ch eq "\012") {
-    $first_ch = "." if $line =~ /^\./;
+    $first_ch = "." if $line =~ m/^\./;
   }
 
   $line =~ s/\015?\012(\.?)/\015\012$1$1/sg;
 
-  substr($line, 0, 0) = $first_ch;
+  substr($line, 0, 0, $first_ch);
 
   ${*$cmd}{'net_cmd_last_ch'} = substr($line, -1, 1);
 
@@ -439,7 +424,7 @@ sub datasend {
   while ($len) {
     my $wout;
     my $s = select(undef, $wout = $win, undef, $timeout);
-    if ((defined $s and $s > 0) or -f $cmd)    # -f for testing on win32
+    if ((defined $s and $s +> 0) or -f $cmd)    # -f for testing on win32
     {
       my $w = syswrite($cmd, $line, $len, $offset);
       unless (defined($w)) {
@@ -471,7 +456,7 @@ sub rawdatasend {
 
   if ($cmd->debug) {
     my $b = "$cmd>>> ";
-    print STDERR $b, join("\n$b", split(/\n/, $line)), "\n";
+    print STDERR $b, join("\n$b", split(m/\n/, $line)), "\n";
   }
 
   my $len    = length($line);
@@ -483,7 +468,7 @@ sub rawdatasend {
   local $SIG{PIPE} = 'IGNORE' unless $^O eq 'MacOS';
   while ($len) {
     my $wout;
-    if (select(undef, $wout = $win, undef, $timeout) > 0) {
+    if (select(undef, $wout = $win, undef, $timeout) +> 0) {
       my $w = syswrite($cmd, $line, $len, $offset);
       unless (defined($w)) {
         carp("$cmd: $!") if $cmd->debug;
@@ -554,14 +539,14 @@ sub READ {
   my ($len, $offset) = @_[1, 2];
   return unless exists ${*$cmd}{'net_cmd_readbuf'};
   my $done = 0;
-  while (!$done and length(${*$cmd}{'net_cmd_readbuf'}) < $len) {
+  while (!$done and length(${*$cmd}{'net_cmd_readbuf'}) +< $len) {
     ${*$cmd}{'net_cmd_readbuf'} .= $cmd->getline() or return;
     $done++ if ${*$cmd}{'net_cmd_readbuf'} =~ s/^\.\r?\n\Z//m;
   }
 
   $_[0] = '';
-  substr($_[0], $offset + 0) = substr(${*$cmd}{'net_cmd_readbuf'}, 0, $len);
-  substr(${*$cmd}{'net_cmd_readbuf'}, 0, $len) = '';
+  substr($_[0], $offset + 0, undef, substr(${*$cmd}{'net_cmd_readbuf'}, 0, $len));
+  substr(${*$cmd}{'net_cmd_readbuf'}, 0, $len, '');
   delete ${*$cmd}{'net_cmd_readbuf'} if $done;
 
   return length $_[0];
@@ -575,7 +560,7 @@ sub READLINE {
   # indicate that we have not yet reached the eof
   return unless exists ${*$cmd}{'net_cmd_readbuf'};
   my $line = $cmd->getline;
-  return if $line =~ /^\.\r?\n/;
+  return if $line =~ m/^\.\r?\n/;
   $line;
 }
 

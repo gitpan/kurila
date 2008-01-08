@@ -4,7 +4,7 @@ BEGIN {
     require './test.pl';
 }
 
-plan tests => 110;
+plan tests => 86;
 
 our ($a, $b, $c);
 
@@ -12,10 +12,6 @@ $a = "HELLO.* world";
 $b = "hello.* WORLD";
 
 is("\Q$a\E."      , "HELLO\\.\\*\\ world.", '\Q\E HELLO.* world');
-is("\u$a"         , "HELLO\.\* world",      '\u');
-is("\l$a"         , "hELLO\.\* world",      '\l');
-is("\U$a"         , "HELLO\.\* WORLD",      '\U');
-is("\L$a"         , "hello\.\* world",      '\L');
 
 is(quotemeta($a)  , "HELLO\\.\\*\\ world",  'quotemeta');
 is(ucfirst($a)    , "HELLO\.\* world",      'ucfirst');
@@ -24,10 +20,6 @@ is(uc($a)         , "HELLO\.\* WORLD",      'uc');
 is(lc($a)         , "hello\.\* world",      'lc');
 
 is("\Q$b\E."      , "hello\\.\\*\\ WORLD.", '\Q\E hello.* WORLD');
-is("\u$b"         , "Hello\.\* WORLD",      '\u');
-is("\l$b"         , "hello\.\* WORLD",      '\l');
-is("\U$b"         , "HELLO\.\* WORLD",      '\U');
-is("\L$b"         , "hello\.\* world",      '\L');
 
 is(quotemeta($b)  , "hello\\.\\*\\ WORLD",  'quotemeta');
 is(ucfirst($b)    , "Hello\.\* WORLD",      'ucfirst');
@@ -54,10 +46,6 @@ $b = "${x101}${x100}aA";
 
 
     is("\Q$a\E."      , "\x{100}\x{101}Aa.", '\Q\E \x{100}\x{101}Aa');
-    is("\u$a"         , "\x{100}\x{101}Aa",  '\u');
-    is("\l$a"         , "\x{101}\x{101}Aa",  '\l');
-    is("\U$a"         , "\x{100}\x{100}AA",  '\U');
-    is("\L$a"         , "\x{101}\x{101}aa",  '\L');
 
     is(quotemeta($a)  , "\x{100}\x{101}Aa",  'quotemeta');
     is(ucfirst($a)    , "\x{100}\x{101}Aa",  'ucfirst');
@@ -66,10 +54,6 @@ $b = "${x101}${x100}aA";
     is(lc($a)         , "\x{101}\x{101}aa",  'lc');
 
     is("\Q$b\E."      , "\x{101}\x{100}aA.", '\Q\E \x{101}\x{100}aA');
-    is("\u$b"         , "\x{100}\x{100}aA",  '\u');
-    is("\l$b"         , "\x{101}\x{100}aA",  '\l');
-    is("\U$b"         , "\x{100}\x{100}AA",  '\U');
-    is("\L$b"         , "\x{101}\x{101}aa",  '\L');
 
     is(quotemeta($b)  , "\x{101}\x{100}aA",  'quotemeta');
     is(ucfirst($b)    , "\x{100}\x{100}aA",  'ucfirst');
@@ -85,10 +69,6 @@ $b = "${x101}${x100}aA";
     local $TODO="no utf8 lc";
 
     is("\Q$a\E."      , "${x100}${x101}Aa.", '\Q\E ${x100}${x101}Aa');
-    is("\u$a"         , "${x100}${x101}Aa",  '\u');
-    is("\l$a"         , "${x100}${x101}Aa",  '\l');
-    is("\U$a"         , "${x100}${x101}AA",  '\U');
-    is("\L$a"         , "${x100}${x101}aa",  '\L');
 
     is(quotemeta($a)  , "${x100}${x101}Aa",  'quotemeta');
     is(ucfirst($a)    , "${x100}${x101}Aa",  'ucfirst');
@@ -97,10 +77,6 @@ $b = "${x101}${x100}aA";
     is(lc($a)         , "${x100}${x101}aa",  'lc');
 
     is("\Q$b\E."      , "${x101}${x100}aA.", '\Q\E ${x101}${x100}aA');
-    is("\u$b"         , "${x101}${x100}aA",  '\u');
-    is("\l$b"         , "${x101}${x100}aA",  '\l');
-    is("\U$b"         , "${x101}${x100}AA",  '\U');
-    is("\L$b"         , "${x101}${x100}aa",  '\L');
 
     is(quotemeta($b)  , "${x101}${x100}aA",  'quotemeta');
     is(ucfirst($b)    , "${x101}${x100}aA",  'ucfirst');
@@ -119,7 +95,7 @@ $b = "${x101}${x100}aA";
 {
     local $TODO="multibyte uppercase";
     use utf8;
-    is("\U\x{DF}aB\x{149}cD" , "SSAB\x{2BC}NCD",
+    is(uc("\x{DF}aB\x{149}cD") , "SSAB\x{2BC}NCD",
        "multicharacter uppercase");
 }
 
@@ -128,7 +104,7 @@ $b = "${x101}${x100}aA";
 
 {
     use utf8;
-    is("\L\x{DF}aB\x{149}cD" , "\x{DF}ab\x{149}cd",
+    is(lc("\x{DF}aB\x{149}cD") , "\x{DF}ab\x{149}cd",
        "multicharacter lowercase");
 }
 
@@ -145,11 +121,11 @@ use utf8;
 
 $a = "\x{587}";
 
-is("\L\x{587}" , "\x{587}",        "ligature lowercase");
+is(lc("\x{587}") , "\x{587}",        "ligature lowercase");
 {
     local $TODO="ligature special case";
-    is("\u\x{587}" , "\x{535}\x{582}", "ligature titlecase");
-    is("\U\x{587}" , "\x{535}\x{552}", "ligature uppercase");
+    is(ucfirst("\x{587}") , "\x{535}\x{582}", "ligature titlecase");
+    is(uc("\x{587}") , "\x{535}\x{552}", "ligature uppercase");
 }
 
 # mktables had problems where many-to-one case mappings didn't work right.
@@ -175,16 +151,16 @@ is(uc("\x{1C6}") , "\x{1C4}",      "U+01C6 uc is U+01C4, too");
 $a = "\x{3c3}foo.bar"; # \x{3c3} == GREEK SMALL LETTER SIGMA.
 $b = "\x{3a3}FOO.BAR"; # \x{3a3} == GREEK CAPITAL LETTER SIGMA.
 
-($c = $b) =~ s/(\w+)/lc($1)/ge;
+($c = $b) =~ s/(\w+)/{lc($1)}/g;
 is($c , $a, "Using s///e to change case.");
 
-($c = $a) =~ s/(\w+)/uc($1)/ge;
+($c = $a) =~ s/(\w+)/{uc($1)}/g;
 is($c , $b, "Using s///e to change case.");
 
-($c = $b) =~ s/(\w+)/lcfirst($1)/ge;
+($c = $b) =~ s/(\w+)/{lcfirst($1)}/g;
 is($c , "\x{3c3}FOO.bAR", "Using s///e to change case.");
 
-($c = $a) =~ s/(\w+)/ucfirst($1)/ge;
+($c = $a) =~ s/(\w+)/{ucfirst($1)}/g;
 is($c , "\x{3a3}foo.Bar", "Using s///e to change case.");
 
 # #18931: perl5.8.0 bug in \U..\E processing
@@ -193,7 +169,7 @@ for my $a (0,1) {
     $_ = 'abcdefgh';
     $_ .= chr 256;
     chop;
-    /(.*)/;
+    m/(.*)/;
     is(uc($1), "ABCDEFGH", "[perl #18931]");
 }
 
@@ -202,7 +178,7 @@ for my $a (0,1) {
         local $TODO = "fix lc";
 	$a = "\x{a}"."\x{101}";
 	chop $a;
-	$a =~ s/^(\s*)(\w*)/$1\u$2/;
+	$a =~ s/^(\s*)(\w*)/{"$1".ucfirst($2)}/;
 	is($a, "\x{a}", "[perl #18857]");
     } 
 }
@@ -226,18 +202,18 @@ for ("a\x{100}", "ßyz\x{100}") { # ß to Ss (different length)
 
 for (map { $_ } "a\x{100}", "abc\x{100}", "\x{100}") {
     chop; # get ("a", "abc", "") in utf8
-    my $return =  uc($_) =~ /\G(.?)/g;
+    my $return =  uc($_) =~ m/\G(.?)/g;
     my $result = $return ? $1 : "not";
-    my $expect = (uc($_) =~ /(.?)/g)[0];
+    my $expect = (uc($_) =~ m/(.?)/g)[0];
     is($return, 1,       "[perl #38619]");
     is($result, $expect, "[perl #38619]");
 }
 
 for (map { $_ } "A\x{100}", "ABC\x{100}", "\x{100}") {
     chop; # get ("A", "ABC", "") in utf8
-    my $return =  lc($_) =~ /\G(.?)/g;
+    my $return =  lc($_) =~ m/\G(.?)/g;
     my $result = $return ? $1 : "not";
-    my $expect = (lc($_) =~ /(.?)/g)[0];
+    my $expect = (lc($_) =~ m/(.?)/g)[0];
     is($return, 1,       "[perl #38619]");
     is($result, $expect, "[perl #38619]");
 }

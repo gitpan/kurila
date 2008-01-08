@@ -8,9 +8,9 @@ BEGIN {
 
 my $opcode_new = 'opcode.h-new';
 my $opname_new = 'opnames.h-new';
-open(OC, ">$opcode_new") || die "Can't create $opcode_new: $!\n";
+open(OC, ">", "$opcode_new") || die "Can't create $opcode_new: $!\n";
 binmode OC;
-open(ON, ">$opname_new") || die "Can't create $opname_new: $!\n";
+open(ON, ">", "$opname_new") || die "Can't create $opname_new: $!\n";
 binmode ON;
 select OC;
 
@@ -19,11 +19,11 @@ select OC;
 my %seen;
 my (@ops, %desc, %check, %ckname, %flags, %args);
 
-while (<DATA>) {
+while ( ~< *DATA) {
     chop;
     next unless $_;
-    next if /^#/;
-    my ($key, $desc, $check, $flags, $args) = split(/\t+/, $_, 5);
+    next if m/^#/;
+    my ($key, $desc, $check, $flags, $args) = split(m/\t+/, $_, 5);
     $args = '' unless defined $args;
 
     warn qq[Description "$desc" duplicates $seen{$desc}\n] if $seen{$desc};
@@ -141,7 +141,7 @@ print ON <<"END";
  *  will be lost!
  */
 
-typedef enum opcode {
+typedef enum opcode \{
 END
 
 my $i = 0;
@@ -149,7 +149,7 @@ for (@ops) {
     print ON "\t", &tab(3,"OP_\U$_,"), "/* ", $i++, " */\n";
 }
 print ON "\t", &tab(3,"OP_max"), "\n";
-print ON "} opcode;\n";
+print ON "\} opcode;\n";
 print ON "\n#define MAXO ", scalar @ops, "\n";
 print ON "#define OP_phoney_INPUT_ONLY -1\n";
 print ON "#define OP_phoney_OUTPUT_ONLY -2\n\n";
@@ -167,7 +167,7 @@ START_EXTERN_C
 #ifndef DOINIT
 EXTCONST char* const PL_op_name[];
 #else
-EXTCONST char* const PL_op_name[] = {
+EXTCONST char* const PL_op_name[] = \{
 END
 
 for (@ops) {
@@ -176,7 +176,7 @@ for (@ops) {
 
 print <<END;
 \tNULL,\n
-};
+\};
 #endif
 
 END
@@ -185,7 +185,7 @@ print <<END;
 #ifndef DOINIT
 EXTCONST char* const PL_op_desc[];
 #else
-EXTCONST char* const PL_op_desc[] = {
+EXTCONST char* const PL_op_desc[] = \{
 END
 
 for (@ops) {
@@ -198,7 +198,7 @@ for (@ops) {
 }
 
 print <<END;
-};
+\};
 #endif
 
 END_EXTERN_C
@@ -235,7 +235,7 @@ EXT Perl_ppaddr_t PL_ppaddr[] /* or perlvars.h */
 #endif /* PERL_GLOBAL_STRUCT */
 #if (defined(DOINIT) && !defined(PERL_GLOBAL_STRUCT)) || defined(PERL_GLOBAL_STRUCT_INIT)
 #  define PERL_PPADDR_INITED
-= {
+= \{
 END
 
 for (@ops) {
@@ -248,7 +248,7 @@ for (@ops) {
 }
 
 print <<END;
-}
+\}
 #endif
 #ifdef PERL_PPADDR_INITED
 ;
@@ -270,7 +270,7 @@ EXT Perl_check_t PL_check[] /* or perlvars.h */
 #endif
 #if (defined(DOINIT) && !defined(PERL_GLOBAL_STRUCT)) || defined(PERL_GLOBAL_STRUCT_INIT)
 #  define PERL_CHECK_INITED
-= {
+= \{
 END
 
 for (@ops) {
@@ -278,7 +278,7 @@ for (@ops) {
 }
 
 print <<END;
-}
+\}
 #endif
 #ifdef PERL_CHECK_INITED
 ;
@@ -294,7 +294,7 @@ print <<END;
 #ifndef DOINIT
 EXTCONST U32 PL_opargs[];
 #else
-EXTCONST U32 PL_opargs[] = {
+EXTCONST U32 PL_opargs[] = \{
 END
 
 my %argnum = (
@@ -330,20 +330,20 @@ my %OP_IS_FILETEST;
 for (@ops) {
     my $argsum = 0;
     my $flags = $flags{$_};
-    $argsum |= 1 if $flags =~ /m/;		# needs stack mark
-    $argsum |= 2 if $flags =~ /f/;		# fold constants
-    $argsum |= 4 if $flags =~ /s/;		# always produces scalar
-    $argsum |= 8 if $flags =~ /t/;		# needs target scalar
-    $argsum |= (8|256) if $flags =~ /T/;	# ... which may be lexical
-    $argsum |= 16 if $flags =~ /i/;		# always produces integer
-    $argsum |= 32 if $flags =~ /I/;		# has corresponding int op
-    $argsum |= 64 if $flags =~ /d/;		# danger, unknown side effects
-    $argsum |= 128 if $flags =~ /u/;		# defaults to $_
-    $flags =~ /([\W\d_])/ or die qq[Opcode "$_" has no class indicator];
-    $argsum |= $opclass{$1} << 9;
+    $argsum ^|^= 1 if $flags =~ m/m/;		# needs stack mark
+    $argsum ^|^= 2 if $flags =~ m/f/;		# fold constants
+    $argsum ^|^= 4 if $flags =~ m/s/;		# always produces scalar
+    $argsum ^|^= 8 if $flags =~ m/t/;		# needs target scalar
+    $argsum ^|^= (8^|^256) if $flags =~ m/T/;	# ... which may be lexical
+    $argsum ^|^= 16 if $flags =~ m/i/;		# always produces integer
+    $argsum ^|^= 32 if $flags =~ m/I/;		# has corresponding int op
+    $argsum ^|^= 64 if $flags =~ m/d/;		# danger, unknown side effects
+    $argsum ^|^= 128 if $flags =~ m/u/;		# defaults to $_
+    $flags =~ m/([\W\d_])/ or die qq[Opcode "$_" has no class indicator];
+    $argsum ^|^= $opclass{$1} << 9;
     my $mul = 0x2000;				# 2 ^ OASHIFT
     for my $arg (split(' ',$args{$_})) {
-	if ($arg =~ /^F/) {
+	if ($arg =~ m/^F/) {
            $OP_IS_SOCKET{$_}   = 1 if $arg =~ s/s//;
            $OP_IS_FILETEST{$_} = 1 if $arg =~ s/-//;
         }
@@ -351,7 +351,7 @@ for (@ops) {
         die "op = $_, arg = $arg\n" unless length($arg) == 1;
 	$argnum += $argnum{$arg};
 	warn "# Conflicting bit 32 for '$_'.\n"
-	    if $argnum & 8 and $mul == 0x10000000;
+	    if $argnum ^&^ 8 and $mul == 0x10000000;
 	$argsum += $argnum * $mul;
 	$mul <<= 4;
     }
@@ -360,7 +360,7 @@ for (@ops) {
 }
 
 print <<END;
-};
+\};
 #endif
 
 #endif /* !PERL_GLOBAL_STRUCT_INIT */
@@ -398,9 +398,9 @@ safer_rename $opname_new, 'opnames.h';
 my $pp_proto_new = 'pp_proto.h-new';
 my $pp_sym_new  = 'pp.sym-new';
 
-open PP, ">$pp_proto_new" or die "Error creating $pp_proto_new: $!";
+open PP, ">", "$pp_proto_new" or die "Error creating $pp_proto_new: $!";
 binmode PP;
-open PPSYM, ">$pp_sym_new" or die "Error creating $pp_sym_new: $!";
+open PPSYM, ">", "$pp_sym_new" or die "Error creating $pp_sym_new: $!";
 binmode PPSYM;
 
 print PP <<"END";
@@ -432,8 +432,8 @@ for (sort keys %ckname) {
 print PP "\n\n";
 
 for (@ops) {
-    next if /^i_(pre|post)(inc|dec)$/;
-    next if /^custom$/;
+    next if m/^i_(pre|post)(inc|dec)$/;
+    next if m/^custom$/;
     print PP "PERL_PPDEF(Perl_pp_$_)\n";
     print PPSYM "Perl_pp_$_\n";
 }
@@ -656,20 +656,20 @@ stringify	string			ck_fun		fsT@	S
 left_shift	left bitshift (<<)	ck_bitop	fsT2	S S
 right_shift	right bitshift (>>)	ck_bitop	fsT2	S S
 
-lt		numeric lt (<)		ck_null		Iifs2	S S
-i_lt		integer lt (<)		ck_null		ifs2	S S
-gt		numeric gt (>)		ck_null		Iifs2	S S
-i_gt		integer gt (>)		ck_null		ifs2	S S
-le		numeric le (<=)		ck_null		Iifs2	S S
-i_le		integer le (<=)		ck_null		ifs2	S S
-ge		numeric ge (>=)		ck_null		Iifs2	S S
-i_ge		integer ge (>=)		ck_null		ifs2	S S
+lt		numeric lt (+<)		ck_null		Iifs2	S S
+i_lt		integer lt (+<)		ck_null		ifs2	S S
+gt		numeric gt (+>)		ck_null		Iifs2	S S
+i_gt		integer gt (+>)		ck_null		ifs2	S S
+le		numeric le (+<=)		ck_null		Iifs2	S S
+i_le		integer le (+<=)		ck_null		ifs2	S S
+ge		numeric ge (+>=)		ck_null		Iifs2	S S
+i_ge		integer ge (+>=)		ck_null		ifs2	S S
 eq		numeric eq (==)		ck_null		Iifs2	S S
 i_eq		integer eq (==)		ck_null		ifs2	S S
 ne		numeric ne (!=)		ck_null		Iifs2	S S
 i_ne		integer ne (!=)		ck_null		ifs2	S S
-ncmp		numeric comparison (<=>)	ck_null		Iifst2	S S
-i_ncmp		integer comparison (<=>)	ck_null		ifst2	S S
+ncmp		numeric comparison (<+>)	ck_null		Iifst2	S S
+i_ncmp		integer comparison (<+>)	ck_null		ifst2	S S
 
 slt		string lt		ck_null		ifs2	S S
 sgt		string gt		ck_null		ifs2	S S
@@ -679,14 +679,14 @@ seq		string eq		ck_null		ifs2	S S
 sne		string ne		ck_null		ifs2	S S
 scmp		string comparison (cmp)	ck_null		ifst2	S S
 
-bit_and		bitwise and (&)		ck_bitop	fst2	S S
-bit_xor		bitwise xor (^)		ck_bitop	fst2	S S
-bit_or		bitwise or (|)		ck_bitop	fst2	S S
+bit_and		bitwise and (^&^)		ck_bitop	fst2	S S
+bit_xor		bitwise xor (^^^)		ck_bitop	fst2	S S
+bit_or		bitwise or (^|^)		ck_bitop	fst2	S S
 
 negate		negation (-)		ck_null		Ifst1	S
 i_negate	integer negation (-)	ck_null		ifsT1	S
 not		not			ck_null		ifs1	S
-complement	1's complement (~)	ck_bitop	fst1	S
+complement	1's complement (^~^)	ck_bitop	fst1	S
 
 smartmatch	smart match		ck_smartmatch	s2
 
@@ -750,7 +750,7 @@ hslice		hash slice		ck_null		m@	H L
 unpack		unpack			ck_unpack	@	S S?
 pack		pack			ck_fun		mst@	S L
 split		split			ck_split	t@	S S S
-join		join or string		ck_join		mst@	S L
+join		join or string		ck_fun		mst@	S L
 
 # List operators.
 

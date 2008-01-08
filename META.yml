@@ -1,5 +1,5 @@
 name: kurila
-version: 1.5_0
+version: 1.7_0
 abstract: a geneticly modified perl
 author: ~
 license: perl
@@ -113,8 +113,6 @@ no_index:
     - lib/Archive/Extract.pm
     - lib/Archive/Tar.pm
     - lib/Attribute/Handlers.pm
-    - lib/AutoLoader.pm
-    - lib/AutoLoader.t
     - lib/base.pm
     - lib/bigint.pm
     - lib/bignum.pm

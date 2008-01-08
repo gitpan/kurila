@@ -58,7 +58,7 @@ if ($@) {
     $B64 = 0;
 }
 
-for (split /^/, $EXPECT) {
+for (split m/^/, $EXPECT) {
      my($md5hex, $file) = split ' ';
      my $base = $file;
 #     print "# $base\n";
@@ -145,7 +145,7 @@ for (split /^/, $EXPECT) {
 	 $failed++;
      }
 
-     my @data = split //, $data;
+     my @data = split m//, $data;
      if (md5(@data) ne $md5bin) {
 	 print "$file: md5(\@data) failed\n";
 	 $failed++;
@@ -174,7 +174,7 @@ sub digest_file
     $method ||= "digest";
     #print "$file $method\n";
 
-    open(FILE, $file) or die "Can't open $file: $!";
+    open(FILE, "<", $file) or die "Can't open $file: $!";
     my $digest = Digest::MD5->new->addfile(*FILE)->?$method();
     close(FILE);
 
@@ -185,12 +185,12 @@ sub cat_file
 {
     my($file) = @_;
     local $/;  # slurp
-    open(FILE, $file) or die "Can't open $file: $!";
+    open(FILE, "<", $file) or die "Can't open $file: $!";
 
     # For PerlIO in case of UTF-8 locales.
-    eval 'binmode(FILE, ":bytes")' if $] >= 5.008;
+    eval 'binmode(FILE, ":bytes")';
 
-    my $tmp = <FILE>;
+    my $tmp = ~< *FILE;
     close(FILE);
     $tmp;
 }

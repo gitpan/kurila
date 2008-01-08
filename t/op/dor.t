@@ -43,8 +43,8 @@ is(pop @ARGV   // 7, 3,	'pop @array // ... works');
 
 # Test that various syntaxes are allowed
 
-for (qw(getc pos readline readlink undef umask <> <FOO> <$foo> -f)) {
-    eval "no strict; sub { $_ // 0 }";
+for (qw(getc pos readline readlink undef umask ~<*ARGV ~<*FOO ~<$foo -f)) {
+    eval "no strict; sub \{ $_ // 0 \}";
     is($@, '', "$_ // ... compiles");
 }
 
@@ -57,11 +57,11 @@ is( $@, '' );
 eval q# sub f ($):lvalue { $y } f $x /= 2; #;
 is( $@, '' );
 eval q# sub f ($) { } f $x /2; #;
-like( $@, qr/^Search pattern not terminated/ );
+is( $@, '' );
 eval q# sub { print $fh / 2 } #;
 is( $@, '' );
 eval q# sub { print $fh /2 } #;
-like( $@, qr/^Search pattern not terminated/ );
+is( $@, '' );
 
 # [perl #28123] Perl optimizes // away incorrectly
 

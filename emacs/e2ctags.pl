@@ -20,10 +20,10 @@ my %filetags = ();
 my %files = ();
 my @lines = ();
 
-while (<>) {
+while ( ~< *ARGV) {
   if ($_ eq "\x0C\n") {
     ##Grab next line and parse it for the filename
-    $_ = <>;
+    $_ = ~< *ARGV;
     chomp;
     s/,\d+$//;
     $filename = $_;
@@ -32,13 +32,13 @@ while (<>) {
   }
   ##Figure out how many records in this line and
   ##extract the tag name and the line that it is found on
-  next if /struct/;
-  if (/\x01/) {
-    ($tag,$line_no) = /\x7F(\w+)\x01(\d+)/;
+  next if m/struct/;
+  if (m/\x01/) {
+    ($tag,$line_no) = m/\x7F(\w+)\x01(\d+)/;
   }
   else {
     tr/(//d;
-    ($tag,$line_no) = /(\w+)\s*\x7F(\d+),/;
+    ($tag,$line_no) = m/(\w+)\s*\x7F(\d+),/;
   }
   next unless $tag;
   ##Take only the first entry per tag
@@ -49,13 +49,13 @@ while (<>) {
 }
 
 foreach $filename (keys %files) {
-  open FILE, $filename or die "Couldn't open $filename: $!\n";
-  @lines = <FILE>;
+  open FILE, "<", $filename or die "Couldn't open $filename: $!\n";
+  @lines = ~< *FILE;
   close FILE;
   chomp @lines;
   foreach $tag ( @{$filetags{$filename}} ) {
     $line = $lines[$tags{$tag}{LINE_NO}-1];
-    if (length($line) >= 50) {
+    if (length($line) +>= 50) {
       $line = substr($line,0,50);
     }
     else {

@@ -55,18 +55,14 @@ if ($^O eq 'MacOS') {
 # not already be found in the t/ subdirectory for perl.
 my $name = 'h2xst';
 my $header = "$name.h";
-my $thisversion = "5.10.0";
-$thisversion =~ s/^v//;
+require kurila;
+my $thisversion = $kurila::VERSION;
 
 # If this test has failed previously a copy may be left.
 rmtree($name);
 
 my @tests = (
-"-f -n $name", $], <<"EOXSFILES",
-Defaulting to backwards compatibility with perl $thisversion
-If you intend this module to be compatible with earlier perl versions, please
-specify a minimum perl version with the -b option.
-
+"-f -n $name", $^V, <<"EOXSFILES",
 Writing $name/ppport.h
 Writing $name/lib/$name.pm
 Writing $name/$name.xs
@@ -79,46 +75,7 @@ Writing $name/Changes
 Writing $name/MANIFEST
 EOXSFILES
 
-"-f -n $name -b $thisversion", $], <<"EOXSFILES",
-Writing $name/ppport.h
-Writing $name/lib/$name.pm
-Writing $name/$name.xs
-Writing $name/fallback/const-c.inc
-Writing $name/fallback/const-xs.inc
-Writing $name/Makefile.PL
-Writing $name/README
-Writing $name/t/$name.t
-Writing $name/Changes
-Writing $name/MANIFEST
-EOXSFILES
-
-"-f -n $name -b 5.6.1", "5.006001", <<"EOXSFILES",
-Writing $name/ppport.h
-Writing $name/lib/$name.pm
-Writing $name/$name.xs
-Writing $name/fallback/const-c.inc
-Writing $name/fallback/const-xs.inc
-Writing $name/Makefile.PL
-Writing $name/README
-Writing $name/t/$name.t
-Writing $name/Changes
-Writing $name/MANIFEST
-EOXSFILES
-
-"-f -n $name -b 5.5.3", "5.00503", <<"EOXSFILES",
-Writing $name/ppport.h
-Writing $name/lib/$name.pm
-Writing $name/$name.xs
-Writing $name/fallback/const-c.inc
-Writing $name/fallback/const-xs.inc
-Writing $name/Makefile.PL
-Writing $name/README
-Writing $name/t/$name.t
-Writing $name/Changes
-Writing $name/MANIFEST
-EOXSFILES
-
-"\"-X\" -f -n $name -b $thisversion", $], <<"EONOXSFILES",
+"\"-X\" -f -n $name", $^V, <<"EONOXSFILES",
 Writing $name/lib/$name.pm
 Writing $name/Makefile.PL
 Writing $name/README
@@ -127,7 +84,7 @@ Writing $name/Changes
 Writing $name/MANIFEST
 EONOXSFILES
 
-"-f -n $name -b $thisversion $header", $], <<"EOXSFILES",
+"-f -n $name -b $thisversion $header", $^V, <<"EOXSFILES",
 Writing $name/ppport.h
 Writing $name/lib/$name.pm
 Writing $name/$name.xs
@@ -142,17 +99,17 @@ EOXSFILES
 );
 
 my $total_tests = 3; # opening, closing and deleting the header file.
-for (my $i = $#tests; $i > 0; $i-=3) {
+for (my $i = $#tests; $i +> 0; $i-=3) {
   # 1 test for running it, 1 test for the expected result, and 1 for each file
   # plus 1 to open and 1 to check for the use in lib/$name.pm and Makefile.PL
   # And 1 more for our check for "bonus" files, 2 more for ExtUtil::Manifest.
   # use the () to force list context and hence count the number of matches.
-  $total_tests += 9 + (() = $tests[$i] =~ /(Writing)/sg);
+  $total_tests += 9 + (() = $tests[$i] =~ m/(Writing)/sg);
 }
 
 plan tests => $total_tests;
 
-ok (open (HEADER, ">$header"), "open '$header'");
+ok (open (HEADER, ">", "$header"), "open '$header'");
 print HEADER <<HEADER or die $!;
 #define Camel 2
 #define Dromedary 1
@@ -181,9 +138,9 @@ while (my ($args, $version, $expectation) = splice @tests, 0, 3) {
   my (%got);
   find (sub {$got{$File::Find::name}++ unless -d $_}, $name);
 
-  foreach ($expectation =~ /Writing\s+(\S+)/gm) {
+  foreach ($expectation =~ m/Writing\s+(\S+)/gm) {
     if ($^O eq 'MacOS') {
-      $_ = ':' . join(':',split(/\//,$_));
+      $_ = ':' . join(':',split(m/\//,$_));
       $_ =~ s/$name:t:1.t/$name:t\/1.t/; # is this an h2xs bug?
     }
     if ($^O eq 'VMS') {
@@ -211,11 +168,12 @@ while (my ($args, $version, $expectation) = splice @tests, 0, 3) {
  
   foreach my $leaf (File::Spec->catfile('lib', "$name.pm"), 'Makefile.PL') {
     my $file = File::Spec->catfile($name, $leaf);
-    if (ok (open (FILE, $file), "open $file")) {
-      my $match = qr/use $version;/;
+    if (ok (open (FILE, "<", $file), "open $file")) {
+        require kurila;
+      my $match = qr/use kurila v$kurila::VERSION;/;
       my $found;
-      while (<FILE>) {
-        last if $found = /$match/;
+      while ( ~< *FILE) {
+        last if $found = m/$match/;
       }
       ok ($found, "looking for /$match/ in $file");
       close FILE or die "close $file: $!";

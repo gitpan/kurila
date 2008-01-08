@@ -1,7 +1,7 @@
 package Time::HiRes;
 
 use strict;
-use vars qw($VERSION $XS_VERSION @ISA @EXPORT @EXPORT_OK $AUTOLOAD);
+use vars qw($VERSION $XS_VERSION @ISA @EXPORT @EXPORT_OK);
 
 require Exporter;
 require DynaLoader;
@@ -23,27 +23,9 @@ require DynaLoader;
 		 stat
 		);
 	
-$VERSION = '1.9708';
+$VERSION = v1.9708;
 $XS_VERSION = $VERSION;
 $VERSION = eval $VERSION;
-
-sub AUTOLOAD {
-    my $constname;
-    ($constname = $AUTOLOAD) =~ s/.*:://;
-    # print "AUTOLOAD: constname = $constname ($AUTOLOAD)\n";
-    die "&Time::HiRes::constant not defined" if $constname eq 'constant';
-    my ($error, $val) = constant($constname);
-    # print "AUTOLOAD: error = $error, val = $val\n";
-    if ($error) {
-        my (undef,$file,$line) = caller;
-        die "$error at $file line $line.\n";
-    }
-    {
-	no strict 'refs';
-	*{Symbol::fetch_glob($AUTOLOAD)} = sub { $val };
-    }
-    goto &{Symbol::fetch_glob($AUTOLOAD)};
-}
 
 sub import {
     my $this = shift;

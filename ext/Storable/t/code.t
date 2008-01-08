@@ -14,7 +14,7 @@ sub BEGIN {
 	unshift @INC, 't';
     }
     require Config; Config->import;
-    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bStorable\b/) {
+    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ m/\bStorable\b/) {
         print "1..0 # Skip: Storable was not built\n";
         exit 0;
     }
@@ -32,7 +32,7 @@ BEGIN {
 	exit;
     }
     require File::Spec;
-    if ($File::Spec::VERSION < 0.8) {
+    if ($File::Spec::VERSION +< 0.8) {
 	print "1..0 # Skip: newer File::Spec needed\n";
 	exit 0;
     }
@@ -194,13 +194,13 @@ ok(prototype($thawed->[4]), prototype($obj[0]->[4]));
 
     my $devnull = File::Spec->devnull;
 
-    open(SAVEERR, ">&STDERR");
-    open(STDERR, ">$devnull") or
+    open(SAVEERR, ">&", \*STDERR);
+    open(STDERR, ">", $devnull) or
 	( print SAVEERR "Unable to redirect STDERR: $!\n" and exit(1) );
 
     eval { $freezed = freeze $obj[0]->[0] };
 
-    open(STDERR, ">&SAVEERR");
+    open(STDERR, ">&", \*SAVEERR);
 
     ok($@, "");
     ok($freezed ne '');

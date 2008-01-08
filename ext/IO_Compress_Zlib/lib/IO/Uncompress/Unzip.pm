@@ -7,13 +7,13 @@ use strict ;
 use warnings;
 use bytes;
 
-use IO::Uncompress::RawInflate  2.006 ;
-use IO::Compress::Base::Common  2.006 qw(:Status createSelfTiedObject);
-use IO::Uncompress::Adapter::Identity 2.006 ;
-use IO::Compress::Zlib::Extra 2.006 ;
-use IO::Compress::Zip::Constants 2.006 ;
+use IO::Uncompress::RawInflate  v2.006 ;
+use IO::Compress::Base::Common  v2.006 qw(:Status createSelfTiedObject);
+use IO::Uncompress::Adapter::Identity v2.006 ;
+use IO::Compress::Zlib::Extra v2.006 ;
+use IO::Compress::Zip::Constants v2.006 ;
 
-use Compress::Raw::Zlib  2.006 qw(crc32) ;
+use Compress::Raw::Zlib  v2.006 qw(crc32) ;
 
 BEGIN
 {
@@ -59,7 +59,7 @@ sub unzip
 
 sub getExtraParams
 {
-    use IO::Compress::Base::Common  2.006 qw(:Parse);
+    use IO::Compress::Base::Common  v2.006 qw(:Parse);
 
     
     return (
@@ -131,7 +131,7 @@ sub readHeader
                 my $b;
                 my $status = $self->smartRead(\$b, 1024 * 16);
                 return undef
-                    if $status <= 0 ;
+                    if $status +<= 0 ;
 
                 my $temp_buf;
                 my $out;
@@ -225,10 +225,10 @@ sub chkTrailer
         if ($got == 0) {
             return STATUS_EOF ;
         }
-        elsif ($got < 0) {
+        elsif ($got +< 0) {
             return STATUS_ERROR ;
         }
-        elsif ($got < 4) {
+        elsif ($got +< 4) {
             $self->pushBack($magic)  ;
             return STATUS_OK ;
         }
@@ -443,7 +443,7 @@ sub skipEndCentralDirectory
 sub _isZipMagic
 {
     my $buffer = shift ;
-    return 0 if length $buffer < 4 ;
+    return 0 if length $buffer +< 4 ;
     my $sig = unpack("V", $buffer) ;
     return $sig == ZIP_LOCAL_HDR_SIG ;
 }

@@ -1,12 +1,5 @@
 #!./perl
 
-BEGIN {
-  if ($ENV{PERL_CORE}){
-    chdir('t') if -d 't';
-    @INC = ('.', '../lib');
-  }
-}
-
 use strict;
 
 use Test::More;
@@ -78,7 +71,6 @@ $tests += @neg_time * 12;
 $tests += @bad_time;
 $tests += @years;
 $tests += 10;
-$tests += 2 if $ENV{PERL_CORE};
 $tests += 8 if $ENV{MAINTAINER};
 
 plan tests => $tests;
@@ -92,10 +84,10 @@ for (@time, @neg_time) {
         skip '1970 test on VOS fails.', 12
             if $^O eq 'vos' && $year == 70;
         skip 'this platform does not support negative epochs.', 12
-            if $year < 70 && ! $neg_epoch_ok;
+            if $year +< 70 && ! $neg_epoch_ok;
 
         {
-            my $year_in = $year < 70 ? $year + 1900 : $year;
+            my $year_in = $year +< 70 ? $year + 1900 : $year;
             my $time = timelocal($sec,$min,$hour,$mday,$mon,$year_in);
 
             my($s,$m,$h,$D,$M,$Y) = localtime($time);
@@ -109,7 +101,7 @@ for (@time, @neg_time) {
         }
 
         {
-            my $year_in = $year < 70 ? $year + 1900 : $year;
+            my $year_in = $year +< 70 ? $year + 1900 : $year;
             my $time = timegm($sec,$min,$hour,$mday,$mon,$year_in);
 
             my($s,$m,$h,$D,$M,$Y) = gmtime($time);
@@ -244,16 +236,4 @@ if ($ENV{MAINTAINER}) {
 
     is( ( localtime( timelocal( 0, 0, 2, 27, 2, 2005 ) ) )[2], 2,
         'hour is 2 when given 2:00 AM on Europe/London date change' );
-}
-
-if ($ENV{PERL_CORE}) {
-  package test;
-  require 'timelocal.pl';
-
-  # need to get ok() from main package
-  ::is(timegm(0,0,0,1,0,80), main::timegm(0,0,0,1,0,80),
-     'timegm in timelocal.pl');
-
-  ::is(timelocal(1,2,3,4,5,88), main::timelocal(1,2,3,4,5,88),
-     'timelocal in timelocal.pl');
 }

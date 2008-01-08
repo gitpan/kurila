@@ -1,6 +1,6 @@
 #!./perl
 
-print "1..95\n";
+print "1..94\n";
 
 our ($foo, $fact, $ans, $i, $x, $eval);
 
@@ -16,26 +16,26 @@ print $foo;
 
 print eval '
 $foo =;';		# this tests for a call through yyerror()
-if ($@ =~ /line 2/) {print "ok 5\n";} else {print "not ok 5\n";}
+if ($@ =~ m/line 2/) {print "ok 5\n";} else {print "not ok 5\n";}
 
-print eval '$foo = /';	# this tests for a call through fatal()
-if ($@ =~ /Search/) {print "ok 6\n";} else {print "not ok 6\n";}
+print eval '$foo = m/';	# this tests for a call through fatal()
+if ($@ =~ m/Search/) {print "ok 6\n";} else {print "not ok 6\n";}
 
 print eval '"ok 7\n";';
 
 # calculate a factorial with recursive evals
 
 $foo = 5;
-$fact = 'our @x; if ($foo <= 1) {1;} else {push(@x,$foo--); (eval $fact) * pop(@x);}';
+$fact = 'our @x; if ($foo +<= 1) {1;} else {push(@x,$foo--); (eval $fact) * pop(@x);}';
 $ans = eval $fact;
 if ($ans == 120) {print "ok 8\n";} else {print "not ok 8\n";}
 
 $foo = 5;
-$fact = 'local($foo)=$foo; $foo <= 1 ? 1 : $foo-- * (eval $fact);';
+$fact = 'local($foo)=$foo; $foo +<= 1 ? 1 : $foo-- * (eval $fact);';
 $ans = eval $fact;
 if ($ans == 120) {print "ok 9\n";} else {print "not ok 9 $ans\n";}
 
-open(try,'>Op.eval');
+open(try, ">",'Op.eval');
 print try 'print "ok 10\n"; unlink "Op.eval";',"\n";
 close try;
 
@@ -138,7 +138,7 @@ EOT
 # can recursive subroutine-call inside eval'' see its own lexicals?
 sub recurse {
   my $l = shift;
-  if ($l < $x) {
+  if ($l +< $x) {
      ++$l;
      eval 'print "# level $l\n"; recurse($l);';
      die if $@;
@@ -148,7 +148,7 @@ sub recurse {
   }
 }
 {
-  local $SIG{__WARN__} = sub { die "not ok $x\n" if $_[0] =~ /^Deep recurs/ };
+  local $SIG{__WARN__} = sub { die "not ok $x\n" if $_[0] =~ m/^Deep recurs/ };
   recurse($x-5);
 }
 $x++;
@@ -190,7 +190,7 @@ print $@;
 {
     my $status = eval {
 	eval { die };
-	print "# eval { return } test\n";
+	print "# eval \{ return \} test\n";
 	return; # removing this changes behavior
     };
     print "not " if $@;
@@ -273,7 +273,7 @@ fred2(49);
 sub do_sort {
     my $zzz = 2;
     my @a = sort
-	    { print eval('$zzz') == 2 ? 'ok' : 'not ok', " 51\n"; $a <=> $b }
+	    { print eval('$zzz') == 2 ? 'ok' : 'not ok', " 51\n"; $a <+> $b }
 	    2, 1;
 }
 do_sort();
@@ -286,7 +286,7 @@ eval q{
     sub fred3 {
 	my $l = shift;
 	my $r = -2;
-	return 1 if $l < 1;
+	return 1 if $l +< 1;
 	return 0 if eval '$zzz' != 1;
 	return 0 if       $yyy  != 9;
 	return 0 if eval '$yyy' != 9;
@@ -454,14 +454,6 @@ print "ok $test - eval and last\n"; $test++;
     print "not " unless $@ eq "";
     print "ok $test # eval undef \n"; $test++;
 }
-
-{
-    no warnings;
-    eval "/ /a;";
-    print "not " unless $@ =~ /^syntax error/;
-    print "ok $test # eval syntax error, no warnings \n"; $test++;
-}
-
 
 # a syntax error in an eval called magically 9eg vie tie or overload)
 # resulted in an assertion failure in S_docatch, since doeval had already

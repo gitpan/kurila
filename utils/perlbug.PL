@@ -20,17 +20,17 @@ chdir dirname($0);
 $file = basename($0, '.PL');
 $file .= '.com' if $^O eq 'VMS';
 
-open OUT, ">$file" or die "Can't create $file: $!";
+open OUT, ">", "$file" or die "Can't create $file: $!";
 
 # extract patchlevel.h information
 
-open PATCH_LEVEL, "<" . catfile(updir, "patchlevel.h")
+open PATCH_LEVEL, "<", catfile(updir, "patchlevel.h")
     or die "Can't open patchlevel.h: $!";
 
 my $patchlevel_date = (stat *PATCH_LEVEL)[9];
 
-while (<PATCH_LEVEL>) {
-    last if $_ =~ /^\s*static\s+(?:const\s+)?char.*?local_patches\[\]\s*=\s*{\s*$/;
+while ( ~< *PATCH_LEVEL) {
+    last if $_ =~ m/^\s*static\s+(?:const\s+)?char.*?local_patches\[\]\s*=\s*{\s*$/;
 }
 
 if (! defined($_)) {
@@ -38,8 +38,8 @@ if (! defined($_)) {
 }
 
 my @patches;
-while (<PATCH_LEVEL>) {
-    last if /^\s*}/;
+while ( ~< *PATCH_LEVEL) {
+    last if m/^\s*}/;
     chomp;
     s/^\s+,?\s*"?//;
     s/"?\s*,?$//;
@@ -47,7 +47,7 @@ while (<PATCH_LEVEL>) {
     push @patches, $_ unless $_ eq 'NULL';
 }
 my $patch_desc = "'" . join("',\n    '", @patches) . "'";
-my $patch_tags = join "", map /(\S+)/ ? "+$1 " : (), @patches;
+my $patch_tags = join "", map m/(\S+)/ ? "+$1 " : (), @patches;
 
 close(PATCH_LEVEL) or die "Error closing patchlevel.h: $!";
 
@@ -65,7 +65,7 @@ my $extract_version = sprintf("%vd", $^V);
 
 print OUT <<"!GROK!THIS!";
 $Config{startperl}
-    eval 'exec $Config{perlpath} -S \$0 \${1+"\$@"}'
+    eval 'exec $Config{perlpath} -S \$0 \$\{1+"\$@"\}'
 	if \$running_under_some_shell;
 
 my \$config_tag1 = '$extract_version - $Config{cf_time}';
@@ -228,7 +228,7 @@ sub Init {
 
     @ARGV = split m/\s+/,
         MacPerl::Ask('Provide command-line args here (-h for help):')
-        if $Is_MacOS && $MacPerl::Version =~ /App/;
+        if $Is_MacOS && $MacPerl::Version =~ m/App/;
 
     if (!getopts("Adhva:s:b:f:F:r:e:SCc:to:n:")) { Help(); exit; };
 
@@ -466,7 +466,7 @@ EOF
 	}
     }
 
-    $cc = '' if $cc =~ /^(none|yourself|me|myself|ourselves)$/i;
+    $cc = '' if $cc =~ m/^(none|yourself|me|myself|ourselves)$/i;
     $andcc = " and $cc" if $cc;
 
     # Prompt for editor, if no override is given
@@ -746,9 +746,9 @@ I am sorry but it looks like you did not report anything.
 EOF
 	print "Action (Retry Edit/Cancel) ";
 	my ($action) = scalar(<>);
-	if ($action =~ /^[re]/i) { # <R>etry <E>dit
+	if ($action =~ m/^[re]/i) { # <R>etry <E>dit
 	    goto tryagain;
-	} elsif ($action =~ /^[cq]/i) { # <C>ancel, <Q>uit
+	} elsif ($action =~ m/^[cq]/i) { # <C>ancel, <Q>uit
 	    Cancel();
 	}
     }
@@ -776,7 +776,7 @@ EOF
 	    my $action = scalar <>;
 	    chomp $action;
 
-	    if ($action =~ /^(f|sa)/i) { # <F>ile/<Sa>ve
+	    if ($action =~ m/^(f|sa)/i) { # <F>ile/<Sa>ve
 		my $file_save = $outfile || "perlbug.rep";
 		print "\n\nName of file to save message in [$file_save]: ";
 		my $file = scalar <>;
@@ -799,12 +799,12 @@ EOF
 
 		print "\nMessage saved in `$file'.\n";
 		exit;
-	    } elsif ($action =~ /^(d|l|sh)/i ) { # <D>isplay, <L>ist, <Sh>ow
+	    } elsif ($action =~ m/^(d|l|sh)/i ) { # <D>isplay, <L>ist, <Sh>ow
 		# Display the message
 		open(REP, "<$filename") or die "Couldn't open file `$filename': $!\n";
 		while (<REP>) { print $_ }
 		close(REP) or die "Error closing report file `$filename': $!";
-	    } elsif ($action =~ /^su/i) { # <Su>bject
+	    } elsif ($action =~ m/^su/i) { # <Su>bject
 		print "Subject: $subject\n";
 		print "If the above subject is fine, just press Enter.\n";
 		print "If not, type in the new subject.\n";
@@ -817,7 +817,7 @@ EOF
 			print "Subject: $subject\n";
 		    }
 		}
-	    } elsif ($action =~ /^se/i) { # <S>end
+	    } elsif ($action =~ m/^se/i) { # <S>end
 		# Send the message
 		print "Are you certain you want to send this message?\n"
 		    . 'Please type "yes" if you are: ';
@@ -832,12 +832,12 @@ your message should be sent, type in "yes" (without the quotes) at the
 confirmation prompt.
 EOF
 		}
-	    } elsif ($action =~ /^[er]/i) { # <E>dit, <R>e-edit
+	    } elsif ($action =~ m/^[er]/i) { # <E>dit, <R>e-edit
 		# edit the message
 		Edit();
-	    } elsif ($action =~ /^[qc]/i) { # <C>ancel, <Q>uit
+	    } elsif ($action =~ m/^[qc]/i) { # <C>ancel, <Q>uit
 		Cancel();
-	    } elsif ($action =~ /^s/i) {
+	    } elsif ($action =~ m/^s/i) {
 		paraprint <<EOF;
 I'm sorry, but I didn't understand that. Please type "send" or "save".
 EOF
@@ -882,14 +882,14 @@ sub Send {
 
 	print "\nMessage sent.\n";
     } elsif ($Is_VMS) {
-	if ( ($address =~ /@/ and $address !~ /^\w+%"/) or
-	     ($cc      =~ /@/ and $cc      !~ /^\w+%"/) ) {
+	if ( ($address =~ m/@/ and $address !~ /^\w+%"/) or
+	     ($cc      =~ m/@/ and $cc      !~ /^\w+%"/) ) {
 	    my $prefix;
 	    foreach (qw[ IN MX SMTP UCX PONY WINS ], '') {
 		$prefix = "$_%", last if $ENV{"MAIL\$PROTOCOL_$_"};
 	    }
-	    $address = qq[${prefix}"$address"] unless $address =~ /^\w+%"/;
-	    $cc = qq[${prefix}"$cc"] unless !$cc || $cc =~ /^\w+%"/;
+	    $address = qq[${prefix}"$address"] unless $address =~ m/^\w+%"/;
+	    $cc = qq[${prefix}"$cc"] unless !$cc || $cc =~ m/^\w+%"/;
 	}
 	$subject =~ s/"/""/g; $address =~ s/"/""/g; $cc =~ s/"/""/g;
 	my $sts = system(qq[mail/Subject="$subject" $filename. "$address","$cc"]);

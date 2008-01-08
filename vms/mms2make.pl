@@ -21,12 +21,12 @@
 #  2.2  29-Jan-1996  Charles Bailey  bailey@newman.upenn.edu
 #    - Fix output file name to work under Unix
 
-if ($#ARGV > -1 && $ARGV[0] =~ /^[\-\/]trim/i) {
+if ($#ARGV +> -1 && $ARGV[0] =~ m/^[\-\/]trim/i) {
   $do_trim = 1;
   shift @ARGV;
 }
-$infile  = $#ARGV > -1 ? shift(@ARGV) : "Descrip.MMS";
-$outfile = $#ARGV > -1 ? shift(@ARGV) : "Makefile";
+$infile  = $#ARGV +> -1 ? shift(@ARGV) : "Descrip.MMS";
+$outfile = $#ARGV +> -1 ? shift(@ARGV) : "Makefile";
 
 # set any other args in %macros - set VAXC by default
 foreach (@ARGV) { $macros{"\U$_"}=1 }
@@ -38,24 +38,24 @@ $macros{"DECC"} = 1 if $macros{"__AXP__"};
 # [lazy - saves having to check for empty array - just test [0]==1]
 @conditions = (1);
 
-open(INFIL,$infile) || die "Can't open $infile: $!\n"; 
-open(OUTFIL,">$outfile") || die "Can't open $outfile: $!\n"; 
+open(INFIL, "<",$infile) || die "Can't open $infile: $!\n"; 
+open(OUTFIL, ">","$outfile") || die "Can't open $outfile: $!\n"; 
 
 print OUTFIL "#> This file produced from $infile by $0\n";
 print OUTFIL "#> Lines beginning with \"#>\" were commented out during the\n";
 print OUTFIL "#> conversion process.  For more information, see $0\n";
 print OUTFIL "#>\n";
 
-while (<INFIL>) {
-  s/$infile/$outfile/eoi;
-  if (/^\#/) { 
-    if (!/^\#\:/) {print OUTFIL;}
+while ( ~< *INFIL) {
+  s/$infile/{$outfile}/oi;
+  if (m/^\#/) { 
+    if (!m/^\#\:/) {print OUTFIL;}
     next;
   }
 
 # look for ".ifdef macro" and push 1 or 0 to head of @conditions
 # push 0 if we are in false branch of another if
-  if (/^\.ifdef\s*(.+)/i)
+  if (m/^\.ifdef\s*(.+)/i)
   {
      print OUTFIL "#> ",$_ unless $do_trim;
      unshift @conditions, ($macros{"\U$1"} ? $conditions[0] : 0);
@@ -63,7 +63,7 @@ while (<INFIL>) {
   }
 
 # reverse $conditions[0] for .else provided surrounding if is active
-  if (/^\.else/i)
+  if (m/^\.else/i)
   {
       print OUTFIL "#> ",$_ unless $do_trim;
       $conditions[0] = $conditions[1] && !$conditions[0];
@@ -71,7 +71,7 @@ while (<INFIL>) {
   }
 
 # pop top condition for .endif
-  if (/^\.endif/i)
+  if (m/^\.endif/i)
   {
      print OUTFIL "#> ",$_ unless $do_trim;
      shift @conditions;
@@ -82,8 +82,8 @@ while (<INFIL>) {
 
 # spot new rule and pick up first source file, since some versions of
 # Make don't provide a macro for this
-  if (/[^#!]*:\s+/) {
-    if (/:\s+([^\s,]+)/) { $firstsrc = $1 }
+  if (m/[^#!]*:\s+/) {
+    if (m/:\s+([^\s,]+)/) { $firstsrc = $1 }
     else { $firstsrc = "\$<" }
   }
 
@@ -98,7 +98,7 @@ while (<INFIL>) {
                            # someday, check for "" and skip contents
       last if $end;
       print OUTFIL $conditions[0] ? "#> " : "",$_;
-      $_ = <INFIL>;
+      $_ = ~< *INFIL;
       m#(.*)(\$\(MACROEND\))?#;
     }
   }

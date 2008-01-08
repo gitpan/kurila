@@ -81,7 +81,7 @@ EOM
                 }
                 elsif ($fb eq 'filehandle')
                 {
-                    $output = 'IO::File'->new( ">$name") ;
+                    $output = 'IO::File'->new( "$name", ">") ;
                 }
                 else
                 {
@@ -105,7 +105,7 @@ EOM
                     $cc = $output ;
                     if ($fb eq 'filehandle')
                     {
-                        $cc = 'IO::File'->new( "<$name") ;
+                        $cc = 'IO::File'->new( "$name", "<") ;
                     }
                     my @opts = $unc ne $UncompressClass 
                                     ? (RawInflate => 1)
@@ -121,7 +121,7 @@ EOM
                     isa_ok $gz, $UncompressClass, '    $gz' ;
 
                     my $un = '';
-                    1 while $gz->read($un) > 0 ;
+                    1 while $gz->read($un) +> 0 ;
                     #print "[[$un]]\n" while $gz->read($un) > 0 ;
                     ok ! $gz->error(), "      ! error()"
                         or diag "Error is " . $gz->error() ;
@@ -140,7 +140,7 @@ EOM
                     $cc = $output ;
                     if ($fb eq 'filehandle')
                     {
-                        $cc = 'IO::File'->new( "<$name") ;
+                        $cc = 'IO::File'->new( "$name", "<") ;
                     }
                     my @opts = $unc ne $UncompressClass 
                                     ? (RawInflate => 1)

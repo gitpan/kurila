@@ -25,7 +25,7 @@ $VERSION = eval $VERSION;
 sub DIR_UNLINK () { 1 }
 
 sub new {
-    @_ >= 1 && @_ <= 2 or croak 'usage: new IO::Dir [DIRNAME]';
+    @_ +>= 1 && @_ +<= 2 or croak 'usage: new IO::Dir [DIRNAME]';
     my $class = shift;
     my $dh = gensym;
     if (@_) {
@@ -48,7 +48,7 @@ sub open {
 	unless opendir($dh, $dirname);
     # a dir name should always have a ":" in it; assume dirname is
     # in current directory
-    $dirname = ':' .  $dirname if ( ($^O eq 'MacOS') && ($dirname !~ /:/) );
+    $dirname = ':' .  $dirname if ( ($^O eq 'MacOS') && ($dirname !~ m/:/) );
     ${*$dh}{io_dir_path} = $dirname;
     1;
 }

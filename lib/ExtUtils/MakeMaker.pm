@@ -19,8 +19,8 @@ use vars qw(
 use vars qw($Revision);
 use strict;
 
-$VERSION = '6.36_01';
-($Revision) = q$Revision: 32261 $ =~ /Revision:\s+(\S+)/;
+$VERSION = v6.36_01;
+($Revision) = q$Revision: 32261 $ =~ m/Revision:\s+(\S+)/;
 
 @ISA = qw(Exporter);
 @EXPORT = qw(&WriteMakefile &writeMakefile $Verbose &prompt);
@@ -101,7 +101,6 @@ my %Special_Sigs = (
  postamble  => 'HASH',
  realclean  => 'HASH',
  test       => 'HASH',
- tool_autosplit => 'HASH',
 );
 
 @Att_Sigs{keys %Recognized_Att_Keys} = ('') x keys %Recognized_Att_Keys;
@@ -160,7 +159,7 @@ sub prompt ($;$) {
         print "$def\n";
     }
     else {
-        $ans = <STDIN>;
+        $ans = ~< *STDIN;
         if( defined $ans ) {
             chomp $ans;
         }
@@ -245,7 +244,6 @@ sub full_setup {
     PPM_INSTALL_SCRIPT PREREQ_FATAL PREREQ_PM PREREQ_PRINT PRINT_PREREQ
     SIGN SKIP TYPEMAPS VERSION VERSION_FROM XS XSOPT XSPROTOARG
     XS_VERSION clean depend dist dynamic_lib linkext macro realclean
-    tool_autosplit
 
     MACPERL_SRC MACPERL_LIB MACLIBS_68K MACLIBS_PPC MACLIBS_SC MACLIBS_MRC
     MACLIBS_ALL_68K MACLIBS_ALL_PPC MACLIBS_SHARED
@@ -266,7 +264,7 @@ sub full_setup {
         qw(
 
  post_initialize const_config constants platform_constants 
- tool_autosplit tool_xsubpp tools_other 
+ tool_xsubpp tools_other 
 
  makemakerdflt
 
@@ -319,15 +317,15 @@ sub full_setup {
           );
 
     # 5.5.3 doesn't have any concept of vendor libs
-    push @Get_from_Config, qw( vendorarchexp vendorlibexp ) if $] >= 5.006;
+    push @Get_from_Config, qw( vendorarchexp vendorlibexp );
 
     foreach my $item (@attrib_help){
         $Recognized_Att_Keys{$item} = 1;
     }
     foreach my $item (@Get_from_Config) {
         $Recognized_Att_Keys{uc $item} = $Config{$item};
-        print "Attribute '\U$item\E' => '$Config{$item}'\n"
-            if ($Verbose >= 2);
+        print "Attribute '".uc($item)."' => '$Config{$item}'\n"
+            if ($Verbose +>= 2);
     }
 
     #
@@ -371,14 +369,14 @@ sub new {
         $self->{ARGS}{$k} = $self->{$k};
     }
 
-    if ("@ARGV" =~ /\bPREREQ_PRINT\b/) {
+    if ("@ARGV" =~ m/\bPREREQ_PRINT\b/) {
         require Data::Dumper;
         print Data::Dumper->Dump([$self->{PREREQ_PM}], [qw(PREREQ_PM)]);
         exit 0;
     }
 
     # PRINT_PREREQ is RedHatism.
-    if ("@ARGV" =~ /\bPRINT_PREREQ\b/) {
+    if ("@ARGV" =~ m/\bPRINT_PREREQ\b/) {
         print join(" ", map { "perl($_)>=$self->{PREREQ_PM}->{$_} " } 
                         sort keys %{$self->{PREREQ_PM}}), "\n";
         exit 0;
@@ -414,7 +412,7 @@ sub new {
               $prereq, $self->{PREREQ_PM}{$prereq} 
                    unless $self->{PREREQ_FATAL};
             $unsatisfied{$prereq} = 'not installed';
-        } elsif ($pr_version < $self->{PREREQ_PM}->{$prereq} ){
+        } elsif ($pr_version +< $self->{PREREQ_PM}->{$prereq} ){
             warn sprintf "Warning: prerequisite %s %s not found. We have %s.\n",
               $prereq, $self->{PREREQ_PM}{$prereq}, 
                 ($pr_version || 'unknown version') 
@@ -433,7 +431,7 @@ sub new {
     }
 
     # This is for old Makefiles written pre 5.00, will go away
-    if ( Carp::longmess("") =~ /runsubdirpl/s ){
+    if ( Carp::longmess("") =~ m/runsubdirpl/s ){
         Carp::carp("WARNING: Please rerun 'perl Makefile.PL' to regenerate your Makefiles\n");
     }
 
@@ -441,7 +439,7 @@ sub new {
     local @Parent = @Parent;    # Protect against non-local exits
     {
         no strict 'refs';
-        print "Blessing Object into class [$newclass]\n" if $Verbose>=2;
+        print "Blessing Object into class [$newclass]\n" if $Verbose+>=2;
         mv_all_methods("MY",$newclass);
         bless $self, $newclass;
         push @Parent, $self;
@@ -461,7 +459,7 @@ sub new {
 
             $self->{$key} = $self->{PARENT}{$key};
 
-            unless ($Is_VMS && $key =~ /PERL$/) {
+            unless ($Is_VMS && $key =~ m/PERL$/) {
                 $self->{$key} = $self->catdir("..",$self->{$key})
                   unless $self->file_name_is_absolute($self->{$key});
             } else {
@@ -470,9 +468,9 @@ sub new {
                 # specification under VMS.  So, don't turn the command
                 # into a filespec, but do add a level to the path of
                 # the argument if not already absolute.
-                my @cmd = split /\s+/, $self->{$key};
+                my @cmd = split m/\s+/, $self->{$key};
                 $cmd[1] = $self->catfile('[-]',$cmd[1])
-                  unless (@cmd < 2) || $self->file_name_is_absolute($cmd[1]);
+                  unless (@cmd +< 2) || $self->file_name_is_absolute($cmd[1]);
                 $self->{$key} = join(' ', @cmd);
             }
         }
@@ -487,7 +485,7 @@ sub new {
                     }
             }
         }
-        my @fm = grep /^FIRST_MAKEFILE=/, @ARGV;
+        my @fm = grep m/^FIRST_MAKEFILE=/, @ARGV;
         parse_args($self,@fm) if @fm;
     } else {
         parse_args($self,split(' ', $ENV{PERL_MM_OPT} || ''),@ARGV);
@@ -585,7 +583,7 @@ END
 
 #   MakeMaker 'CONFIGURE' Parameters:
 END
-        if (scalar(keys %configure_att) > 0) {
+        if (scalar(keys %configure_att) +> 0) {
             foreach my $key (sort keys %configure_att){
                next if $key eq 'ARGS';
                my($v) = neatvalue($configure_att{$key});
@@ -625,7 +623,7 @@ END
         my $method = $section;
         $method .= '_target' unless $self->can($method);
 
-        print "Processing Makefile '$section' section\n" if ($Verbose >= 2);
+        print "Processing Makefile '$section' section\n" if ($Verbose +>= 2);
         my($skipit) = $self->skipcheck($section);
         if ($skipit){
             push @{$self->{RESULT}}, "\n# --- MakeMaker $section section $skipit.";
@@ -656,7 +654,7 @@ sub WriteEmptyMakefile {
     if ( -f $new ) {
         _rename($new, $old) or warn "rename $new => $old: $!"
     }
-    open MF, '>'.$new or die "open $new for write: $!";
+    open MF, ">", ''.$new or die "open $new for write: $!";
     print MF <<'EOP';
 all:
 
@@ -698,10 +696,10 @@ sub parse_args{
         my($name, $value) = ($1, $2);
         if ($value =~ m/^~(\w+)?/) { # tilde with optional username
             $value =~ s [^~(\w*)]
-                [$1 ?
+                [{$1 ?
                  ((getpwnam($1))[7] || "~$1") :
                  (getpwuid($>))[7]
-                 ]ex;
+                 }]x;
         }
 
         # Remember the original args passed it.  It will be useful later.
@@ -723,7 +721,7 @@ sub parse_args{
     if (defined $self->{ARMAYBE}){
         my($armaybe) = $self->{ARMAYBE};
         print STDOUT "ARMAYBE => '$armaybe' should be changed to:\n",
-                        "\t'dynamic_lib' => {ARMAYBE => '$armaybe'}\n";
+                        "\t'dynamic_lib' => \{ARMAYBE => '$armaybe'\}\n";
         my(%dl) = %{$self->{dynamic_lib} || {}};
         $self->{dynamic_lib} = { %dl, ARMAYBE => $armaybe};
         delete $self->{ARMAYBE};
@@ -817,7 +815,7 @@ sub mv_all_methods {
 
     local $SIG{__WARN__} = sub { 
         # can't use 'no warnings redefined', 5.6 only
-        warn @_ unless $_[0] =~ /^Subroutine .* redefined/ 
+        warn @_ unless $_[0] =~ m/^Subroutine .* redefined/ 
     };
     foreach my $method (@Overridable) {
 
@@ -843,7 +841,7 @@ sub mv_all_methods {
         # %MY:: being intact, we have to fill the hole with an
         # inheriting method:
 
-        eval "package MY; sub $method { shift->SUPER::$method(\@_); }";
+        eval "package MY; sub $method \{ shift->SUPER::$method(\@_); \}";
     }
 
     # We have to clean out %INC also, because the current directory is
@@ -899,7 +897,7 @@ sub flush {
     print STDOUT "Writing $finalname for $self->{NAME}\n";
 
     unlink($finalname, "MakeMaker.tmp", $Is_VMS ? 'Descrip.MMS' : ());
-    open(FH,">MakeMaker.tmp") or die "Unable to open MakeMaker.tmp: $!";
+    open(FH,">", "MakeMaker.tmp") or die "Unable to open MakeMaker.tmp: $!";
 
     for $chunk (@{$self->{RESULT}}) {
         print FH "$chunk\n";
@@ -979,7 +977,7 @@ sub neatvalue {
         last unless defined $key; # cautious programming in case (undef,undef) is true
         push(@m,"$key=>".neatvalue($val)) ;
     }
-    return "{ ".join(', ',@m)." }";
+    return "\{ ".join(', ',@m)." \}";
 }
 
 sub selfdocument {
@@ -988,7 +986,7 @@ sub selfdocument {
     if ($Verbose){
         push @m, "\n# Full list of MakeMaker attribute values:";
         foreach my $key (sort keys %$self){
-            next if $key eq 'RESULT' || $key =~ /^[A-Z][a-z]/;
+            next if $key eq 'RESULT' || $key =~ m/^[A-Z][a-z]/;
             my($v) = neatvalue($self->{$key});
             $v =~ s/(CODE|HASH|ARRAY|SCALAR)\([\dxa-f]+\)/$1\(...\)/;
             $v =~ tr/\n/ /s;
@@ -1181,7 +1179,7 @@ recommend you use that instead.
 Another way to specify many INSTALL directories with a single
 parameter is LIB.
 
-    perl Makefile.PL LIB=~/lib
+    perl Makefile.PL LIB=~m/lib
 
 This will install the module's architecture-independent files into
 ~/lib, the architecture-dependent files into ~/lib/$archname.
@@ -1429,7 +1427,7 @@ Something like C<"-DHAVE_UNISTD_H">
 
 This is the root directory into which the code will be installed.  It
 I<prepends itself to the normal prefix>.  For example, if your code
-would normally go into F</usr/local/lib/perl> you could set DESTDIR=~/tmp/
+would normally go into F</usr/local/lib/perl> you could set DESTDIR=~m/tmp/
 and installation would go into F<~/tmp/usr/local/lib/perl>.
 
 This is primarily of use for people who repackage Perl modules.
@@ -2316,10 +2314,6 @@ Anything put here will be passed to MY::postamble() if you have one.
 =item test
 
   {TESTS => 't/*.t'}
-
-=item tool_autosplit
-
-  {MAXLEN => 8}
 
 =back
 

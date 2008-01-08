@@ -16,7 +16,7 @@ use overload (
 '+'	=>	sub { Oscalar->new( $ {$_[0]}+$_[1])},
 '-'	=>	sub { Oscalar->new(
 		       $_[2]? $_[1]-${$_[0]} : ${$_[0]}-$_[1])},
-'<=>'	=>	sub { Oscalar->new(
+'<+>'	=>	sub { Oscalar->new(
 		       $_[2]? $_[1]-${$_[0]} : ${$_[0]}-$_[1])},
 'cmp'	=>	sub { Oscalar->new(
 		       $_[2]? ($_[1] cmp ${$_[0]}) : (${$_[0]} cmp $_[1]))},
@@ -29,9 +29,8 @@ use overload (
 '**'	=>	sub { Oscalar->new(
 		       $_[2]? $_[1]**${$_[0]} : ${$_[0]}-$_[1])},
 
-qw(
-""	stringify
-0+	numify)			# Order of arguments insignificant
+'""'	=> \&stringify,
+'0+'	=> \&numify,			# Order of arguments insignificant
 );
 
 sub new {
@@ -47,7 +46,7 @@ sub numify { 0 + "${$_[0]}" }	# Not needed, additional overhead
 package main;
 
 $| = 1;
-use Test::More tests => 535;
+use Test::More tests => 548;
 
 
 $a = Oscalar->new( "087");
@@ -281,40 +280,12 @@ is("b${a}c", "bxxc");
 $na = eval { ^~^$a };
 like($@, qr/no method found/);
 
-# Check AUTOLOADING:
+eval "package Oscalar; sub numify \{ return '_!_' . shift() . '_!_' \} use overload '0+' => \\&numify";
+is $@, '';
+eval "package Oscalar; sub rshft \{ return '_!_' . shift() . '_!_' \} use overload '>>' => \\&rshft";
+is $@, '';
 
-*Oscalar::AUTOLOAD = 
-  sub { *{Symbol::fetch_glob("Oscalar::$AUTOLOAD")} = sub {"_!_" . shift() . "_!_"} ;
-	goto &{Symbol::fetch_glob("Oscalar::$AUTOLOAD")}};
-
-eval "package Oscalar; sub comple; use overload '^~^' => 'comple'";
-
-$na = eval { ^~^$a };		# Hash was not updated
-like($@, qr/no method found/);
-
-bless \$x, 'Oscalar';
-
-$na = eval { ^~^$a };		# Hash updated
-warn "`$na', $@" if $@;
-ok !$@;
-is($na, '_!_xx_!_');
-
-$na = 0;
-
-$na = eval { ^~^$aI };		# Hash was not updated
-like($@, qr/no method found/);
-
-bless \$x, 'OscalarI';
-
-$na = eval { ^~^$aI };
-print $@;
-
-ok(!$@);
-is($na, '_!_xx_!_');
-
-eval "package Oscalar; sub rshft; use overload '>>' => 'rshft'";
-
-$na = eval { $aI >> 1 };	# Hash was not updated
+$na = eval { $aI >> 1 };       # Hash was not updated
 like($@, qr/no method found/);
 
 bless \$x, 'OscalarI';
@@ -334,26 +305,10 @@ ok(overload::Overloaded($aI));
 ok(!overload::Overloaded('overload'));
 
 ok(! defined overload::Method($aI, '<<'));
-ok(! defined overload::Method($a, '<'));
+ok(! defined overload::Method($a, '+<'));
 
 like (overload::StrVal($aI), qr/^OscalarI=SCALAR\(0x[\da-fA-F]+\)$/);
 is(overload::StrVal(\$aI), "@{[\$aI]}");
-
-# Check overloading by methods (specified deep in the ISA tree).
-{
-  package OscalarII;
-  @ISA = 'OscalarI';
-  sub Oscalar::lshft {"_<<_" . shift() . "_<<_"}
-  eval "package OscalarI; use overload '<<' => 'lshft', '^|^' => 'lshft'";
-}
-
-$aaII = "087";
-$aII = \$aaII;
-bless $aII, 'OscalarII';
-bless \$fake, 'OscalarI';		# update the hash
-is(($aI ^|^ 3), '_<<_xx_<<_');
-# warn $aII << 3;
-is(($aII << 3), '_<<_087_<<_');
 
 {
   BEGIN { $int = 7; overload::constant 'integer' => sub {$int++; shift}; }
@@ -363,20 +318,20 @@ is($int, 9);
 is($out, 1024);
 
 $foo = 'foo';
-$foo1 = 'f\'o\\o';
+$foo1 = q|f'o\\o|;
 {
   BEGIN { $q = $qr = 7; 
 	  overload::constant 'q' => sub {$q++; push @q, shift, ($_[1] || 'none'); shift},
 			     'qr' => sub {$qr++; push @qr, shift, ($_[1] || 'none'); shift}; }
   $out = 'foo';
-  $out1 = 'f\'o\\o';
+  $out1 = q|f'o\\o|;
   $out2 = "a\a$foo,\,";
-  /b\b$foo.\./;
+  m/b\b$foo.\./;
 }
 
 is($out, 'foo');
 is($out, $foo);
-is($out1, 'f\'o\\o');
+is($out1, q|f'o\\o|);
 is($out1, $foo1);
 is($out2, "a\afoo,\,");
 is("@q", "foo q f'o\\\\o q a\\a qq ,\\, qq");
@@ -389,9 +344,9 @@ is($qr, 9);
   BEGIN { overload::constant 'q' => sub {push @q1, shift, ($_[1] || 'none'); "_<" . (shift) . ">_"},
 			     'qr' => sub {push @qr1, shift, ($_[1] || 'none'); "!<" . (shift) . ">!"}; }
   $out = 'foo';
-  $out1 = 'f\'o\\o';
+  $out1 = q|f'o\\o|;
   $out2 = "a\a$foo,\,";
-  $res = /b\b$foo.\./;
+  $res = m/b\b$foo.\./;
   $a = <<EOF;
 oups
 EOF
@@ -403,14 +358,10 @@ EOF
   s/yet another/tail here/;
   tr/A-Z/a-z/;
 }
-
-is($out, '_<foo>_');
-is($out1, '_<f\'o\\o>_');
-is($out2, "_<a\a>_foo_<,\,>_");
-is("@q1", "foo q f'o\\\\o q a\\a qq ,\\, qq oups
+ is($out, '_<foo>_'); is($out1, q|_<f'o\\o>_|); is($out2, "_<a\a>_foo_<,\,>_"); is("@q1", "foo q f'o\\\\o q a\\a qq ,\\, qq oups
  qq oups1
- q second part q tail here s A-Z tr a-z tr");
-is("@qr1", "b\\b qq .\\. qq try it q first part q yet another qq");
+ q second part s tail here s A-Z tr a-z tr");
+is("@qr1", "b\\b qq .\\. qq try it qq first part qq yet another qq");
 is($res, 1);
 is($a, "_<oups
 >_");
@@ -449,14 +400,14 @@ is($b, "_<oups1
   } 
   my %subr = ( 'n' => sub {$_[0]} );
   foreach my $op (split " ", $overload::ops{with_assign}) {
-    $subr{$op} = $subr{"$op="} = eval "sub {shift() $op shift()}";
+    $subr{$op} = $subr{"$op="} = eval "sub \{shift() $op shift()\}";
   }
   my @bins = qw(binary 3way_comparison num_comparison str_comparison);
   foreach my $op (split " ", "@overload::ops{ @bins }") {
-    $subr{$op} = eval "sub {shift() $op shift()}";
+    $subr{$op} = eval "sub \{shift() $op shift()\}";
   }
   foreach my $op (split " ", "@overload::ops{qw(unary func)}") {
-    $subr{$op} = eval "sub {$op shift()}";
+    $subr{$op} = eval "sub \{$op shift()\}";
   }
   $subr{'++'} = $subr{'+'};
   $subr{'--'} = $subr{'-'};
@@ -570,14 +521,14 @@ is($b, "_<oups1
   } 
   my %subr = ( 'n' => sub {$_[0]} );
   foreach my $op (split " ", $overload::ops{with_assign}) {
-    $subr{$op} = $subr{"$op="} = eval "sub {shift() $op shift()}";
+    $subr{$op} = $subr{"$op="} = eval "sub \{shift() $op shift()\}";
   }
   my @bins = qw(binary 3way_comparison num_comparison str_comparison);
   foreach my $op (split " ", "@overload::ops{ @bins }") {
-    $subr{$op} = eval "sub {shift() $op shift()}";
+    $subr{$op} = eval "sub \{shift() $op shift()\}";
   }
   foreach my $op (split " ", "@overload::ops{qw(unary func)}") {
-    $subr{$op} = eval "sub {$op shift()}";
+    $subr{$op} = eval "sub \{$op shift()\}";
   }
   $subr{'++'} = $subr{'+'};
   $subr{'--'} = $subr{'-'};
@@ -674,14 +625,14 @@ is($b, "_<oups1
   my $seven = two_face->new("vii", 7);
   is((sprintf "seven=$seven, seven=%d, eight=%d", $seven, $seven+1),
 	'seven=vii, seven=7, eight=8');
-  is(scalar ($seven =~ /i/), '1');
+  is(scalar ($seven =~ m/i/), '1');
 }
 
 {
   package sorting;
   use overload 'cmp' => \&comp;
   sub new { my ($p, $v) = @_; bless \$v, $p }
-  sub comp { my ($x,$y) = @_; ($$x * 3 % 10) <=> ($$y * 3 % 10) or $$x cmp $$y }
+  sub comp { my ($x,$y) = @_; ($$x * 3 % 10) <+> ($$y * 3 % 10) or $$x cmp $$y }
 }
 {
   my @arr = map sorting->new($_), 0..12;
@@ -693,7 +644,7 @@ is($b, "_<oups1
   package iterator;
   use overload '<>' => \&iter;
   sub new { my ($p, $v) = @_; bless \$v, $p }
-  sub iter { my ($x) = @_; return undef if $$x < 0; return $$x--; }
+  sub iter { my ($x) = @_; return undef if $$x +< 0; return $$x--; }
 }
 
 # XXX iterator overload not intended to work with CORE::GLOBAL?
@@ -711,7 +662,7 @@ else {
   $iter = iterator->new(5);
   is(scalar glob("${iter}"), '5');
   $acc = '';
-  $acc .= " $out" while $out = <$iter>;
+  $acc .= " $out" while $out = ~< $iter;
   is($acc, ' 4 3 2 1 0');
 }
 {
@@ -766,7 +717,7 @@ else {
   is(&$deref(6), 40);
   sub xxx_goto { goto &$deref }
   is(xxx_goto(7), 41);
-  my $srt = bless { c => sub {$b <=> $a}
+  my $srt = bless { c => sub {$b <+> $a}
 		  }, 'deref';
   *srt = \&$srt;
   my @sorted = sort srt 11, 2, 5, 1, 22;
@@ -994,7 +945,7 @@ unless ($aaa) {
                fallback => 1;
   my $x = bless([]);
   # For some reason beyond me these have to be oks rather than likes.
-  main::ok("$x" =~ /Recurse=ARRAY/);
+  main::ok("$x" =~ m/Recurse=ARRAY/);
   main::ok($x);
   main::ok($x+0 =~ qr/Recurse=ARRAY/);
 }
@@ -1046,9 +997,8 @@ sub new
 package main;
 
 
-my $utfvar = utf8_o->new( 200.2.1);
-is("$utfvar", 200.2.1); # 223 - stringify
-is("a$utfvar", "a".200.2.1); # 224 - overload via sv_2pv_flags
+my $utfvar = utf8_o->new( "\x{c8}\x{2}\x{1}");
+is("$utfvar", "\x{c8}\x{2}\x{1}"); # 223 - stringify
 
 # 225..227 -- more %{} tests.  Hangs in 5.6.0, okay in later releases.
 # Basically this example implements strong encapsulation: if Hderef::import()
@@ -1098,7 +1048,7 @@ like ($@, qr/zap/);
 
 {
     package Numify;
-    use overload (qw(0+ numify fallback 1));
+    use overload ('0+' => \&numify, fallback => 1);
 
     sub new {
 	my $val = $_[1];
@@ -1135,7 +1085,7 @@ my ($two, $one, $un, $deux) = map {Numify->new( $_)} 2, 1, 1, 2;
 my ($ein, $zwei) = (1, 2);
 
 my %map = (one => 1, un => 1, ein => 1, deux => 2, two => 2, zwei => 2);
-foreach my $op (qw(<=> == != < <= > >=)) {
+foreach my $op (qw(<+> == != +< +<= +> +>=)) {
     foreach my $l (keys %map) {
 	foreach my $r (keys %map) {
 	    my $ocode = "\$$l $op \$$r";
@@ -1382,7 +1332,7 @@ foreach my $op (qw(<=> == != < <= > >=)) {
     package numify_other;
     use overload "0+" => sub { $_[0][0]++; $_[0][1] = bless [], 'numify_int' };
     package numify_by_fallback;
-    use overload "-" => sub { 1 }, fallback => 1;
+    use overload fallback => 1;
 
     package main;
     my $o = bless [], 'numify_int';
@@ -1402,4 +1352,27 @@ foreach my $op (qw(<=> == != < <= > >=)) {
 
     my $m = bless $aref, 'numify_by_fallback';
     is(int($m), $num_val, 'numifies to usual reference value');
+    is(abs($m), $num_val, 'numifies to usual reference value');
+    is(-$m, -$num_val, 'numifies to usual reference value');
+    is(0+$m, $num_val, 'numifies to usual reference value');
+    is($m+0, $num_val, 'numifies to usual reference value');
+    is($m+$m, 2*$num_val, 'numifies to usual reference value');
+    is(0-$m, -$num_val, 'numifies to usual reference value');
+    is(1*$m, $num_val, 'numifies to usual reference value');
+    is($m/1, $num_val, 'numifies to usual reference value');
+    is($m%100, $num_val%100, 'numifies to usual reference value');
+    is($m**1, $num_val, 'numifies to usual reference value');
+
+    is(abs($aref), $num_val, 'abs() of ref');
+    is(-$aref, -$num_val, 'negative of ref');
+    is(0+$aref, $num_val, 'ref addition');
+    is($aref+0, $num_val, 'ref addition');
+    is($aref+$aref, 2*$num_val, 'ref addition');
+    is(0-$aref, -$num_val, 'subtraction of ref');
+    is(1*$aref, $num_val, 'multiplicaton of ref');
+    is($aref/1, $num_val, 'division of ref');
+    is($aref%100, $num_val%100, 'modulo of ref');
+    is($aref**1, $num_val, 'exponentiation of ref');
 }
+
+# EOF

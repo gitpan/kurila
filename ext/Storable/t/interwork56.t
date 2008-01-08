@@ -20,11 +20,11 @@ sub BEGIN {
 	unshift @INC, 't';
     }
     require Config; Config->import;
-    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bStorable\b/) {
+    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ m/\bStorable\b/) {
         print "1..0 # Skip: Storable was not built\n";
         exit 0;
     }
-    unless ($Config{ivsize} and $Config{ivsize} > $Config{longsize}) {
+    unless ($Config{ivsize} and $Config{ivsize} +> $Config{longsize}) {
         print "1..0 # Skip: Your IVs are no larger than your longs\n";
         exit 0;
     }
@@ -38,7 +38,7 @@ use vars qw(%tests);
 
 {
     local $/ = "\n\nend\n";
-    while (<DATA>) {
+    while (~< *DATA) {
         next unless /\S/s;
         unless (/begin ([0-7]{3}) ([^\n]*)\n(.*)$/s) {
             s/\n.*//s;

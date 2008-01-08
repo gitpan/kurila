@@ -5,7 +5,7 @@ use warnings ;
 use IO::Uncompress::Gunzip qw($GunzipError);
 
 die "Usage: gzgrep pattern [file...]\n"
-    unless @ARGV >= 1;
+    unless @ARGV +>= 1;
 
 my $pattern = shift ;
 my $file ;
@@ -16,8 +16,8 @@ foreach $file (@ARGV) {
     my $gz = IO::Uncompress::Gunzip->new( $file) 
          or die "Cannot uncompress $file: $GunzipError\n" ;
 
-     while (<$gz>) {
-        print if /$pattern/ ;
+     while ( ~< $gz) {
+        print if m/$pattern/ ;
      }
 
      die "Error reading from $file: $GunzipError\n" 

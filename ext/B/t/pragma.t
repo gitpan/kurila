@@ -9,12 +9,8 @@ BEGIN {    ## no critic strict
         unshift @INC, 't';
     }
     require Config;
-    if ( ( $Config::Config{'extensions'} !~ /\bB\b/ ) ) {
+    if ( ( $Config::Config{'extensions'} !~ m/\bB\b/ ) ) {
         print "1..0 # Skip -- Perl configured without B module\n";
-        exit 0;
-    }
-    if ( $] < 5.009 ) {
-        print "1..0 # Skip -- No user pragmata in 5.8.x\n";
         exit 0;
     }
 }

@@ -14,11 +14,11 @@ chdir 't';
 BEGIN { 
     use Test::More; 
 
-    if( $^O =~ /^VMS|os2|MacOS|MSWin32|cygwin|beos|netware$/i ) {
+    if( $^O =~ m/^VMS|os2|MacOS|MSWin32|cygwin|beos|netware$/i ) {
         plan skip_all => 'Non-Unix platform';
     }
     else {
-        plan tests => 110;
+        plan tests => 109;
     }
 }
 
@@ -35,11 +35,11 @@ my $os =  ($ExtUtils::MM_Unix::Is_OS2 	|| 0)
 	+ ($ExtUtils::MM_Unix::Is_Win32 || 0) 
 	+ ($ExtUtils::MM_Unix::Is_Dos 	|| 0)
 	+ ($ExtUtils::MM_Unix::Is_VMS   || 0); 
-ok ( $os <= 1,  'There can be only one (or none)');
+ok ( $os +<= 1,  'There can be only one (or none)');
 
 my $version = $ExtUtils::MM_Unix::VERSION;
    $version =~ s/_//g;
-cmp_ok ($version, '>=', '1.12606', 'Should be at least version 1.12606');
+cmp_ok ($version, '+>=', '1.12606', 'Should be at least version 1.12606');
 
 # when the following calls like canonpath, catdir etc are replaced by
 # File::Spec calls, the test's become a bit pointless
@@ -117,7 +117,6 @@ foreach ( qw /
   test
   test_via_harness
   test_via_script
-  tool_autosplit
   tool_xsubpp
   tools_other
   top_targets
@@ -172,7 +171,7 @@ is ($t->libscan('Fatty'), 'Fatty', 'libscan on something not a VC file' );
 ###############################################################################
 # maybe_command
 
-open(FILE, ">command"); print FILE "foo"; close FILE;
+open(FILE, ">", "command"); print FILE "foo"; close FILE;
 ok (!$t->maybe_command('command') ,"non executable file isn't a command");
 chmod 0755, "command";
 ok ($t->maybe_command('command'),        "executable file is a command");

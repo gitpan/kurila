@@ -94,7 +94,7 @@ sub caller_info {
   my $sub_name = Carp::get_subname(\%call_info);
   if ($call_info{has_args}) {
     my @args = map {Carp::format_arg($_)} @DB::args;
-    if ($MaxArgNums and @args > $MaxArgNums) { # More than we want to show?
+    if ($MaxArgNums and @args +> $MaxArgNums) { # More than we want to show?
       $#args = $MaxArgNums;
       push @args, '...';
     }
@@ -112,11 +112,15 @@ sub format_arg {
       $arg = defined($overload::VERSION) ? overload::StrVal($arg) : "$arg";
   }
   if (defined($arg)) {
-      $arg =~ s/'/\\'/g;
+      if (ref \$arg eq "GLOB") {
+          $arg = '*' . Symbol::glob_name($arg);
+      } else {
+          $arg =~ s/'/\\'/g;
+      }
       $arg = str_len_trim($arg, $MaxArgLen);
   
       # Quote it?
-      $arg = "'$arg'" unless $arg =~ /^-?[\d.]+\z/;
+      $arg = "'$arg'" unless $arg =~ m/^-?[\d.]+\z/;
   } else {
       $arg = 'undef';
   }
@@ -124,7 +128,7 @@ sub format_arg {
   # The following handling of "control chars" is direct from
   # the original code - it is broken on Unicode though.
   # Suggestions?
-  $arg =~ s/([[:cntrl:]]|[[:^ascii:]])/sprintf("\\x{%x}",ord($1))/eg;
+  $arg =~ s/([[:cntrl:]]|[[:^ascii:]])/{sprintf("\\x\{%x\}",ord($1))}/g;
   return $arg;
 }
 
@@ -177,7 +181,7 @@ sub long_error_loc {
       }
     }
     redo if $CarpInternal{$pkg};
-    redo unless 0 > --$lvl;
+    redo unless 0 +> --$lvl;
     redo if $Internal{$pkg};
   }
   return $i - 1;
@@ -247,7 +251,7 @@ sub short_error_loc {
     redo if $CarpInternal{$called};
     redo if trusts($called, $caller, $cache);
     redo if trusts($caller, $called, $cache);
-    redo unless 0 > --$lvl;
+    redo unless 0 +> --$lvl;
   }
   return $i - 1;
 }
@@ -269,8 +273,8 @@ sub shortmess_heavy {
 sub str_len_trim {
   my $str = shift;
   my $max = shift || 0;
-  if (2 < $max and $max < length($str)) {
-    substr($str, $max - 3) = '...';
+  if (2 +< $max and $max +< length($str)) {
+    substr($str, $max - 3, undef, '...');
   }
   return $str;
 }

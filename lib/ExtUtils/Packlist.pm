@@ -46,7 +46,7 @@ sub __find_relocations
     }
     # Longest prefixes go first in the alternatives
     my $alternations = join "|", map {quotemeta $_}
-    sort {length $b <=> length $a} keys %paths;
+    sort {length $b <+> length $a} keys %paths;
     qr/^($alternations)/o;
 }
 
@@ -117,14 +117,14 @@ if (defined($packfile)) { $self->{packfile} = $packfile; }
 else { $packfile = $self->{packfile}; }
 Carp::croak("No packlist filename specified") if (! defined($packfile));
 my $fh = mkfh();
-open($fh, "<$packfile") || Carp::croak("Can't open file $packfile: $!");
+open($fh, "<", "$packfile") || Carp::croak("Can't open file $packfile: $!");
 $self->{data} = {};
 my ($line);
-while (defined($line = <$fh>))
+while (defined($line = ~< $fh))
    {
    chomp $line;
    my ($key, $data) = $line;
-   if ($key =~ /^(.*?)( \w+=.*)$/)
+   if ($key =~ m/^(.*?)( \w+=.*)$/)
       {
       $key = $1;
       $data = { map { split('=', $_) } split(' ', $2)};
@@ -152,7 +152,7 @@ if (defined($packfile)) { $self->{packfile} = $packfile; }
 else { $packfile = $self->{packfile}; }
 Carp::croak("No packlist filename specified") if (! defined($packfile));
 my $fh = mkfh();
-open($fh, ">$packfile") || Carp::croak("Can't open file $packfile: $!");
+open($fh, ">", "$packfile") || Carp::croak("Can't open file $packfile: $!");
 foreach my $key (sort(keys(%{$self->{data}})))
    {
        my $data = $self->{data}->{$key};

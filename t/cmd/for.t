@@ -6,7 +6,7 @@ use strict;
 
 our ($i, @x, $y, $c, $foo, @ary, $loop_count, @array, $r, $TODO);
 
-for ($i = 0; $i <= 10; $i++) {
+for ($i = 0; $i +<= 10; $i++) {
     $x[$i] = $i;
 }
 $y = $x[10];
@@ -22,7 +22,7 @@ if (join(' ', @x) eq '0 1 2 3 4 5 6 7 8 9 10') {
 $i = $c = 0;
 for (;;) {
 	$c++;
-	last if $i++ > 10;
+	last if $i++ +> 10;
 }
 if ($c == 12) {print "ok 2\n";} else {print "not ok 2\n";}
 
@@ -79,7 +79,7 @@ print $loop_count == 4 ? "ok" : "not ok", " 12\n";
 # modifying arrays in loops is a no-no
 our @a = (3,4);
 eval { @a = () for (1,2,@a) };
-print $@ =~ /Use of freed value in iteration/ ? "ok" : "not ok", " 13\n";
+print $@ =~ m/Use of freed value in iteration/ ? "ok" : "not ok", " 13\n";
 
 # [perl #30061] double destory when same iterator variable (eg $_) used in
 # DESTROY as used in for loop that triggered the destroy
@@ -464,7 +464,7 @@ is ($r, '1CBA', 'Reverse for array and value via map with var');
 
 TODO: {
     $test++;
-    local $TODO = "RT #1085: what should be output of perl -we 'print do { foreach (1, 2) { 1; } }'";
+    local $TODO = "RT #1085: what should be output of perl -we 'print do \{ foreach (1, 2) \{ 1; \} \}'";
     if (do {17; foreach (1, 2) { 1; } } != 17) {
         print "not ";
     }

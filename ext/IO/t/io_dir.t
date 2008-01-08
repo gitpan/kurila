@@ -1,12 +1,12 @@
 #!./perl
 
 BEGIN {
-    unless(grep /blib/, @INC) {
+    unless(grep m/blib/, @INC) {
         chdir 't' if -d 't';
         @INC = '../lib';
     }
     require Config; Config->import;
-    if ($] < 5.00326 || not $Config{'d_readdir'}) {
+    if ($Config{'d_readdir'}) {
 	print "1..0 # Skip: readdir() not available\n";
 	exit 0;
     }
@@ -33,14 +33,14 @@ $dot = IO::Dir->new( $DIR);
 ok(defined($dot));
 
 @a = sort glob("*");
-do { $first = $dot->read } while defined($first) && $first =~ /^\./;
+do { $first = $dot->read } while defined($first) && $first =~ m/^\./;
 ok(+(grep { $_ eq $first } @a));
 
-@b = sort($first, (grep {/^[^.]/} $dot->read));
+@b = sort($first, (grep {m/^[^.]/} $dot->read));
 ok(+(join("\0", @a) eq join("\0", @b)));
 
 $dot->rewind;
-@c = sort grep {/^[^.]/} $dot->read;
+@c = sort grep {m/^[^.]/} $dot->read;
 ok(+(join("\0", @b) eq join("\0", @c)));
 
 $dot->close;

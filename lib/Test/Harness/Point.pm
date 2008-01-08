@@ -42,14 +42,14 @@ sub from_test_line  {
     my $line = shift or return;
 
     # We pulverize the line down into pieces in three parts.
-    my ($not, $number, $extra) = ($line =~ /^(not )?ok\b(?:\s+(\d+))?\s*(.*)/) or return;
+    my ($not, $number, $extra) = ($line =~ m/^(not )?ok\b(?:\s+(\d+))?\s*(.*)/) or return;
 
     my $point = $class->new;
     $point->set_number( $number );
     $point->set_ok( !$not );
 
     if ( $extra ) {
-        my ($description,$directive) = split( /(?:[^\\]|^)#/, $extra, 2 );
+        my ($description,$directive) = split( m/(?:[^\\]|^)#/, $extra, 2 );
         $description =~ s/^- //; # Test::More puts it in there
         $point->set_description( $description );
         if ( $directive ) {
@@ -103,7 +103,7 @@ sub set_directive   {
     $directive =~ s/\s+$//;
     $self->{directive} = $directive;
 
-    my ($type,$reason) = ($directive =~ /^\s*(\S+)(?:\s+(.*))?$/);
+    my ($type,$reason) = ($directive =~ m/^\s*(\S+)(?:\s+(.*))?$/);
     $self->set_directive_type( $type );
     $reason = "" unless defined $reason;
     $self->{directive_reason} = $reason;

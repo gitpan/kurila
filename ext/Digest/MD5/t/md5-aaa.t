@@ -13,12 +13,12 @@ use Digest::MD5 qw(md5_hex);
 my $Is_EBCDIC = ord('A') == 193;
 
 my $testno = 0;
-while (<DATA>) {
+while ( ~< *DATA) {
     if (!$Is_EBCDIC) {
-	next if /^EBCDIC/;
+	next if m/^EBCDIC/;
     }
     else {
-	next if !/^EBCDIC/;
+	next if !m/^EBCDIC/;
 	s/^EBCDIC,\w+#//;
    }
    my($hexdigest, $message) = split;
@@ -26,7 +26,7 @@ while (<DATA>) {
 
    my $failed;
    $failed++ unless md5_hex($message) eq $hexdigest;
-   $failed++ unless Digest::MD5->new->add(split(//, $message))->digest
+   $failed++ unless Digest::MD5->new->add(split(m//, $message))->digest
                                               eq pack("H*", $hexdigest);
 
    print "not " if $failed;

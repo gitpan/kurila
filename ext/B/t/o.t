@@ -9,7 +9,7 @@ BEGIN {
 	        push @INC, "../../t";
         }
 	require Config;
-	if (($Config::Config{'extensions'} !~ /\bB\b/) ){
+	if (($Config::Config{'extensions'} !~ m/\bB\b/) ){
 		print "1..0 # Skip -- Perl configured without B module\n";
 		exit 0;
 	}
@@ -29,7 +29,7 @@ unless (-d $path) {
 my $file = File::Spec->catfile( $path, 'success.pm' );
 local *OUT;
 open(OUT, '>', $file) or skip_all( 'Cannot write fake backend module');
-print OUT while <DATA>;
+print OUT while ~< *DATA;
 close *OUT;
 
 plan( 9 ); # And someone's responsible.
@@ -65,7 +65,7 @@ like( $lines[1], qr/fail at .eval/,
 	'O.pm should die if backend compile() does not return a subref' );
 
 sub get_lines {
-	split(/[\r\n]+/, runperl( args => [ @_ ], stderr => 1 ));
+	split(m/[\r\n]+/, runperl( args => [ @_ ], stderr => 1 ));
 }
 
 END {

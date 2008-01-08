@@ -19,15 +19,15 @@ my $Is_VMS_VAX = 0;
 if ($^O eq 'VMS') {
     my $hw_model;
     chomp($hw_model = `write sys\$output f\$getsyi("HW_MODEL")`);
-    $Is_VMS_VAX = $hw_model < 1024 ? 1 : 0;
+    $Is_VMS_VAX = $hw_model +< 1024 ? 1 : 0;
 }
 
 # No %Config.
-my $Is_Ultrix_VAX = $^O eq 'ultrix' && `uname -m` =~ /^VAX$/;
+my $Is_Ultrix_VAX = $^O eq 'ultrix' && `uname -m` =~ m/^VAX$/;
 
-while (<DATA>) {
+while ( ~< *DATA) {
     s/^\s*>//; s/<\s*$//;
-    ($template, $data, $result, $comment) = split(/<\s*>/, $_, 4);
+    ($template, $data, $result, $comment) = split(m/<\s*>/, $_, 4);
     if ($^O eq 'os390' || $^O eq 's390') { # non-IEEE (s390 is UTS)
         $data   =~ s/([eE])96$/${1}63/;      # smaller exponents
         $result =~ s/([eE]\+)102$/${1}69/;   #  "       "
@@ -36,7 +36,7 @@ while (<DATA>) {
     }
     if ($Is_VMS_VAX || $Is_Ultrix_VAX) {
 	# VAX DEC C 5.3 at least since there is no
-	# ccflags =~ /float=ieee/ on VAX.
+	# ccflags =~ m/float=ieee/ on VAX.
 	# AXP is unaffected whether or not it's using ieee.
         $data   =~ s/([eE])96$/${1}26/;      # smaller exponents
         $result =~ s/([eE]\+)102$/${1}32/;   #  "       "
@@ -45,6 +45,7 @@ while (<DATA>) {
     }
 
     $evalData = eval $data;
+    die if $@;
     $data = ref $evalData ? $evalData : [$evalData];
     push @tests, [$template, $data, $result, $comment];
 }
@@ -52,9 +53,9 @@ while (<DATA>) {
 print '1..', scalar @tests, "\n";
 
 $SIG{__WARN__} = sub {
-    if ($_[0] =~ /^Invalid conversion/) {
+    if ($_[0] =~ m/^Invalid conversion/) {
 	$w = ' INVALID';
-    } elsif ($_[0] =~ /^Use of uninitialized value/) {
+    } elsif ($_[0] =~ m/^Use of uninitialized value/) {
 	$w = ' UNINIT';
     } else {
 	warn @_;
@@ -65,20 +66,20 @@ for ($i = 1; @tests; $i++) {
     ($template, $data, $result, $comment) = @{shift @tests};
     $w = undef;
     $x = sprintf(">$template<", @$data);
-    substr($x, -1, 0) = $w if $w;
+    substr($x, -1, 0, $w) if $w;
     # $x may have 3 exponent digits, not 2
     my $y = $x;
     if ($y =~ s/([Ee][-+])0(\d)/$1$2/) {
         # if result is left-adjusted, append extra space
-        if ($template =~ /%\+?\-/ and $result =~ / $/) {
+        if ($template =~ m/%\+?\-/ and $result =~ m/ $/) {
 	    $y =~ s/<$/ </;
 	}
         # if result is zero-filled, add extra zero
-	elsif ($template =~ /%\+?0/ and $result =~ /^0/) {
+	elsif ($template =~ m/%\+?0/ and $result =~ m/^0/) {
 	    $y =~ s/^>0/>00/;
 	}
         # if result is right-adjusted, prepend extra space
-	elsif ($result =~ /^ /) {
+	elsif ($result =~ m/^ /) {
 	    $y =~ s/^>/> /;
 	}
     }
@@ -88,15 +89,15 @@ for ($i = 1; @tests; $i++) {
 	my $os  = $1;
 	my $osv = exists $Config{osvers} ? $Config{osvers} : "0";
 	# >comment skip: all<
-	if ($os =~ /\ball\b/i) {
+	if ($os =~ m/\ball\b/i) {
 	    $skip = 1;
 	# >comment skip: VMS hpux:10.20<
-	} elsif ($os =~ /\b$^O(?::(\S+))?\b/i) {
+	} elsif ($os =~ m/\b$^O(?::(\S+))?\b/i) {
 	    my $vsn = defined $1 ? $1 : "0";
 	    # Only compare on the the first pair of digits, as numeric
 	    # compares don't like 2.6.10-3mdksmp or 2.6.8-24.10-default
 	    s/^(\d+(\.\d+)?).*/$1/ for $osv, $vsn;
-	    $skip = $vsn ? ($osv <= $vsn ? 1 : 0) : 1;
+	    $skip = $vsn ? ($osv +<= $vsn ? 1 : 0) : 1;
 	}
 	$skip and $comment =~ s/$/, failure expected on $^O $osv/;
     }
@@ -111,7 +112,7 @@ for ($i = 1; @tests; $i++) {
     {				# three-digit exponent
 		print("ok $i # >$result< $x three-digit exponent accepted\n");
     }
-	elsif ($result =~ /[-+]\d{3}$/ &&
+	elsif ($result =~ m/[-+]\d{3}$/ &&
 		   # Suppress tests with modulo of exponent >= 100 on platforms
 		   # which can't handle such magnitudes (or where we can't tell).
 		   ((!eval {require POSIX}) || # Costly: only do this if we must!
@@ -300,19 +301,10 @@ __END__
 >%+vd<      >chr(1)<      >+1<
 >%#vd<      >chr(1)<      >1<
 >%vd<       >"\01\02\03"< >1.2.3<
->%vd<       >v1.2.3<      >1.2.3<
->%vd<       >[version::qv("1.2.3")]< >1.2.3<
->%vd<       >[version->new("1.2")]< >1.2<
->%vd<       >[version->new("1.02")]< >1.2<
->%vd<       >[version->new("1.002")]< >1.2<
->%vd<       >[version->new("1048576.5")]< >244.128.128.128.5<
->%vd<       >[version->new("50")]< >50<
 >%v.3d<     >"\01\02\03"< >001.002.003<
 >%0v3d<     >"\01\02\03"< >001.002.003<
->%v.3d<     >[version::qv("1.2.3")]< >001.002.003<
 >%-v3d<     >"\01\02\03"< >1  .2  .3  <
 >%+-v3d<    >"\01\02\03"< >+1 .2  .3  <
->%+-v3d<    >[version::qv("1.2.3")]< >+1 .2  .3  <
 >%v4.3d<    >"\01\02\03"< > 001. 002. 003<
 >%0v4.3d<   >"\01\02\03"< > 001. 002. 003<
 >%0*v2d<    >['-', "\0\7\14"]< >00-07-12<
@@ -323,7 +315,6 @@ __END__
 >%v*.*d<    >["\01\02\03", 4, 3]< > 001. 002. 003<
 >%0v*.*d<   >["\01\02\03", 4, 3]< > 001. 002. 003<
 >%0*v*d<    >['-', "\0\7\13", 2]< >00-07-11<
->%0*v*d<    >['-', version::qv("0.7.11"), 2]< >00-07-11<
 >%e<        >1234.875<    >1.234875e+03<
 >%e<        >0.000012345< >1.234500e-05<
 >%e<        >1234567E96<  >1.234567e+102<
@@ -483,8 +474,8 @@ __END__
 >%#+6.4o<   >18<          >  0022<
 >%# 6.4o<   >18<          >  0022<
 >%#06.4o<   >18<          >  0022<        >0 flag with precision: no effect<
->%d< >$p=sprintf('%p',$p);$p=~/^[0-9a-f]+$/< >1< >Coarse hack: hex from %p?<
->%d< >$p=sprintf('%-8p',$p);$p=~/^[0-9a-f]+\s*$/< >1< >Coarse hack: hex from %p?<
+>%d< >$p=sprintf('%p',$p);$p=~m/^[0-9a-f]+$/< >1< >Coarse hack: hex from %p?<
+>%d< >$p=sprintf('%-8p',$p);$p=~m/^[0-9a-f]+\s*$/< >1< >Coarse hack: hex from %p?<
 >%#p<       >''<          >%#p INVALID<
 >%q<        >''<          >%q INVALID<
 >%r<        >''<          >%r INVALID<
@@ -583,8 +574,8 @@ __END__
 >%# 6.3x<   >28<          > 0x01c<
 >% #6.3x<   >28<          > 0x01c<
 >%0*x<      >[-10, ,2**32-1]< >ffffffff  <
->%vx<       >[version::qv("1.2.3")]< >1.2.3<
->%vx<       >[version::qv("1.20.300")]< >1.14.c4.ac<
+>%vx<       >["\01\02\03"]< >1.2.3<
+>%vx<       >["\01\x[14]\x[c4]\x[ac]"]< >1.14.c4.ac<
 >%.*x<      >[0,0]<       ><
 >%-.*x<     >[0,0]<       ><
 >%+.*x<     >[0,0]<       ><

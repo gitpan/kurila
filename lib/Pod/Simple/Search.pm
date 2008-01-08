@@ -8,7 +8,7 @@ $VERSION = 3.04;   ## Current version of this package
 BEGIN { *DEBUG = sub () {0} unless defined &DEBUG; }   # set DEBUG level
 use Carp ();
 
-$SLEEPY = 1 if !defined $SLEEPY and $^O =~ /mswin|mac/i;
+$SLEEPY = 1 if !defined $SLEEPY and $^O =~ m/mswin|mac/i;
   # flag to occasionally sleep for $SLEEPY - 1 seconds.
 
 $MAX_VERSION_WITHIN ||= 60;
@@ -73,7 +73,7 @@ sub survey {
     if($self->{'dir_prefix'}) {
       $start_in = File::Spec->catdir(
         $try,
-        grep length($_), split '[\\/:]+', $self->{'dir_prefix'}
+        grep length($_), split '[\/:]+', $self->{'dir_prefix'}
       );
       $modname_prefix = [grep length($_), split m{[:/\\]}, $self->{'dir_prefix'}];
       $verbose and print "Appending \"$self->{'dir_prefix'}\" to $try, ",
@@ -144,13 +144,6 @@ sub _make_search_callback {
       print "Looking in dir $file\n" if $verbose;
 
       unless ($laborious) { # $laborious overrides pruning
-        if( m/^(\d+\.[\d_]{3,})\z/s
-             and do { my $x = $1; $x =~ tr/_//d; $x != $] }
-           ) {
-          $verbose and print "Perl $] version mismatch on $_, skipping.\n";
-          return 'PRUNE';
-        }
-
         if( m/^([A-Za-z][a-zA-Z0-9_]*)\z/s ) {
           $verbose and print "$_ is a well-named module subdir.  Looking....\n";
         } else {
@@ -170,19 +163,19 @@ sub _make_search_callback {
         m/\.(pod|pm|plx?)\z/i || -x _ and -T _
          # Note that the cheapest operation (the RE) is run first.
       ) {
-        $verbose > 1 and print " Brushing off uninteresting $file\n";
+        $verbose +> 1 and print " Brushing off uninteresting $file\n";
         return;
       }
     } else {
       unless( m/^[-_a-zA-Z0-9]+\.(?:pod|pm|plx?)\z/is ) {
-        $verbose > 1 and print " Brushing off oddly-named $file\n";
+        $verbose +> 1 and print " Brushing off oddly-named $file\n";
         return;
       }
     }
 
     $verbose and print "Considering item $file\n";
     my $name = $self->_path2modname( $file, $shortname, $modname_bits );
-    $verbose > 0.01 and print " Nominating $file as $name\n";
+    $verbose +> 0.01 and print " Nominating $file as $name\n";
         
     if($limit_re and $name !~ m/$limit_re/i) {
       $verbose and print "Shunning $name as not matching $limit_re\n";
@@ -257,11 +250,11 @@ sub _path2modname {
   # filenames, so try to extract them from the "=head1 NAME" tag in the
   # file instead.
   if ($^O eq 'VMS' && ($name eq lc($name) || $name eq uc($name))) {
-      open PODFILE, "<$file" or die "_path2modname: Can't open $file: $!";
+      open PODFILE, "<", "$file" or die "_path2modname: Can't open $file: $!";
       my $in_pod = 0;
       my $in_name = 0;
       my $line;
-      while ($line = <PODFILE>) {
+      while ($line = ~< *PODFILE) {
         chomp $line;
         $in_pod = 1 if ($line =~ m/^=\w/);
         $in_pod = 0 if ($line =~ m/^=cut/);
@@ -304,17 +297,17 @@ sub _recurse_dir {
   my $recursor;
   $recursor = sub {
     my($dir_long, $dir_bare) = @_;
-    if( @$modname_bits >= 10 ) {
+    if( @$modname_bits +>= 10 ) {
       $verbose and print "Too deep! [@$modname_bits]\n";
       return;
     }
 
     unless(-d $dir_long) {
-      $verbose > 2 and print "But it's not a dir! $dir_long\n";
+      $verbose +> 2 and print "But it's not a dir! $dir_long\n";
       return;
     }
     unless( opendir(INDIR, $dir_long) ) {
-      $verbose > 2 and print "Can't opendir $dir_long : $!\n";
+      $verbose +> 2 and print "Can't opendir $dir_long : $!\n";
       closedir(INDIR);
       return
     }
@@ -341,13 +334,13 @@ sub _recurse_dir {
         my $rv = $callback->( $i_full, $i, 1, $modname_bits ) || '';
 
         if($rv eq 'PRUNE') {
-          $verbose > 1 and print "OK, pruning";
+          $verbose +> 1 and print "OK, pruning";
         } else {
           # Otherwise, recurse into it
           $recursor->( File::Spec->catdir($dir_long, $i) , $i);
         }
       } else {
-        $verbose > 1 and print "Skipping oddity $i_full\n";
+        $verbose +> 1 and print "Skipping oddity $i_full\n";
       }
     }
     pop @$modname_bits;
@@ -381,14 +374,14 @@ sub run {
     if($file =~ m/\.pod$/i) {
       # Don't bother looking for $VERSION in .pod files
       DEBUG and print "Not looking for \$VERSION in .pod $file\n";
-    } elsif( !open(INPOD, $file) ) {
+    } elsif( !open(INPOD, "<", $file) ) {
       DEBUG and print "Couldn't open $file: $!\n";
       close(INPOD);
     } else {
       # Sane case: file is readable
       my $lines = 0;
-      while(<INPOD>) {
-        last if $lines++ > $MAX_VERSION_WITHIN; # some degree of sanity
+      while( ~< *INPOD) {
+        last if $lines++ +> $MAX_VERSION_WITHIN; # some degree of sanity
         if( s/^\s*\$VERSION\s*=\s*//s and m/\d/ ) {
           DEBUG and print "Found version line (#$lines): $_";
           s/\s*\#.*//s;
@@ -447,7 +440,7 @@ sub _simplify_base {   # Internal method only
   $_[1] =~ s/\.(pod|pm|plx?)\z//i;
 
   # strip meaningless extensions on Win32 and OS/2
-  $_[1] =~ s/\.(bat|exe|cmd)\z//i if $^O =~ /mswin|os2/i;
+  $_[1] =~ s/\.(bat|exe|cmd)\z//i if $^O =~ m/mswin|os2/i;
 
   # strip meaningless extensions on VMS
   $_[1] =~ s/\.(com)\z//i if $^O eq 'VMS';
@@ -482,7 +475,7 @@ sub _mac_whammy { # Tolerate '.', './some_dir' and '(../)+some_dir' on Mac OS
   for $_ (@them) {
     if ( $_ eq '.' ) {
       $_ = ':';
-    } elsif ( $_ =~ s|^((?:\.\./)+)|':' x (length($1)/3)|e ) {
+    } elsif ( $_ =~ s|^((?:\.\./)+)|{':' x (length($1)/3)}| ) {
       $_ = ':'. $_;
     } else {
       $_ =~ s|^\./|:|;
@@ -531,8 +524,8 @@ sub find {
   my $verbose = $self->verbose;
 
   # Split on :: and then join the name together using File::Spec
-  my @parts = split /::/, $pod;
-  $verbose and print "Chomping {$pod} => {@parts}\n";
+  my @parts = split m/::/, $pod;
+  $verbose and print "Chomping \{$pod\} => \{@parts\}\n";
 
   #@search_dirs = File::Spec->curdir unless @search_dirs;
   
@@ -595,8 +588,8 @@ sub contains_pod {
   my $verbose = $self->{'verbose'};
 
   # check for one line of POD
-  $verbose > 1 and print " Scanning $file for pod...\n";
-  unless( open(MAYBEPOD,"<$file") ) {
+  $verbose +> 1 and print " Scanning $file for pod...\n";
+  unless( open(MAYBEPOD, "<","$file") ) {
     print "Error: $file is unreadable: $!\n";
     return undef;
   }
@@ -605,16 +598,16 @@ sub contains_pod {
    # avoid totally hogging the processor on OSs with poor process control
   
   local $_;
-  while( <MAYBEPOD> ) {
+  while( ~< *MAYBEPOD ) {
     if(m/^=(head\d|pod|over|item)\b/s) {
       close(MAYBEPOD) || die "Bizarre error closing $file: $!\nAborting";
       chomp;
-      $verbose > 1 and print "  Found some pod ($_) in $file\n";
+      $verbose +> 1 and print "  Found some pod ($_) in $file\n";
       return 1;
     }
   }
   close(MAYBEPOD) || die "Bizarre error closing $file: $!\nAborting";
-  $verbose > 1 and print "  No POD in $file, skipping.\n";
+  $verbose +> 1 and print "  No POD in $file, skipping.\n";
   return 0;
 }
 
@@ -646,11 +639,11 @@ sub _accessorize {  # A simple-minded method-maker
 sub _state_as_string {
   my $self = $_[0];
   return '' unless ref $self;
-  my @out = "{\n  # State of $self ...\n";
+  my @out = "\{\n  # State of $self ...\n";
   foreach my $k (sort keys %$self) {
     push @out, "  ", _esc($k), " => ", _esc($self->{$k}), ",\n";
   }
-  push @out, "}\n";
+  push @out, "\}\n";
   my $x = join '', @out;
   $x =~ s/^/#/mg;
   return $x;
@@ -660,8 +653,8 @@ sub _esc {
   my $in = $_[0];
   return 'undef' unless defined $in;
   $in =~
-    s<([^\x20\x21\x23\x27-\x3F\x41-\x5B\x5D-\x7E])>
-     <'\\x'.(unpack("H2",$1))>eg;
+    s<([^\x[20]\x[21]\x[23]\x[27]-\x[3F]\x[41]-\x[5B]\x[5D]-\x[7E]])>
+     <{'\\x['.(unpack("H2",$1).']')}>g;
   return qq{"$in"};
 }
 

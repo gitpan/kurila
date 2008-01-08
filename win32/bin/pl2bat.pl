@@ -35,7 +35,7 @@ warn($usage), exit(0) if !getopts('whun:o:a:s:',\%OPT) or $OPT{'h'};
 # NOTE: %0 is already enclosed in doublequotes by cmd.exe, as appropriate
 $OPT{'n'} = '-x -S %0 %*' unless exists $OPT{'n'};
 $OPT{'o'} = '-x -S "%0" %1 %2 %3 %4 %5 %6 %7 %8 %9' unless exists $OPT{'o'};
-$OPT{'s'} = '/\\.plx?/' unless exists $OPT{'s'};
+$OPT{'s'} = '/\.plx?/' unless exists $OPT{'s'};
 $OPT{'s'} = ($OPT{'s'} =~ m#^/([^/]*[^/\$]|)\$?/?$# ? $1 : "\Q$OPT{'s'}\E");
 
 my $head;
@@ -82,19 +82,19 @@ sub process {
     my $skiplines = 0;
     my $line;
     my $start= $Config{startperl};
-    $start= "#!perl"   unless  $start =~ /^#!.*perl/;
-    open( FILE, $file ) or die "$0: Can't open $file: $!";
-    @file = <FILE>;
+    $start= "#!perl"   unless  $start =~ m/^#!.*perl/;
+    open( FILE, "<", $file ) or die "$0: Can't open $file: $!";
+    @file = ~< *FILE;
     foreach $line ( @file ) {
 	$linenum++;
-	if ( $line =~ /^:endofperl\b/ ) {
+	if ( $line =~ m/^:endofperl\b/ ) {
 	    if(  ! exists $OPT{'u'}  ) {
 		warn "$0: $file has already been converted to a batch file!\n";
 		return;
 	    }
 	    $taildone++;
 	}
-	if ( not $linedone and $line =~ /^#!.*perl/ ) {
+	if ( not $linedone and $line =~ m/^#!.*perl/ ) {
 	    if(  exists $OPT{'u'}  ) {
 		$skiplines = $linenum - 1;
 		$line .= "#line ".(1+$headlines)."\n";
@@ -103,14 +103,14 @@ sub process {
 	    }
 	    $linedone++;
 	}
-	if ( $line =~ /^#\s*line\b/ and $linenum == 2 + $skiplines ) {
+	if ( $line =~ m/^#\s*line\b/ and $linenum == 2 + $skiplines ) {
 	    $line = "";
 	}
     }
     close( FILE );
     $file =~ s/$OPT{'s'}$//oi;
-    $file .= '.bat' unless $file =~ /\.bat$/i or $file =~ /^-$/;
-    open( FILE, ">$file" ) or die "Can't open $file: $!";
+    $file .= '.bat' unless $file =~ m/\.bat$/i or $file =~ m/^-$/;
+    open( FILE, ">", "$file" ) or die "Can't open $file: $!";
     print FILE $myhead;
     print FILE $start, ( $OPT{'w'} ? " -w" : "" ),
 	       "\n#line ", ($headlines+1), "\n" unless $linedone;

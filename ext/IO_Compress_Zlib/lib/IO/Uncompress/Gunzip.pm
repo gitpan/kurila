@@ -8,12 +8,12 @@ use strict ;
 use warnings;
 use bytes;
 
-use IO::Uncompress::RawInflate 2.006 ;
+use IO::Uncompress::RawInflate v2.006 ;
 
-use Compress::Raw::Zlib 2.006 qw( crc32 ) ;
-use IO::Compress::Base::Common 2.006 qw(:Status createSelfTiedObject);
-use IO::Compress::Gzip::Constants 2.006 ;
-use IO::Compress::Zlib::Extra 2.006 ;
+use Compress::Raw::Zlib v2.006 qw( crc32 ) ;
+use IO::Compress::Base::Common v2.006 qw(:Status createSelfTiedObject);
+use IO::Compress::Gzip::Constants v2.006 ;
+use IO::Compress::Zlib::Extra v2.006 ;
 
 require Exporter ;
 
@@ -46,7 +46,7 @@ sub gunzip
 
 sub getExtraParams
 {
-    use IO::Compress::Base::Common  2.006 qw(:Parse);
+    use IO::Compress::Base::Common  v2.006 qw(:Parse);
     return ( 'ParseExtra' => [1, 1, Parse_boolean,  0] ) ;
 }
 
@@ -116,7 +116,7 @@ sub chkTrailer
 sub isGzipMagic
 {
     my $buffer = shift ;
-    return 0 if length $buffer < GZIP_ID_SIZE ;
+    return 0 if length $buffer +< GZIP_ID_SIZE ;
     my ($id1, $id2) = unpack("C C", $buffer) ;
     return $id1 == GZIP_ID1 && $id2 == GZIP_ID2 ;
 }
@@ -198,7 +198,7 @@ sub _readGzipHeader($)
         $keep .= $origname . GZIP_NULL_BYTE ;
 
         return $self->HeaderError("Non ISO 8859-1 Character found in Name")
-            if *$self->{Strict} && $origname =~ /$GZIP_FNAME_INVALID_CHAR_RE/o ;
+            if *$self->{Strict} && $origname =~ m/$GZIP_FNAME_INVALID_CHAR_RE/o ;
     }
 
     my $comment ;
@@ -213,7 +213,7 @@ sub _readGzipHeader($)
         $keep .= $comment . GZIP_NULL_BYTE ;
 
         return $self->HeaderError("Non ISO 8859-1 Character found in Comment")
-            if *$self->{Strict} && $comment =~ /$GZIP_FCOMMENT_INVALID_CHAR_RE/o ;
+            if *$self->{Strict} && $comment =~ m/$GZIP_FCOMMENT_INVALID_CHAR_RE/o ;
     }
 
     if ($flag ^&^ GZIP_FLG_FHCRC) {

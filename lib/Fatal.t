@@ -10,17 +10,17 @@ use strict;
 use Fatal qw(open close :void opendir sin);
 
 my $i = 1;
-eval { open *FOO, '<lkjqweriuapofukndajsdlfjnvcvn' };
-print "not " unless $@ =~ /^Can't open/;
+eval { open *FOO, '<', 'lkjqweriuapofukndajsdlfjnvcvn' };
+print "not " unless $@ =~ m/^Can't open/;
 print "ok $i\n"; ++$i;
 
 my $foo = 'FOO';
 for ("*$foo", "\\*$foo") {
-    eval qq{ open $_, '<$0' };
+    eval qq{ open $_, '<', '$0' };
     print "not " if $@;
     print "ok $i\n"; ++$i;
 
-    print "not " if $@ or scalar(<$foo>) !~ m|^#!./perl|;
+    print "not " if $@ or scalar( ~< *FOO ) !~ m|^#!./perl|;
     print "ok $i\n"; ++$i;
     eval qq{ close FOO };
     print "not " if $@;
@@ -28,9 +28,9 @@ for ("*$foo", "\\*$foo") {
 }
 
 eval { opendir *FOO, 'lkjqweriuapofukndajsdlfjnvcvn' };
-print "not " unless $@ =~ /^Can't open/;
+print "not " unless $@ =~ m/^Can't open/;
 print "ok $i\n"; ++$i;
 
 eval { my $a = opendir *FOO, 'lkjqweriuapofukndajsdlfjnvcvn' };
-print "not " if $@ =~ /^Can't open/;
+print "not " if $@ =~ m/^Can't open/;
 print "ok $i\n"; ++$i;

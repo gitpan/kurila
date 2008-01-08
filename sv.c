@@ -1694,13 +1694,14 @@ Perl_looks_like_number(pTHX_ SV *sv)
 STATIC bool
 S_glob_2number(pTHX_ GV * const gv)
 {
+    Perl_croak(aTHX "Tried to use glob as number");
     const U32 wasfake = SvFLAGS(gv) & SVf_FAKE;
     SV *const buffer = sv_newmortal();
 
     /* FAKE globs can get coerced, so need to turn this off temporarily if it
        is on.  */
     SvFAKE_off(gv);
-    gv_efullname3(buffer, gv, "*");
+    gv_efullname4(buffer, gv, "*", TRUE);
     SvFLAGS(gv) |= wasfake;
 
     /* We know that all GVs stringify to something that is not-a-number,
@@ -1715,20 +1716,7 @@ S_glob_2number(pTHX_ GV * const gv)
 STATIC char *
 S_glob_2pv(pTHX_ GV * const gv, STRLEN * const len)
 {
-    const U32 wasfake = SvFLAGS(gv) & SVf_FAKE;
-    SV *const buffer = sv_newmortal();
-
-    /* FAKE globs can get coerced, so need to turn this off temporarily if it
-       is on.  */
-    SvFAKE_off(gv);
-    gv_efullname3(buffer, gv, "*");
-    SvFLAGS(gv) |= wasfake;
-
-    assert(SvPOK(buffer));
-    if (len) {
-	*len = SvCUR(buffer);
-    }
-    return SvPVX(buffer);
+    Perl_croak(aTHX "Tried to use glob as string");
 }
 
 /* Actually, ISO C leaves conversion of UV to IV undefined, but
@@ -2482,6 +2470,29 @@ Perl_sv_2nv(pTHX_ register SV *sv)
     return SvNVX(sv);
 }
 
+/*
+=for apidoc sv_2num
+
+Return an SV with the numeric value of the source SV, doing any necessary
+reference or overload conversion.  You must use the C<SvNUM(sv)> macro to
+access this function.
+
+=cut
+*/
+
+SV *
+Perl_sv_2num(pTHX_ register SV *sv)
+{
+    if (!SvROK(sv))
+	return sv;
+    if (SvAMAGIC(sv)) {
+	SV * const tmpsv = AMG_CALLun(sv,numer);
+	if (tmpsv && (!SvROK(tmpsv) || (SvRV(tmpsv) != SvRV(sv))))
+	    return sv_2num(tmpsv);
+    }
+    return sv_2mortal(newSVuv(PTR2UV(SvRV(sv))));
+}
+
 /* uiv_2buf(): private routine for use by sv_2pv_flags(): print an IV or
  * UV as a string towards the end of buf, and return pointers to start and
  * end of it.
@@ -3109,12 +3120,6 @@ Perl_sv_setsv_flags(pTHX_ SV *dstr, register SV *sstr, I32 flags)
     dtype = SvTYPE(dstr);
 
     (void)SvAMAGIC_off(dstr);
-    if ( SvVOK(dstr) )
-    {
-	/* need to nuke the magic */
-	mg_free(dstr);
-	SvRMAGICAL_off(dstr);
-    }
 
     /* There's a lot of redundancy below but we're going for speed here */
 
@@ -3463,14 +3468,6 @@ Perl_sv_setsv_flags(pTHX_ SV *dstr, register SV *sstr, I32 flags)
 		SvIsUV_on(dstr);
 	}
 	SvFLAGS(dstr) |= sflags & (SVf_IOK|SVp_IOK|SVf_NOK|SVp_NOK);
-	{
-	    const MAGIC * const smg = SvVSTRING_mg(sstr);
-	    if (smg) {
-		sv_magic(dstr, NULL, PERL_MAGIC_vstring,
-			 smg->mg_ptr, smg->mg_len);
-		SvRMAGICAL_on(dstr);
-	    }
-	}
     }
     else if (sflags & (SVp_IOK|SVp_NOK)) {
 	(void)SvOK_off(dstr);
@@ -3492,7 +3489,7 @@ Perl_sv_setsv_flags(pTHX_ SV *dstr, register SV *sstr, I32 flags)
 	    /* FAKE globs can get coerced, so need to turn this off
 	       temporarily if it is on.  */
 	    SvFAKE_off(sstr);
-	    gv_efullname3(dstr, (GV *)sstr, "*");
+	    gv_efullname4(dstr, (GV *)sstr, "*", TRUE);
 	    SvFLAGS(sstr) |= wasfake;
 	}
 	else
@@ -4300,12 +4297,6 @@ Perl_sv_magic(pTHX_ register SV *sv, SV *obj, int how, const char *name, I32 nam
 	break;
     case PERL_MAGIC_utf8:
 	vtable = &PL_vtbl_utf8;
-	break;
-    case PERL_MAGIC_substr:
-	vtable = &PL_vtbl_substr;
-	break;
-    case PERL_MAGIC_substr_utf8:
-	vtable = &PL_vtbl_substr_utf8;
 	break;
     case PERL_MAGIC_defelem:
 	vtable = &PL_vtbl_defelem;
@@ -6993,7 +6984,7 @@ Perl_sv_2cv(pTHX_ SV *sv, HV **st, GV **gvp, I32 lref)
 	    SV *tmpsv;
 	    ENTER;
 	    tmpsv = newSV(0);
-	    gv_efullname3(tmpsv, gv, NULL);
+	    gv_efullname4(tmpsv, gv, NULL,TRUE);
 	    /* XXX this is probably not what they think they're getting.
 	     * It has the same effect as "sub name;", i.e. just a forward
 	     * declaration! */
@@ -7140,8 +7131,6 @@ Perl_sv_reftype(pTHX_ const SV *sv, int ob)
 	case SVt_PVIV:
 	case SVt_PVNV:
 	case SVt_PVMG:
-				if (SvVOK(sv))
-				    return "VSTRING";
 				if (SvROK(sv))
 				    return "REF";
 				else
@@ -7437,7 +7426,7 @@ S_sv_unglob(pTHX_ SV *sv)
 
     assert(SvTYPE(sv) == SVt_PVGV);
     SvFAKE_off(sv);
-    gv_efullname3(temp, (GV *) sv, "*");
+    gv_efullname4(temp, (GV *) sv, "*", TRUE);
 
     if (GvGP(sv)) {
         if(GvCVu((GV*)sv) && (stash = GvSTASH((GV*)sv)) && HvNAME_get(stash))
@@ -8035,10 +8024,11 @@ Perl_sv_vcatpvfn(pTHX_ SV *sv, const char *pat, STRLEN patlen, va_list *args, SV
 		%p		include pointer address (standard)	
 		%-p	(SVf)	include an SV (previously %_)
 		%-<num>p	include an SV with precision <num>	
-		%1p	(VDf)	include a v-string (as %vd)
 		%<num>p		reserved for future extensions
 
 	Robin Barker 2005-07-14
+
+		%1p	(VDf)	removed.  RMB 2007-10-19
 */
  	    char* r = q; 
 	    bool sv = FALSE;	
@@ -8056,13 +8046,6 @@ Perl_sv_vcatpvfn(pTHX_ SV *sv, const char *pat, STRLEN patlen, va_list *args, SV
 		    eptr = SvPV_const(argsv, elen);
 		    goto string;
 		}
-#if vdNUMBER
-		else if (n == vdNUMBER) {	/* VDf */
-		    vectorize = TRUE;
-		    VECTORIZE_ARGS
-		    goto format_vd;
-	  	}
-#endif
 		else if (n) {
 		    if (ckWARN_d(WARN_INTERNAL))
 			Perl_warner(aTHX_ packWARN(WARN_INTERNAL),
@@ -8986,6 +8969,8 @@ Perl_parser_dup(pTHX_ const yy_parser *proto, CLONE_PARAMS* param)
     parser->lex_repl	= sv_dup_inc(proto->lex_repl, param);
     parser->lex_starts	= proto->lex_starts;
     parser->lex_stuff	= sv_dup_inc(proto->lex_stuff, param);
+    parser->lex_delim	= proto->lex_delim;
+    parser->lex_repl_delim	= proto->lex_repl_delim;
     parser->multi_close	= proto->multi_close;
     parser->multi_open	= proto->multi_open;
     parser->multi_start	= proto->multi_start;
@@ -9433,8 +9418,7 @@ Perl_sv_dup(pTHX_ const SV *sstr, CLONE_PARAMS* param)
 
     /* don't clone objects whose class has asked us not to */
     if (SvOBJECT(sstr) && ! (SvFLAGS(SvSTASH(sstr)) & SVphv_CLONEABLE)) {
-	SvFLAGS(dstr) &= ~SVTYPEMASK;
-	SvOBJECT_off(dstr);
+	SvFLAGS(dstr) = 0;
 	return dstr;
     }
 
@@ -10181,7 +10165,7 @@ do_mark_cloneable_stash(pTHX_ SV *sv)
 {
     const HEK * const hvname = HvNAME_HEK((HV*)sv);
     if (hvname) {
-	GV* const cloner = gv_fetchmethod_autoload((HV*)sv, "CLONE_SKIP", 0);
+	GV* const cloner = gv_fetchmethod((HV*)sv, "CLONE_SKIP");
 	SvFLAGS(sv) |= SVphv_CLONEABLE; /* clone objects by default */
 	if (cloner && GvCV(cloner)) {
 	    dSP;
@@ -10921,7 +10905,7 @@ perl_clone_using(PerlInterpreter *proto_perl, UV flags,
     */
     while(av_len(param->stashes) != -1) {
 	HV* const stash = (HV*) av_shift(param->stashes);
-	GV* const cloner = gv_fetchmethod_autoload(stash, "CLONE", 0);
+	GV* const cloner = gv_fetchmethod(stash, "CLONE");
 	if (cloner && GvCV(cloner)) {
 	    dSP;
 	    ENTER;
@@ -11450,9 +11434,17 @@ S_find_uninit_var(pTHX_ OP* obase, SV* uninit_sv, bool match)
 
     case OP_RV2SV:
     case OP_CUSTOM:
-    case OP_ENTERSUB:
 	match = 1; /* XS or custom code could trigger random warnings */
 	goto do_op;
+
+    case OP_ENTERSUB:
+    case OP_GOTO:
+	/* XXX tmp hack: these two may call an XS sub, and currently
+	  XS subs don't have a SUB entry on the context stack, so CV and
+	  pad determination goes wrong, and BAD things happen. So, just
+	  don't try to determine the value under those circumstances.
+	  Need a better fix at dome point. DAPM 11/2007 */
+	break;
 
     case OP_POS:
 	/* def-ness of rval pos() is independent of the def-ness of its arg */

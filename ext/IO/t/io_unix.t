@@ -1,7 +1,7 @@
 #!./perl
 
 BEGIN {
-    unless(grep /blib/, @INC) {
+    unless(grep m/blib/, @INC) {
         chdir 't' if -d 't';
         @INC = '../lib';
     }
@@ -11,17 +11,17 @@ use Config;
 
 BEGIN {
     my $reason;
-    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bSocket\b/) {
+    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ m/\bSocket\b/) {
 	$reason = 'Socket extension unavailable';
     }
-    elsif ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bIO\b/) {
+    elsif ($ENV{PERL_CORE} and $Config{'extensions'} !~ m/\bIO\b/) {
 	$reason = 'IO extension unavailable';
     }
     elsif ($^O eq 'os2') {
 	require IO::Socket;
 
 	eval {IO::Socket::pack_sockaddr_un('/foo/bar') || 1}
-	  or $@ !~ /not implemented/ or
+	  or $@ !~ m/not implemented/ or
 	    $reason = 'compiled without TCP/IP stack v4';
     }
     elsif ($^O =~ m/^(?:qnx|nto|vos|MSWin32)$/ ) {
@@ -46,7 +46,7 @@ if ($^O eq 'os2') {	# Can't create sockets with relative path...
 }
 
 # Test if we can create the file within the tmp directory
-if (-e $PATH or not open(TEST, ">$PATH") and $^O ne 'os2') {
+if (-e $PATH or not open(TEST, ">", "$PATH") and $^O ne 'os2') {
     print "1..0 # Skip: cannot open '$PATH' for write\n";
     exit 0;
 }

@@ -2,7 +2,7 @@ package POSIX;
 use strict;
 use warnings;
 
-our(@ISA, %EXPORT_TAGS, @EXPORT_OK, @EXPORT, $AUTOLOAD, %SIGRT) = ();
+our(@ISA, %EXPORT_TAGS, @EXPORT_OK, @EXPORT, %SIGRT) = ();
 
 our $VERSION = "1.13";
 
@@ -34,27 +34,8 @@ my %NON_CONSTS = (map {($_,1)}
                   qw(S_ISBLK S_ISCHR S_ISDIR S_ISFIFO S_ISREG WEXITSTATUS
                      WIFEXITED WIFSIGNALED WIFSTOPPED WSTOPSIG WTERMSIG));
 
-sub AUTOLOAD {
-    no strict;
-    no warnings 'uninitialized';
-    if ($AUTOLOAD =~ /::(_?[a-z])/) {
-	# require AutoLoader;
-        croak "subroutine $AUTOLOAD does not exist";
-    }
-    local $! = 0;
-    my $constname = $AUTOLOAD;
-    $constname =~ s/.*:://;
-    if ($NON_CONSTS{$constname}) {
-        my ($val, $error) = &int_macro_int($constname, $_[0]);
-        croak $error if $error;
-        *{Symbol::fetch_glob($AUTOLOAD)} = sub { &int_macro_int($constname, $_[0]) };
-    } else {
-        my ($error, $val) = constant($constname);
-        croak $error if $error;
-	*{Symbol::fetch_glob($AUTOLOAD)} = sub { $val };
-    }
-
-    goto &{Symbol::fetch_glob($AUTOLOAD)};
+for my $name (keys %NON_CONSTS) {
+    *{Symbol::fetch_glob($name)} = sub { &int_macro_int($name, $_[0]) };
 }
 
 package POSIX::SigRt;
@@ -208,7 +189,7 @@ sub longjmp {
 }
 
 sub setjmp {
-    unimpl "setjmp() is C-specific: use eval {} instead";
+    unimpl "setjmp() is C-specific: use eval \{\} instead";
 }
 
 sub siglongjmp {
@@ -216,7 +197,7 @@ sub siglongjmp {
 }
 
 sub sigsetjmp {
-    unimpl "sigsetjmp() is C-specific: use eval {} instead";
+    unimpl "sigsetjmp() is C-specific: use eval \{\} instead";
 }
 
 sub kill {
@@ -333,7 +314,7 @@ sub getchar {
 
 sub gets {
     usage "gets()" if @_ != 0;
-    scalar <STDIN>;
+    scalar ~< *STDIN;
 }
 
 sub perror {
@@ -342,7 +323,7 @@ sub perror {
 }
 
 sub printf {
-    usage "printf(pattern, args...)" if @_ < 1;
+    usage "printf(pattern, args...)" if @_ +< 1;
     CORE::printf STDOUT @_;
 }
 
@@ -412,7 +393,7 @@ sub abs {
 }
 
 sub atexit {
-    unimpl "atexit() is C-specific: use END {} instead";
+    unimpl "atexit() is C-specific: use END \{\} instead";
 }
 
 sub atof {
@@ -577,7 +558,7 @@ sub chmod {
 sub fstat {
     usage "fstat(fd)" if @_ != 1;
     local *TMP;
-    CORE::open(TMP, "<&$_[0]");		# Gross.
+    CORE::open(TMP, "<&", $_[0]);		# Gross.
     my @l = CORE::stat(*TMP);
     CORE::close(TMP);
     @l;
@@ -976,10 +957,10 @@ require Exporter;
 package POSIX::SigAction;
 
 sub new { bless {HANDLER => $_[1], MASK => $_[2], FLAGS => $_[3] || 0, SAFE => 0}, $_[0] }
-sub handler { $_[0]->{HANDLER} = $_[1] if @_ > 1; $_[0]->{HANDLER} };
-sub mask    { $_[0]->{MASK}    = $_[1] if @_ > 1; $_[0]->{MASK} };
-sub flags   { $_[0]->{FLAGS}   = $_[1] if @_ > 1; $_[0]->{FLAGS} };
-sub safe    { $_[0]->{SAFE}    = $_[1] if @_ > 1; $_[0]->{SAFE} };
+sub handler { $_[0]->{HANDLER} = $_[1] if @_ +> 1; $_[0]->{HANDLER} };
+sub mask    { $_[0]->{MASK}    = $_[1] if @_ +> 1; $_[0]->{MASK} };
+sub flags   { $_[0]->{FLAGS}   = $_[1] if @_ +> 1; $_[0]->{FLAGS} };
+sub safe    { $_[0]->{SAFE}    = $_[1] if @_ +> 1; $_[0]->{SAFE} };
 
 package POSIX::SigRt;
 
@@ -992,7 +973,7 @@ sub _init {
 
 sub _croak {
     &_init unless defined $_sigrtn;
-    die "POSIX::SigRt not available" unless defined $_sigrtn && $_sigrtn > 0;
+    die "POSIX::SigRt not available" unless defined $_sigrtn && $_sigrtn +> 0;
 }
 
 sub _getsig {
@@ -1000,13 +981,13 @@ sub _getsig {
     my $rtsig = $_[0];
     # Allow (SIGRT)?MIN( + n)?, a common idiom when doing these things in C.
     $rtsig = $_SIGRTMIN + ($1 || 0)
-	if $rtsig =~ /^(?:(?:SIG)?RT)?MIN(\s*\+\s*(\d+))?$/;
+	if $rtsig =~ m/^(?:(?:SIG)?RT)?MIN(\s*\+\s*(\d+))?$/;
     return $rtsig;
 }
 
 sub _exist {
     my $rtsig = _getsig($_[1]);
-    my $ok    = $rtsig >= $_SIGRTMIN && $rtsig <= $_SIGRTMAX;
+    my $ok    = $rtsig +>= $_SIGRTMIN && $rtsig +<= $_SIGRTMAX;
     ($rtsig, $ok);
 }
 

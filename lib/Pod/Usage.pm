@@ -431,14 +431,8 @@ use File::Spec;
 use vars qw(@ISA @EXPORT);
 @EXPORT = qw(&pod2usage);
 BEGIN {
-    if ( $] >= 5.005_58 ) {
        require Pod::Text;
        @ISA = qw( Pod::Text );
-    }
-    else {
-       require Pod::PlainText;
-       @ISA = qw( Pod::PlainText );
-    }
 }
 
 
@@ -452,7 +446,7 @@ sub pod2usage {
     local($_) = shift;
     my %opts;
     ## Collect arguments
-    if (@_ > 0) {
+    if (@_ +> 0) {
         ## Too many arguments - assume that this is a hash and
         ## the user forgot to pass a reference to it.
         %opts = ($_, @_);
@@ -464,7 +458,7 @@ sub pod2usage {
         ## User passed a ref to a hash
         %opts = %{$_}  if (ref($_) eq 'HASH');
     }
-    elsif (/^[-+]?\d+$/) {
+    elsif (m/^[-+]?\d+$/) {
         ## User passed in the exit value to use
         $opts{"-exitval"} =  $_;
     }
@@ -480,8 +474,8 @@ sub pod2usage {
     %opts = map {
         my $val = $opts{$_};
         s/^(?=\w)/-/;
-        /^-msg/i   and  $_ = '-message';
-        /^-exit/i  and  $_ = '-exitval';
+        m/^-msg/i   and  $_ = '-message';
+        m/^-exit/i  and  $_ = '-exitval';
         lc($_) => $val;    
     } (keys %opts);
 
@@ -491,16 +485,16 @@ sub pod2usage {
         $opts{"-verbose"} = 0;
     }
     elsif (! defined $opts{"-exitval"}) {
-        $opts{"-exitval"} = ($opts{"-verbose"} > 0) ? 1 : 2;
+        $opts{"-exitval"} = ($opts{"-verbose"} +> 0) ? 1 : 2;
     }
     elsif (! defined $opts{"-verbose"}) {
         $opts{"-verbose"} = (lc($opts{"-exitval"}) eq "noexit" ||
-                             $opts{"-exitval"} < 2);
+                             $opts{"-exitval"} +< 2);
     }
 
     ## Default the output file
     $opts{"-output"} = (lc($opts{"-exitval"}) eq "noexit" ||
-                        $opts{"-exitval"} < 2) ? \*STDOUT : \*STDERR
+                        $opts{"-exitval"} +< 2) ? \*STDOUT : \*STDERR
             unless (defined $opts{"-output"});
     ## Default the input file
     $opts{"-input"} = $0  unless (defined $opts{"-input"});
@@ -508,7 +502,7 @@ sub pod2usage {
     ## Look up input file in path if it doesnt exist.
     unless ((ref $opts{"-input"}) || (-e $opts{"-input"})) {
         my ($dirname, $basename) = ('', $opts{"-input"});
-        my $pathsep = ($^O =~ /^(?:dos|os2|MSWin32)$/) ? ";"
+        my $pathsep = ($^O =~ m/^(?:dos|os2|MSWin32)$/) ? ";"
                             : (($^O eq 'MacOS' || $^O eq 'VMS') ? ',' :  ":");
         my $pathspec = $opts{"-pathlist"} || $ENV{PATH} || $ENV{PERL5LIB};
 
@@ -530,7 +524,7 @@ sub pod2usage {
                      '(?:\s*(?:AND|\/)\s*(?:OPTIONS|ARGUMENTS))?';
         $parser->select( 'SYNOPSIS', $opt_re, "DESCRIPTION/$opt_re" );
     }
-    elsif ($opts{"-verbose"} >= 2 && $opts{"-verbose"} != 99) {
+    elsif ($opts{"-verbose"} +>= 2 && $opts{"-verbose"} != 99) {
         $parser->select('.*');
     }
     elsif ($opts{"-verbose"} == 99) {
@@ -540,7 +534,7 @@ sub pod2usage {
 
     ## Now translate the pod document and then exit with the desired status
     if ( !$opts{"-noperldoc"}
-             and  $opts{"-verbose"} >= 2 
+             and  $opts{"-verbose"} +>= 2 
              and  !ref($opts{"-input"})
              and  $opts{"-output"} == \*STDOUT )
     {
@@ -599,7 +593,7 @@ sub _handle_element_end {
     my ($self, $element) = @_;
     if ($element eq 'head1') {
         $$self{USAGE_HEAD1} = $$self{PENDING}[-1][1];
-        if ($self->{USAGE_OPTIONS}->{-verbose} < 2) {
+        if ($self->{USAGE_OPTIONS}->{-verbose} +< 2) {
             $$self{PENDING}[-1][1] =~ s/^\s*SYNOPSIS\s*$/USAGE/;
         }
     } elsif ($element eq 'head2') {
@@ -613,7 +607,7 @@ sub _handle_element_end {
            $$self{USAGE_SKIPPING} = 0;
         } else {
           for (@{ $$self{USAGE_SELECT} }) {
-              if ($heading =~ /^$_\s*$/) {
+              if ($heading =~ m/^$_\s*$/) {
                   $$self{USAGE_SKIPPING} = 0;
                   last;
               }
@@ -622,10 +616,10 @@ sub _handle_element_end {
 
         # Try to do some lowercasing instead of all-caps in headings, and use
         # a colon to end all headings.
-        if($self->{USAGE_OPTIONS}->{-verbose} < 2) {
+        if($self->{USAGE_OPTIONS}->{-verbose} +< 2) {
             local $_ = $$self{PENDING}[-1][1];
-            s{([A-Z])([A-Z]+)}{((length($2) > 2) ? $1 : lc($1)) . lc($2)}ge;
-            s/\s*$/:/  unless (/:\s*$/);
+            s{([A-Z])([A-Z]+)}{{((length($2) +> 2) ? $1 : lc($1)) . lc($2)}}g;
+            s/\s*$/:/  unless (m/:\s*$/);
             $_ .= "\n";
             $$self{PENDING}[-1][1] = $_;
         }
@@ -658,13 +652,13 @@ sub preprocess_paragraph {
     local $_ = shift;
     my $line = shift;
     ## See if this is a heading and we arent printing the entire manpage.
-    if (($self->{USAGE_OPTIONS}->{-verbose} < 2) && /^=head/) {
+    if (($self->{USAGE_OPTIONS}->{-verbose} +< 2) && m/^=head/) {
         ## Change the title of the SYNOPSIS section to USAGE
         s/^=head1\s+SYNOPSIS\s*$/=head1 USAGE/;
         ## Try to do some lowercasing instead of all-caps in headings
-        s{([A-Z])([A-Z]+)}{((length($2) > 2) ? $1 : lc($1)) . lc($2)}ge;
+        s{([A-Z])([A-Z]+)}{{((length($2) +> 2) ? $1 : lc($1)) . lc($2)}}g;
         ## Use a colon to end all headings
-        s/\s*$/:/  unless (/:\s*$/);
+        s/\s*$/:/  unless (m/:\s*$/);
         $_ .= "\n";
     }
     return  $self->SUPER::preprocess_paragraph($_);

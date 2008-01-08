@@ -8,15 +8,18 @@ package Archive::Tar;
 
 use strict;
 use vars qw[$DEBUG $error $VERSION $WARN $FOLLOW_SYMLINK $CHOWN $CHMOD
-            $DO_NOT_USE_PREFIX $HAS_PERLIO $HAS_IO_STRING];
+            $DO_NOT_USE_PREFIX $HAS_PERLIO $HAS_IO_STRING
+            $INSECURE_EXTRACT_MODE
+         ];
 
-$DEBUG              = 0;
-$WARN               = 1;
-$FOLLOW_SYMLINK     = 0;
-$VERSION            = "1.36";
-$CHOWN              = 1;
-$CHMOD              = 1;
-$DO_NOT_USE_PREFIX  = 0;
+$DEBUG                  = 0;
+$WARN                   = 1;
+$FOLLOW_SYMLINK         = 0;
+$VERSION                = "1.37_01";
+$CHOWN                  = 1;
+$CHMOD                  = 1;
+$DO_NOT_USE_PREFIX      = 0;
+$INSECURE_EXTRACT_MODE  = 0;
 
 BEGIN {
     use Config;
@@ -237,7 +240,7 @@ sub _read_tar {
 
     ### set a cap on the amount of files to extract ###
     my $limit   = 0;
-    $limit = 1 if $count > 0;
+    $limit = 1 if $count +> 0;
 
     my $tarfile = [ ];
     my $chunk;
@@ -253,7 +256,7 @@ sub _read_tar {
 
         unless( $read++ ) {
             my $gzip = GZIP_MAGIC_NUM;
-            if( $chunk =~ /$gzip/ ) {
+            if( $chunk =~ m/$gzip/ ) {
                 $self->_error( qq[Cannot read compressed format in tar-mode] );
                 return;
             }
@@ -305,7 +308,7 @@ sub _read_tar {
                 ### bytes ends up in the ->name area.
                 ### clean it up, if need be
                 my $name = $entry->name;
-                $name = substr($name, 0, 100) if length $name > 100;
+                $name = substr($name, 0, 100) if length $name +> 100;
                 $name =~ s/\n/ /g;
 
                 $self->_error( $name . qq[: checksum error] );
@@ -320,14 +323,14 @@ sub _read_tar {
             ### can't do lazy loading since IO::Zlib doesn't support 'seek'
             ### this is because Compress::Zlib doesn't support it =/
             ### this reads in the whole data in one read() call.
-            if( $handle->read( $$data, $block ) < $block ) {
+            if( $handle->read( $$data, $block ) +< $block ) {
                 $self->_error( qq[Read error on tarfile (missing data) '].
                                     $entry->full_path ."' at offset $offset" );
                 next LOOP;
             }
 
             ### throw away trailing garbage ###
-            substr ($$data, $entry->size) = "" if defined $$data;
+            substr ($$data, $entry->size, undef, "") if defined $$data;
 
             ### part II of the @LongLink munging -- need to do /after/
             ### the checksum check.
@@ -347,7 +350,7 @@ sub _read_tar {
 
                 ### cut data + size by that many bytes
                 $entry->size( $entry->size - $nulls );
-                substr ($$data, $entry->size) = "";
+                substr ($$data, $entry->size, undef, "");
             }
         }
 
@@ -541,18 +544,42 @@ sub _extract_file {
     my $dir;
     ### is $name an absolute path? ###
     if( File::Spec->file_name_is_absolute( $dirs ) ) {
+
+        ### absolute names are not allowed to be in tarballs under
+        ### strict mode, so only allow it if a user tells us to do it
+        if( not defined $alt and not $INSECURE_EXTRACT_MODE ) {
+            $self->_error( 
+                q[Entry ']. $entry->full_path .q[' is an absolute path. ].
+                q[Not extracting absolute paths under SECURE EXTRACT MODE]
+            );  
+            return;
+        }
+        
+        ### user asked us to, it's fine.
         $dir = $dirs;
 
     ### it's a relative path ###
     } else {
         my $cwd     = (defined $self->{cwd} ? $self->{cwd} : cwd());
 
-
-
         my @dirs = defined $alt
             ? File::Spec->splitdir( $dirs )         # It's a local-OS path
             : File::Spec::Unix->splitdir( $dirs );  # it's UNIX-style, likely
                                                     # straight from the tarball
+
+        ### paths that leave the current directory are not allowed under
+        ### strict mode, so only allow it if a user tells us to do this.
+        if( not defined $alt            and 
+            not $INSECURE_EXTRACT_MODE  and 
+            grep { $_ eq '..' } @dirs
+        ) {
+            $self->_error(
+                q[Entry ']. $entry->full_path .q[' is attempting to leave the ].
+                q[current working directory. Not extracting under SECURE ].
+                q[EXTRACT MODE]
+            );
+            return;
+        }            
         
         ### '.' is the directory delimiter, of which the first one has to
         ### be escaped/changed.
@@ -622,7 +649,7 @@ sub _extract_file {
 
     if( length $entry->type && $entry->is_file ) {
         my $fh = IO::File->new;
-        $fh->open( '>' . $full ) or (
+        $fh->open( $full, ">" ) or (
             $self->_error( qq[Could not open file '$full': $!] ),
             return
         );
@@ -1001,8 +1028,8 @@ sub write {
 
         ### names are too long, and will get truncated if we don't add a
         ### '@LongLink' file...
-        my $make_longlink = (   length($clone->name)    > NAME_LENGTH or
-                                length($clone->prefix)  > PREFIX_LENGTH
+        my $make_longlink = (   length($clone->name)    +> NAME_LENGTH or
+                                length($clone->prefix)  +> PREFIX_LENGTH
                             ) || 0;
 
         ### perhaps we need to make a longlink file?
@@ -1074,7 +1101,7 @@ sub write {
     ### did you want it written to a file, or returned as a string? ###
     my $rv =  length($file) ? 1
                         : $HAS_PERLIO ? $dummy
-                        : do { seek $handle, 0, 0; local $/; <$handle> };
+                        : do { seek $handle, 0, 0; local $/; ~< $handle };
 
     ### make sure to close the handle;
     close $handle;
@@ -1105,7 +1132,7 @@ sub _format_tar_entry {
 
     ### not sure why this is... ###
     my $l = PREFIX_LENGTH; # is ambiguous otherwise...
-    substr ($prefix, 0, -$l) = "" if length $prefix >= PREFIX_LENGTH;
+    substr ($prefix, 0, -$l, "") if length $prefix +>= PREFIX_LENGTH;
 
     my $f1 = "%06o"; my $f2  = "%11o";
 
@@ -1130,7 +1157,7 @@ sub _format_tar_entry {
     );
 
     ### add the checksum ###
-    substr($tar,148,7) = sprintf("%6o\0", unpack("%16C*",$tar));
+    substr($tar,148,7, sprintf("%6o\0", unpack("%16C*",$tar)));
 
     return $tar;
 }
@@ -1553,6 +1580,23 @@ Holds the last reported error. Kept for historical reasons, but its
 use is very much discouraged. Use the C<error()> method instead:
 
     warn $tar->error unless $tar->extract;
+
+=head2 $Archive::Tar::INSECURE_EXTRACT_MODE
+
+This variable indicates whether C<Archive::Tar> should allow
+files to be extracted outside their current working directory.
+
+Allowing this could have security implications, as a malicious
+tar archive could alter or replace any file the extracting user
+has permissions to. Therefor, the default is to not allow 
+insecure extractions. 
+
+If you trust the archive, or have other reasons to allow the 
+archive to write files outside your current working directory, 
+set this variable to C<true>.
+
+Note that this is a backwards incompatible change from version
+C<1.36> and before.
 
 =head2 $Archive::Tar::HAS_PERLIO
 

@@ -151,7 +151,6 @@ S_is_container_magic(const MAGIC *mg)
     case PERL_MAGIC_vec:
     case PERL_MAGIC_vstring:
     case PERL_MAGIC_utf8:
-    case PERL_MAGIC_substr:
     case PERL_MAGIC_defelem:
     case PERL_MAGIC_arylen:
     case PERL_MAGIC_pos:
@@ -763,8 +762,6 @@ Perl_magic_get(pTHX_ SV *sv, MAGIC *mg)
 	     SvRTRIM(sv);
 	     SvNOK_on(sv);	/* what a wonderful hack! */
 	 }
-	 else if (strEQ(remaining, "NCODING"))
-	     sv_setsv(sv, PL_encoding);
 	 break;
     case '\006':		/* ^F */
 	sv_setiv(sv, (IV)PL_maxsysfd);
@@ -773,10 +770,7 @@ Perl_magic_get(pTHX_ SV *sv, MAGIC *mg)
 	sv_setiv(sv, (IV)PL_hints);
 	break;
     case '\011':		/* ^I */ /* NOT \t in EBCDIC */
-	if (PL_inplace)
-	    sv_setpv(sv, PL_inplace);
-	else
-	    sv_setsv(sv, &PL_sv_undef);
+	sv_setpv(sv, PL_inplace); /* Will undefine sv if PL_inplace is NULL */
 	break;
     case '\017':		/* ^O & ^OPEN */
 	if (nextchar == '\0') {
@@ -1204,7 +1198,7 @@ Perl_magic_clearsig(pTHX_ SV *sv, MAGIC *mg)
 	    sigaddset(&set,i);
 	    sigprocmask(SIG_BLOCK, &set, &save);
 	    ENTER;
-	    save_sv = newSVpv((char *)(&save), sizeof(sigset_t));
+	    save_sv = newSVpvn((char *)(&save), sizeof(sigset_t));
 	    SAVEFREESV(save_sv);
 	    SAVEDESTRUCTOR_X(restore_sigmask, save_sv);
 #endif
@@ -1409,7 +1403,7 @@ Perl_magic_setsig(pTHX_ SV *sv, MAGIC *mg)
 	sigaddset(&set,i);
 	sigprocmask(SIG_BLOCK, &set, &save);
 	ENTER;
-	save_sv = newSVpv((char *)(&save), sizeof(sigset_t));
+	save_sv = newSVpvn((char *)(&save), sizeof(sigset_t));
 	SAVEFREESV(save_sv);
 	SAVEDESTRUCTOR_X(restore_sigmask, save_sv);
 #endif
@@ -1703,7 +1697,7 @@ Perl_magic_scalarpack(pTHX_ HV *hv, MAGIC *mg)
     SV * const tied = SvTIED_obj((SV*)hv, mg);
     HV * const pkg = SvSTASH((SV*)SvRV(tied));
    
-    if (!gv_fetchmethod_autoload(pkg, "SCALAR", FALSE)) {
+    if (!gv_fetchmethod(pkg, "SCALAR")) {
         SV *key;
         if (HvEITER_get(hv))
             /* we are in an iteration so the hash cannot be empty */
@@ -1905,51 +1899,6 @@ Perl_magic_setglob(pTHX_ SV *sv, MAGIC *mg)
     if (GvGP(sv))
 	gp_free((GV*)sv);
     GvGP(sv) = gp_ref(GvGP(gv));
-    return 0;
-}
-
-int
-Perl_magic_getsubstr(pTHX_ SV *sv, MAGIC *mg)
-{
-    STRLEN len;
-    SV * const lsv = LvTARG(sv);
-    const char * const tmps = SvPV_const(lsv,len);
-    I32 offs = LvTARGOFF(sv);
-    I32 rem = LvTARGLEN(sv);
-    PERL_UNUSED_ARG(mg);
-
-    if (LvTYPE(sv) == 'X')  /* Uppercase is with utf8 */
-	sv_pos_u2b(lsv, &offs, &rem);
-    if (offs > (I32)len)
-	offs = len;
-    if (rem + offs > (I32)len)
-	rem = len - offs;
-    sv_setpvn(sv, tmps + offs, (STRLEN)rem);
-    return 0;
-}
-
-int
-Perl_magic_setsubstr(pTHX_ SV *sv, MAGIC *mg)
-{
-    dVAR;
-    STRLEN len;
-    const char * const tmps = SvPV_const(sv, len);
-    SV * const lsv = LvTARG(sv);
-    I32 lvoff = LvTARGOFF(sv);
-    I32 lvlen = LvTARGLEN(sv);
-    PERL_UNUSED_ARG(mg);
-
-    if (LvTYPE(sv) == 'X') {  /* Uppercase is with utf8 */
- 	sv_pos_u2b(lsv, &lvoff, &lvlen);
-	sv_insert(lsv, lvoff, lvlen, tmps, len);
-	LvTARGLEN(sv) = sv_len_utf8(sv);
-    }
-    else {
-	sv_insert(lsv, lvoff, lvlen, tmps, len);
-	LvTARGLEN(sv) = len;
-    }
-
-
     return 0;
 }
 
@@ -2239,16 +2188,6 @@ Perl_magic_set(pTHX_ SV *sv, MAGIC *mg)
 #    endif
 #  endif
 #endif
-	}
-	else if (strEQ(mg->mg_ptr+1, "NCODING")) {
-           if (PL_encoding)
-               SvREFCNT_dec(PL_encoding);
-           if (SvOK(sv) || SvGMAGICAL(sv)) {
-               PL_encoding = newSVsv(sv);
-           }
-           else {
-               PL_encoding = NULL;
-           }
 	}
 	break;
     case '\006':	/* ^F */
@@ -2780,7 +2719,7 @@ Perl_sighandler(int sig)
 #endif
 		   EXTEND(SP, 2);
 		   PUSHs((SV*)rv);
-		   PUSHs(newSVpv((char *)sip, sizeof(*sip)));
+		   PUSHs(newSVpvn((char *)sip, sizeof(*sip)));
 	      }
 
 	 }

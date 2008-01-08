@@ -11,7 +11,7 @@ use File::Copy qw(copy);
 my $name = $0;
 $name =~ s#^(.*)\.PL$#../$1.SH#;
 my %opt;
-while (@ARGV && $ARGV[0] =~ /^([\w_]+)=(.*)$/)
+while (@ARGV && $ARGV[0] =~ m/^([\w_]+)=(.*)$/)
  {
   $opt{$1}=$2;
   shift(@ARGV);
@@ -28,16 +28,16 @@ $patchlevel =~ s|~VERSION~|$Config{version}|g;
 $patchlevel ||= $Config{version};
 $patchlevel = qq["$patchlevel"];
 
-open(SH,"<$name") || die "Cannot open $name:$!";
-while (<SH>)
+open(SH, "<","$name") || die "Cannot open $name:$!";
+while ( ~< *SH)
  {
-  last if /^\s*sed/;
+  last if m/^\s*sed/;
  }
-($term,$file,$pat) = /^\s*sed\s+<<(\S+)\s+>(\S+)\s+(.*)$/;
+($term,$file,$pat) = m/^\s*sed\s+<<(\S+)\s+>(\S+)\s+(.*)$/;
 
 $file =~ s/^\$(\w+)$/$opt{$1}/g;
 
-my $str = "sub munge\n{\n";
+my $str = "sub munge\n\{\n";
 
 while ($pat =~ s/-e\s+'([^']*)'\s*//)
  {
@@ -46,28 +46,28 @@ while ($pat =~ s/-e\s+'([^']*)'\s*//)
   $e =~ s/\\(\d)/\$$1/g; 
   $str .= "$e;\n";
  }
-$str .= "}\n";
+$str .= "\}\n";
 
 eval $str;
 
 die "$str:$@" if $@;
 
-open(H,">$file.new") || die "Cannot open $file.new:$!";
+open(H, ">","$file.new") || die "Cannot open $file.new:$!";
 #binmode H;		# no CRs (which cause a spurious rebuild)
-while (<SH>)
+while ( ~< *SH)
  {
-  last if /^$term$/o;
-  s/\$([\w_]+)/Config($1)/eg;
-  s/`([^\`]*)`/BackTick($1)/eg;
+  last if m/^$term$/o;
+  s/\$([\w_]+)/{Config($1)}/g;
+  s/`([^\`]*)`/{BackTick($1)}/g;
   munge();
   s/\\\$/\$/g;
   s#/[ *\*]*\*/#/**/#;
-  if (/^\s*#define\s+(PRIVLIB|SITELIB|VENDORLIB)_EXP/)
+  if (m/^\s*#define\s+(PRIVLIB|SITELIB|VENDORLIB)_EXP/)
    {
      $_ = "#define ". $1 . "_EXP (win32_get_". lc($1) . "($patchlevel))\t/**/\n";
    }
   # incpush() handles archlibs, so disable them
-  elsif (/^\s*#define\s+(ARCHLIB|SITEARCH|VENDORARCH)_EXP/)
+  elsif (m/^\s*#define\s+(ARCHLIB|SITEARCH|VENDORARCH)_EXP/)
    {
      $_ = "/*#define ". $1 . "_EXP \"\"\t/**/\n";
    }
@@ -108,7 +108,7 @@ sub Config
 sub BackTick
 {
  my $cmd = shift;
- if ($cmd =~ /^echo\s+(.*?)\s*\|\s+sed\s+'(.*)'\s*$/)
+ if ($cmd =~ m/^echo\s+(.*?)\s*\|\s+sed\s+'(.*)'\s*$/)
   {
    local ($data,$pat) = ($1,$2);
    $data =~ s/\s+/ /g;

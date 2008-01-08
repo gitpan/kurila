@@ -14,7 +14,7 @@
 
 BEGIN {
   $SIG{__WARN__} = sub {
-    help() if $_[0] =~ /"main::\w" used only once: possible typo at /;
+    help() if $_[0] =~ m/"main::\w" used only once: possible typo at /;
   };
 }
 
@@ -34,14 +34,14 @@ use vars qw($x $m $l $h);
 
 help() if $h;
 
-open(MANIFEST, "MANIFEST") or die "MANIFEST: $!";
+open(MANIFEST, "<", "MANIFEST") or die "MANIFEST: $!";
 
 my %mani;
 my %mand = qw(. 1);
 use File::Basename qw(dirname);
 
-while (<MANIFEST>) {
-  if (/^(\S+)\t+(.+)$/) {
+while ( ~< *MANIFEST) {
+  if (m/^(\S+)\t+(.+)$/) {
     $mani{$1}++;
     my $d = dirname($1);
     while($d ne '.') {

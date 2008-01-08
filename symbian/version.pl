@@ -2,9 +2,9 @@ use strict;
 
 my %VERSION;
 
-if (open(PATCHLEVEL_H, "patchlevel.h")) {
-  while (<PATCHLEVEL_H>) {
-     if (/#define\s+PERL_(REVISION|VERSION|SUBVERSION)\s+(\d+)/) {
+if (open(PATCHLEVEL_H, "<", "patchlevel.h")) {
+  while ( ~< *PATCHLEVEL_H) {
+     if (m/#define\s+PERL_(REVISION|VERSION|SUBVERSION)\s+(\d+)/) {
          $VERSION{$1} = $2;
      }
   }
@@ -15,7 +15,7 @@ if (open(PATCHLEVEL_H, "patchlevel.h")) {
 
 die "$0: Perl release looks funny.\n"
   unless (defined $VERSION{REVISION} && $VERSION{REVISION} == 5 &&
-          defined $VERSION{VERSION}  && $VERSION{VERSION}  >= 8 &&
+          defined $VERSION{VERSION}  && $VERSION{VERSION}  +>= 8 &&
           defined $VERSION{SUBVERSION});
 
 

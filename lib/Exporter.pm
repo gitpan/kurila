@@ -38,7 +38,7 @@ sub import {
   my($exports, $fail) = (\@{*{Symbol::fetch_glob("$pkg\::EXPORT")}}, 
                          \@{*{Symbol::fetch_glob("$pkg\::EXPORT_FAIL")}});
   return export $pkg, $callpkg, @_
-    if $Verbose or $Debug or @$fail > 1;
+    if $Verbose or $Debug or @$fail +> 1;
   my $export_cache = ($Cache{$pkg} ||= {});
   my $args = @_ or @_ = @$exports;
 
@@ -51,11 +51,11 @@ sub import {
   # Try very hard not to use {} and hence have to  enter scope on the foreach
   # We bomb out of the loop with last as soon as heavy is set.
   if ($args or $fail) {
-    ($heavy = (/\W/ or $args and not exists $export_cache->{$_}
+    ($heavy = (m/\W/ or $args and not exists $export_cache->{$_}
                or @$fail and $_ eq $fail->[0])) and last
                  foreach (@_);
   } else {
-    ($heavy = /\W/) and last
+    ($heavy = m/\W/) and last
       foreach (@_);
   }
   return export $pkg, $callpkg, ($args ? @_ : ()) if $heavy;
@@ -405,36 +405,5 @@ change:
   }
 
 Note that the tag names in %EXPORT_TAGS don't have the leading ':'.
-
-=head2 C<AUTOLOAD>ed Constants
-
-Many modules make use of C<AUTOLOAD>ing for constant subroutines to
-avoid having to compile and waste memory on rarely used values (see
-L<perlsub> for details on constant subroutines).  Calls to such
-constant subroutines are not optimized away at compile time because
-they can't be checked at compile time for constancy.
-
-Even if a prototype is available at compile time, the body of the
-subroutine is not (it hasn't been C<AUTOLOAD>ed yet). perl needs to
-examine both the C<()> prototype and the body of a subroutine at
-compile time to detect that it can safely replace calls to that
-subroutine with the constant value.
-
-A workaround for this is to call the constants once in a C<BEGIN> block:
-
-   package My ;
-
-   use Socket ;
-
-   foo( SO_LINGER );     ## SO_LINGER NOT optimized away; called at runtime
-   BEGIN { SO_LINGER }
-   foo( SO_LINGER );     ## SO_LINGER optimized away at compile time.
-
-This forces the C<AUTOLOAD> for C<SO_LINGER> to take place before
-SO_LINGER is encountered later in C<My> package.
-
-If you are writing a package that C<AUTOLOAD>s, consider forcing
-an C<AUTOLOAD> for any constants explicitly imported by other packages
-or which are usually used when your package is C<use>d.
 
 =cut

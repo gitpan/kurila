@@ -6,8 +6,8 @@ BEGIN {
 	@INC = '../lib';
     }
     require Config; Config->import;
-    if ($Config{'extensions'} !~ /\bOpcode\b/
-	&& $Config{'extensions'} !~ /\bPOSIX\b/
+    if ($Config{'extensions'} !~ m/\bOpcode\b/
+	&& $Config{'extensions'} !~ m/\bPOSIX\b/
 	&& $Config{'osname'} ne 'VMS')
     {
 	print "1..0\n";
@@ -36,7 +36,7 @@ like( $@, qr/^'?addition \(\+\)'? trapped by operation mask/,
 my $safe2 = Safe->new();
 $safe2->deny('add');
 
-open my $fh, '>nasty.pl' or die "Can't write nasty.pl: $!\n";
+open my $fh, ">", 'nasty.pl' or die "Can't write nasty.pl: $!\n";
 print $fh <<EOF;
 \$_[1] = "\0" x $masksize;
 EOF

@@ -23,7 +23,7 @@ SKIP: {
     my @tzname = tzname();
     like($tzname[0], qr/(GMT|UTC)/i, "tzset() to GMT/UTC");
     SKIP: {
-        skip "Mac OS X/Darwin doesn't handle this", 1 if $^O =~ /darwin/i;
+        skip "Mac OS X/Darwin doesn't handle this", 1 if $^O =~ m/darwin/i;
         like($tzname[1], qr/(GMT|UTC)/i, "The whole year?");
     }
 }
@@ -45,7 +45,7 @@ setlocale(LC_TIME, $orig_loc) || die "Cannot setlocale() back to orig: $!";
 # and BSD.  Cygwin, Win32, and Linux lean the BSD way.  So, the tests just
 # check the basics.
 like(clock(), qr/\d*/, "clock() returns a numeric value");
-ok(clock() >= 0, "...and it returns something >= 0");
+ok(clock() +>= 0, "...and it returns something >= 0");
 
 SKIP: {
     skip "No difftime()", 1 if $Config{d_difftime} ne 'define';

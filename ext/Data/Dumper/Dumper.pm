@@ -93,14 +93,14 @@ sub new {
 	     deparse	=> $Deparse,	# use B::Deparse for coderefs
 	   };
 
-  if ($Indent > 0) {
+  if ($Indent +> 0) {
     $s->{xpad} = "  ";
     $s->{sep} = "\n";
   }
   return bless($s, $c);
 }
 
-if ($] >= 5.006) {
+{
   # Packed numeric addresses take less memory. Plus pack is faster than sprintf
   *init_refaddr_format = sub {};
 
@@ -108,18 +108,6 @@ if ($] >= 5.006) {
     require Scalar::Util;
     pack "J", Scalar::Util::refaddr(shift);
   };
-} else {
-  *init_refaddr_format = sub {
-    require Config;
-    my $f = $Config::Config{uvxformat};
-    $f =~ tr/"//d;
-    our $refaddr_format = "0x%" . $f;
-  };
-
-  *format_refaddr = sub {
-    require Scalar::Util;
-    sprintf our $refaddr_format, Scalar::Util::refaddr(shift);
-  }
 }
 
 #
@@ -133,13 +121,13 @@ sub Seen {
     while (($k, $v) = each %$g) {
       if (defined $v and ref $v) {
 	$id = format_refaddr($v);
-	if ($k =~ /^[*](.*)$/) {
+	if ($k =~ m/^[*](.*)$/) {
 	  $k = (ref $v eq 'ARRAY') ? ( "\\\@" . $1 ) :
 	       (ref $v eq 'HASH')  ? ( "\\\%" . $1 ) :
 	       (ref $v eq 'CODE')  ? ( "\\\&" . $1 ) :
 				     (   "\$" . $1 ) ;
 	}
-	elsif ($k !~ /^\$/) {
+	elsif ($k !~ m/^\$/) {
 	  $k = "\$" . $k;
 	}
 	$s->{seen}{$id} = [$k, $v];
@@ -211,7 +199,7 @@ sub Dumpperl {
     @post = ();
     $name = $s->{names}[$i++];
     if (defined $name) {
-      if ($name =~ /^[*](.*)$/) {
+      if ($name =~ m/^[*](.*)$/) {
 	if (defined $val) {
 	  $name = (ref $val eq 'ARRAY') ? ( "\@" . $1 ) :
 		  (ref $val eq 'HASH')  ? ( "\%" . $1 ) :
@@ -222,7 +210,7 @@ sub Dumpperl {
 	  $name = "\$" . $1;
 	}
       }
-      elsif ($name !~ /^\$/) {
+      elsif ($name !~ m/^\$/) {
 	$name = "\$" . $name;
       }
     }
@@ -238,7 +226,7 @@ sub Dumpperl {
     my $valstr;
     {
       local($s->{apad}) = $s->{apad};
-      $s->{apad} .= ' ' x (length($name) + 3) if $s->{indent} >= 2;
+      $s->{apad} .= ' ' x (length($name) + 3) if $s->{indent} +>= 2;
       $valstr = $s->_dump($val, $name);
     }
 
@@ -255,8 +243,8 @@ sub Dumpperl {
 # wrap string in single quotes (escaping if needed)
 sub _quote {
     my $val = shift;
-    $val =~ s/([\\\'])/\\$1/g;
-    return  "'" . $val .  "'";
+    $val =~ s/([\\\"\$\{\}\@])/\\$1/g;
+    return  '"' . $val .  '"';
 }
 
 #
@@ -295,7 +283,7 @@ sub _dump {
       # keep a tab on it so that we dont fall into recursive pit
       if (exists $s->{seen}{$id}) {
 #	if ($s->{expdepth} < $s->{level}) {
-	  if ($s->{purity} and $s->{level} > 0) {
+	  if ($s->{purity} and $s->{level} +> 0) {
 	    $out = ($realtype eq 'HASH')  ? '{}' :
 	      ($realtype eq 'ARRAY') ? '[]' :
 		'do{my $o}' ;
@@ -303,9 +291,9 @@ sub _dump {
 	  }
 	  else {
 	    $out = $s->{seen}{$id}[0];
-	    if ($name =~ /^([\@\%])/) {
+	    if ($name =~ m/^([\@\%])/) {
 	      my $start = $1;
-	      if ($out =~ /^\\$start/) {
+	      if ($out =~ m/^\\$start/) {
 		$out = substr($out, 1);
 	      }
 	      else {
@@ -318,9 +306,9 @@ sub _dump {
       }
       else {
         # store our name
-        $s->{seen}{$id} = [ (($name =~ /^[@%]/)     ? ('\\' . $name ) :
+        $s->{seen}{$id} = [ (($name =~ m/^[@%]/)     ? ('\' . $name ) :
 			     ($realtype eq 'CODE' and
-			      $name =~ /^[*](.*)$/) ? ('\\&' . $1 )   :
+			      $name =~ m/^[*](.*)$/) ? ('\&' . $1 )   :
 			     $name          ),
 			    $val ];
       }
@@ -337,8 +325,8 @@ sub _dump {
     # representation of the thing we are currently examining
     # at this depth (i.e., 'Foo=ARRAY(0xdeadbeef)'). 
     if (!$s->{purity}
-	and $s->{maxdepth} > 0
-	and $s->{level} >= $s->{maxdepth})
+	and $s->{maxdepth} +> 0
+	and $s->{level} +>= $s->{maxdepth})
     {
       return qq['$val'];
     }
@@ -347,7 +335,7 @@ sub _dump {
     if ($realpack) {
       $out = $s->{'bless'} . '( ';
       $blesspad = $s->{apad};
-      $s->{apad} .= '       ' if ($s->{indent} >= 2);
+      $s->{apad} .= '       ' if ($s->{indent} +>= 2);
     }
 
     $s->{level}++;
@@ -355,45 +343,45 @@ sub _dump {
 
     if ($realtype eq 'SCALAR' || $realtype eq 'REF') {
       if ($realpack) {
-	$out .= 'do{\\(my $o = ' . $s->_dump($$val, "\${$name}") . ')}';
+	$out .= 'do{\(my $o = ' . $s->_dump($$val, "\$\{$name\}") . ')}';
       }
       else {
-	$out .= '\\' . $s->_dump($$val, "\${$name}");
+	$out .= '\' . $s->_dump($$val, "\$\{$name\}");
       }
     }
     elsif ($realtype eq 'GLOB') {
-	$out .= '\\' . $s->_dump($$val, "*{$name}");
+	$out .= '\' . $s->_dump($$val, "*\{$name\}");
     }
     elsif ($realtype eq 'ARRAY') {
       my($v, $pad, $mname);
       my($i) = 0;
-      $out .= ($name =~ /^\@/) ? '(' : '[';
+      $out .= ($name =~ m/^\@/) ? '(' : '[';
       $pad = $s->{sep} . $s->{pad} . $s->{apad};
-      ($name =~ /^\@(.*)$/) ? ($mname = "\$" . $1) : 
+      ($name =~ m/^\@(.*)$/) ? ($mname = "\$" . $1) : 
 	# omit -> if $foo->[0]->{bar}, but not ${$foo->[0]}->{bar}
-	($name =~ /^\\?[\%\@\*\$][^{].*[]}]$/) ? ($mname = $name) :
+	($name =~ m/^\\?[\%\@\*\$][^{].*[]}]$/) ? ($mname = $name) :
 	  ($mname = $name . '->');
-      $mname .= '->' if $mname =~ /^\*.+\{[A-Z]+\}$/;
+      $mname .= '->' if $mname =~ m/^\*.+\{[A-Z]+\}$/;
       for $v (@$val) {
 	$sname = $mname . '[' . $i . ']';
-	$out .= $pad . $ipad . '#' . $i if $s->{indent} >= 3;
+	$out .= $pad . $ipad . '#' . $i if $s->{indent} +>= 3;
 	$out .= $pad . $ipad . $s->_dump($v, $sname);
-	$out .= "," if $i++ < $#$val;
+	$out .= "," if $i++ +< $#$val;
       }
       $out .= $pad . ($s->{xpad} x ($s->{level} - 1)) if $i;
-      $out .= ($name =~ /^\@/) ? ')' : ']';
+      $out .= ($name =~ m/^\@/) ? ')' : ']';
     }
     elsif ($realtype eq 'HASH') {
       my($k, $v, $pad, $lpad, $mname, $pair);
-      $out .= ($name =~ /^\%/) ? '(' : '{';
+      $out .= ($name =~ m/^\%/) ? '(' : '{';
       $pad = $s->{sep} . $s->{pad} . $s->{apad};
       $lpad = $s->{apad};
       $pair = $s->{pair};
-      ($name =~ /^\%(.*)$/) ? ($mname = "\$" . $1) :
+      ($name =~ m/^\%(.*)$/) ? ($mname = "\$" . $1) :
 	# omit -> if $foo->[0]->{bar}, but not ${$foo->[0]}->{bar}
-	($name =~ /^\\?[\%\@\*\$][^{].*[]}]$/) ? ($mname = $name) :
+	($name =~ m/^\\?[\%\@\*\$][^{].*[]}]$/) ? ($mname = $name) :
 	  ($mname = $name . '->');
-      $mname .= '->' if $mname =~ /^\*.+\{[A-Z]+\}$/;
+      $mname .= '->' if $mname =~ m/^\*.+\{[A-Z]+\}$/;
       my ($sortkeys, $keys, $key) = ("$s->{sortkeys}");
       if ($sortkeys) {
 	if (ref($s->{sortkeys}) eq 'CODE') {
@@ -412,27 +400,27 @@ sub _dump {
 	     () ) 
       {
 	my $nk = $s->_dump($k, "");
-	$nk = $1 if !$s->{quotekeys} and $nk =~ /^[\"\']([A-Za-z_]\w*)[\"\']$/;
+	$nk = $1 if !$s->{quotekeys} and $nk =~ m/^[\"\']([A-Za-z_]\w*)[\"\']$/;
 	$sname = $mname . '{' . $nk . '}';
 	$out .= $pad . $ipad . $nk . $pair;
 
 	# temporarily alter apad
-	$s->{apad} .= (" " x (length($nk) + 4)) if $s->{indent} >= 2;
+	$s->{apad} .= (" " x (length($nk) + 4)) if $s->{indent} +>= 2;
 	$out .= $s->_dump($val->{$k}, $sname) . ",";
-	$s->{apad} = $lpad if $s->{indent} >= 2;
+	$s->{apad} = $lpad if $s->{indent} +>= 2;
       }
       if (substr($out, -1) eq ',') {
 	chop $out;
 	$out .= $pad . ($s->{xpad} x ($s->{level} - 1));
       }
-      $out .= ($name =~ /^\%/) ? ')' : '}';
+      $out .= ($name =~ m/^\%/) ? ')' : '}';
     }
     elsif ($realtype eq 'CODE') {
       if ($s->{deparse}) {
 	require B::Deparse;
 	my $sub =  'sub ' . (B::Deparse->new)->coderef2text($val);
 	$pad    =  $s->{sep} . $s->{pad} . $s->{apad} . $s->{xpad} x ($s->{level} - 1);
-	$sub    =~ s/\n/$pad/gse;
+	$sub    =~ s/\n/{$pad}/gs;
 	$out   .=  $sub;
       } else {
         $out .= 'sub { "DUMMY" }';
@@ -461,7 +449,7 @@ sub _dump {
         if ($s->{seen}{$id}[2]) {
 	  $out = $s->{seen}{$id}[0];
 	  #warn "[<$out]\n";
-	  return "\${$out}";
+	  return "\$\{$out\}";
 	}
       }
       else {
@@ -469,9 +457,9 @@ sub _dump {
 	$s->{seen}{$id} = ["\\$name", $ref];
       }
     }
-    if (ref($ref) eq 'GLOB' or "$ref" =~ /=GLOB\([^()]+\)$/) {  # glob
-      my $name = substr($val, 1);
-      if ($name =~ /^[A-Za-z_][\w:]*$/) {
+    if (ref($ref) eq 'GLOB' or "$ref" =~ m/=GLOB\([^()]+\)$/) {  # glob
+      my $name = Symbol::glob_name($val);
+      if ($name =~ m/^[A-Za-z_][\w:]*$/) {
 	$name =~ s/^main::/::/;
 	$sname = $name;
       }
@@ -490,7 +478,7 @@ sub _dump {
 	  # _dump can push into @post, so we hold our place using $postlen
 	  my $postlen = scalar @post;
 	  $post[$postlen] = "\*$sname = ";
-	  local ($s->{apad}) = " " x length($post[$postlen]) if $s->{indent} >= 2;
+	  local ($s->{apad}) = " " x length($post[$postlen]) if $s->{indent} +>= 2;
 	  $post[$postlen] .= $s->_dump($gval, "\*$sname\{$k\}");
 	}
       }
@@ -499,11 +487,11 @@ sub _dump {
     elsif (!defined($val)) {
       $out .= "undef";
     }
-    elsif ($val =~ /^(?:0|-?[1-9]\d{0,8})\z/) { # safe decimal number
+    elsif ($val =~ m/^(?:0|-?[1-9]\d{0,8})\z/) { # safe decimal number
       $out .= $val;
     }
     else {				 # string
-      if ($s->{useqq} or $val =~ m/[\x80-\xFF]/) {
+      if ($s->{useqq} or $val =~ m/[\x[80]-\x[FF]]/) {
         # Fall back to qq if there's Unicode
 	$out .= qquote($val, $s->{useqq});
       }
@@ -658,21 +646,21 @@ my %esc = (
 # put a string value in double quotes
 sub qquote {
   local($_) = shift;
-  s/([\\\"\@\$])/\\$1/g;
+  s/([\\\"\@\$\{\}])/\\$1/g;
   my $bytes; { use bytes; $bytes = length }
-  s/([^\x00-\x7f])/'\x'.sprintf("%02x",ord($1))/ge if $bytes > length;
+  s/([^\x[00]-\x[7f]])/{'\x'.sprintf("[%02x]",ord($1))}/g if $bytes +> length;
   return qq("$_") unless 
-    /[^ !"\#\$%&'()*+,\-.\/0-9:;<=>?\@A-Z[\\\]^_`a-z{|}~]/;  # fast exit
+    m/[^ !"\#\$%&'()*+,\-.\/0-9:;<=>?\@A-Z[\\\]^_`a-z{|}~]/;  # fast exit
 
   my $high = shift || "";
   s/([\a\b\t\n\f\r\e])/$esc{$1}/g;
 
     # no need for 3 digits in escape for these
-    s/([\0-\037])(?!\d)/'\\'.sprintf('%o',ord($1))/eg;
-    s/([\0-\037\177])/'\\'.sprintf('%03o',ord($1))/eg;
+    s/([\0-\037])(?!\d)/{'\'.sprintf('%o',ord($1))}/g;
+    s/([\0-\037\177])/{'\'.sprintf('%03o',ord($1))}/g;
     # all but last branch below not supported --BEHAVIOR SUBJECT TO CHANGE--
     if ($high eq "iso8859") {
-      s/([\200-\240])/'\\'.sprintf('%o',ord($1))/eg;
+      s/([\200-\240])/{'\'.sprintf('%o',ord($1))}/g;
     } elsif ($high eq "utf8") {
 #     use utf8;
 #     $str =~ s/([^\040-\176])/sprintf "\\x{%04x}", ord($1)/ge;
@@ -680,7 +668,7 @@ sub qquote {
         # leave it as it is
     } else {
         use utf8;
-        s/([^\040-\176])/sprintf "\\x{%04x}", ord($1)/ge;
+        s/([^\040-\176])/{sprintf "\\x\{%04x\}", ord($1)}/g;
     }
 
   return qq("$_");

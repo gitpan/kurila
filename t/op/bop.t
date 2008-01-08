@@ -28,16 +28,16 @@ ok ((257 << 7) == 32896);
 ok ((33023 >> 7) == 257);
 
 # signed vs. unsigned
-ok ((^~^0 > 0 && do { use integer; ^~^0 } == -1));
+ok ((^~^0 +> 0 && do { use integer; ^~^0 } == -1));
 
 my $bits = 0;
 for (my $i = ^~^0; $i; $i >>= 1) { ++$bits; }
 my $cusp = 1 << ($bits - 1);
 
 
-ok (($cusp ^&^ -1) > 0 && do { use integer; $cusp ^&^ -1 } < 0);
-ok (($cusp ^|^ 1) > 0 && do { use integer; $cusp ^|^ 1 } < 0);
-ok (($cusp ^^^ 1) > 0 && do { use integer; $cusp ^^^ 1 } < 0);
+ok (($cusp ^&^ -1) +> 0 && do { use integer; $cusp ^&^ -1 } +< 0);
+ok (($cusp ^|^ 1) +> 0 && do { use integer; $cusp ^|^ 1 } +< 0);
+ok (($cusp ^^^ 1) +> 0 && do { use integer; $cusp ^^^ 1 } +< 0);
 ok ((1 << ($bits - 1)) == $cusp &&
     do { use integer; 1 << ($bits - 1) } == -$cusp);
 ok (($cusp >> 1) == ($cusp / 2) &&
@@ -73,7 +73,7 @@ is (sprintf("%vd", utf8::chr(0xfff) ^^^ utf8::chr(0x321)), '44.30.191');
 # UTF8 ~ behaviour: ~ always works on bytes
 #
 
-is ^~^"\x01\x00", "\xFE\xFF";
+is ^~^"\x[0100]", "\x[FEFF]";
 
 # Tests to see if you really can do casts negative floats to unsigned properly
 $neg1 = -1.0;
@@ -236,32 +236,32 @@ SKIP: {
 {
     $a = "aa";
     $a ^&^= "a";
-    ok($a =~ /a+$/, 'ASCII "a" is NUL-terminated');
+    ok($a =~ m/a+$/, 'ASCII "a" is NUL-terminated');
 
     use utf8;
     $b = "bb\x{100}";
     $b ^&^= "b";
-    ok($b =~ /b+$/, 'Unicode "b" is NUL-terminated');
+    ok($b =~ m/b+$/, 'Unicode "b" is NUL-terminated');
 }
 
 {
-    $a = "\x01\x01" x 0x101;
-    $b = "\xFF" x 0x100;
+    $a = "\x[0101]" x 0x101;
+    $b = "\x[FF]" x 0x100;
 
     my $c = $a ^|^ $b;
-    is($c, "\xFF" x 0x100 . "\x01\x01" x 0x81);
+    is($c, "\x[FF]" x 0x100 . "\x[0101]" x 0x81);
     is( ($a ^|^ $b), ($b ^|^ $a) );
     $c = $a; $c ^|^= $b;
     is( $c, ($a ^|^ $b) );
 
     $c = $a ^&^ $b;
-    is($c, "\x01" x 0x100);
+    is($c, "\x[01]" x 0x100);
     is( ($a ^&^ $b), ($b ^&^ $a) );
     $c = $a; $c ^^^= $b;
     is( $c, ($a ^^^ $b) );
 
     $c = $a ^^^ $b;
-    is($c, "\xFE" x 0x100 . "\x01\x01" x 0x81);
+    is($c, "\x[FE]" x 0x100 . "\x[0101]" x 0x81);
     is( ($a ^^^ $b), ($b ^^^ $a) );
     $c = $a; $c ^^^= $b;
     is( $c, ($a ^^^ $b) );

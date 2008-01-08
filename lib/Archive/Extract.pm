@@ -202,13 +202,13 @@ Returns a C<Archive::Extract> object on success, or false on failure.
         ### figure out the type, if it wasn't already specified ###
         unless ( $parsed->{type} ) {
             $parsed->{type} =
-                $ar =~ /.+?\.(?:tar\.gz|tgz)$/i     ? TGZ   :
-                $ar =~ /.+?\.gz$/i                  ? GZ    :
-                $ar =~ /.+?\.tar$/i                 ? TAR   :
-                $ar =~ /.+?\.(zip|jar|par)$/i       ? ZIP   :
-                $ar =~ /.+?\.(?:tbz2?|tar\.bz2?)$/i ? TBZ   :
-                $ar =~ /.+?\.bz2$/i                 ? BZ2   :
-                $ar =~ /.+?\.Z$/                    ? Z     :
+                $ar =~ m/.+?\.(?:tar\.gz|tgz)$/i     ? TGZ   :
+                $ar =~ m/.+?\.gz$/i                  ? GZ    :
+                $ar =~ m/.+?\.tar$/i                 ? TAR   :
+                $ar =~ m/.+?\.(zip|jar|par)$/i       ? ZIP   :
+                $ar =~ m/.+?\.(?:tbz2?|tar\.bz2?)$/i ? TBZ   :
+                $ar =~ m/.+?\.bz2$/i                 ? BZ2   :
+                $ar =~ m/.+?\.Z$/                    ? Z     :
                 '';
 
         }
@@ -487,9 +487,9 @@ sub have_old_bunzip2 {
     ### no output
     return unless $buffer;
     
-    my ($version) = $buffer =~ /version \s+ (\d+)/ix;
+    my ($version) = $buffer =~ m/version \s+ (\d+)/ix;
 
-    return 1 if $version < 1;
+    return 1 if $version +< 1;
     return;
 }
 
@@ -639,7 +639,7 @@ sub _untar_at {
     if( $self->is_tgz ) {
         my $use_list = { 'Compress::Zlib' => '0.0' };
            $use_list->{ 'IO::Zlib' } = '0.0'
-                if $Archive::Tar::VERSION >= '0.99';
+                if $Archive::Tar::VERSION +>= '0.99';
 
         unless( can_load( modules => $use_list ) ) {
             my $which = join '/', sort keys %$use_list;
@@ -743,7 +743,7 @@ sub _gunzip_bin {
         unless $self->bin_gzip;
 
 
-    my $fh = FileHandle->new('>'. $self->_gunzip_to) or
+    my $fh = FileHandle->new($self->_gunzip_to, '>') or
         return $self->_error(loc("Could not open '%1' for writing: %2",
                             $self->_gunzip_to, $! ));
 
@@ -787,12 +787,12 @@ sub _gunzip_cz {
                 return $self->_error(loc("Unable to open '%1': %2",
                             $self->archive, $Compress::Zlib::gzerrno));
 
-    my $fh = FileHandle->new('>'. $self->_gunzip_to) or
+    my $fh = FileHandle->new($self->_gunzip_to, ">") or
         return $self->_error(loc("Could not open '%1' for writing: %2",
                             $self->_gunzip_to, $! ));
 
     my $buffer;
-    $fh->print($buffer) while $gz->gzread($buffer) > 0;
+    $fh->print($buffer) while $gz->gzread($buffer) +> 0;
     $fh->close;
 
     ### set what files where extract, and where they went ###
@@ -832,7 +832,7 @@ sub _uncompress_bin {
         unless $self->bin_uncompress;
 
 
-    my $fh = FileHandle->new('>'. $self->_gunzip_to) or
+    my $fh = FileHandle->new($self->_gunzip_to, '>') or
         return $self->_error(loc("Could not open '%1' for writing: %2",
                             $self->_gunzip_to, $! ));
 
@@ -1045,13 +1045,13 @@ sub _bunzip2_bin {
         unless $self->bin_bunzip2;
 
 
-    my $fh = FileHandle->new('>'. $self->_gunzip_to) or
+    my $fh = FileHandle->new($self->_gunzip_to, '>') or
         return $self->_error(loc("Could not open '%1' for writing: %2",
                             $self->_gunzip_to, $! ));
     
     ### guard against broken bunzip2. See ->have_old_bunzip2()
     ### for details
-    if( $self->have_old_bunzip2 and $self->archive !~ /\.bz2$/i ) {
+    if( $self->have_old_bunzip2 and $self->archive !~ m/\.bz2$/i ) {
         return $self->_error(loc("Your bunzip2 version is too old and ".
                                  "can only extract files ending in '%1'",
                                  '.bz2'));

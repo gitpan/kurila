@@ -16,7 +16,7 @@ use ExtUtils::MakeMaker;
 
 my %versions = (q[$VERSION = '1.00']        => '1.00',
                 q[*VERSION = \'1.01']       => '1.01',
-                q[($VERSION) = q$Revision: 32208 $ =~ /(\d+)/g;] => 32208,
+                q[($VERSION) = q$Revision: 32208 $ =~ m/(\d+)/g;] => 32208,
                 q[$FOO::VERSION = '1.10';]  => '1.10',
                 q[*FOO::VERSION = \'1.11';] => '1.11',
                 '$VERSION = 0.02'   => 0.02,
@@ -34,14 +34,14 @@ if( eval 'our $foo' ) {
 }
 
 if( eval 'require version; "version"->import' ) {
-    $versions{q[use version; $VERSION = qv(1.2.3);]} = qv(1.2.3);
-    $versions{q[$VERSION = qv(1.2.3)]}               = qv(1.2.3);
+    $versions{q[use version; $VERSION = v1.2.3;]} = v1.2.3;
+    $versions{q[$VERSION = v1.2.3]}               = v1.2.3;
 }
 
 plan tests => 2 * keys %versions;
 
 while( my($code, $expect) = each %versions ) {
-    open(FILE, ">VERSION.tmp") || die $!;
+    open(FILE, ">", "VERSION.tmp") || die $!;
     print FILE "$code\n";
     close FILE;
 

@@ -19,17 +19,17 @@ cmp_ok($warns,'==',0,'no warns at start');
 
 no strict 'subs';
 
-open(FILE,">$saved_filename");
+open(FILE, ">","$saved_filename");
 ok(defined('FILE'),'created work file');
 print FILE "1\n";
 print FILE "0";
 close(FILE);
 
-open(FILE,"<$saved_filename");
+open(FILE, "<","$saved_filename");
 ok(defined('FILE'),'opened work file');
 my $seen = 0;
 my $dummy;
-while (my $name = <FILE>)
+while (my $name = ~< *FILE)
  {
   $seen++ if $name eq '0';
  }
@@ -41,13 +41,13 @@ my $line = '';
 do
  {
   $seen++ if $line eq '0';
- } while ($line = <FILE>);
+ } while ($line = ~< *FILE);
 cmp_ok($seen,'==',1,'seen in do/while');
 
 seek(FILE,0,0);
 $seen = 0;
 my $name;
-while (($seen ? $dummy : $name) = <FILE> )
+while (($seen ? $dummy : $name) = ~< *FILE )
  {
   $seen++ if $name eq '0';
  }
@@ -56,7 +56,7 @@ cmp_ok($seen,'==',1,'seen in while() ternary');
 seek(FILE,0,0);
 $seen = 0;
 my %where;
-while ($where{$seen} = <FILE>)
+while ($where{$seen} = ~< *FILE)
  {
   $seen++ if $where{$seen} eq '0';
  }
@@ -79,7 +79,7 @@ while (($seen ? $dummy : $name) = readdir(DIR))
  {
   $seen++ if $name eq $wanted_filename;
  }
-cmp_ok($seen,'>',0,'saw file in while() ternary');
+cmp_ok($seen,'+>',0,'saw file in while() ternary');
 
 rewinddir(DIR);
 $seen = 0;
@@ -102,7 +102,7 @@ while (($seen ? $dummy : $name) = glob('*'))
  {
   $seen++ if $name eq $wanted_filename;
  }
-cmp_ok($seen,'>',0,'saw file in glob hash while() ternary');
+cmp_ok($seen,'+>',0,'saw file in glob hash while() ternary');
 
 $seen = 0;
 while ($where{$seen} = glob('*'))

@@ -13,7 +13,7 @@ chdir 't';
 
 use strict;
 use Test::More;
-if ($^O =~ /os2/i) {
+if ($^O =~ m/os2/i) {
 	plan( tests => 32 );
 } else {
 	plan( skip_all => "This is not OS/2" );
@@ -61,7 +61,7 @@ like( $res, qr/"IMPORTS" => .+imports/, '... and allow parameter options too' );
 my $can_write;
 {
 	local *OUT;
-	$can_write = open(OUT, '>tmp_imp');
+	$can_write = open(OUT, ">", 'tmp_imp');
 }
 
 SKIP: {
@@ -162,7 +162,7 @@ is( ExtUtils::MM_OS2->replace_manpage_separator($sep), '.a.b.c.de',
 	# in addition, we need them to be unique enough they do not trip
 	# an earlier file test in maybe_command().  Portability.
 
-	foreach my $path (split(/:/, $ENV{PATH})) {
+	foreach my $path (split(m/:/, $ENV{PATH})) {
 		opendir(DIR, $path) or next;
 		while (defined(my $file = readdir(DIR))) {
 			next if $file eq $curdir or $file eq $updir;

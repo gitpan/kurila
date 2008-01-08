@@ -31,7 +31,7 @@ SKIP: {
     if (!$Config{d_seteuid}) {
 	skip('no seteuid');
     } 
-    elsif ($Config{config_args} =~/Dmksymlinks/) {
+    elsif ($Config{config_args} =~m/Dmksymlinks/) {
 	skip('we cannot chmod symlinks');
     }
     elsif ($bad_chmod) {
@@ -76,7 +76,7 @@ ok( defined(-d -e 'TEST') );
 ok( defined(-e -d 'TEST') );
 ok( ! -f -d 'op' );
 ok( -x -d -x 'op' );
-ok( (-s -f 'TEST' > 1), "-s returns real size" );
+ok( (-s -f 'TEST' +> 1), "-s returns real size" );
 ok( -f -s 'TEST' == 1 );
 
 # test that _ is a bareword after filetest operators

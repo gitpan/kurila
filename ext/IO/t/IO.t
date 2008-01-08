@@ -1,12 +1,12 @@
 #!/usr/bin/perl -w
 
 BEGIN {
-    unless(grep /blib/, @INC) {
+    unless(grep m/blib/, @INC) {
 	chdir 't' if -d 't';
 	@INC = '../lib';
     }
 	require Config;
-	if ($Config::Config{'extensions'} !~ /\bSocket\b/) {
+	if ($Config::Config{'extensions'} !~ m/\bSocket\b/) {
 		print "1..0 # Skip: Socket not built - IO.pm uses Socket";
 		exit 0;
 	}
@@ -92,7 +92,7 @@ my $fakemod = File::Spec->catfile( $fakedir, 'fakemod.pm' );
 my $flag;
 if ( -d $fakedir or mkpath( $fakedir ))
 {
-	if (open( OUT, ">$fakemod"))
+	if (open( OUT, ">", "$fakemod"))
 	{
 		(my $package = <<'		END_HERE') =~ tr/\t//d;
 		package IO::fakemod;

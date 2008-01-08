@@ -27,8 +27,8 @@ sub _compiler_type {
   my $self = shift;
   my $cc = $self->{config}{cc};
 
-  return (  $cc =~ /cl(\.exe)?$/ ? 'MSVC'
-	  : $cc =~ /bcc32(\.exe)?$/ ? 'BCC'
+  return (  $cc =~ m/cl(\.exe)?$/ ? 'MSVC'
+	  : $cc =~ m/bcc32(\.exe)?$/ ? 'BCC'
 	  : 'GCC');
 }
 
@@ -51,16 +51,16 @@ sub split_like_shell {
   my $arg = '';
   my( $i, $quote_mode ) = ( 0, 0 );
   
-  while ( $i < length() ) {
+  while ( $i +< length() ) {
     
     my $ch      = substr( $_, $i  , 1 );
     my $next_ch = substr( $_, $i+1, 1 );
     
-    if ( $ch eq '\\' && $next_ch eq '"' ) {
+    if ( $ch eq '\' && $next_ch eq '"' ) {
       $arg .= '"';
       $i++;
-    } elsif ( $ch eq '\\' && $next_ch eq '\\' ) {
-      $arg .= '\\';
+    } elsif ( $ch eq '\' && $next_ch eq '\' ) {
+      $arg .= '\';
       $i++;
     } elsif ( $ch eq '"' && $next_ch eq '"' && $quote_mode ) {
       $quote_mode = !$quote_mode;
@@ -383,7 +383,7 @@ sub format_linker_cmd {
   ) ];
 
   # Embed the manifest file for VC 2005 (aka VC 8) or higher, but not for the 64-bit Platform SDK compiler
-  if ($cf->{ivsize} == 4 && $cf->{cc} eq 'cl' and $cf->{ccversion} =~ /^(\d+)/ and $1 >= 14) {
+  if ($cf->{ivsize} == 4 && $cf->{cc} eq 'cl' and $cf->{ccversion} =~ m/^(\d+)/ and $1 +>= 14) {
     push @cmds, [
       'mt', '-nologo', $spec{manifest}, '-outputresource:' . "$output;2"
     ];
@@ -568,7 +568,7 @@ sub format_compiler_cmd {
   }
 
   # split off any -arguments included in cc
-  my @cc = split / (?=-)/, $spec{cc};
+  my @cc = split m/ (?=-)/, $spec{cc};
 
   return [ grep {defined && length} (
     @cc, '-c'               ,
@@ -599,7 +599,7 @@ sub format_linker_cmd {
   ## we try to overcome non-relocateable-DLL problems by generating
   ##    a (hopefully unique) image-base from the dll's name
   ## -- BKS, 10-19-1999
-  File::Basename::basename( $spec{output} ) =~ /(....)(.{0,4})/;
+  File::Basename::basename( $spec{output} ) =~ m/(....)(.{0,4})/;
   $spec{image_base} = sprintf( "0x%x0000", unpack('n', $1 ^^^ $2) );
 
   %spec = $self->write_linker_script(%spec)
@@ -617,7 +617,7 @@ sub format_linker_cmd {
   ];
 
   # split off any -arguments included in ld
-  my @ld = split / (?=-)/, $spec{ld};
+  my @ld = split m/ (?=-)/, $spec{ld};
 
   push @cmds, [ grep {defined && length} (
     @ld                       ,

@@ -103,9 +103,9 @@ sub FIRSTKEY {
   if (!$DoCache || !$Cache_set) {
     # We should eventually replace this with a C routine which walks the
     # CLI symbol table directly.  If I ever get 'hold of an I&DS manual . . .
-    open(P,'Show Symbol * |');
-    while (<P>) {
-      ($name,$eqs,$val) = /^\s+(\S+) (=+) (.+)/
+    open(P, "-|",'Show Symbol *');
+    while ( ~< *P) {
+      ($name,$eqs,$val) = m/^\s+(\S+) (=+) (.+)/
         or carp "VMS::DCLsym: unparseable line $_";
       $name =~ s#\*##;
       $val =~ s/"(.*)"$/$1/ or $val =~ s/^(\S+).*/$1/;

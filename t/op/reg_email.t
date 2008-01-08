@@ -64,10 +64,10 @@ my $email = qr {
 my $count = 0;
 
 $| = 1;
-while (<DATA>) {
+while ( ~< *DATA) {
     chomp;
-    next if /^#/;
-    print /^$email$/ ? "ok " : "not ok ", ++ $count, "\n";
+    next if m/^#/;
+    print m/^$email$/ ? "ok " : "not ok ", ++ $count, "\n";
 }
 
 #

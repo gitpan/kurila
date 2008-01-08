@@ -1,19 +1,12 @@
 #!./perl 
 
-BEGIN {
-    unless(grep /blib/, @INC) {
-        chdir 't' if -d 't';
-        @INC = '../lib' if -d '../lib';
-    }
-}
- 
 use warnings;
 use strict;
 use Config;
  
 BEGIN {
     if(-d "lib" && -f "TEST") {
-        if ($Config{'extensions'} !~ /\bDB_File\b/ ) {
+        if ($Config{'extensions'} !~ m/\bDB_File\b/ ) {
             print "1..0 # Skip: DB_File was not built\n";
             exit 0;
         }
@@ -47,7 +40,7 @@ sub ok
         my $class = shift ;
         my $filename = shift ;
 	my $fh = gensym ;
-	open ($fh, ">$filename") || die "Cannot open $filename: $!" ;
+	open ($fh, ">", "$filename") || die "Cannot open $filename: $!" ;
 	my $real_stdout = select($fh) ;
 	return bless [$fh, $real_stdout ] ;
 
@@ -64,8 +57,8 @@ sub docat_del
 { 
     my $file = shift;
     local $/ = undef;
-    open(CAT,$file) || die "Cannot open $file: $!";
-    my $result = <CAT>;
+    open(CAT, "<",$file) || die "Cannot open $file: $!";
+    my $result = ~< *CAT;
     close(CAT);
     $result = normalise($result) ;
     unlink $file ;
@@ -92,8 +85,8 @@ sub safeUntie
 
 my $Dfile = "dbhash.tmp";
 my $Dfile2 = "dbhash2.tmp";
-my $null_keys_allowed = ($DB_File::db_ver < 2.004010 
-				|| $DB_File::db_ver >= 3.1 );
+my $null_keys_allowed = ($DB_File::db_ver +< 2.004010 
+				|| $DB_File::db_ver +>= 3.1 );
 
 unlink $Dfile;
 
@@ -131,9 +124,9 @@ ok(12, $dbh->{lorder} == 1234 );
 
 # Check that an invalid entry is caught both for store & fetch
 eval '$dbh->{fred} = 1234' ;
-ok(13, $@ =~ /^DB_File::HASHINFO::STORE - Unknown element 'fred' at/ );
+ok(13, $@ =~ m/^DB_File::HASHINFO::STORE - Unknown element 'fred' at/ );
 eval 'my $q = $dbh->{fred}' ;
-ok(14, $@ =~ /^DB_File::HASHINFO::FETCH - Unknown element 'fred' at/ );
+ok(14, $@ =~ m/^DB_File::HASHINFO::FETCH - Unknown element 'fred' at/ );
 
 
 # Now check the interface to HASH
@@ -255,13 +248,13 @@ ok(27, $result) ;
 
 # check cache overflow and numeric keys and contents
 my $ok = 1;
-for ($i = 1; $i < 200; $i++) { $h{$i + 0} = $i + 0; }
-for ($i = 1; $i < 200; $i++) { $ok = 0 unless $h{$i} == $i; }
+for ($i = 1; $i +< 200; $i++) { $h{$i + 0} = $i + 0; }
+for ($i = 1; $i +< 200; $i++) { $ok = 0 unless $h{$i} == $i; }
 ok(28, $ok );
 
 ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,$atime,$mtime,$ctime,
    $blksize,$blocks) = stat($Dfile);
-ok(29, $size > 0 );
+ok(29, $size +> 0 );
 
 @h{0..200} = 200..400;
 my @foo = @h{0..200};
@@ -395,7 +388,7 @@ untie %h ;
     ok(50, $h{"abc"} == 123) ;
     untie %x ;
     unlink $filename ;
-    ok(51, $::count >0) ;
+    ok(51, $::count +>0) ;
 }
 
 {
@@ -404,7 +397,7 @@ untie %h ;
     my $filename = "xyz" ;
     my @x ;
     eval { tie @x, 'DB_File', $filename, O_RDWR^|^O_CREAT, 0640, $DB_HASH ; } ;
-    ok(52, $@ =~ /^DB_File can only tie an associative array to a DB_HASH database/) ;
+    ok(52, $@ =~ m/^DB_File can only tie an associative array to a DB_HASH database/) ;
     unlink $filename ;
 }
 
@@ -416,7 +409,7 @@ untie %h ;
    use warnings ;
    use strict ;
 
-   open(FILE, ">SubDB.pm") or die "Cannot open SubDB.pm: $!\n" ;
+   open(FILE, ">", "SubDB.pm") or die "Cannot open SubDB.pm: $!\n" ;
    print FILE <<'EOM' ;
 
    package SubDB ;
@@ -714,7 +707,7 @@ EOM
    $db->filter_store_key (sub { $_ = $h{$_} }) ;
 
    eval '$h{1} = 1234' ;
-   ok(116, $@ =~ /^recursion detected in filter_store_key at/ );
+   ok(116, $@ =~ m/^recursion detected in filter_store_key at/ );
    
    undef $db ;
    untie %h;
@@ -826,7 +819,7 @@ EOM
     my $db ;
     ok(120, $db = tie(%h, 'DB_File', $Dfile, O_RDWR^|^O_CREAT, 0640, $DB_HASH ) );
     $db->filter_fetch_key (sub { $_ =~ s/^Beta_/Alpha_/ if defined $_}) ;
-    $db->filter_store_key (sub { $bad_key = 1 if /^Beta_/ ; $_ =~ s/^Alpha_/Beta_/}) ;
+    $db->filter_store_key (sub { $bad_key = 1 if m/^Beta_/ ; $_ =~ s/^Alpha_/Beta_/}) ;
 
     $h{'Alpha_ABC'} = 2 ;
     $h{'Alpha_DEF'} = 5 ;
@@ -856,7 +849,7 @@ EOM
     my $dbh = DB_File::HASHINFO->new() ;
 
     eval { $dbh->{hash} = 2 };
-    ok(126, $@ =~ /^Key 'hash' not associated with a code reference at/);
+    ok(126, $@ =~ m/^Key 'hash' not associated with a code reference at/);
 
 }
 
@@ -914,7 +907,7 @@ EOM
     $hash2{xyz} = 2;
     $hash2{abcde} = 5;
 
-    ok(129, $h1_count > 0);
+    ok(129, $h1_count +> 0);
     ok(130, $h1_count == $h2_count);
 
     ok(131, safeUntie \%hash1);
@@ -1067,7 +1060,7 @@ EOM
         my $key = $ix . "data" ;
         my $value = "value$ix" ;
         $remember{$key} = $value ;
-        $db->put(substr($key,0), $value) ;
+        $db->put($key, $value) ;
     }
 
     ok 153, $warned eq '' 
@@ -1080,7 +1073,7 @@ EOM
         my $key = $ix . "data" ;
         my $value = "value$ix" ;
         $remember{$key} = $value ;
-        $db->put($key, substr($value,0)) ;
+        $db->put($key, $value) ;
     }
 
     ok 154, $warned eq '' 
@@ -1116,9 +1109,9 @@ EOM
 
     my %bad = () ;
     $key = '';
-    for ($status = $db->seq(substr($key,0), substr($value,0), R_FIRST ) ;
+    for ($status = $db->seq($key, $value, R_FIRST ) ;
          $status == 0 ;
-         $status = $db->seq(substr($key,0), substr($value,0), R_NEXT ) ) {
+         $status = $db->seq($key, $value, R_NEXT ) ) {
 
         #print "# key [$key] value [$value]\n" ;
         if (defined $remember{$key} && defined $value && 
@@ -1145,7 +1138,7 @@ EOM
       or print "# Caught warning [$warned]\n" ;
     $warned = '';
 
-    my $no_NULL = ($DB_File::db_ver >= 2.003016 && $DB_File::db_ver < 3.001) ;
+    my $no_NULL = ($DB_File::db_ver +>= 2.003016 && $DB_File::db_ver +< 3.001) ;
     print "# db_ver $DB_File::db_ver\n";
     $value = '' ;
     $db->get(undef, $value) ;

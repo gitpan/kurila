@@ -2,7 +2,7 @@ package Fatal;
 
 use Carp;
 use strict;
-our($AUTOLOAD, $Debug, $VERSION);
+our($Debug, $VERSION);
 
 $VERSION = 1.05;
 
@@ -23,20 +23,13 @@ sub import {
     }
 };
 
-sub AUTOLOAD {
-    my $cmd = $AUTOLOAD;
-    $cmd =~ s/.*:://;
-    &_make_fatal($cmd, (caller)[0]);
-    goto &{Symbol::fetch_glob($AUTOLOAD)};
-}
-
 sub fill_protos {
   my $proto = shift;
   my ($n, $isref, @out, @out1, $seen_semi) = -1;
-  while ($proto =~ /\S/) {
+  while ($proto =~ m/\S/) {
     $n++;
     push(@out1,[$n,@out]) if $seen_semi;
-    push(@out, $1 . "{\$_[$n]}"), next if $proto =~ s/^\s*\\([\@%\$\&])//;
+    push(@out, $1 . "\{\$_[$n]\}"), next if $proto =~ s/^\s*\\([\@%\$\&])//;
     push(@out, "\$_[$n]"), next if $proto =~ s/^\s*([_*\$&])//;
     push(@out, "\@_[$n..\$#_]"), last if $proto =~ s/^\s*(;\s*)?\@//;
     $seen_semi = 1, $n--, next if $proto =~ s/^\s*;//; # XXXX ????
@@ -58,13 +51,13 @@ sub write_invocation {
     while (@argvs) {
       @argv = @{shift @argvs};
       $n = shift @argv;
-      push @out, "$ {else}if (\@_ == $n) {\n";
-      $else = "\t} els";
+      push @out, "$ {else}if (\@_ == $n) \{\n";
+      $else = "\t\} els";
       push @out, 
           "\t\treturn " . one_invocation($core, $call, $name, $void, @argv) . ";\n";
     }
     push @out, <<EOC;
-	}
+	\}
 	die "$name(\@_): Do not expect to get ", scalar \@_, " arguments";
 EOC
     return join '', @out;
@@ -89,16 +82,16 @@ sub _make_fatal {
     my($name, $code, $sref, $real_proto, $proto, $core, $call);
     my $ini = $sub;
 
-    $sub = "${pkg}::$sub" unless $sub =~ /::/;
+    $sub = "${pkg}::$sub" unless $sub =~ m/::/;
     $name = $sub;
     $name =~ s/.*::// or $name =~ s/^&//;
     print "# _make_fatal: sub=$sub pkg=$pkg name=$name void=$void\n" if $Debug;
-    croak "Bad subroutine name for Fatal: $name" unless $name =~ /^\w+$/;
+    croak "Bad subroutine name for Fatal: $name" unless $name =~ m/^\w+$/;
     if (defined(&$sub)) {	# user subroutine
 	$sref = \&$sub;
 	$proto = prototype $sref;
 	$call = '&$sref';
-    } elsif ($sub eq $ini && $sub !~ /^CORE::GLOBAL::/) {
+    } elsif ($sub eq $ini && $sub !~ m/^CORE::GLOBAL::/) {
 	# Stray user subroutine
 	die "$sub is not a Perl subroutine" 
     } else {			# CORE subroutine
@@ -117,12 +110,12 @@ sub _make_fatal {
       $proto = '@';
     }
     $code = <<EOS;
-sub$real_proto {
+sub$real_proto \{
 	local(\$", \$!) = (', ', 0);
 EOS
     my @protos = fill_protos($proto);
     $code .= write_invocation($core, $call, $name, $void, @protos);
-    $code .= "}\n";
+    $code .= "\}\n";
     print $code if $Debug;
     {
       no strict 'refs'; # to avoid: Can't use string (...) as a symbol ref ...

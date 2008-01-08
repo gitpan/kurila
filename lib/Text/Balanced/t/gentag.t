@@ -22,6 +22,7 @@ $loaded = 1;
 print "ok 1\n";
 my $count=2;
 use vars qw( $DEBUG );
+$DEBUG=1;
 sub debug { print "\t>>>",@_ if $DEBUG }
 
 ######################### End of black magic.
@@ -30,18 +31,19 @@ our ($cmd, $neg, $str, $var);
 
 $cmd = "print";
 $neg = 0;
-while (defined($str = <DATA>))
+while (defined($str = ~< *DATA))
 {
 	chomp $str;
 	$str =~ s/\\n/\n/g;
 	if ($str =~ s/\A# USING://)
 	{
 		$neg = 0;
+                $cmd = $str;
 		eval{local$^W;*f = eval $str || die};
 		next;
 	}
-	elsif ($str =~ /\A# TH[EI]SE? SHOULD FAIL/) { $neg = 1; next; }
-	elsif (!$str || $str =~ /\A#/) { $neg = 0; next }
+	elsif ($str =~ m/\A# TH[EI]SE? SHOULD FAIL/) { $neg = 1; next; }
+	elsif (!$str || $str =~ m/\A#/) { $neg = 0; next }
 	$str =~ s/\\n/\n/g;
 	debug "\tUsing: $cmd\n";
 	debug "\t   on: [$str]\n";
@@ -68,7 +70,7 @@ while (defined($str = <DATA>))
 
 __DATA__
 
-# USING: gen_extract_tagged('{','}');
+# USING: gen_extract_tagged('\{','\}');
 	{ a test };
 
 # USING: gen_extract_tagged(qr/<[A-Z]+>/,undef, undef, {ignore=>["<BR>"]});

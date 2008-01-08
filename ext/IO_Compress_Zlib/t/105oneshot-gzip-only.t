@@ -14,10 +14,6 @@ use Test::More ;
 use CompTestUtils;
 
 BEGIN {
-    plan(skip_all => "oneshot needs Perl 5.005 or better - you have Perl $]" )
-        if $] < 5.005 ;
-
-
     # use Test::NoWarnings, if available
     my $extra = 0 ;
     $extra = 1
@@ -106,7 +102,7 @@ sub gzipGetHeader
     is $hdr->{Time}, 4321, "  Time is 4321";
 
     title "Filehandle doesn't have default Name or Time" ;
-    my $fh = IO::File->new( "< $file1")
+    my $fh = IO::File->new( "$file1", "<")
         or diag "Cannot open '$file1': $!\n" ;
     sleep 3 ; 
     my $before = time ;
@@ -114,8 +110,8 @@ sub gzipGetHeader
     my $after = time ;
 
     ok ! defined $hdr->{Name}, "  Name is undef";
-    cmp_ok $hdr->{Time}, '>=', $before, "  Time is ok";
-    cmp_ok $hdr->{Time}, '<=', $after, "  Time is ok";
+    cmp_ok $hdr->{Time}, '+>=', $before, "  Time is ok";
+    cmp_ok $hdr->{Time}, '+<=', $after, "  Time is ok";
 
     $fh->close;
 
@@ -126,8 +122,8 @@ sub gzipGetHeader
     $after = time ;
 
     ok ! defined $hdr->{Name}, "  Name is undef";
-    cmp_ok $hdr->{Time}, '>=', $before, "  Time is ok";
-    cmp_ok $hdr->{Time}, '<=', $after, "  Time is ok";
+    cmp_ok $hdr->{Time}, '+>=', $before, "  Time is ok";
+    cmp_ok $hdr->{Time}, '+<=', $after, "  Time is ok";
 }
 
 # TODO add more error cases

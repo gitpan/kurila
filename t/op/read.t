@@ -7,7 +7,7 @@ use strict;
 
 plan tests => 24;
 
-open(FOO,'op/read.t') || open(FOO,'t/op/read.t') || open(FOO,':op:read.t') || die "Can't open op.read";
+open(FOO, "<",'op/read.t') || open(FOO, "<",'t/op/read.t') || open(FOO, "<",':op:read.t') || die "Can't open op.read";
 seek(FOO,4,0) or die "Seek failed: $!";
 my $buf;
 my $got = read(FOO,$buf,4);
@@ -35,13 +35,13 @@ my $tmpfile = 'Op_read.tmp';
     use utf8;
     my $value = "\x{236a}" x 3; # e2.8d.aa x 3
 
-    open FH, ">$tmpfile" or die "Can't open $tmpfile: $!";
+    open FH, ">", "$tmpfile" or die "Can't open $tmpfile: $!";
     print FH $value;
     close FH;
 
     use bytes;
     for ([length($value), 0, '', length($value), "$value"],
-         [4, 0, '', 4, "\xE2\x8D\xAA\xE2"],
+         [4, 0, '', 4, "\x[E28DAAE2]"],
          [9+8, 0, '', 9, $value],
          [9, 3, '', 9, "\0" x 3 . $value],
          [9+8, 3, '', 9, "\0" x 3 . $value]
@@ -49,7 +49,7 @@ my $tmpfile = 'Op_read.tmp';
     {
         my ($length, $offset, $buffer, $expect_length, $expect) = @$_;
         my $buffer = "";
-        open FH, $tmpfile or die "Can't open $tmpfile: $!";
+        open FH, "<", $tmpfile or die "Can't open $tmpfile: $!";
         $got = read (FH, $buffer, $length, $offset);
         is($got, $expect_length);
         is($buffer, $expect);
@@ -66,7 +66,7 @@ my $tmpfile = 'Op_read.tmp';
     {
         my ($length, $offset, $buffer, $expect_length, $expect) = @$_;
         my $buffer = "";
-        open FH, $tmpfile or die "Can't open $tmpfile: $!";
+        open FH, "<", $tmpfile or die "Can't open $tmpfile: $!";
         $got = read (FH, $buffer, $length, $offset);
         is($got, $expect_length);
         is($buffer, $expect);

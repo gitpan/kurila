@@ -83,7 +83,7 @@ sub openunicode {
 	for my $d (@INC) {
 	    use File::Spec;
 	    $f = File::Spec->catfile($d, "unicore", @path);
-	    last if open($$rfh, $f);
+	    last if open($$rfh, "<", $f);
 	    undef $f;
 	}
 	croak __PACKAGE__, ": failed to find ",
@@ -140,9 +140,9 @@ you will need also the compexcl(), casefold(), and casespec() functions.
 sub _getcode {
     my $arg = shift;
 
-    if ($arg =~ /^[1-9]\d*$/) {
+    if ($arg =~ m/^[1-9]\d*$/) {
 	return $arg;
-    } elsif ($arg =~ /^(?:[Uu]\+|0[xX])?([[:xdigit:]]+)$/) {
+    } elsif ($arg =~ m/^(?:[Uu]\+|0[xX])?([[:xdigit:]]+)$/) {
 	return hex($1);
     }
 
@@ -208,7 +208,7 @@ sub charinfo {
     my $hexk = sprintf("%06X", $code);
     my($rcode,$rname,$rdec);
     foreach my $range (@CharinfoRanges){
-      if ($range->[0] <= $code && $code <= $range->[1]) {
+      if ($range->[0] +<= $code && $code +<= $range->[1]) {
         $rcode = $hexk;
 	$rcode =~ s/^0+//;
 	$rcode =  sprintf("%04X", hex($rcode));
@@ -220,9 +220,9 @@ sub charinfo {
     }
     openunicode(\$UNICODEFH, "UnicodeData.txt");
     if (defined $UNICODEFH) {
-	use Search::Dict 1.02;
-	if (look($UNICODEFH, "$hexk;", { xfrm => sub { $_[0] =~ /^([^;]+);(.+)/; sprintf "%06X;$2", hex($1) } } ) >= 0) {
-	    my $line = <$UNICODEFH>;
+	use Search::Dict v1.02;
+	if (look($UNICODEFH, "$hexk;", { xfrm => sub { $_[0] =~ m/^([^;]+);(.+)/; sprintf "%06X;$2", hex($1) } } ) +>= 0) {
+	    my $line = ~< $UNICODEFH;
 	    return unless defined $line;
 	    chomp $line;
 	    my %prop;
@@ -232,7 +232,7 @@ sub charinfo {
 		     decimal digit numeric
 		     mirrored unicode10 comment
 		     upper lower title
-		    )} = split(/;/, $line, -1);
+		    )} = split(m/;/, $line, -1);
 	    $hexk =~ s/^0+//;
 	    $hexk =  sprintf("%04X", hex($hexk));
 	    if ($prop{code} eq $hexk) {
@@ -253,17 +253,17 @@ sub charinfo {
 sub _search { # Binary search in a [[lo,hi,prop],[...],...] table.
     my ($table, $lo, $hi, $code) = @_;
 
-    return if $lo > $hi;
+    return if $lo +> $hi;
 
     my $mid = int(($lo+$hi) / 2);
 
-    if ($table->[$mid]->[0] < $code) {
-	if ($table->[$mid]->[1] >= $code) {
+    if ($table->[$mid]->[0] +< $code) {
+	if ($table->[$mid]->[1] +>= $code) {
 	    return $table->[$mid]->[2];
 	} else {
 	    _search($table, $mid + 1, $hi, $code);
 	}
-    } elsif ($table->[$mid]->[0] > $code) {
+    } elsif ($table->[$mid]->[0] +> $code) {
 	_search($table, $lo, $mid - 1, $code);
     } else {
 	return $table->[$mid]->[2];
@@ -311,8 +311,8 @@ sub _charblocks {
     unless (@BLOCKS) {
 	if (openunicode(\$BLOCKSFH, "Blocks.txt")) {
 	    local $_;
-	    while (<$BLOCKSFH>) {
-		if (/^([0-9A-F]+)\.\.([0-9A-F]+);\s+(.+)/) {
+	    while ( ~< $BLOCKSFH) {
+		if (m/^([0-9A-F]+)\.\.([0-9A-F]+);\s+(.+)/) {
 		    my ($lo, $hi) = (hex($1), hex($2));
 		    my $subrange = [ $lo, $hi, $3 ];
 		    push @BLOCKS, $subrange;
@@ -373,18 +373,18 @@ sub _charscripts {
     unless (@SCRIPTS) {
 	if (openunicode(\$SCRIPTSFH, "Scripts.txt")) {
 	    local $_;
-	    while (<$SCRIPTSFH>) {
-		if (/^([0-9A-F]+)(?:\.\.([0-9A-F]+))?\s+;\s+(\w+)/) {
+	    while ( ~< $SCRIPTSFH) {
+		if (m/^([0-9A-F]+)(?:\.\.([0-9A-F]+))?\s+;\s+(\w+)/) {
 		    my ($lo, $hi) = (hex($1), $2 ? hex($2) : hex($1));
 		    my $script = lc($3);
-		    $script =~ s/\b(\w)/uc($1)/ge;
+		    $script =~ s/\b(\w)/{uc($1)}/g;
 		    my $subrange = [ $lo, $hi, $script ];
 		    push @SCRIPTS, $subrange;
 		    push @{$SCRIPTS{$script}}, $subrange;
 		}
 	    }
 	    close($SCRIPTSFH);
-	    @SCRIPTS = sort { $a->[0] <=> $b->[0] } @SCRIPTS;
+	    @SCRIPTS = sort { $a->[0] <+> $b->[0] } @SCRIPTS;
 	}
     }
 }
@@ -621,8 +621,8 @@ sub _compexcl {
     unless (%COMPEXCL) {
 	if (openunicode(\$COMPEXCLFH, "CompositionExclusions.txt")) {
 	    local $_;
-	    while (<$COMPEXCLFH>) {
-		if (/^([0-9A-F]+)\s+\#\s+/) {
+	    while ( ~< $COMPEXCLFH) {
+		if (m/^([0-9A-F]+)\s+\#\s+/) {
 		    my $code = hex($1);
 		    $COMPEXCL{$code} = undef;
 		}
@@ -692,8 +692,8 @@ sub _casefold {
     unless (%CASEFOLD) {
 	if (openunicode(\$CASEFOLDFH, "CaseFolding.txt")) {
 	    local $_;
-	    while (<$CASEFOLDFH>) {
-		if (/^([0-9A-F]+); ([CFSI]); ([0-9A-F]+(?: [0-9A-F]+)*);/) {
+	    while ( ~< $CASEFOLDFH) {
+		if (m/^([0-9A-F]+); ([CFSI]); ([0-9A-F]+(?: [0-9A-F]+)*);/) {
 		    my $code = hex($1);
 		    $CASEFOLD{$code} = { code    => $1,
 					 status  => $2,
@@ -773,8 +773,8 @@ sub _casespec {
     unless (%CASESPEC) {
 	if (openunicode(\$CASESPECFH, "SpecialCasing.txt")) {
 	    local $_;
-	    while (<$CASESPECFH>) {
-		if (/^([0-9A-F]+); ([0-9A-F]+(?: [0-9A-F]+)*)?; ([0-9A-F]+(?: [0-9A-F]+)*)?; ([0-9A-F]+(?: [0-9A-F]+)*)?; (\w+(?: \w+)*)?/) {
+	    while ( ~< $CASESPECFH) {
+		if (m/^([0-9A-F]+); ([0-9A-F]+(?: [0-9A-F]+)*)?; ([0-9A-F]+(?: [0-9A-F]+)*)?; ([0-9A-F]+(?: [0-9A-F]+)*)?; (\w+(?: \w+)*)?/) {
 		    my ($hexcode, $lower, $title, $upper, $condition) =
 			($1, $2, $3, $4, $5);
 		    my $code = hex($hexcode);
@@ -790,7 +790,7 @@ sub _casespec {
 							   condition)};
 			    if (defined $oldcondition) {
 				my ($oldlocale) =
-				($oldcondition =~ /^([a-z][a-z](?:_\S+)?)/);
+				($oldcondition =~ m/^([a-z][a-z](?:_\S+)?)/);
 				delete $CASESPEC{$code};
 				$CASESPEC{$code}->{$oldlocale} =
 				{ code      => $hexcode,
@@ -801,7 +801,7 @@ sub _casespec {
 			    }
 			}
 			my ($locale) =
-			    ($condition =~ /^([a-z][a-z](?:_\S+)?)/);
+			    ($condition =~ m/^([a-z][a-z](?:_\S+)?)/);
 			$CASESPEC{$code}->{$locale} =
 			{ code      => $hexcode,
 			  lower     => $lower,
@@ -861,8 +861,8 @@ sub _namedseq {
     unless (%NAMEDSEQ) {
 	if (openunicode(\$NAMEDSEQFH, "NamedSequences.txt")) {
 	    local $_;
-	    while (<$NAMEDSEQFH>) {
-		if (/^(.+)\s*;\s*([0-9A-F]+(?: [0-9A-F]+)*)$/) {
+	    while ( ~< $NAMEDSEQFH) {
+		if (m/^(.+)\s*;\s*([0-9A-F]+(?: [0-9A-F]+)*)$/) {
 		    my ($n, $s) = ($1, $2);
 		    my @s = map { chr(hex($_)) } split(' ', $s);
 		    $NAMEDSEQ{$n} = join("", @s);
@@ -905,10 +905,10 @@ my $UNICODEVERSION;
 sub UnicodeVersion {
     unless (defined $UNICODEVERSION) {
 	openunicode(\$VERSIONFH, "version");
-	chomp($UNICODEVERSION = <$VERSIONFH>);
+	chomp($UNICODEVERSION = ~< $VERSIONFH);
 	close($VERSIONFH);
 	croak __PACKAGE__, "::VERSION: strange version '$UNICODEVERSION'"
-	    unless $UNICODEVERSION =~ /^\d+(?:\.\d+)+$/;
+	    unless $UNICODEVERSION =~ m/^\d+(?:\.\d+)+$/;
     }
     return $UNICODEVERSION;
 }

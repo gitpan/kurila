@@ -5,7 +5,7 @@ BEGIN {
   @INC = '../lib';
   push @INC, "::lib:$MacPerl::Architecture:" if $^O eq 'MacOS';
   require Config; Config->import;
-  if ($Config{'extensions'} !~ /\bXS\/APItest\b/) {
+  if ($Config{'extensions'} !~ m/\bXS\/APItest\b/) {
     # Look, I'm using this fully-qualified variable more than once!
     my $arch = $MacPerl::Architecture;
     print "1..0 # Skip: XS::APItest was not built\n";
@@ -88,7 +88,7 @@ foreach my $in ("", "N", "a\0b") {
     is ($got, $in, "test_share_unshare_pvn");
 }
 
-if ($] > 5.009) {
+{
     foreach ([\&XS::APItest::Hash::rot13_hash, \&rot13, "rot 13"],
 	     [\&XS::APItest::Hash::bitflip_hash, \&bitflip, "bitflip"],
 	    ) {
@@ -269,7 +269,7 @@ sub main_test_inner {
 
 sub perform_test {
   my ($test_sub, $key, $keys, $message, @other) = @_;
-  my $printable = join ',', map {ord} split //, $key;
+  my $printable = join ',', map {ord} split m//, $key;
 
   my (%hash, %tiehash);
   tie %tiehash, 'Tie::StdHash';

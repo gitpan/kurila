@@ -32,7 +32,7 @@ sub Mksymlists {
             my($packprefix,$sym,$bootseen);
             ($packprefix = $package) =~ s/\W/_/g;
             foreach $sym (@{$spec{DL_FUNCS}->{$package}}) {
-                if ($sym =~ /^boot_/) {
+                if ($sym =~ m/^boot_/) {
                     push(@{$spec{FUNCLIST}},$sym);
                     $bootseen++;
                 }
@@ -46,7 +46,7 @@ sub Mksymlists {
 #    not as pseudo-builtin.
 #    require DynaLoader;
     if (defined &DynaLoader::mod2fname and not $spec{DLBASE}) {
-        $spec{DLBASE} = DynaLoader::mod2fname([ split(/::/,$spec{NAME}) ]);
+        $spec{DLBASE} = DynaLoader::mod2fname([ split(m/::/,$spec{NAME}) ]);
     }
 
     if    ($osname eq 'aix') { _write_aix(\%spec); }
@@ -63,7 +63,7 @@ sub _write_aix {
 
     rename "$data->{FILE}.exp", "$data->{FILE}.exp_old";
 
-    open(EXP,">$data->{FILE}.exp")
+    open(EXP, ">","$data->{FILE}.exp")
         or croak("Can't create $data->{FILE}.exp: $!\n");
     print EXP join("\n",@{$data->{DL_VARS}}, "\n") if @{$data->{DL_VARS}};
     print EXP join("\n",@{$data->{FUNCLIST}}, "\n") if @{$data->{FUNCLIST}};
@@ -74,7 +74,7 @@ sub _write_aix {
 sub _write_os2 {
     my($data) = @_;
     require Config;
-    my $threaded = ($Config::Config{archname} =~ /-thread/ ? " threaded" : "");
+    my $threaded = ($Config::Config{archname} =~ m/-thread/ ? " threaded" : "");
 
     if (not $data->{DLBASE}) {
         ($data->{DLBASE} = $data->{NAME}) =~ s/.*:://;
@@ -91,10 +91,10 @@ sub _write_os2 {
 	$comment = "Core $comment";
     }
     $comment = "$comment (Perl-config: $Config{config_args})";
-    $comment = substr($comment, 0, 200) . "...)" if length $comment > 203;
+    $comment = substr($comment, 0, 200) . "...)" if length $comment +> 203;
     rename "$data->{FILE}.def", "$data->{FILE}_def.old";
 
-    open(DEF,">$data->{FILE}.def")
+    open(DEF, ">","$data->{FILE}.def")
         or croak("Can't create $data->{FILE}.def: $!\n");
     print DEF "LIBRARY '$data->{DLBASE}' INITINSTANCE TERMINSTANCE\n";
     print DEF "DESCRIPTION '\@#$distname:$data->{VERSION}#\@ $comment'\n";
@@ -123,10 +123,10 @@ sub _write_win32 {
     }
     rename "$data->{FILE}.def", "$data->{FILE}_def.old";
 
-    open(DEF,">$data->{FILE}.def")
+    open(DEF, ">","$data->{FILE}.def")
         or croak("Can't create $data->{FILE}.def: $!\n");
     # put library name in quotes (it could be a keyword, like 'Alias')
-    if ($Config::Config{'cc'} !~ /^gcc/i) {
+    if ($Config::Config{'cc'} !~ m/^gcc/i) {
       print DEF "LIBRARY \"$data->{DLBASE}\"\n";
     }
     print DEF "EXPORTS\n  ";
@@ -136,7 +136,7 @@ sub _write_win32 {
     # NOTE: DynaLoader itself only uses the names without underscores,
     # so this is only to cover the case when the extension DLL may be
     # linked to directly from C. GSAR 97-07-10
-    if ($Config::Config{'cc'} =~ /^bcc/i) {
+    if ($Config::Config{'cc'} =~ m/^bcc/i) {
 	for (@{$data->{DL_VARS}}, @{$data->{FUNCLIST}}) {
 	    push @syms, "_$_", "$_ = _$_";
 	}
@@ -164,13 +164,13 @@ sub _write_vms {
     require Config; # a reminder for once we do $^O
     require ExtUtils::XSSymSet;
 
-    my($isvax) = $Config::Config{'archname'} =~ /VAX/i;
+    my($isvax) = $Config::Config{'archname'} =~ m/VAX/i;
     my($set) = ExtUtils::XSSymSet->new();
     my($sym);
 
     rename "$data->{FILE}.opt", "$data->{FILE}.opt_old";
 
-    open(OPT,">$data->{FILE}.opt")
+    open(OPT, ">","$data->{FILE}.opt")
         or croak("Can't create $data->{FILE}.opt: $!\n");
 
     # Options file declaring universal symbols

@@ -8,7 +8,7 @@ $VERSION = '1.11';
 #=======================================================================
 
 # Some names are evil choices.
-my %keywords = map +($_, 1), qw{ BEGIN INIT CHECK UNITCHECK END DESTROY AUTOLOAD };
+my %keywords = map +($_, 1), qw{ BEGIN INIT CHECK UNITCHECK END DESTROY };
 
 my %forced_into_main = map +($_, 1),
     qw{ STDIN STDOUT STDERR ARGV ARGVOUT ENV INC SIG };
@@ -30,12 +30,8 @@ sub import {
     my $multiple  = ref $_[0];
     my $pkg = caller;
     my $symtab;
-    my $str_end = $] >= 5.006 ? "\\z" : "\\Z";
 
-    if ($] > 5.009002) {
-	no strict 'refs';
-	$symtab = \%{*{Symbol::fetch_glob($pkg . '::')}};
-    };
+    $symtab = \%{*{Symbol::fetch_glob($pkg . '::')}};
 
     if ( $multiple ) {
 	if (ref $_[0] ne 'HASH') {
@@ -54,7 +50,7 @@ sub import {
 	}
 
 	# Normal constant name
-	if ($name =~ /^_?[^\W_0-9]\w*$str_end/ and !$forbidden{$name}) {
+	if ($name =~ m/^_?[^\W_0-9]\w*\z/ and !$forbidden{$name}) {
 	    # Everything is okay
 
 	# Name forced into main, but we're not in main. Fatal.
@@ -63,12 +59,12 @@ sub import {
 	    Carp::croak("Constant name '$name' is forced into main::");
 
 	# Starts with double underscore. Fatal.
-	} elsif ($name =~ /^__/) {
+	} elsif ($name =~ m/^__/) {
 	    require Carp;
 	    Carp::croak("Constant name '$name' begins with '__'");
 
 	# Maybe the name is tolerable
-	} elsif ($name =~ /^[A-Za-z_]\w*$str_end/) {
+	} elsif ($name =~ m/^[A-Za-z_]\w*\z/) {
 	    # Then we'll warn only if you've asked for warnings
 	    if (warnings::enabled()) {
 		if ($keywords{$name}) {
@@ -81,7 +77,7 @@ sub import {
 
 	# Looks like a boolean
 	# use constant FRED == fred;
-	} elsif ($name =~ /^[01]?$str_end/) {
+	} elsif ($name =~ m/^[01]?\z/) {
             require Carp;
 	    if (@_) {
 		Carp::croak("Constant name '$name' is invalid");

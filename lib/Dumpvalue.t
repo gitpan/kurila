@@ -40,7 +40,7 @@ is( $d->stringify(), 'undef', 'stringify handles undef okay' );
 $d->{printUndef} = 0;
 is( $d->stringify(), "''", 'stringify skips undef when asked nicely' );
 
-is( $d->stringify(*FOO), *FOO . "", 'stringify stringifies globs alright' );
+is( $d->stringify(*FOO), '*main::FOO', 'stringify stringifies globs alright' );
 
 # check for double-quotes if there's an unprintable character
 $d->{tick} = 'auto';
@@ -186,7 +186,7 @@ is( $out->read, "\%baz = (\n   'one' => 1, 'two' => 2\n)\n",
 	'dumped glob for %baz fine' );
 
 SKIP: {
-	skip( "Couldn't open $0 for reading", 1 ) unless open(FILE, $0);
+	skip( "Couldn't open $0 for reading", 1 ) unless open(FILE, "<", $0);
 	my $fileno = fileno(FILE);
 	$d->dumpglob( '', 0, 'FILE', *FILE );
 	is( $out->read, "FileHandle(FILE) => fileno($fileno)\n",

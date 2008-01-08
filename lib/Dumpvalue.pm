@@ -77,7 +77,7 @@ sub unctrl {
   local($_) = @_;
 
   return \$_ if ref \$_ eq "GLOB";
-  s/([\001-\037\177])/'^'.pack('c',ord($1)^^^64)/eg;
+  s/([\001-\037\177])/{'^'.pack('c',ord($1)^^^64)}/g;
   $_;
 }
 
@@ -88,7 +88,7 @@ sub stringify {
   my $tick = $self->{tick};
 
   return 'undef' unless defined $_ or not $self->{printUndef};
-  return $_ . "" if ref \$_ eq 'GLOB';
+  return '*' . Symbol::glob_name($_) if ref \$_ eq 'GLOB';
   { no strict 'refs';
     $_ = &{*{Symbol::fetch_glob('overload::StrVal')}}($_)
       if $self->{bareStringify} and ref $_
@@ -96,7 +96,7 @@ sub stringify {
   }
 
   if ($tick eq 'auto') {
-    if (/[\000-\011\013-\037\177]/) {
+    if (m/[\000-\011\013-\037\177]/) {
       $tick = '"';
     } else {
       $tick = "'";
@@ -106,16 +106,16 @@ sub stringify {
     s/([\'\\])/\\$1/g;
   } elsif ($self->{unctrl} eq 'unctrl') {
     s/([\"\\])/\\$1/g ;
-    s/([\000-\037\177])/'^'.pack('c',ord($1)^^^64)/eg;
-    s/([\200-\377])/'\\0x'.sprintf('%2X',ord($1))/eg
+    s/([\000-\037\177])/{'^'.pack('c',ord($1)^^^64)}/g;
+    s/([\200-\377])/{'\0x'.sprintf('%2X',ord($1))}/g
       if $self->{quoteHighBit};
   } elsif ($self->{unctrl} eq 'quote') {
     s/([\"\\\$\@])/\\$1/g if $tick eq '"';
     s/\033/\\e/g;
-    s/([\000-\037\177])/'\\c'.chr(ord($1)^^^64)/eg;
+    s/([\000-\037\177])/{'\c'.chr(ord($1)^^^64)}/g;
   }
-  s/([\200-\377])/'\\'.sprintf('%3o',ord($1))/eg if $self->{quoteHighBit};
-  ($noticks || /^\d+(\.\d*)?\Z/)
+  s/([\200-\377])/{'\'.sprintf('%3o',ord($1))}/g if $self->{quoteHighBit};
+  ($noticks || m/^\d+(\.\d*)?\Z/)
     ? $_
       : $tick . $_ . $tick;
 }
@@ -128,7 +128,7 @@ sub DumpElem {
       && (ref $v eq 'ARRAY' and !grep(ref $_, @$v) )) {
     my $depth = $#$v;
     ($shortmore, $depth) = (' ...', $self->{arrayDepth} - 1)
-      if $self->{arrayDepth} and $depth >= $self->{arrayDepth};
+      if $self->{arrayDepth} and $depth +>= $self->{arrayDepth};
     my @a = map $self->stringify($_), @$v[0..$depth];
     print "0..$#{$v}  @a$shortmore\n";
   } elsif ($self->{veryCompact} && ref $v
@@ -136,7 +136,7 @@ sub DumpElem {
     my @a = sort keys %$v;
     my $depth = $#a;
     ($shortmore, $depth) = (' ...', $self->{hashDepth} - 1)
-      if $self->{hashDepth} and $depth >= $self->{hashDepth};
+      if $self->{hashDepth} and $depth +>= $self->{hashDepth};
     my @b = map {$self->stringify($_) . " => " . $self->stringify($$v{$_})}
       @a[0..$depth];
     local $" = ', ';
@@ -165,18 +165,18 @@ sub unwrap {
       $val = &{*{Symbol::fetch_glob('overload::StrVal')}}($v)
 	if %{Symbol::stash("overload")} and defined &{*{Symbol::fetch_glob('overload::StrVal')}};
     }
-    ($address) = $val =~ /(0x[0-9a-f]+)\)$/ ;
+    ($address) = $val =~ m/(0x[0-9a-f]+)\)$/ ;
     if (!$self->{dumpReused} && defined $address) {
       $address{$address}++ ;
-      if ( $address{$address} > 1 ) {
+      if ( $address{$address} +> 1 ) {
 	print "${sp}-> REUSED_ADDRESS\n" ;
 	return ;
       }
     }
   } elsif (ref \$v eq 'GLOB') {
-    $address = "$v" . "";	# To avoid a bug with globs
+    $address = '*' . Symbol::glob_name($v);	# To avoid a bug with globs
     $address{$address}++ ;
-    if ( $address{$address} > 1 ) {
+    if ( $address{$address} +> 1 ) {
       print "${sp}*DUMPED_GLOB*\n" ;
       return ;
     }
@@ -193,11 +193,11 @@ sub unwrap {
     my @sortKeys = sort keys(%$v) ;
     my $more;
     my $tHashDepth = $#sortKeys ;
-    $tHashDepth = $#sortKeys < $self->{hashDepth}-1 ? $#sortKeys : $self->{hashDepth}-1
+    $tHashDepth = $#sortKeys +< $self->{hashDepth}-1 ? $#sortKeys : $self->{hashDepth}-1
       unless $self->{hashDepth} eq '' ;
-    $more = "....\n" if $tHashDepth < $#sortKeys ;
+    $more = "....\n" if $tHashDepth +< $#sortKeys ;
     my $shortmore = "";
-    $shortmore = ", ..." if $tHashDepth < $#sortKeys ;
+    $shortmore = ", ..." if $tHashDepth +< $#sortKeys ;
     $#sortKeys = $tHashDepth ;
     if ($self->{compactDump} && !grep(ref $_, values %{$v})) {
       $short = $sp;
@@ -207,7 +207,7 @@ sub unwrap {
       }
       $short .= join ', ', @keys;
       $short .= $shortmore;
-      (print "$short\n"), return if length $short <= $self->{compactDump};
+      (print "$short\n"), return if length $short +<= $self->{compactDump};
     }
     for my $key (@sortKeys) {
       return if $DB::signal and $self->{stopDbSignal};
@@ -220,13 +220,13 @@ sub unwrap {
   } elsif ( UNIVERSAL::isa($v, 'ARRAY') ) {
     my $tArrayDepth = $#{$v} ;
     my $more ;
-    $tArrayDepth = $#$v < $self->{arrayDepth}-1 ? $#$v : $self->{arrayDepth}-1
+    $tArrayDepth = $#$v +< $self->{arrayDepth}-1 ? $#$v : $self->{arrayDepth}-1
       unless  $self->{arrayDepth} eq '' ;
-    $more = "....\n" if $tArrayDepth < $#{$v} ;
+    $more = "....\n" if $tArrayDepth +< $#{$v} ;
     my $shortmore = "";
-    $shortmore = " ..." if $tArrayDepth < $#{$v} ;
+    $shortmore = " ..." if $tArrayDepth +< $#{$v} ;
     if ($self->{compactDump} && !grep(ref $_, @{$v})) {
-      if ($#$v >= 0) {
+      if ($#$v +>= 0) {
 	$short = $sp . "0..$#{$v}  " .
 	  join(" ", 
 	       map {exists $v->[$_] ? $self->stringify($v->[$_]) : "empty"} ($[..$tArrayDepth)
@@ -234,7 +234,7 @@ sub unwrap {
       } else {
 	$short = $sp . "empty array";
       }
-      (print "$short\n"), return if length $short <= $self->{compactDump};
+      (print "$short\n"), return if length $short +<= $self->{compactDump};
     }
     for my $num ($[ .. $tArrayDepth) {
       return if $DB::signal and $self->{stopDbSignal};
@@ -257,30 +257,30 @@ sub unwrap {
     print "$sp-> ",$self->stringify($$v,1),"\n";
     if ($self->{globPrint}) {
       $s += 3;
-      $self->dumpglob('', $s, "{$$v}", $$v, 1);
+      $self->dumpglob('', $s, "\{$$v\}", $$v, 1);
     } elsif (defined ($fileno = fileno($v))) {
-      print( (' ' x ($s+3)) .  "FileHandle({$$v}) => fileno($fileno)\n" );
+      print( (' ' x ($s+3)) .  "FileHandle(\{$$v\}) => fileno($fileno)\n" );
     }
   } elsif (ref \$v eq 'GLOB') {
     if ($self->{globPrint}) {
-      $self->dumpglob('', $s, "{$v}", $v, 1);
+      $self->dumpglob('', $s, "\{*" . Symbol::glob_name($v) . "\}", $v, 1);
     } elsif (defined ($fileno = fileno(\$v))) {
-      print( (' ' x $s) .  "FileHandle({$v}) => fileno($fileno)\n" );
+      print( (' ' x $s) .  "FileHandle(\{$v\}) => fileno($fileno)\n" );
     }
   }
 }
 
 sub matchvar {
   $_[0] eq $_[1] or
-    ($_[1] =~ /^([!~])(.)([\x00-\xff]*)/) and
-      ($1 eq '!') ^^^ (eval {($_[2] . "::" . $_[0]) =~ /$2$3/});
+    ($_[1] =~ m/^([!~])(.)([\x00-\xff]*)/) and
+      ($1 eq '!') ^^^ (eval {($_[2] . "::" . $_[0]) =~ m/$2$3/});
 }
 
 sub compactDump {
   my $self = shift;
   $self->{compactDump} = shift if @_;
   $self->{compactDump} = 6*80-1 
-    if $self->{compactDump} and $self->{compactDump} < 2;
+    if $self->{compactDump} and $self->{compactDump} +< 2;
   $self->{compactDump};
 }
 
@@ -325,18 +325,18 @@ sub dumpglob {
   my ($package, $off, $key, $val, $all) = @_;
   local(*stab) = $val;
   my $fileno;
-  if (($key !~ /^_</ or $self->{dumpDBFiles}) and defined $stab) {
+  if (($key !~ m/^_</ or $self->{dumpDBFiles}) and defined $stab) {
     print( (' ' x $off) . "\$", &unctrl($key), " = " );
     $self->DumpElem($stab, 3+$off);
   }
-  if (($key !~ /^_</ or $self->{dumpDBFiles}) and @stab) {
+  if (($key !~ m/^_</ or $self->{dumpDBFiles}) and @stab) {
     print( (' ' x $off) . "\@$key = (\n" );
     $self->unwrap(\@stab,3+$off) ;
     print( (' ' x $off) .  ")\n" );
   }
   if ($key ne "main::" && $key ne "DB::" && %stab
-      && ($self->{dumpPackages} or $key !~ /::$/)
-      && ($key !~ /^_</ or $self->{dumpDBFiles})
+      && ($self->{dumpPackages} or $key !~ m/::$/)
+      && ($key !~ m/^_</ or $self->{dumpDBFiles})
       && !($package eq "Dumpvalue" and $key eq "stab")) {
     print( (' ' x $off) . "\%$key = (\n" );
     $self->unwrap(\%stab,3+$off) ;
@@ -367,7 +367,7 @@ sub dumpsub {
   my ($off,$sub) = @_;
   my $ini = $sub;
   my $s;
-  $sub = $1 if $sub =~ /^\{\*(.*)\}$/;
+  $sub = $1 if $sub =~ m/^\{\*(.*)\}$/;
   my $subref = defined $1 ? \&$sub : \&$ini;
   my $place = $DB::sub{$sub} || (($s = $subs{"$subref"}) && $DB::sub{$s})
     || (($s = $self->CvGV_name($subref)) && $DB::sub{$s})
@@ -395,10 +395,10 @@ sub dumpvars {
   my ($package,@vars) = @_;
   local(%address,$^W);
   my ($key,$val);
-  $package .= "::" unless $package =~ /::$/;
+  $package .= "::" unless $package =~ m/::$/;
   *stab = *main::;
 
-  while ($package =~ /(\w+?::)/g) {
+  while ($package =~ m/(\w+?::)/g) {
     *stab = $ {stab}{$1};
   }
   $self->{TotalStrings} = 0;
@@ -446,7 +446,7 @@ sub arrayUsage {		# array ref, name
   my $size = 0;
   map {$size += $self->scalarUsage($_)} @{$_[0]};
   my $len = @{$_[0]};
-  print "\@$_[1] = $len item", ($len > 1 ? "s" : ""), " (data: $size bytes)\n"
+  print "\@$_[1] = $len item", ($len +> 1 ? "s" : ""), " (data: $size bytes)\n"
       if defined $_[1];
   $self->{CompleteTotal} +=  $size;
   $size;
@@ -460,7 +460,7 @@ sub hashUsage {			# hash ref, name
   my $values = $self->arrayUsage(\@values);
   my $len = @keys;
   my $total = $keys + $values;
-  print "\%$_[1] = $len item", ($len > 1 ? "s" : ""),
+  print "\%$_[1] = $len item", ($len +> 1 ? "s" : ""),
     " (keys: $keys; values: $values; total: $total bytes)\n"
       if defined $_[1];
   $total;

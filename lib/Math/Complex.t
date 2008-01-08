@@ -13,6 +13,8 @@ BEGIN {
     }
 }
 
+BEGIN { require "./test.pl" }
+
 use Math::Complex;
 
 use strict;
@@ -35,26 +37,26 @@ if ($^O eq 'unicos') { 	# For some reason root() produces very inaccurate
 }			# cos(), sin(), cosh(), sinh().  The division
 			# of doubles is the current suspect.
 
-while (<DATA>) {
+while ( ~< *DATA) {
 	s/^\s+//;
-	next if $_ eq '' || /^\#/;
+	next if $_ eq '' || m/^\#/;
 	chomp;
 	$test_set = 0;		# Assume not a test over a set of values
-	if (/^&(.+)/) {
+	if (m/^&(.+)/) {
 		$op = $1;
 		next;
 	}
-	elsif (/^\{(.+)\}/) {
+	elsif (m/^\{(.+)\}/) {
 		set($1, \@set, \@val);
 		next;
 	}
 	elsif (s/^\|//) {
 		$test_set = 1;	# Requests we loop over the set...
 	}
-	my @args = split(/:/);
+	my @args = split(m/:/);
 	if ($test_set == 1) {
 		my $i;
-		for ($i = 0; $i < @set; $i++) {
+		for ($i = 0; $i +< @set; $i++) {
 			# complex number
 			$target = $set[$i];
 			# textual value as found in set definition
@@ -80,7 +82,7 @@ push(@script, <<'EOT');
     print "# $test Re(z) = ",$z->Re(), " Im(z) = ", $z->Im(), " z = $z\n";
     print 'not ' unless Re($z) == 2 and Im($z) == 3;
 EOT
-    push(@script, qq(print "ok $test\\n"}\n));
+    push(@script, qq(print "ok $test\\n"\}\n));
 
     $test++;
 push(@script, <<'EOT');
@@ -88,12 +90,12 @@ push(@script, <<'EOT');
     my $z = cplx(  1,  1);
     $z->abs(3 * sqrt(2));
     print "# $test Re(z) = ",$z->Re(), " Im(z) = ", $z->Im(), " z = $z\n";
-    print 'not ' unless (abs($z) - 3 * sqrt(2)) < $eps and
-                        (arg($z) - pi / 4     ) < $eps and
-                        (Re($z) - 3           ) < $eps and
-                        (Im($z) - 3           ) < $eps;
+    print 'not ' unless (abs($z) - 3 * sqrt(2)) +< $eps and
+                        (arg($z) - pi / 4     ) +< $eps and
+                        (Re($z) - 3           ) +< $eps and
+                        (Im($z) - 3           ) +< $eps;
 EOT
-    push(@script, qq(print "ok $test\\n"}\n));
+    push(@script, qq(print "ok $test\\n"\}\n));
 
     $test++;
 push(@script, <<'EOT');
@@ -101,12 +103,12 @@ push(@script, <<'EOT');
     my $z = cplx(  1,  1);
     $z->arg(-3 / 4 * pi);
     print "# $test Re(z) = ",$z->Re(), " Im(z) = ", $z->Im(), " z = $z\n";
-    print 'not ' unless (arg($z) + 3 / 4 * pi) < $eps and
-                        (abs($z) - sqrt(2)   ) < $eps and
-                        (Re($z) + 1          ) < $eps and
-                        (Im($z) + 1          ) < $eps;
+    print 'not ' unless (arg($z) + 3 / 4 * pi) +< $eps and
+                        (abs($z) - sqrt(2)   ) +< $eps and
+                        (Re($z) + 1          ) +< $eps and
+                        (Im($z) + 1          ) +< $eps;
 EOT
-    push(@script, qq(print "ok $test\\n"}\n));
+    push(@script, qq(print "ok $test\\n"\}\n));
 }
 
 test_mutators();
@@ -131,9 +133,9 @@ sub test_dbz {
 	$test++;
 	push(@script, <<EOT);
 	eval '$op';
-	(\$bad) = (\$@ =~ /(.+)/);
+	(\$bad) = (\$@ =~ m/(.+)/);
 	print "# $test op = $op divbyzero? \$bad...\n";
-	print 'not ' unless (\$@ =~ /Division by zero/);
+	print 'not ' unless (\$@ =~ m/Division by zero/);
 EOT
         push(@script, qq(print "ok $test\\n";\n));
     }
@@ -146,9 +148,9 @@ sub test_loz {
 	$test++;
 	push(@script, <<EOT);
 	eval '$op';
-	(\$bad) = (\$@ =~ /(.+)/);
+	(\$bad) = (\$@ =~ m/(.+)/);
 	print "# $test op = $op logofzero? \$bad...\n";
-	print 'not ' unless (\$@ =~ /Logarithm of zero/);
+	print 'not ' unless (\$@ =~ m/Logarithm of zero/);
 EOT
         push(@script, qq(print "ok $test\\n";\n));
     }
@@ -190,9 +192,9 @@ sub test_broot {
 	$test++;
 	push(@script, <<EOT);
 	eval 'root(2, $op)';
-	(\$bad) = (\$@ =~ /(.+)/);
+	(\$bad) = (\$@ =~ m/(.+)/);
 	print "# $test op = $op badroot? \$bad...\n";
-	print 'not ' unless (\$@ =~ /root rank must be/);
+	print 'not ' unless (\$@ =~ m/root rank must be/);
 EOT
         push(@script, qq(print "ok $test\\n";\n));
     }
@@ -201,113 +203,43 @@ EOT
 test_broot(qw(-3 -2.1 0 0.99));
 
 sub test_display_format {
-    $test++;
-    push @script, <<EOS;
-    print "# package display_format cartesian?\n";
-    print "not " unless Math::Complex->display_format eq 'cartesian';
-    print "ok $test\n";
-EOS
+    is(Math::Complex->display_format, 'cartesian');
+    my $j = (root(1,3))[1];
 
-    push @script, <<EOS;
-    my \$j = (root(1,3))[1];
+    $j->display_format('polar');
+    is($j->display_format, 'polar');
 
-    \$j->display_format('polar');
-EOS
-
-    $test++;
-    push @script, <<EOS;
-    print "# j display_format polar?\n";
-    print "not " unless \$j->display_format eq 'polar';
-    print "ok $test\n";
-EOS
-
-    $test++;
-    push @script, <<EOS;
-    print "# j = \$j\n";
-    print "not " unless "\$j" eq "[1,2pi/3]";
-    print "ok $test\n";
+    is("$j", "[1,2pi/3]");
 
     my %display_format;
 
-    %display_format = \$j->display_format;
-EOS
+    %display_format = $j->display_format;
 
-    $test++;
-    push @script, <<EOS;
-    print "# display_format{style} polar?\n";
-    print "not " unless \$display_format{style} eq 'polar';
-    print "ok $test\n";
-EOS
+    is($display_format{style}, 'polar');
 
-    $test++;
-    push @script, <<EOS;
-    print "# keys %display_format == 2?\n";
-    print "not " unless keys %display_format == 2;
-    print "ok $test\n";
+    is(keys %display_format, 2);
 
-    \$j->display_format('style' => 'cartesian', 'format' => '%.5f');
-EOS
+    $j->display_format('style' => 'cartesian', 'format' => '%.5f');
 
-    $test++;
-    push @script, <<EOS;
-    print "# j = \$j\n";
-    print "not " unless "\$j" eq "-0.50000+0.86603i";
-    print "ok $test\n";
+    is("$j", "-0.50000+0.86603i");
 
-    %display_format = \$j->display_format;
-EOS
+    %display_format = $j->display_format;
+    is($display_format{format}, '%.5f');
+    is(keys %display_format, 3);
 
-    $test++;
-    push @script, <<EOS;
-    print "# display_format{format} %.5f?\n";
-    print "not " unless \$display_format{format} eq '%.5f';
-    print "ok $test\n";
-EOS
+    $j->display_format('format' => undef);
+    like("$j", qr/^-0(?:\.5(?:0000\d+)?|\.49999\d+)\+0.86602540\d+i$/);
 
-    $test++;
-    push @script, <<EOS;
-    print "# keys %display_format == 3?\n";
-    print "not " unless keys %display_format == 3;
-    print "ok $test\n";
+    $j->display_format('style' => 'polar', 'polar_pretty_print' => 0);
+    like("$j", qr/^\[1,2\.09439510\d+\]$/);
 
-    \$j->display_format('format' => undef);
-EOS
+    $j->display_format('style' => 'cartesian', 'format' => '(%.5g)');
 
-    $test++;
-    push @script, <<EOS;
-    print "# j = \$j\n";
-    print "not " unless "\$j" =~ /^-0(?:\\.5(?:0000\\d+)?|\\.49999\\d+)\\+0.86602540\\d+i\$/;
-    print "ok $test\n";
+    is("$j", "(-0.5)+(0.86603)i");
 
-    \$j->display_format('style' => 'polar', 'polar_pretty_print' => 0);
-EOS
-
-    $test++;
-    push @script, <<EOS;
-    print "# j = \$j\n";
-    print "not " unless "\$j" =~ /^\\[1,2\\.09439510\\d+\\]\$/;
-    print "ok $test\n";
-
-    \$j->display_format('style' => 'cartesian', 'format' => '(%.5g)');
-EOS
-
-    $test++;
-    push @script, <<EOS;
-    print "# j = \$j\n";
-    print "not " unless "\$j" eq "(-0.5)+(0.86603)i";
-    print "ok $test\n";
-EOS
-
-    $test++;
-    push @script, <<EOS;
-    print "# j display_format cartesian?\n";
-    print "not " unless \$j->display_format eq 'cartesian';
-    print "ok $test\n";
-EOS
+    is($j->display_format, 'cartesian');
 }
-
-test_display_format();
-
+         
 sub test_remake {
     $test++;
     push @script, <<EOS;
@@ -406,7 +338,7 @@ EOS
     $test++;
     push @script, <<EOS;
     print ((\$z3->theta() == 0) ? "ok $test\n" : "not ok $test\n");
-}
+\}
 EOS
 }
 
@@ -429,21 +361,25 @@ EOS
 EOS
     $test++;
     push @script, <<EOS;
-    print (abs(atan2(0, cplx(0, 1))) < $eps ? "ok $test\n" : "not ok $test\n");
+    print (abs(atan2(0, cplx(0, 1))) +< $eps ? "ok $test\n" : "not ok $test\n");
 EOS
     $test++;
     push @script, <<EOS;
-    print (abs(atan2(cplx(0, 1), 0) - \$pip2) < $eps ? "ok $test\n" : "not ok $test\n");
+    print (abs(atan2(cplx(0, 1), 0) - \$pip2) +< $eps ? "ok $test\n" : "not ok $test\n");
 EOS
     $test++;
     push @script, <<EOS;
-    print (abs(atan2(cplx(0, 1), cplx(0, 1)) - \$pip4) < $eps ? "ok $test\n" : "not ok $test\n");
+    print (abs(atan2(cplx(0, 1), cplx(0, 1)) - \$pip4) +< $eps ? "ok $test\n" : "not ok $test\n");
 EOS
     $test++;
     push @script, <<EOS;
-    print (abs(atan2(cplx(0, 1), cplx(1, 1)) - cplx(0.553574358897045, 0.402359478108525)) < $eps ? "ok $test\n" : "not ok $test\n");
+    print (abs(atan2(cplx(0, 1), cplx(1, 1)) - cplx(0.553574358897045, 0.402359478108525)) +< $eps ? "ok $test\n" : "not ok $test\n");
 EOS
 }
+
+push @script, "test_display_format();\n";
+curr_test($test+1);
+$test += 12;
 
 sub test_decplx {
 }
@@ -459,7 +395,7 @@ test_decplx();
 print "1..$test\n";
 #print @script, "\n";
 eval join '', @script;
-die $@ if $@;
+die if $@;
 
 sub abop {
 	my ($op) = @_;
@@ -473,39 +409,39 @@ sub test {
 	$test++;
 	my $i;
 	$baop = 1 if ($op =~ s/;=$//);
-	for ($i = 0; $i < @args; $i++) {
+	for ($i = 0; $i +< @args; $i++) {
 		$val = value($args[$i]);
 		push @script, "\$z$i = $val;\n";
 	}
 	if (defined $z) {
 		$args = "'$op'";		# Really the value
-		$try = "abs(\$z0 - \$z1) <= $eps ? \$z1 : \$z0";
+		$try = "abs(\$z0 - \$z1) +<= $eps ? \$z1 : \$z0";
 		push @script, "\$res = $try; ";
 		push @script, "check($test, $args[0], \$res, \$z$#args, $args);\n";
 	} else {
 		my ($try, $args);
 		if (@args == 2) {
-			$try = ($op =~ /^\w/) ? "\$z0->$op" : "$op \$z0";
+			$try = ($op =~ m/^\w/) ? "\$z0->$op" : "$op \$z0";
 			$args = "'$args[0]'";
 		} else {
-			$try = ($op =~ /^\w/) ? "$op(\$z0, \$z1)" : "\$z0 $op \$z1";
+			$try = ($op =~ m/^\w/) ? "$op(\$z0, \$z1)" : "\$z0 $op \$z1";
 			$args = "'$args[0]', '$args[1]'";
 		}
 		push @script, "\$res = $try; ";
 		push @script, "check($test, '$try', \$res, \$z$#args, $args);\n";
-		if (@args > 2 and $baop) { # binary assignment ops
+		if (@args +> 2 and $baop) { # binary assignment ops
 			$test++;
 			# check the op= works
 			push @script, <<EOB;
-{
-	my \$za = cplx(ref \$z0 ? \@{\$z0->_cartesian} : (\$z0, 0));
+\{
+	my \$za = cplx(ref \$z0 ? \@\{\$z0->_cartesian\} : (\$z0, 0));
 
-	my (\$z1r, \$z1i) = ref \$z1 ? \@{\$z1->_cartesian} : (\$z1, 0);
+	my (\$z1r, \$z1i) = ref \$z1 ? \@\{\$z1->_cartesian\} : (\$z1, 0);
 
 	my \$zb = cplx(\$z1r, \$z1i);
 
 	\$za $op= \$zb;
-	my (\$zbr, \$zbi) = \@{\$zb->_cartesian};
+	my (\$zbr, \$zbi) = \@\{\$zb->_cartesian\};
 
 	check($test, '\$z0 $op= \$z1', \$za, \$z$#args, $args);
 EOB
@@ -513,7 +449,7 @@ EOB
 			# check that the rhs has not changed
 			push @script, qq(print "not " unless (\$zbr == \$z1r and \$zbi == \$z1i););
 			push @script, qq(print "ok $test\\n";\n);
-			push @script, "}\n";
+			push @script, "\}\n";
 		}
 	}
 }
@@ -522,10 +458,10 @@ sub set {
 	my ($set, $setref, $valref) = @_;
 	@{$setref} = ();
 	@{$valref} = ();
-	my @set = split(/;\s*/, $set);
+	my @set = split(m/;\s*/, $set);
 	my @res;
 	my $i;
-	for ($i = 0; $i < @set; $i++) {
+	for ($i = 0; $i +< @set; $i++) {
 		push(@{$valref}, $set[$i]);
 		my $val = value($set[$i]);
 		push @script, "\$s$i = $val;\n";
@@ -535,16 +471,16 @@ sub set {
 
 sub value {
 	local ($_) = @_;
-	if (/^\s*\((.*),(.*)\)/) {
+	if (m/^\s*\((.*),(.*)\)/) {
 		return "cplx($1,$2)";
 	}
-	elsif (/^\s*([\-\+]?(?:\d+(\.\d+)?|\.\d+)(?:[e[\-\+]\d+])?)/) {
+	elsif (m/^\s*([\-\+]?(?:\d+(\.\d+)?|\.\d+)(?:[e[\-\+]\d+])?)/) {
 		return "cplx($1,0)";
 	}
-	elsif (/^\s*\[(.*),(.*)\]/) {
+	elsif (m/^\s*\[(.*),(.*)\]/) {
 		return "cplxe($1,$2)";
 	}
-	elsif (/^\s*'(.*)'/) {
+	elsif (m/^\s*'(.*)'/) {
 		my $ex = $1;
 		$ex =~ s/\bz\b/$target/g;
 		$ex =~ s/\br\b/abs($target)/g;
@@ -553,7 +489,7 @@ sub value {
 		$ex =~ s/\bb\b/Im($target)/g;
 		return $ex;
 	}
-	elsif (/^\s*"(.*)"/) {
+	elsif (m/^\s*"(.*)"/) {
 		return "\"$1\"";
 	}
 	return $_;
@@ -566,11 +502,11 @@ sub check {
 
 	if ("$got" eq "$expected"
 	    ||
-	    ($expected =~ /^-?\d/ && $got == $expected)
+	    ($expected =~ m/^-?\d/ && $got == $expected)
 	    ||
-	    (abs(Math::Complex->make($got) - Math::Complex->make($expected)) < $eps)
+	    (abs(Math::Complex->make($got) - Math::Complex->make($expected)) +< $eps)
 	    ||
-	    (abs($got - $expected) < $eps)
+	    (abs($got - $expected) +< $eps)
 	    ) {
 		print "ok $test\n";
 	} else {
@@ -668,7 +604,7 @@ __END__
 (-3,4):(-3,-4)
 [2,pi/2]:[2,-(pi)/2]
 
-&<
+&+<
 (3,4):(1,2):0
 (3,4):(3,2):0
 (3,4):(3,8):1

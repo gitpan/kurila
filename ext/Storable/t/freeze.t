@@ -14,7 +14,7 @@ sub BEGIN {
 	unshift @INC, 't';
     }
     require Config; Config->import;
-    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bStorable\b/) {
+    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ m/\bStorable\b/) {
         print "1..0 # Skip: Storable was not built\n";
         exit 0;
     }
@@ -97,8 +97,8 @@ $VAR1 = [
 	'method',
 	1,
 	'prepare',
-	'SELECT table_name, table_owner, num_rows FROM iitables
-                  where table_owner != \'$ingres\' and table_owner != \'DBA\''
+	q|SELECT table_name, table_owner, num_rows FROM iitables
+                  where table_owner != '$ingres' and table_owner != 'DBA'|
 ];
 
 $x = nfreeze($VAR1);
@@ -137,7 +137,6 @@ ok 18, !$@;
 thaw $frozen;			# used to segfault here
 ok 19, 1;
 
-if ($] >= 5.006) {
     eval '
         $a = []; $#$a = 2; $a->[1] = undef;
         $b = thaw freeze $a;
@@ -145,7 +144,3 @@ if ($] >= 5.006) {
         @b = map { exists $b->[$_] } 0 .. $#$b;
         ok 20, "@a" eq "@b";
     ';
-}
-else {
-    print "ok 20 # skipped (no av_exists)\n";
-}

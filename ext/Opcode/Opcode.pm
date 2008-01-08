@@ -56,14 +56,14 @@ sub _init_optags {
 
     local($_);
     local($/) = "\n=cut"; # skip to optags definition section
-    <DATA>;
+    ~< *DATA;
     $/ = "\n=";		# now read in 'pod section' chunks
-    while(<DATA>) {
+    while( ~< *DATA) {
 	next unless m/^item\s+(:\w+)/;
 	my $tag = $1;
 
 	# Split into lines, keep only indented lines
-	my @lines = grep { m/^\s/    } split(/\n/);
+	my @lines = grep { m/^\s/    } split(m/\n/);
 	foreach (@lines) { s/--.*//  } # delete comments
 	my @ops   = map  { split ' ' } @lines; # get op words
 

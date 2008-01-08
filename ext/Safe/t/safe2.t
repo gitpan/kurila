@@ -6,7 +6,7 @@ BEGIN {
 	@INC = '../lib';
     } 
     require Config; Config->import;
-    if ($Config{'extensions'} !~ /\bOpcode\b/ && $Config{'osname'} ne 'VMS') {
+    if ($Config{'extensions'} !~ m/\bOpcode\b/ && $Config{'osname'} ne 'VMS') {
         print "1..0\n";
         exit 0;
     }
@@ -20,7 +20,7 @@ use vars qw($bar);
 use Opcode 1.00, qw(opdesc opset opset_to_ops opset_to_hex
 	opmask_add full_opset empty_opset opcodes opmask define_optag);
 
-use Safe 1.00;
+use Safe v1.00;
 
 my $last_test; # initalised at end
 print "1..$last_test\n";
@@ -42,7 +42,7 @@ $cpt = Safe->new( "Root");
 $cpt->permit(qw(:base_io));
 
 $cpt->reval(q{ system("echo not ok 1"); });
-if ($@ =~ /^'?system'? trapped by operation mask/) {
+if ($@ =~ m/^'?system'? trapped by operation mask/) {
     print "ok 1\n";
 } else {
     print "#$@" if $@;
@@ -118,14 +118,14 @@ print $t_array[2] == 4 ? "ok 27\n" : "not ok 27\n";
 
 my $t_scalar2 = $cpt->reval('die "foo bar"; 1');
 print defined $t_scalar2 ? "not ok 28\n" : "ok 28\n";
-print $@ =~ /foo bar/ ? "ok 29\n" : "not ok 29\n";
+print $@ =~ m/foo bar/ ? "ok 29\n" : "not ok 29\n";
 
 # --- rdo
   
 my $t = 30;
 $! = 0;
 my $nosuch = '/non/existant/file.name';
-open(NOSUCH, $nosuch);
+open(NOSUCH, "<", $nosuch);
 if ($@) {
     my $errno  = $!;
     die "Eek! Attempting to open $nosuch failed, but \$! is still 0" unless $!;

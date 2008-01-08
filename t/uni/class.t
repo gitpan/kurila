@@ -61,33 +61,33 @@ if (ord('A') == 193) {
 }
 
 # make sure it finds built-in class
-is(($str =~ /(\p{Letter}+)/)[0], 'ABCDEFGHIJKLMNOPQRSTUVWXYZ');
-is(($str =~ /(\p{l}+)/)[0], 'ABCDEFGHIJKLMNOPQRSTUVWXYZ');
+is(($str =~ m/(\p{Letter}+)/)[0], 'ABCDEFGHIJKLMNOPQRSTUVWXYZ');
+is(($str =~ m/(\p{l}+)/)[0], 'ABCDEFGHIJKLMNOPQRSTUVWXYZ');
 
 # make sure it finds user-defined class
-is(($str =~ /(\p{MyUniClass}+)/)[0], '0123456789:;<=>?@ABCDEFGHIJKLMNO');
+is(($str =~ m/(\p{MyUniClass}+)/)[0], '0123456789:;<=>?@ABCDEFGHIJKLMNO');
 
 # make sure it finds class in other package
-is(($str =~ /(\p{Other::Class}+)/)[0], '@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_');
+is(($str =~ m/(\p{Other::Class}+)/)[0], '@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_');
 
 # make sure it finds class in other OTHER package
-is(($str =~ /(\p{A::B::Intersection}+)/)[0], '@ABCDEFGHIJKLMNO');
+is(($str =~ m/(\p{A::B::Intersection}+)/)[0], '@ABCDEFGHIJKLMNO');
 
 # all of these should look in lib/unicore/bc/AL.pl
 $str = "\x{070D}\x{070E}\x{070F}\x{0710}\x{0711}";
-is(($str =~ /(\P{BidiClass: ArabicLetter}+)/)[0], "\x{070E}\x{070F}");
-is(($str =~ /(\P{BidiClass: AL}+)/)[0], "\x{070E}\x{070F}");
-is(($str =~ /(\P{BC :ArabicLetter}+)/)[0], "\x{070E}\x{070F}");
-is(($str =~ /(\P{bc=AL}+)/)[0], "\x{070E}\x{070F}");
+is(($str =~ m/(\P{BidiClass: ArabicLetter}+)/)[0], "\x{070E}\x{070F}");
+is(($str =~ m/(\P{BidiClass: AL}+)/)[0], "\x{070E}\x{070F}");
+is(($str =~ m/(\P{BC :ArabicLetter}+)/)[0], "\x{070E}\x{070F}");
+is(($str =~ m/(\P{bc=AL}+)/)[0], "\x{070E}\x{070F}");
 
 # make sure InGreek works
 $str = "[\x{038B}\x{038C}\x{038D}]";
 
-is(($str =~ /(\p{InGreek}+)/)[0], "\x{038B}\x{038C}\x{038D}");
-is(($str =~ /(\p{Script:InGreek}+)/)[0], "\x{038B}\x{038C}\x{038D}");
-is(($str =~ /(\p{Script=InGreek}+)/)[0], "\x{038B}\x{038C}\x{038D}");
-is(($str =~ /(\p{sc:InGreek}+)/)[0], "\x{038B}\x{038C}\x{038D}");
-is(($str =~ /(\p{sc=InGreek}+)/)[0], "\x{038B}\x{038C}\x{038D}");
+is(($str =~ m/(\p{InGreek}+)/)[0], "\x{038B}\x{038C}\x{038D}");
+is(($str =~ m/(\p{Script:InGreek}+)/)[0], "\x{038B}\x{038C}\x{038D}");
+is(($str =~ m/(\p{Script=InGreek}+)/)[0], "\x{038B}\x{038C}\x{038D}");
+is(($str =~ m/(\p{sc:InGreek}+)/)[0], "\x{038B}\x{038C}\x{038D}");
+is(($str =~ m/(\p{sc=InGreek}+)/)[0], "\x{038B}\x{038C}\x{038D}");
 
 use File::Spec;
 my $updir = 'File::Spec'->updir;
@@ -104,12 +104,12 @@ sub char_range {
 
     my $str;
 
-    if (ord('A') == 193 && $h1 < 256) {
+    if (ord('A') == 193 && $h1 +< 256) {
 	my $h3 = ($h2 || $h1) + 1;
 	if ($h3 - $h1 == 1) {
 	    $str = join "", pack 'U*', $h1 .. $h3; # Using pack since chr doesn't generate Unicode chars for value < 256.
-	} elsif ($h3 - $h1 > 1) {
-	    for (my $i = $h1; $i <= $h3; $i++) {
+	} elsif ($h3 - $h1 +> 1) {
+	    for (my $i = $h1; $i +<= $h3; $i++) {
 		$str = join "", $str, pack 'U*', $i;
 	    }
 	}
@@ -132,14 +132,14 @@ while (my ($abbrev, $files) = each %utf8::PVA_abbr_map) {
     );
 
     next unless -e $filename;
-    my ($h1, $h2) = map hex, (split(/\t/, (do $filename), 3))[0,1];
+    my ($h1, $h2) = map hex, (split(m/\t/, (do $filename), 3))[0,1];
 
     my $str = char_range($h1, $h2);
 
     for my $p ($prop_name, $abbrev) {
       for my $c ($files->{$_}, $_) {
-        is($str =~ /(\p{$p: $c}+)/ && $1, substr($str, 0, -1));
-        is($str =~ /(\P{$p= $c}+)/ && $1, substr($str, -1));
+        is($str =~ m/(\p{$p: $c}+)/ && $1, substr($str, 0, -1));
+        is($str =~ m/(\P{$p= $c}+)/ && $1, substr($str, -1));
       }
     }
   }
@@ -153,14 +153,14 @@ for my $p ('gc', 'sc') {
     );
 
     next unless -e $filename;
-    my ($h1, $h2) = map hex, (split(/\t/, (do $filename), 3))[0,1];
+    my ($h1, $h2) = map hex, (split(m/\t/, (do $filename), 3))[0,1];
 
     my $str = char_range($h1, $h2);
 
     for my $x ($p, { gc => 'General Category', sc => 'Script' }->{$p}) {
       for my $y ($abbr, $utf8::PropValueAlias{$p}{$abbr}, $utf8::PVA_abbr_map{gc_sc}{$abbr}) {
-        is($str =~ /(\p{$x: $y}+)/ && $1, substr($str, 0, -1));
-        is($str =~ /(\P{$x= $y}+)/ && $1, substr($str, -1));
+        is($str =~ m/(\p{$x: $y}+)/ && $1, substr($str, 0, -1));
+        is($str =~ m/(\P{$x= $y}+)/ && $1, substr($str, -1));
         SKIP: {
 	  skip("surrogate", 1) if $abbr eq 'cs';
  	  test_regexp ($str, $y);
@@ -195,15 +195,15 @@ SKIP:
 
     my $filename = 'File::Spec'->catfile($dirname, $leafname);
 
-    my ($h1, $h2) = map hex, (split(/\t/, (do $filename), 3))[0,1];
+    my ($h1, $h2) = map hex, (split(m/\t/, (do $filename), 3))[0,1];
 
     my $str = char_range($h1, $h2);
 
     for my $x ('gc', 'General Category') {
       print "# $filename $x $_, $utf8::PA_reverse{$_}\n";
       for my $y ($_, $utf8::PA_reverse{$_}) {
-	is($str =~ /(\p{$x: $y}+)/ && $1, substr($str, 0, -1));
-	is($str =~ /(\P{$x= $y}+)/ && $1, substr($str, -1));
+	is($str =~ m/(\p{$x: $y}+)/ && $1, substr($str, 0, -1));
+	is($str =~ m/(\P{$x= $y}+)/ && $1, substr($str, -1));
 	test_regexp ($str, $y);
       }
     }
@@ -211,7 +211,7 @@ SKIP:
 }
 
 # test the blocks (InFoobar)
-for (grep $utf8::Canonical{$_} =~ /^In/, keys %utf8::Canonical) {
+for (grep $utf8::Canonical{$_} =~ m/^In/, keys %utf8::Canonical) {
   my $filename = 'File::Spec'->catfile(
     $updir => lib => unicore => lib => gc_sc => "$utf8::Canonical{$_}.pl"
   );
@@ -220,14 +220,14 @@ for (grep $utf8::Canonical{$_} =~ /^In/, keys %utf8::Canonical) {
 
   print "# In$_ $filename\n";
 
-  my ($h1, $h2) = map hex, (split(/\t/, (do $filename), 3))[0,1];
+  my ($h1, $h2) = map hex, (split(m/\t/, (do $filename), 3))[0,1];
 
   my $str = char_range($h1, $h2);
 
   my $blk = $_;
 
   SKIP: {
-    skip($blk, 2) if $blk =~ /surrogates/i;
+    skip($blk, 2) if $blk =~ m/surrogates/i;
     test_regexp ($str, $blk);
     $blk =~ s/^In/Block:/;
     test_regexp ($str, $blk);

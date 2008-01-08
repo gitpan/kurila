@@ -38,23 +38,23 @@ use FindExt;
 use Config;
 
 # @ARGV with '!' at first position are exclusions
-my %excl = map {$_=>1} map {/^!(.*)$/} @ARGV;
-@ARGV = grep {!/^!/} @ARGV;
+my %excl = map {$_=>1} map {m/^!(.*)$/} @ARGV;
+@ARGV = grep {!m/^!/} @ARGV;
 # @ARGV with '+' at first position are inclusions
-my %incl = map {$_=>1} map {/^\+(.*)$/} @ARGV;
-@ARGV = grep {!/^\+/} @ARGV;
+my %incl = map {$_=>1} map {m/^\+(.*)$/} @ARGV;
+@ARGV = grep {!m/^\+/} @ARGV;
 
 # --static/--dynamic
-my %opts = map {$_=>1} map {/^--([\w\-]+)$/} @ARGV;
-@ARGV = grep {!/^--([\w\-]+)$/} @ARGV;
+my %opts = map {$_=>1} map {m/^--([\w\-]+)$/} @ARGV;
+@ARGV = grep {!m/^--([\w\-]+)$/} @ARGV;
 my ($static,$dynamic) = ((exists $opts{static}?1:0),(exists $opts{dynamic}?1:0));
 if ("$static,$dynamic" eq "0,0") {
   ($static,$dynamic) = (1,1);
 }
 if ($opts{'list-static-libs'} || $opts{'create-perllibst-h'}) {
-  my @statics = split /\s+/, $Config{static_ext};
+  my @statics = split m/\s+/, $Config{static_ext};
   if ($opts{'create-perllibst-h'}) {
-    open my $fh, ">perllibst.h"
+    open my $fh, ">", "perllibst.h"
         or die "Failed to write to perllibst.h:$!";
     my @statics1 = map {local $_=$_;s/\//__/g;$_} @statics;
     my @statics2 = map {local $_=$_;s/\//::/g;$_} @statics;
@@ -66,8 +66,8 @@ if ($opts{'list-static-libs'} || $opts{'create-perllibst-h'}) {
   } else {
     my %extralibs;
     for (@statics) {
-      open my $fh, "<..\\lib\\auto\\$_\\extralibs.ld" or die "can't open <..\\lib\\auto\\$_\\extralibs.ld: $!";
-      $extralibs{$_}++ for grep {/\S/} split /\s+/, join '', <$fh>;
+      open my $fh, "<", "..\\lib\\auto\\$_\\extralibs.ld" or die "can't open <..\\lib\\auto\\$_\\extralibs.ld: $!";
+      $extralibs{$_}++ for grep {m/\S/} split m/\s+/, join '', ~< $fh;
     }
     print map {s|/|\\|g;m|([^\\]+)$|;"..\\lib\\auto\\$_\\$1$Config{_a} "} @statics;
     print map {"$_ "} sort keys %extralibs;
@@ -90,7 +90,7 @@ unless (-f "$pl2bat.bat") {
     system(@args) unless defined $::Cross::platform;
 }
 my $make = shift;
-$make .= " ".shift while $ARGV[0]=~/^-/;
+$make .= " ".shift while $ARGV[0]=~m/^-/;
 my $dep  = shift;
 my $dmod = -M $dep;
 my $dir  = shift;
@@ -119,7 +119,7 @@ foreach $dir (sort @ext)
   if (chdir("$ext\\$dir"))
    {
     my $mmod = -M 'Makefile';
-    if (!(-f 'Makefile') || $mmod > $dmod)
+    if (!(-f 'Makefile') || $mmod +> $dmod)
      {
       print "\nRunning Makefile.PL in $dir\n";
       my @perl = ($perl, "-I$here\\..\\lib", 'Makefile.PL',
@@ -134,7 +134,7 @@ foreach $dir (sort @ext)
       $code = system(@perl);
       warn "$code from $dir\'s Makefile.PL" if $code;
       $mmod = -M 'Makefile';
-      if ($mmod > $dmod)
+      if ($mmod +> $dmod)
        {
         warn "Makefile $mmod > $dmod ($dep)\n";
        }

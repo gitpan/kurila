@@ -23,7 +23,7 @@ sub _readrc {
   if ($^O eq "MacOS") {
     $home = $ENV{HOME} || `pwd`;
     chomp($home);
-    $file = ($home =~ /:$/ ? $home . "netrc" : $home . ":netrc");
+    $file = ($home =~ m/:$/ ? $home . "netrc" : $home . ":netrc");
   }
   else {
 
@@ -43,7 +43,7 @@ sub _readrc {
   unless ($^O eq 'os2'
     || $^O eq 'MSWin32'
     || $^O eq 'MacOS'
-    || $^O =~ /^cygwin/)
+    || $^O =~ m/^cygwin/)
   {
     my @stat = stat($file);
 
@@ -62,8 +62,8 @@ sub _readrc {
   if ($fh = FileHandle->new($file, "r")) {
     my ($mach, $macdef, $tok, @tok) = (0, 0);
 
-    while (<$fh>) {
-      undef $macdef if /\A\n\Z/;
+    while ( ~< $fh) {
+      undef $macdef if m/\A\n\Z/;
 
       if ($macdef) {
         push(@$macdef, $_);
@@ -89,7 +89,7 @@ sub _readrc {
         }
 
         last TOKEN
-          unless @tok > 1;
+          unless @tok +> 1;
 
         $tok = shift(@tok);
 
@@ -101,7 +101,7 @@ sub _readrc {
             unless exists($netrc{$host});
           push(@{$netrc{$host}}, $mach);
         }
-        elsif ($tok =~ /^(login|password|account)$/) {
+        elsif ($tok =~ m/^(login|password|account)$/) {
           next TOKEN unless $mach;
           my $value = shift @tok;
 

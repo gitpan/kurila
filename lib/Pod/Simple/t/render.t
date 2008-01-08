@@ -77,15 +77,17 @@ foreach my $file (
   }
 
   print "# Reading $precooked...\n";
-  open(IN, $precooked) or die "Can't read-open $precooked: $!";
+  open(IN, "<", $precooked) or die "Can't read-open $precooked: $!";
   {
     local $/;
-    push @out, <IN>;
+    push @out, ~< *IN;
   }
   close(IN);
   print "#   ", length($out[-1]), " bytes pulled in.\n";
   
-  @out = map { Encode::decode('latin1', $_) } @out;
+  @out = map {
+               join '', pack("U*", unpack("C*", $_)) # latin1 decode.
+             } @out; 
 
   for (@out) { s/\s+/ /g; s/^\s+//s; s/\s+$//s; }
 
@@ -101,7 +103,7 @@ foreach my $file (
     ++$outfile;
     
     my @outnames = map $outfile . $_ , qw(0 1);
-    open(OUT2, ">$outnames[0].~out.txt") || die "Can't write-open $outnames[0].txt: $!";
+    open(OUT2, ">", "$outnames[0].~out.txt") || die "Can't write-open $outnames[0].txt: $!";
 
     foreach my $out (@out) { push @outnames, $outnames[-1];  ++$outnames[-1] };
     pop @outnames;
@@ -111,7 +113,7 @@ foreach my $file (
     binmode(OUT2);
     foreach my $out (@out) {
       my $outname = shift @outnames;
-      open(OUT, ">$outname.txt") || die "Can't write-open $outname.txt: $!";
+      open(OUT, ">", "$outname.txt") || die "Can't write-open $outname.txt: $!";
       binmode(OUT);
       print OUT  $out, "\n";
       print OUT2 $out, "\n";
@@ -146,7 +148,7 @@ sub compare2 {
     $x =~ m/^(\x00*)/s or die;
     my $at = length($1);
     print "# Difference at byte $at...\n";
-    if($at > 10) {
+    if($at +> 10) {
       $at -= 5;
     }
     {

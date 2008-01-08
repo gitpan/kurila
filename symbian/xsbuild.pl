@@ -137,7 +137,7 @@ my %EXTCFG;
 sub write_bld_inf {
     my ($base) = @_;
     print "\tbld.inf\n";
-    open( BLD_INF, ">bld.inf" ) or die "$0: bld.inf: $!\n";
+    open( BLD_INF, ">", "bld.inf" ) or die "$0: bld.inf: $!\n";
     print BLD_INF <<__EOF__;
 PRJ_MMPFILES
 $base.mmp
@@ -171,7 +171,7 @@ sub run_PL {
 
 sub read_old_multi {
     my ( $conf, $k ) = @_;
-    push @{ $conf->{$k} }, split( ' ', $1 ) if /^$k\s(.+)$/;
+    push @{ $conf->{$k} }, split( ' ', $1 ) if m/^$k\s(.+)$/;
 }
 
 sub uniquefy_filenames {
@@ -188,13 +188,13 @@ sub uniquefy_filenames {
 
 sub read_mmp {
     my ( $conf, $mmp ) = @_;
-    if ( -r $mmp && open( MMP, "<$mmp" ) ) {
+    if ( -r $mmp && open( MMP, "<", "$mmp" ) ) {
         print "\tReading $mmp...\n";
-        while (<MMP>) {
+        while ( ~< *MMP) {
             chomp;
-            $conf->{TARGET}     = $1 if /^TARGET\s+(.+)$/;
-            $conf->{TARGETPATH} = $1 if /^TARGETPATH\s+(.+)$/;
-            $conf->{EXTVERSION} = $1 if /^EXTVERSION\s+(.+)$/;
+            $conf->{TARGET}     = $1 if m/^TARGET\s+(.+)$/;
+            $conf->{TARGETPATH} = $1 if m/^TARGETPATH\s+(.+)$/;
+            $conf->{EXTVERSION} = $1 if m/^EXTVERSION\s+(.+)$/;
             read_old_multi( $conf, "SOURCE" );
             read_old_multi( $conf, "SOURCEPATH" );
             read_old_multi( $conf, "USERINCLUDE" );
@@ -269,7 +269,7 @@ sub write_mmp {
     for my $u (qw(SOURCE SOURCEPATH SYSTEMINCLUDE USERINCLUDE LIBRARY MACRO)) {
         $CONF{$u} = uniquefy_filenames( $CONF{$u} );
     }
-    open( BASE_MMP, ">$base.mmp" ) or die "$0: $base.mmp: $!\n";
+    open( BASE_MMP, ">", "$base.mmp" ) or die "$0: $base.mmp: $!\n";
 
     print BASE_MMP <<__EOF__;
 TARGET		$CONF{TARGET}
@@ -307,10 +307,10 @@ sub write_makefile {
     my $armdef1 = "$SYMBIAN_ROOT\\Epoc32\\Build$CWD\\$base\\$ARM\\$base.def";
     my $armdef2 = "..\\BMARM\\${base}u.def";
 
-    my $wrap = $SYMBIAN_ROOT && defined $SDK_VARIANT eq 'S60' && $SDK_VERSION eq '1.2' && $SYMBIAN_ROOT !~ /_CW$/;
+    my $wrap = $SYMBIAN_ROOT && defined $SDK_VARIANT eq 'S60' && $SDK_VERSION eq '1.2' && $SYMBIAN_ROOT !~ m/_CW$/;
     my $ABLD = $wrap ? 'perl b.pl' : 'abld';
 
-    open( MAKEFILE, ">Makefile" ) or die "$0: Makefile: $!\n";
+    open( MAKEFILE, ">", "Makefile" ) or die "$0: Makefile: $!\n";
     print MAKEFILE <<__EOF__;
 WIN = $WIN
 ARM = $ARM
@@ -382,7 +382,7 @@ distclean:	defrost realclean
 __EOF__
     close(MAKEFILE);
     if ($wrap) {
-	if(open(B,">b.pl")) {
+	if(open(B, ">","b.pl")) {
 	    print B <<'__EOF__';
 # abld.pl wrapper.
 
@@ -420,7 +420,7 @@ sub patch_config {
     return unless $CoreBuild;
     my $V = sprintf "%vd", $^V;
     # create reverse patch script
-    if (open(RSCRIPT, ">$config_restore_script")) {
+    if (open(RSCRIPT, ">", "$config_restore_script")) {
         print RSCRIPT <<__EOF__;
 #!perl -pi.bak
 s:\\Q$V:$R_V_SV:
@@ -494,7 +494,7 @@ sub xsconfig {
         my @found;
         find( sub { push @found, $File::Find::name if -f $_ }, 'lib' );
         for my $found (@found) {
-	    next if $found =~ /\.bak$/i; # Zlib
+	    next if $found =~ m/\.bak$/i; # Zlib
             my ($short) = ( $found =~ m/^lib.(.+)/ );
             $short =~ s!/!\\!g;
             $found =~ s!/!\\!g;
@@ -525,14 +525,14 @@ sub xsconfig {
     }
     if ( exists $EXTCFG{$ext} ) {
         for my $cfg ( @{ $EXTCFG{$ext} } ) {
-            if ( $cfg =~ /^([-+])?(.+\.(c|cpp|h))$/ ) {
+            if ( $cfg =~ m/^([-+])?(.+\.(c|cpp|h))$/ ) {
                 my $o = defined $1 ? $1 : '+';
                 my $f = $2;
                 $f =~ s:/:\\:g;
                 for my $f ( glob($f) ) {
                     if ( $o eq '+' ) {
                         warn "$0: no source file $dir\\$f\n" unless -f $f;
-                        $src{$f}++ unless $cfg =~ /\.h$/;
+                        $src{$f}++ unless $cfg =~ m/\.h$/;
                         if ( $f =~ m:^(.+)\\[^\\]+$: ) {
                             $incdir{$1}++;
                         }
@@ -542,7 +542,7 @@ sub xsconfig {
                     }
                 }
             }
-            if ( $cfg =~ /^([-+])?(.+\.(pm|pl|inc))$/ ) {
+            if ( $cfg =~ m/^([-+])?(.+\.(pm|pl|inc))$/ ) {
                 my $o = defined $1 ? $1 : '+';
                 my $f = $2;
                 $f =~ s:/:\\:g;
@@ -568,9 +568,6 @@ sub xsconfig {
         run_PL( "Errno_pm.PL", $dir, "Errno.pm" );
         $lst{"$dir\\Errno.pm"} = "$targetroot\\Errno.pm";
     }
-    elsif ( $dir eq "ext\\Devel\\PPPort" ) {
-        run_PL( "ppport_h.PL", $dir, "ppport.h" );
-    }
     elsif ( $dir eq "ext\\DynaLoader" ) {
         run_PL( "XSLoader_pm.PL", $dir, "XSLoader.pm" );
         $lst{"ext\\DynaLoader\\XSLoader.pm"} = "$targetroot\\XSLoader.pm";
@@ -590,8 +587,8 @@ sub xsconfig {
         my @MM = qw(VERSION XS_VERSION);
         if ( -f "Makefile" ) {
             print "\tReading MakeMaker Makefile...\n";
-            if ( open( MAKEFILE, "Makefile" ) ) {
-                while (<MAKEFILE>) {
+            if ( open( MAKEFILE, "<", "Makefile" ) ) {
+                while ( ~< *MAKEFILE) {
                     for my $m (@MM) {
                         if (m!^$m = (.+)!) {
                             $MM{$m} = $1;
@@ -617,7 +614,7 @@ sub xsconfig {
         }
         (&restore_config and die "$0: VERSION or XS_VERSION undefined\n")
           unless defined $MM{VERSION} && defined $MM{XS_VERSION};
-        if ( open( BASE_C, ">$basec" ) ) {
+        if ( open( BASE_C, ">", "$basec" ) ) {
             print BASE_C <<__EOF__;
 #ifndef VERSION
 #define VERSION "$MM{VERSION}"
@@ -643,13 +640,13 @@ __EOF__
         }
 
         print "\t_init.c\n";
-        open( _INIT_C, ">_init.c" )
+        open( _INIT_C, ">", "_init.c" )
             or &restore_config and die "$!: _init.c: $!\n";
         print _INIT_C <<__EOF__;
     #include "EXTERN.h"
     #include "perl.h"
-    EXPORT_C void _init(void *handle) {
-    }
+    EXPORT_C void _init(void *handle) \{
+    \}
 __EOF__
         close(_INIT_C);
 
@@ -659,11 +656,11 @@ __EOF__
             for my $submf ( glob("*/Makefile") ) {
                 my $d = dirname($submf);
                 print "Configuring Encode::$d...\n";
-                if ( open( SUBMF, $submf ) ) {
+                if ( open( SUBMF, "<", $submf ) ) {
                     if ( update_dir($d) ) {
                         my @subsrc;
-                        while (<SUBMF>) {
-                            next if 1 .. /postamble/;
+                        while ( ~< *SUBMF) {
+                            next if 1 .. m/postamble/;
                             if (m!^(\w+_t)\.c : !) {
                                 system_echo(
                                     "perl ..\\bin\\enc2xs -Q -o $1.c -f $1.fnm")
@@ -715,7 +712,7 @@ __EOF__
     print "\t$lstname.lst\n";
     my $lstout =
       $CoreBuild ? "$BUILDROOT/symbian/$lstname.lst" : "$BUILDROOT/$lstname.lst";
-    if ( open( my $lst, ">$lstout" ) ) {
+    if ( open( my $lst, ">", "$lstout" ) ) {
         for my $f (@lst) { print $lst qq["$f"-"!:$lst{$f}"\n] }
         close($lst);
     }
@@ -734,7 +731,7 @@ sub update_cwd {
 for my $ext (@ARGV) {
 
     $ext =~ s!::!\\!g;
-    my $extdash = $ext =~ /ext\\/ ? $ext : "ext\\$ext"; $extdash =~ s!\\!-!g;
+    my $extdash = $ext =~ m/ext\\/ ? $ext : "ext\\$ext"; $extdash =~ s!\\!-!g;
     $ext =~ s!/!\\!g;
 
     my $cfg;
@@ -744,7 +741,7 @@ for my $ext (@ARGV) {
     my $dir;
 
     unless ( -e $ext ) {
-        if ( $ext =~ /\.xs$/ && !-f $ext ) {
+        if ( $ext =~ m/\.xs$/ && !-f $ext ) {
             if ( -f "ext\\$ext" ) {
                 $ext = "ext\\$ext";
                 $dir = dirname($ext);
@@ -759,7 +756,7 @@ for my $ext (@ARGV) {
         $dir = "." unless defined $dir;
     }
     else {
-        if ( $ext =~ /\.xs$/ && -f $ext ) {
+        if ( $ext =~ m/\.xs$/ && -f $ext ) {
             $ext = dirname($ext);
             $dir = $ext;
         }
@@ -775,18 +772,18 @@ for my $ext (@ARGV) {
         $dir = "ext\\DynaLoader";
     }
 
-    $EXTCFG{$ext} = [ split( /,/, $cfg ) ] if defined $cfg;
+    $EXTCFG{$ext} = [ split( m/,/, $cfg ) ] if defined $cfg;
 
     die "$0: no lib\\Config.pm\n"
       if $CoreBuild && $Build && !-f "lib\\Config.pm";
 
     if ($CoreBuild) {
-        open( my $cfg, "symbian/install.cfg" )
+        open( my $cfg, "<", "symbian/install.cfg" )
           or die "$0: symbian/install.cfg: $!\n";
         my $extdir = $dir;
         $extdir =~ s:^ext\\::;
-        while (<$cfg>) {
-            next unless /^ext\s+(.+)/;
+        while ( ~< $cfg) {
+            next unless m/^ext\s+(.+)/;
             chomp;
             my $ext = $1;
             my @ext = split( ' ', $ext );
@@ -811,7 +808,7 @@ for my $ext (@ARGV) {
 
     my %CONF;
 
-    my @ext   = split( /\\/, $ext );
+    my @ext   = split( m/\\/, $ext );
     my $base  = $ext[-1];
 
     if ( $Clean || $DistClean ) {
@@ -858,7 +855,7 @@ for my $ext (@ARGV) {
         system_echo("make @TARGET") == 0 or die "$0: make #2 failed\n";
         unlink("$base.mmp.bak");
 
-        open( _INIT_C, ">_init.c" ) or die "$0: _init.c: $!\n";
+        open( _INIT_C, ">", "_init.c" ) or die "$0: _init.c: $!\n";
         print _INIT_C <<'__EOF__';
 #include "EXTERN.h"
 #include "perl.h"
@@ -879,7 +876,7 @@ __EOF__
         for my $f ("$SYMBIAN_ROOT\\Epoc32\\Build$CWD\\$base\\WINS\\perl$VERSION-$extdash.def",
 		   "..\\BMARM\\perl$VERSION-${extdash}u.def") {
 	    print "\t($f - ";
-	    if ( open( $def, $f ) ) {
+	    if ( open( $def, "<", $f ) ) {
 		print "OK)\n";
 	        $basef = $f;
 		last;
@@ -890,9 +887,9 @@ __EOF__
 	unless (defined $basef) {
 	    die "$0: failed to find .def for $base\n";
 	}
-        while (<$def>) {
-            next while 1 .. /^EXPORTS/;
-            if (/^\s*(\w+) \@ (\d+) /) {
+        while ( ~< $def) {
+            next while 1 .. m/^EXPORTS/;
+            if (m/^\s*(\w+) \@ (\d+) /) {
                 $symbol{$1} = $2;
             }
         }
@@ -945,7 +942,7 @@ __EOF__
             }
 	    if ( $ext eq "ext\\Compress\\Raw\\Zlib" ) {
 		my @bak;
-		find( sub { push @bak, $File::Find::name if /\.bak$/ }, "." );
+		find( sub { push @bak, $File::Find::name if m/\.bak$/ }, "." );
 		unlink(@bak) if @bak;
 		my @src;
 		find( sub { push @src, $_ if -f $_ }, "zlib-src" );

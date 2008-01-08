@@ -38,7 +38,7 @@ my $tmpl = [
 ];
 
 ### install get/set accessors for this object.
-for ( my $i=0; $i<scalar @$tmpl ; $i+=2 ) {
+for ( my $i=0; $i+<scalar @$tmpl ; $i+=2 ) {
     my $key = $tmpl->[$i];
     no strict 'refs';
     *{Symbol::fetch_glob(__PACKAGE__."::$key")} = sub {
@@ -212,18 +212,18 @@ sub _new_from_chunk {
     my $i = -1;
     my %entry = map {
         $tmpl->[++$i] => $tmpl->[++$i] ? oct $_ : $_
-    } map { /^([^\0]*)/ } unpack( UNPACK, $chunk );
+    } map { m/^([^\0]*)/ } unpack( UNPACK, $chunk );
 
     my $obj = bless { %entry, %args }, $class;
 
 	### magic is a filetype string.. it should have something like 'ustar' or
 	### something similar... if the chunk is garbage, skip it
-	return unless $obj->magic !~ /\W/;
+	return unless $obj->magic !~ m/\W/;
 
     ### store the original chunk ###
     $obj->raw( $chunk );
 
-    $obj->type(FILE) if ( (!length $obj->type) or ($obj->type =~ /\W/) );
+    $obj->type(FILE) if ( (!length $obj->type) or ($obj->type =~ m/\W/) );
     $obj->type(DIR)  if ( ($obj->is_file) && ($obj->name =~ m|/$|) );
 
 
@@ -258,7 +258,7 @@ sub _new_from_file {
 
             ### binmode needed to read files properly on win32 ###
             binmode $fh;
-            $data = do { local $/; <$fh> };
+            $data = do { local $/; ~< $fh };
             close $fh;
         }
     }
@@ -444,7 +444,7 @@ sub validate {
     my $raw = $self->raw;
 
     ### don't know why this one is different from the one we /write/ ###
-    substr ($raw, 148, 8) = "        ";
+    substr ($raw, 148, 8, "        ");
 	return unpack ("%16C*", $raw) == $self->chksum ? 1 : 0;
 }
 

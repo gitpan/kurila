@@ -3,7 +3,7 @@ print "1..5\n";
 
 my $file = "F-Pathological.pl";
 
-open F, ">$file" or die "Open $file: $!";
+open F, ">", "$file" or die "Open $file: $!";
 
 my $prog = <<'EOT';
 #!./perl -anF[~#QQ\\xq']
@@ -21,7 +21,7 @@ ok'4
 EOT
 
 # 2 of the characters toke.c used to use to quote the split parameter:
-$prog =~ s/QQ/\x01\x80/;
+$prog =~ s/QQ/\x[0180]/;
 # These 2 plus ~ # and ' were enough to make perl choke
 print F $prog;
 close F or die "Close $file: $!";

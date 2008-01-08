@@ -109,8 +109,8 @@ while (@ARGV) {
     $archname = 1 if $ARGV[0] eq '-A';
     $nwinstall = 1 if $ARGV[0] eq '-netware';
     $nopods = 1 if $ARGV[0] eq '-p';
-    $destdir = $1 if $ARGV[0] =~ /^-?-destdir=(.*)$/;
-    if ($ARGV[0] eq '-?' or $ARGV[0] =~ /^-?-h/) {
+    $destdir = $1 if $ARGV[0] =~ m/^-?-destdir=(.*)$/;
+    if ($ARGV[0] eq '-?' or $ARGV[0] =~ m/^-?-h/) {
 	print <<"EOT";
 Usage $0: [switches]
   -n	    Don't actually run any commands; just print them.
@@ -136,13 +136,13 @@ EOT
 
 $versiononly = 1 if $Config{versiononly} && !defined $versiononly;
 my (@scripts, @tolink);
-open SCRIPTS, "utils.lst" or die "Can't open utils.lst: $!";
-while (<SCRIPTS>) {
-    next if /^#/;
+open SCRIPTS, "<", "utils.lst" or die "Can't open utils.lst: $!";
+while (~< *SCRIPTS) {
+    next if m/^#/;
     s/\s*#\s*pod\s*=.*//; # install script regardless of pod location
-    next if /a2p/; # a2p is binary, to be installed separately
+    next if m/a2p/; # a2p is binary, to be installed separately
     chomp;
-    if (/(\S*)\s*#\s*link\s*=\s*(\S*)/) {
+    if (m/(\S*)\s*#\s*link\s*=\s*(\S*)/) {
 	push @scripts, $1;
 	push @tolink, [$1, $2];
     } else {
@@ -197,11 +197,11 @@ find(sub {
 # print "[$_]\n" for sort keys %archpms;
 
 my $ver = $Config{version};
-my $release = substr($],0,3);   # Not used currently.
-my $patchlevel = substr($],3,2);
+$^V =~ m/kurila-(\d+).(\d+)/ or die "Invalid \$^V";
+my ($release, $patchlevel) = ($1, $2);
 warn "Patchlevel of perl ($patchlevel)",
-    "and patchlevel of config.sh ($Config{'PERL_VERSION'}) don't match\n"
-	if $patchlevel != $Config{'PERL_VERSION'};
+    "and patchlevel of config.sh ($Config{'KURILA_VERSION'}) don't match\n"
+	if $patchlevel != $Config{'KURILA_VERSION'};
 
 # Fetch some frequently-used items from %Config
 my $installbin = "$destdir$Config{installbin}";
@@ -223,7 +223,7 @@ if ($^O eq 'os390') {
     my $archlibexp = $Config{archlibexp};
     my $usedl = $Config{usedl};
     if ($usedl eq 'define') {
-	`./$^X -pibak -e 's{$pwd\/libperl.x}{$archlibexp/CORE/libperl.x}' lib/Config.pm`;
+	`./$^X -pibak -e 's<$pwd\/libperl.x><$archlibexp/CORE/libperl.x>' lib/Config.pm`;
     }
 }
 
@@ -409,8 +409,8 @@ foreach my $file (@corefiles) {
     # HP-UX (at least) needs to maintain execute permissions
     # on dynamically-loadable libraries. So we do it for all.
     if (copy_if_diff($file,"$installarchlib/CORE/$file")) {
-	if ($file =~ /\.(\Q$so\E|\Q$dlext\E)$/) {
-	    strip("-S", "$installarchlib/CORE/$file") if $^O =~ /^(rhapsody|darwin)$/;
+	if ($file =~ m/\.(\Q$so\E|\Q$dlext\E)$/) {
+	    strip("-S", "$installarchlib/CORE/$file") if $^O =~ m/^(rhapsody|darwin)$/;
 	    chmod(0555, "$installarchlib/CORE/$file");
 	} else {
 	    chmod(0444, "$installarchlib/CORE/$file");
@@ -557,11 +557,11 @@ if ( !$versiononly || ($installprivlib =~ m/\Q$ver/)) {
     mkpath("${installprivlib}/$pod", $verbose, 0777);
 
     # If Perl 5.003's perldiag.pod is there, rename it.
-    if (open POD, "${installprivlib}/$pod/perldiag.pod") {
+    if (open POD, "<", "${installprivlib}/$pod/perldiag.pod") {
 	read POD, $_, 4000;
 	close POD;
 	# Some of Perl 5.003's diagnostic messages ended with periods.
-	if (/^=.*\.$/m) {
+	if (m/^=.*\.$/m) {
 	    my ($from, $to) = ("${installprivlib}/$pod/perldiag.pod",
 			       "${installprivlib}/$pod/perldiag-5.003.pod");
 	    print "  rename $from $to";
@@ -589,7 +589,7 @@ if (!$versiononly && $otherperls) {
     my ($path, @path);
     my $dirsep = ($Is_OS2 || $Is_W32 || $Is_NetWare) ? ';' : ':' ;
     ($path = $ENV{"PATH"}) =~ s:\\:/:g ;
-    @path = split(/$dirsep/, $path);
+    @path = split(m/$dirsep/, $path);
     if ($Is_VMS) {
 	my $i = 0;
 	while (exists $ENV{'DCL$PATH' . $i}) {
@@ -633,7 +633,7 @@ sub yn {
     my($answer);
     my($default) = $prompt =~ m/\[([yn])\]\s*$/i;
     print STDERR $prompt;
-    chop($answer = <STDIN>);
+    chop($answer = ~< *STDIN);
     $answer = $default if $answer =~ m/^\s*$/;
     ($answer =~ m/^[yY]/);
 }
@@ -663,7 +663,7 @@ sub safe_unlink {
 	print "  unlink $name\n" if $verbose;
 	next if CORE::unlink($name);
 	warn "Couldn't unlink $name: $!\n";
-	if ($! =~ /busy/i) {
+	if ($! =~ m/busy/i) {
 	    print "  mv $name $name.old\n" if $verbose;
 	    safe_rename($name, "$name.old")
 		or warn "Couldn't rename $name: $!\n";
@@ -675,11 +675,11 @@ sub safe_rename {
     my($from,$to) = @_;
     if (-f $to and not unlink($to)) {
 	my($i);
-	for ($i = 1; $i < 50; $i++) {
+	for ($i = 1; $i +< 50; $i++) {
 	    last if rename($to, "$to.$i");
 	}
 	warn("Cannot rename to `$to.$i': $!"), return 0
-	   if $i >= 50;	# Give up!
+	   if $i +>= 50;	# Give up!
     }
     link($from,$to) || return 0;
     unlink($from);
@@ -769,7 +769,7 @@ sub installlib {
     my $name = $_;
 
     # Ignore version control directories.
-    if ($name =~ /^(?:CVS|RCS|SCCS|\.svn)\z/ and -d $name) {
+    if ($name =~ m/^(?:CVS|RCS|SCCS|\.svn)\z/ and -d $name) {
 	$File::Find::prune = 1;
 	return;
     }
@@ -783,14 +783,14 @@ sub installlib {
     # the corelist script from lib/Module/CoreList/bin and ptar* in
     # lib/Archive/Tar/bin, the config_data script in lib/Module/Build/scripts
     # (they're installed later with other utils)
-    return if $name =~ /^(?:cpan|instmodsh|prove|corelist|ptar|cpan2dist|ptardiff|config_data)\z/;
+    return if $name =~ m/^(?:cpan|instmodsh|prove|corelist|ptar|cpan2dist|ptardiff|config_data)\z/;
     # ignore the Makefiles
-    return if $name =~ /^makefile$/i;
+    return if $name =~ m/^makefile$/i;
     # ignore the test extensions
     return if $dir =~ m{\bXS/(?:APItest|Typemap)\b};
     return if $name =~ m{\b(?:APItest|Typemap)\.pm$};
     # ignore the demo files
-    return if $dir =~ /\b(?:demos?|eg)\b/;
+    return if $dir =~ m/\b(?:demos?|eg)\b/;
 
     # ignore READMEs, MANIFESTs, INSTALL docs, META.ymls and change logs.
     # Changes.e2x and README.e2x are needed by enc2xs.
@@ -806,14 +806,14 @@ sub installlib {
     # - import library files and export library files (only present on Win32
     #   anyway?) and empty bootstrap files [of dynamically linked extensions].
     return if $Config{useshrplib} eq 'true' and
-             ($name =~ /$Config{_a}$/ or $name =~ /\.exp$/ or ($name =~ /\.bs$/ and -z $name));
+             ($name =~ m/$Config{_a}$/ or $name =~ m/\.exp$/ or ($name =~ m/\.bs$/ and -z $name));
 
     $name = "$dir/$name" if $dir ne '';
 
     my $installlib = $installprivlib;
-    if ($dir =~ /^auto/ ||
-	  ($name =~ /^(.*)\.(?:pm|pod)$/ && $archpms{$1}) ||
-	  ($name =~ /^(.*)\.(?:h|lib)$/i && ($Is_W32 || $Is_NetWare)) ||
+    if ($dir =~ m/^auto/ ||
+	  ($name =~ m/^(.*)\.(?:pm|pod)$/ && $archpms{$1}) ||
+	  ($name =~ m/^(.*)\.(?:h|lib)$/i && ($Is_W32 || $Is_NetWare)) ||
 	  $name eq 'Config_heavy.pl'
        ) {
 	$installlib = $installarchlib;
@@ -823,7 +823,7 @@ sub installlib {
     }
 
     if (-f $_) {
-	if (/\.(?:al|ix)$/ && !($dir =~ m[^auto/(.*)$])) {
+	if (m/\.(?:al|ix)$/ && !($dir =~ m[^auto/(.*)$])) {
 	    $installlib = $installprivlib;
 	    #We're installing *.al and *.ix files into $installprivlib,
 	    #but we have to delete old *.al and *.ix files from the 5.000
@@ -844,19 +844,19 @@ sub installlib {
 		# if copied will give problems when building new extensions.
 		# Has to be copied if we are installing on a NetWare server and hence
 		# the check !$nwinstall
-		if (!(/\.(?:nlp|nlm|bs)$/)) {
+		if (!(m/\.(?:nlp|nlm|bs)$/)) {
 		    copy_if_diff($_, "$installlib/$name")
-			and chmod($name =~ /\.(so|$dlext)$/o ? 0555 : 0444,
+			and chmod($name =~ m/\.(so|$dlext)$/o ? 0555 : 0444,
 				  "$installlib/$name");
 		}
 	   } else {
 		if (copy_if_diff($_, "$installlib/$name")) {
-		    if ($name =~ /\.(so|$dlext)$/o) {
-			strip("-S", "$installlib/$name") if $^O =~ /^(rhapsody|darwin)$/;
+		    if ($name =~ m/\.(so|$dlext)$/o) {
+			strip("-S", "$installlib/$name") if $^O =~ m/^(rhapsody|darwin)$/;
 			chmod(0555, "$installlib/$name");
 		    } else {
 			strip("-S", "$installlib/$name")
-			    if ($name =~ /\.a$/o and $^O =~ /^(rhapsody|darwin)$/);
+			    if ($name =~ m/\.a$/o and $^O =~ m/^(rhapsody|darwin)$/);
 			chmod(0444, "$installlib/$name");
 		    }
 		}
@@ -903,7 +903,7 @@ sub copy_if_diff {
 	}
 	copy($from, $to);
 	# Restore timestamps if it's a .a library or for OS/2.
-	if (!$nonono && ($Is_OS2 || $to =~ /\.a$/)) {
+	if (!$nonono && ($Is_OS2 || $to =~ m/\.a$/)) {
 	    my ($atime, $mtime) = (stat $from)[8,9];
 	    utime $atime, $mtime, $to;
 	}
@@ -918,7 +918,7 @@ sub strip
     return unless $dostrip;
 
     my @opts;
-    while (@args && $args[0] =~ /^(-\w+)$/) {
+    while (@args && $args[0] =~ m/^(-\w+)$/) {
 	push @opts, shift @args;
     }
 

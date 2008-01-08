@@ -252,9 +252,8 @@ sub new {
 
     # the Windows CONIN$ needs GENERIC_WRITE mode to allow
     # a SetConsoleMode() if we end up using Term::ReadKey
-    open FIN, (  $^O eq 'MSWin32' && $console eq 'CONIN$' ) ? "+<$console" :
-                                                              "<$console";
-    open FOUT,">$consoleOUT";
+    open FIN, ((  $^O eq 'MSWin32' && $console eq 'CONIN$' ) ? "+<" : "<"), "$console";
+    open FOUT, ">","$consoleOUT";
 
     #OUT->autoflush(1);		# Conflicts with debugger?
     my $sel = select(FOUT);
@@ -270,7 +269,7 @@ sub new {
     $ret = bless [$FIN, $FOUT];
   }
   if ($ret->Features->{ornaments} 
-      and not ($ENV{PERL_RL} and $ENV{PERL_RL} =~ /\bo\w*=0/)) {
+      and not ($ENV{PERL_RL} and $ENV{PERL_RL} =~ m/\bo\w*=0/)) {
     local $Term::ReadLine::termcap_nowarn = 1;
     $ret->ornaments(1);
   }
@@ -298,18 +297,18 @@ sub get_line {
   my $self = shift;
   my $in = $self->IN;
   local ($/) = "\n";
-  return scalar <$in>;
+  return scalar ~< $in;
 }
 
 package Term::ReadLine;		# So late to allow the above code be defined?
 
 our $VERSION = '1.03';
 
-my ($which) = exists $ENV{PERL_RL} ? split /\s+/, $ENV{PERL_RL} : undef;
+my ($which) = exists $ENV{PERL_RL} ? split m/\s+/, $ENV{PERL_RL} : undef;
 if ($which) {
-  if ($which =~ /\bgnu\b/i){
+  if ($which =~ m/\bgnu\b/i){
     eval "use Term::ReadLine::Gnu;";
-  } elsif ($which =~ /\bperl\b/i) {
+  } elsif ($which =~ m/\bperl\b/i) {
     eval "use Term::ReadLine::Perl;";
   } else {
     eval "use Term::ReadLine::$which;";
@@ -357,7 +356,7 @@ sub ornaments {
   $rl_term_set = shift;
   $rl_term_set ||= ',,,';
   $rl_term_set = 'us,ue,md,me' if $rl_term_set eq '1';
-  my @ts = split /,/, $rl_term_set, 4;
+  my @ts = split m/,/, $rl_term_set, 4;
   eval { LoadTermCap };
   unless (defined $terminal) {
     warn("Cannot find termcap: $@\n") unless $Term::ReadLine::termcap_nowarn;
@@ -391,7 +390,7 @@ sub register_Tk {
 }
 
 sub tkRunning {
-  $Term::ReadLine::toloop = $_[1] if @_ > 1;
+  $Term::ReadLine::toloop = $_[1] if @_ +> 1;
   $Term::ReadLine::toloop;
 }
 
@@ -406,7 +405,7 @@ sub get_line {
   $self->Tk_loop if $Term::ReadLine::toloop && defined &Tk::DoOneEvent;
   my $in = $self->IN;
   local ($/) = "\n";
-  return scalar <$in>;
+  return scalar ~< $in;
 }
 
 1;

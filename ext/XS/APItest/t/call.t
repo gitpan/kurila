@@ -8,7 +8,7 @@ BEGIN {
     @INC = '../lib';
     push @INC, "::lib:$MacPerl::Architecture:" if $^O eq 'MacOS';
     require Config; Config->import;
-    if ($Config{'extensions'} !~ /\bXS\/APItest\b/) {
+    if ($Config{'extensions'} !~ m/\bXS\/APItest\b/) {
 	# Look, I'm using this fully-qualified variable more than once!
 	my $arch = $MacPerl::Architecture;
         print "1..0 # Skip: XS::APItest was not built\n";
@@ -121,15 +121,15 @@ for my $test (
     # it's not a sensible combination. DAPM.
 
     ok(eq_array( [ eval { call_pv('d', $flags, @$args) }, $@ ],
-	[ "its_dead_jim\n" ]), "$description eval { call_pv('d') }");
+	[ "its_dead_jim\n" ]), "$description eval \{ call_pv('d') \}");
 
     ok(eq_array( [ eval { eval_sv('d', $flags), $@ }, $@ ],
 	[ ($flags ^&^ (G_ARRAY^|^G_DISCARD)) ? (0) : (undef, 1),
 		"its_dead_jim\n", '' ]),
-	"$description eval { eval_sv('d') }");
+	"$description eval \{ eval_sv('d') \}");
 
     ok(eq_array( [ eval { call_method('d', $flags, $obj, @$args) }, $@ ],
-	[ "its_dead_jim\n" ]), "$description eval { call_method('d') }");
+	[ "its_dead_jim\n" ]), "$description eval \{ call_method('d') \}");
 
 };
 
@@ -137,8 +137,8 @@ is(eval_pv('f()', 0), 'y', "eval_pv('f()', 0)");
 is(eval_pv('f(qw(a b c))', 0), 'y', "eval_pv('f(qw(a b c))', 0)");
 is(eval_pv('d()', 0), undef, "eval_pv('d()', 0)");
 is($@, "its_dead_jim\n", "eval_pv('d()', 0) - \$@");
-is(eval { eval_pv('d()', 1) } , undef, "eval { eval_pv('d()', 1) }");
-is($@, "its_dead_jim\n", "eval { eval_pv('d()', 1) } - \$@");
+is(eval { eval_pv('d()', 1) } , undef, "eval \{ eval_pv('d()', 1) \}");
+is($@, "its_dead_jim\n", "eval \{ eval_pv('d()', 1) \} - \$@");
 
 # DAPM 9-Aug-04. A taint test in eval_sv() could die after setting up
 # a new jump level but before pushing an eval context, leading to
@@ -151,7 +151,7 @@ my $x = 0;
 sub f {
     eval { my @a = ($^X . "x" , eval_sv(q(die "inner\n"), 0)) ; };
     $x++;
-    $a <=> $b;
+    $a <+> $b;
 }
 
 eval { my @a = sort f 2, 1;  $x++};

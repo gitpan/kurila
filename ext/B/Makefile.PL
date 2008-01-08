@@ -7,10 +7,10 @@ my $o = $Config{'obj_ext'};
 my $exeout_flag = '-o ';
 my $core = grep { $_ eq 'PERL_CORE=1' } @ARGV;
 if ($^O eq 'MSWin32') {
-    if ($Config{'cc'} =~ /^cl/i) {
+    if ($Config{'cc'} =~ m/^cl/i) {
 	$exeout_flag = '-Fe';
     }
-    elsif ($Config{'cc'} =~ /^bcc/i) {
+    elsif ($Config{'cc'} =~ m/^bcc/i) {
 	$exeout_flag = '-e';
     }
 }
@@ -60,6 +60,6 @@ defsubs.h :: @headers defsubs_h.PL
 sub MY::processPL {
     my $text = shift->SUPER::processPL(@_);
     # Append our extra parameter
-    $text =~ s/^\t.*defsubs_h\.PL.*/$& . ' ' . headerpath()/me;
+    $text =~ s/^\t.*defsubs_h\.PL.*/{$& . ' ' . headerpath()}/m;
     $text;
 }

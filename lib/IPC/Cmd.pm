@@ -13,7 +13,7 @@ BEGIN {
                         $USE_IPC_RUN $USE_IPC_OPEN3 $WARN
                     ];
 
-    $VERSION        = '0.40';
+    $VERSION        = '0.40_1';
     $VERBOSE        = 0;
     $DEBUG          = 0;
     $WARN           = 1;
@@ -125,6 +125,10 @@ sub can_use_ipc_open3   {
     my $self    = shift;
     my $verbose = shift || 0;
 
+    ### ipc::open3 is not working on VMS becasue of a lack of fork.
+    ### todo, win32 also does not have fork, so need to do more research.
+    return 0 if IS_VMS;
+
     ### ipc::open3 works on every platform, but it can't capture buffers
     ### on win32 :(
     return unless can_load(
@@ -188,7 +192,7 @@ sub can_run {
 
     } else {
         for my $dir (
-            (split /\Q$Config::Config{path_sep}\E/, $ENV{PATH}),
+            (split m/\Q$Config::Config{path_sep}\E/, $ENV{PATH}),
             File::Spec->curdir
         ) {           
             my $abs = File::Spec->catfile($dir, $command);
@@ -511,7 +515,7 @@ sub _ipc_run {
     if( ref $cmd ) {
         my $aref = [];
         for my $item (@$cmd) {
-            if( $item =~ /([<>|&])/ ) {
+            if( $item =~ m/([<>|&])/ ) {
                 push @command, $aref, $item;
                 $aref = [];
                 $special_chars .= $1;
@@ -521,12 +525,12 @@ sub _ipc_run {
         }
         push @command, $aref;
     } else {
-        @command = map { if( /([<>|&])/ ) {
+        @command = map { if( m/([<>|&])/ ) {
                             $special_chars .= $1; $_;
                          } else {
-                            [ split / +/ ]
+                            [ split m/ +/ ]
                          }
-                    } split( /\s*([<>|&])\s*/, $cmd );
+                    } split( m/\s*([<>|&])\s*/, $cmd );
     }
  
     ### if there's a pipe in the command, *STDIN needs to 
@@ -598,17 +602,15 @@ sub _system_run {
             ### MUST use the 2-arg version of open for dup'ing for 
             ### 5.6.x compatibilty. 5.8.x can use 3-arg open
             ### see perldoc5.6.2 -f open for details            
-            open $glob, $redir . fileno($fh) or (
+            open $glob, $redir, fileno($fh) or (
                         Carp::carp(loc("Could not dup '$name': %1", $!)),
                         return
                     );        
                 
             ### we should re-open this filehandle right now, not
             ### just dup it
-            ### Use 2-arg version of open, as 5.5.x doesn't support
-            ### 3-arg version =/
             if( $redir eq '>&' ) {
-                open( $fh, '>' . File::Spec->devnull ) or (
+                open( $fh, ">", '' . File::Spec->devnull ) or (
                     Carp::carp(loc("Could not reopen '$name': %1", $!)),
                     return
                 );
@@ -629,10 +631,7 @@ sub _system_run {
             my($redir, $fh, $glob) = @{$Map{$name}} or (
                 Carp::carp(loc("No such FD: '%1'", $name)), next );
 
-            ### MUST use the 2-arg version of open for dup'ing for 
-            ### 5.6.x compatibilty. 5.8.x can use 3-arg open
-            ### see perldoc5.6.2 -f open for details
-            open( $fh, $redir . fileno($glob) ) or (
+            open( $fh, $redir, fileno($glob) ) or (
                     Carp::carp(loc("Could not restore '$name': %1", $!)),
                     return
                 ); 

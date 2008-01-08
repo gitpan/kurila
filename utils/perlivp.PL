@@ -20,7 +20,7 @@ my $file = basename($0, '.PL');
 $file .= '.com' if $^O eq 'VMS';
 
 # Create output file.
-open OUT,">$file" or die "Can't create $file: $!";
+open OUT,">", "$file" or die "Can't create $file: $!";
 
 print "Extracting $file (with variable substitutions)\n";
 
@@ -29,7 +29,7 @@ print "Extracting $file (with variable substitutions)\n";
 
 print OUT <<"!GROK!THIS!";
 $Config{'startperl'}
-    eval 'exec $Config{'perlpath'} -S \$0 \${1+"\$@"}'
+    eval 'exec $Config{'perlpath'} -S \$0 \$\{1+"\$@"\}'
         if \$running_under_some_shell;
 !GROK!THIS!
 
@@ -114,22 +114,22 @@ else {
 $tests_total++;
 
 
-print "## Checking Perl version via variable `\$]'.\n" if $opt{'p'};
+print "## Checking Perl version via variable `\$^V'.\n" if $opt{'p'};
 
 !NO!SUBS!
 
 print OUT <<"!GROK!THIS!";
-my \$ivp_VERSION = "$]";
+my \$ivp_VERSION = "$^V";
 
 !GROK!THIS!
 print OUT <<'!NO!SUBS!';
-if ($ivp_VERSION eq $]) {
-    print "## Perl version `$]' appears installed as expected.\n" if $opt{'v'};
+if ($ivp_VERSION eq $^V) {
+    print "## Perl version `$^V' appears installed as expected.\n" if $opt{'v'};
     print "ok 2\n";
     $pass__total++;
 }
 else {
-    print "# Perl version `$]' installed, expected $ivp_VERSION.\n";
+    print "# Perl version `$^V' installed, expected $ivp_VERSION.\n";
     print "not ok 2\n";
     $error_total++;
 }
@@ -201,15 +201,15 @@ use Config;
 my $extensions_total = 0;
 my $extensions_there = 0;
 if (defined($Config{'extensions'})) {
-    my @extensions = split(/\s+/,$Config{'extensions'});
+    my @extensions = split(m/\s+/,$Config{'extensions'});
     foreach (@extensions) {
         next if ($_ eq '');
-        if ( $useithreads !~ /define/i ) {
+        if ( $useithreads !~ m/define/i ) {
             next if ($_ eq 'threads');
             next if ($_ eq 'threads/shared');
         }
 	# that's a distribution name, not a module name
-	next if /^IO_Compress_(?:Zlib|Base)$/;
+	next if m/^IO_Compress_(?:Zlib|Base)$/;
         next if $_ eq 'Devel/DProf'; 
 	# test modules
 	next if $_ eq 'XS/APItest';
@@ -442,7 +442,7 @@ or not -v is thrown.
 Likely to occur for a perl binary that was not properly installed.
 Correct by conducting a proper installation.
 
-=item * print "# Perl version `$]' installed, expected $ivp_VERSION.\n";
+=item * print "# Perl version `$^V' installed, expected $ivp_VERSION.\n";
 
 Likely to occur for a perl that was not properly installed.
 Correct by conducting a proper installation.

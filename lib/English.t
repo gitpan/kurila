@@ -22,7 +22,7 @@ sub foo {
 }
 foo(1);
 
-"abc" =~ /b/;
+"abc" =~ m/b/;
 
 ok( !$PREMATCH, '$PREMATCH undefined' );
 ok( !$MATCH, '$MATCH undefined' );
@@ -36,7 +36,7 @@ $ORS = "\n";
 	if ($^O ne 'dos') {
 	    pipe(IN, 'OUT');
 	} else {
-	    open(OUT, ">en.tmp");
+	    open(OUT, ">", "en.tmp");
 	}
 	select(OUT);
 	$| = 1;
@@ -48,8 +48,8 @@ $ORS = "\n";
 	my $close = close OUT;
 	ok( !($close) == $CHILD_ERROR, '$CHILD_ERROR should be false' );
 
-	open(IN, "<en.tmp") if ($^O eq 'dos');
-	my $foo = <IN>;
+	open(IN, "<", "en.tmp") if ($^O eq 'dos');
+	my $foo = ~< *IN;
 	like( $foo, qr/ok 7/, '$OFS' );
 
 	# chomp is true because $ORS is "\n"
@@ -60,7 +60,7 @@ undef $OUTPUT_FIELD_SEPARATOR;
 
 if ($threads) { $" = "\n" } else { $LIST_SEPARATOR = "\n" };
 @foo = (8, 9);
-@foo = split(/\n/, "@foo");
+@foo = split(m/\n/, "@foo");
 is( $foo[0], 8, '$"' );
 is( $foo[1], 9, '$LIST_SEPARATOR' );
 
@@ -85,11 +85,11 @@ like( $EXECUTABLE_NAME, qr/perl/i, '$EXECUTABLE_NAME' );
 is( $OSNAME, $Config{osname}, '$OSNAME' );
 
 # may be non-portable
-ok( $SYSTEM_FD_MAX >= 2, '$SYSTEM_FD_MAX should be at least 2' );
+ok( $SYSTEM_FD_MAX +>= 2, '$SYSTEM_FD_MAX should be at least 2' );
 
 is( $INPLACE_EDIT, '.inplace', '$INPLACE_EDIT' );
 
-'aabbcc' =~ /(.{2}).+(.{2})(?{ 9 })/;
+'aabbcc' =~ m/(.{2}).+(.{2})(?{ 9 })/;
 is( $LAST_PAREN_MATCH, 'cc', '$LAST_PARENT_MATCH' );
 is( $LAST_REGEXP_CODE_RESULT, 9, '$LAST_REGEXP_CODE_RESULT' );
 
@@ -100,9 +100,9 @@ ok( !$PERLDB, '$PERLDB should be false' );
 
 {
 	local $INPUT_RECORD_SEPARATOR = "\n\n";
-	like( <DATA>, qr/a paragraph./, '$INPUT_RECORD_SEPARATOR' );
+	like( ~< *DATA, qr/a paragraph./, '$INPUT_RECORD_SEPARATOR' );
 }
-like( <DATA>, qr/second paragraph..\z/s, '$INPUT_RECORD_SEPARATOR' );
+like( ~< *DATA, qr/second paragraph..\z/s, '$INPUT_RECORD_SEPARATOR' );
 
 is( $INPUT_LINE_NUMBER, 2, '$INPUT_LINE_NUMBER' );
 
@@ -119,7 +119,7 @@ is( $keys[1], 'd|e|f', '$SUBSCRIPT_SEPARATOR' );
 eval { is( $EXCEPTIONS_BEING_CAUGHT, 1, '$EXCEPTIONS_BEING_CAUGHT' ) };
 ok( !$EXCEPTIONS_BEING_CAUGHT, '$EXCEPTIONS_BEING_CAUGHT should be false' );
 
-eval { local *F; my $f = 'asdasdasd'; ++$f while -e $f; open(F, $f); };
+eval { local *F; my $f = 'asdasdasd'; ++$f while -e $f; open(F, "<", $f); };
 is( $OS_ERROR, $ERRNO, '$OS_ERROR' );
 ok( $OS_ERROR{ENOENT}, '%OS_ERROR (ENOENT should be set)' );
 
@@ -127,7 +127,7 @@ package B;
 
 use English;
 
-"abc" =~ /b/;
+"abc" =~ m/b/;
 
 main::is( $PREMATCH, 'a', '$PREMATCH defined' );
 main::is( $MATCH, 'b', '$MATCH defined' );
@@ -143,7 +143,7 @@ package C;
 
 use English qw( -no_match_vars ) ;
 
-"abc" =~ /b/;
+"abc" =~ m/b/;
 
 main::ok( !$PREMATCH, '$PREMATCH disabled' );
 main::ok( !$MATCH, '$MATCH disabled' );

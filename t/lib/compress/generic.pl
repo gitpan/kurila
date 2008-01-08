@@ -34,7 +34,7 @@ sub myGZreadFile
 
     my $data = '';
     $data = $init if defined $init ;
-    1 while $fil->read($data) > 0;
+    1 while $fil->read($data) +> 0;
 
     $fil->close ;
     return $data ;
@@ -187,7 +187,7 @@ EOM
       ok $x->opened(), "opened";
 
       my $len ;
-      1 while ($len = $x->read($uncomp)) > 0 ;
+      1 while ($len = $x->read($uncomp)) +> 0 ;
 
       is $len, 0, "read returned 0"
         or diag $$UnError ;
@@ -227,7 +227,7 @@ EOM
       ok $x, "creates $UncompressClass $name"  ;
 
       my $data = '';
-      $data .= $uncomp while $x->read($uncomp) > 0 ;
+      $data .= $uncomp while $x->read($uncomp) +> 0 ;
 
       ok $x->close, "close ok" ;
       is $data, $hello, "expected output" ;
@@ -249,7 +249,7 @@ this is a test
 EOM
 
     {
-      my $fh = 'IO::File'->new( ">$name") ;
+      my $fh = 'IO::File'->new( "$name", ">") ;
       ok $fh, "opened file $name ok";
       my $x = $CompressClass-> new( $fh)  ;
       ok $x, " created $CompressClass $fh"  ;
@@ -266,11 +266,11 @@ EOM
     my $uncomp;
     {
       my $x ;
-      ok my $fh1 = 'IO::File'->new( "<$name") ;
+      ok my $fh1 = 'IO::File'->new( "$name", "<") ;
       ok $x = $UncompressClass-> new( $fh1, -Append => 1)  ;
       ok $x->fileno() == fileno $fh1 ;
 
-      1 while $x->read($uncomp) > 0 ;
+      1 while $x->read($uncomp) +> 0 ;
 
       ok $x->close ;
     }
@@ -294,7 +294,7 @@ EOM
 
     {
       title "$CompressClass: Input from typeglob filehandle";  
-      ok open FH, ">$name" ;
+      ok open FH, ">", "$name" ;
 
       my $x = $CompressClass-> new( *FH)  ;
       ok $x, "  create $CompressClass"  ;
@@ -313,12 +313,12 @@ EOM
     {
       title "$UncompressClass: Input from typeglob filehandle, append output";  
       my $x ;
-      ok open FH, "<$name" ;
+      ok open FH, "<", "$name" ;
       ok $x = $UncompressClass-> new( *FH, -Append => 1, Transparent => 0)
         or diag $$UnError ;
       is $x->fileno(), fileno FH, "  fileno ok" ;
 
-      1 while $x->read($uncomp) > 0 ;
+      1 while $x->read($uncomp) +> 0 ;
 
       ok $x->close, "  close" ;
     }
@@ -339,15 +339,15 @@ EOM
     {
       title "Outout to stdout via '-'" ;
 
-      open(SAVEOUT, ">&STDOUT");
+      open(SAVEOUT, ">&", \*STDOUT);
       my $dummy = fileno SAVEOUT;
-      open STDOUT, ">$name" ;
+      open STDOUT, ">", "$name" ;
 
       my $x = $CompressClass->new( '-')  ;
       $x->write($hello);
       $x->close;
 
-      open(STDOUT, ">&SAVEOUT");
+      open(STDOUT, ">&", \*SAVEOUT);
 
       ok 1, "  wrote to stdout" ;
     }
@@ -361,18 +361,18 @@ EOM
       my $uncomp ;
       my $stdinFileno = fileno(STDIN);
       # open below doesn't return 1 sometines on XP
-         open(SAVEIN, "<&STDIN");
-      ok open(STDIN, "<$name"), "  redirect STDIN";
+         open(SAVEIN, "<&", \*STDIN);
+      ok open(STDIN, "<", "$name"), "  redirect STDIN";
       my $dummy = fileno SAVEIN;
       $x = $UncompressClass->new( '-', Append => 1, Transparent => 0)
             or diag $$UnError ;
       ok $x, "  created object" ;
       is $x->fileno(), $stdinFileno, "  fileno ok" ;
 
-      1 while $x->read($uncomp) > 0 ;
+      1 while $x->read($uncomp) +> 0 ;
 
       ok $x->close, "  close" ;
-         open(STDIN, "<&SAVEIN");
+         open(STDIN, "<&", \*SAVEIN);
       is $uncomp, $hello, "  expected output" ;
     }
 }
@@ -417,7 +417,7 @@ EOM
       ok ! defined $x->autoflush(1) ;
       ok ! defined $x->autoflush(1) ;
       ok ! defined $x->fileno() ;
-      1 while $x->read($uncomp) > 0  ;
+      1 while $x->read($uncomp) +> 0  ;
 
       ok $x->close ;
     }
@@ -445,7 +445,7 @@ if ($CompressClass ne 'RawDeflate')
       my $x ;
       ok $x = $UncompressClass-> new((\$buffer, Append => 1))  ;
 
-      1 while $x->read($uncomp) > 0  ;
+      1 while $x->read($uncomp) +> 0  ;
 
       ok $x->close ;
     }
@@ -512,7 +512,7 @@ EOM
 
     {
       my $fh ;
-      ok $fh = 'IO::File'->new( ">$name") ;
+      ok $fh = 'IO::File'->new( "$name", ">") ;
       print $fh $header ;
       my $x ;
       ok $x = $CompressClass-> new( $fh,
@@ -527,14 +527,14 @@ EOM
 
     my ($fil, $uncomp) ;
     my $fh1 ;
-    ok $fh1 = 'IO::File'->new( "<$name") ;
+    ok $fh1 = 'IO::File'->new( "$name", "<") ;
     # skip leading junk
-    my $line = <$fh1> ;
+    my $line = ~< $fh1 ;
     ok $line eq $header ;
 
     ok my $x = $UncompressClass-> new( $fh1, Append => 1)  ;
     ok $x->binmode();
-    1 while $x->read($uncomp) > 0 ;
+    1 while $x->read($uncomp) +> 0 ;
 
     ok $uncomp eq $hello ;
     my $rest ;
@@ -569,7 +569,7 @@ EOM
 
     my $uncomp;
     ok my $x = $UncompressClass-> new((\$compressed, Append => 1))  ;
-    1 while $x->read($uncomp) > 0 ;
+    1 while $x->read($uncomp) +> 0 ;
 
     ok $uncomp eq $hello ;
     is $x->trailingData(), $trailer ;
@@ -612,10 +612,7 @@ EOM
     my $foo = "1234567890";
 
     is $io->syswrite($foo, length($foo)), length($foo), "  syswrite ok" ;
-    if ( $[ < 5.6 )
-      { is $io->syswrite($foo, length $foo), length $foo, "  syswrite ok" }
-    else
-      { is $io->syswrite($foo), length $foo, "  syswrite ok" }
+    is $io->syswrite($foo), length $foo, "  syswrite ok";
     is $io->syswrite($foo, length($foo)), length $foo, "  syswrite ok";
     is $io->write($foo, length($foo), 5), 5,   " write 5";
     is $io->write("xxx\n", 100, -1), 1, "  write 1";
@@ -1003,11 +1000,11 @@ EOT
                 is $io->tell(), 0;
 
                 if ($append) {
-                    1 while $io->read($buf, $bufsize) > 0;
+                    1 while $io->read($buf, $bufsize) +> 0;
                 }
                 else {
                     my $tmp ;
-                    $buf .= $tmp while $io->read($tmp, $bufsize) > 0 ;
+                    $buf .= $tmp while $io->read($tmp, $bufsize) +> 0 ;
                 }
                 is length $buf, length $str;
                 ok $buf eq $str ;
@@ -1146,7 +1143,7 @@ foreach my $fb (qw(filename buffer filehandle))
             }
             elsif ($fb eq 'filehandle')
             {
-                $output = 'IO::File'->new( ">$name") ;
+                $output = 'IO::File'->new( "$name", ">") ;
                 print $output $buffer;
             }
 
@@ -1171,7 +1168,7 @@ foreach my $fb (qw(filename buffer filehandle))
             if ($append || $fb eq 'filehandle')
             {
                 is substr($data, 0, length($already)), $already, "  got prefix";
-                substr($data, 0, length($already)) = '';
+                substr($data, 0, length($already), '');
             }
 
 
@@ -1180,7 +1177,7 @@ foreach my $fb (qw(filename buffer filehandle))
             ok $x, "  created $UncompressClass";
 
             my $len ;
-            1 while ($len = $x->read($uncomp)) > 0 ;
+            1 while ($len = $x->read($uncomp)) +> 0 ;
 
             $x->close ;
             is $uncomp, $string, '  Got uncompressed data' ;
@@ -1227,7 +1224,7 @@ foreach my $type (qw(buffer filename filehandle))
         }
         elsif ($type eq 'filehandle')
         {
-            my $fh = 'IO::File'->new( "<$name") ;
+            my $fh = 'IO::File'->new( "$name", '<') ;
             ok $fh, "opened file $name ok";
             $input = $fh ;
         }
@@ -1282,7 +1279,7 @@ foreach my $append (0, 1)
     if ($append)
     {
         is substr($output, 0, length($already)), $already, "  got prefix";
-        substr($output, 0, length($already)) = '';
+        substr($output, 0, length($already), '');
     }
     is $output, $string, '  Got uncompressed data' ;
 }

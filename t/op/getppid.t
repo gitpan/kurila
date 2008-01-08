@@ -29,12 +29,12 @@ sub fork_and_retrieve {
     if ($pid) {
 	# parent
 	close $w;
-	$_ = <$r>;
+	$_ = ~< $r;
 	chomp;
 	die "Garbled output '$_'"
-	    unless my ($first, $second) = /^(\d+),(\d+)\z/;
-	cmp_ok ($first, '>=', 1, "Parent of $which grandchild");
-	cmp_ok ($second, '>=', 1, "New parent of orphaned $which grandchild");
+	    unless my ($first, $second) = m/^(\d+),(\d+)\z/;
+	cmp_ok ($first, '+>=', 1, "Parent of $which grandchild");
+	cmp_ok ($second, '+>=', 1, "New parent of orphaned $which grandchild");
 	isnt($first, $second, "Orphaned $which grandchild got a new parent");
 	return $second;
     }

@@ -15,7 +15,7 @@ $VERSION = '2.006';
 use constant G_EOF => 0 ;
 use constant G_ERR => -1 ;
 
-use IO::Compress::Base::Common 2.006 ;
+use IO::Compress::Base::Common v2.006 ;
 #use Parse::Parameters ;
 
 use IO::File ;
@@ -41,14 +41,14 @@ sub smartRead
 
     if (defined *$self->{InputLength}) {
         return 0
-            if *$self->{InputLengthRemaining} <= 0 ;
+            if *$self->{InputLengthRemaining} +<= 0 ;
         $size = min($size, *$self->{InputLengthRemaining});
     }
 
     if ( length *$self->{Prime} ) {
         #$$out = substr(*$self->{Prime}, 0, $size, '') ;
         $$out = substr(*$self->{Prime}, 0, $size) ;
-        substr(*$self->{Prime}, 0, $size) =  '' ;
+        substr(*$self->{Prime}, 0, $size,  '') ;
         if (length $$out == $size) {
             *$self->{InputLengthRemaining} -= length $$out
                 if defined *$self->{InputLength};
@@ -65,30 +65,30 @@ sub smartRead
     #}
 
     if (defined *$self->{FH})
-      { *$self->{FH}->read($$out, $get_size, $offset) }
+      { read(*$self->{FH}, $$out, $get_size, $offset) }
     elsif (defined *$self->{InputEvent}) {
         my $got = 1 ;
-        while (length $$out < $size) {
+        while (length $$out +< $size) {
             last 
-                if ($got = *$self->{InputEvent}->($$out, $get_size)) <= 0;
+                if ($got = *$self->{InputEvent}->($$out, $get_size)) +<= 0;
         }
 
-        if (length $$out > $size ) {
+        if (length $$out +> $size ) {
             #*$self->{Prime} = substr($$out, $size, length($$out), '');
             *$self->{Prime} = substr($$out, $size, length($$out));
-            substr($$out, $size, length($$out)) =  '';
+            substr($$out, $size, length($$out),  '');
         }
 
-       *$self->{EventEof} = 1 if $got <= 0 ;
+       *$self->{EventEof} = 1 if $got +<= 0 ;
     }
     else {
        no warnings 'uninitialized';
        my $buf = *$self->{Buffer} ;
        $$buf = '' unless defined $$buf ;
        #$$out = '' unless defined $$out ;
-       substr($$out, $offset) = substr($$buf, *$self->{BufferOffset}, $get_size);
+       substr($$out, $offset, undef, substr($$buf, *$self->{BufferOffset}, $get_size));
        if (*$self->{ConsumeInput})
-         { substr($$buf, 0, $get_size) = '' }
+         { substr($$buf, 0, $get_size, '') }
        else  
          { *$self->{BufferOffset} += length($$out) - $offset }
     }
@@ -96,7 +96,7 @@ sub smartRead
     *$self->{InputLengthRemaining} -= length($$out) #- $offset 
         if defined *$self->{InputLength};
         
-    $self->saveStatus(length $$out < 0 ? STATUS_ERROR : STATUS_OK) ;
+    $self->saveStatus(length $$out +< 0 ? STATUS_ERROR : STATUS_OK) ;
 
     return length $$out;
 }
@@ -114,7 +114,7 @@ sub pushBack
     else {
         my $len = length $_[0];
 
-        if($len > *$self->{BufferOffset}) {
+        if($len +> *$self->{BufferOffset}) {
             *$self->{Prime} = substr($_[0], 0, $len - *$self->{BufferOffset}) . *$self->{Prime} ;
             *$self->{InputLengthRemaining} = *$self->{InputLength};
             *$self->{BufferOffset} = 0
@@ -138,7 +138,7 @@ sub smartSeek
       { *$self->{FH}->seek($offset, SEEK_SET) }
     else {
         *$self->{BufferOffset} = $offset ;
-        substr(${ *$self->{Buffer} }, *$self->{BufferOffset}) = ''
+        substr(${ *$self->{Buffer} }, *$self->{BufferOffset}, undef, '')
             if $truncate;
         return 1;
     }
@@ -156,7 +156,7 @@ sub smartWrite
     }
     else {
        my $buf = *$self->{Buffer} ;
-       substr($$buf, *$self->{BufferOffset}, length $out_data) = $out_data ;
+       substr($$buf, *$self->{BufferOffset}, length $out_data, $out_data) ;
        *$self->{BufferOffset} += length($out_data) ;
        return 1;
     }
@@ -175,11 +175,11 @@ sub smartEof
     return 0 if length *$self->{Prime} || *$self->{PushMode};
 
     if (defined *$self->{FH})
-     { *$self->{FH}->eof() }
+     { eof(*$self->{FH}) }
     elsif (defined *$self->{InputEvent})
      { *$self->{EventEof} }
     else 
-     { *$self->{BufferOffset} >= length(${ *$self->{Buffer} }) }
+     { *$self->{BufferOffset} +>= length(${ *$self->{Buffer} }) }
 }
 
 sub clearError
@@ -340,13 +340,13 @@ sub _create
     if (! $got)
     {
         $got = $obj->checkParams($class, undef, @_)
-            or return undef ;
+          or die $obj->croakError("$class: Failed checkParams");
     }
 
     my $inType  = whatIsInput($inValue, 1);
 
     $obj->ckInputParam($class, $inValue, 1) 
-        or return undef ;
+      or return undef;
 
     *$obj->{InNew} = 1;
 
@@ -371,7 +371,7 @@ sub _create
             my $mode = '<';
             $mode = '+<' if $got->value('Scan');
             *$obj->{StdIO} = ($inValue eq '-');
-            *$obj->{FH} = IO::File->new( "$mode $inValue")
+            *$obj->{FH} = IO::File->new( "$inValue", $mode)
                 or return $obj->saveErrorString(undef, "cannot open file '$inValue': $!", $!) ;
         }
         
@@ -484,7 +484,7 @@ sub _inf
     my $name = (caller(1))[3] ;
 
     $obj->croakError("$name: expected at least 1 parameters\n")
-        unless @_ >= 1 ;
+        unless @_ +>= 1 ;
 
     my $input = shift ;
     my $haveOut = @_ ;
@@ -588,7 +588,7 @@ sub _singleTarget
         my $mode = '>' ;
         $mode = '>>'
             if $x->{Got}->value('Append') ;
-        $x->{fh} = IO::File->new( "$mode $output") 
+        $x->{fh} = IO::File->new( "$output", $mode) 
             or return retErr($x, "cannot open file '$output': $!") ;
         binmode $x->{fh} if $x->{Got}->valueOrDefault('BinModeOut');
 
@@ -653,7 +653,7 @@ sub _rd2
     
     while (1) {
 
-        while (($status = $z->read($x->{buff})) > 0) {
+        while (($status = $z->read($x->{buff})) +> 0) {
             if ($fh) {
                 print $fh ${ $x->{buff} }
                     or return $z->saveErrorString(undef, "Error writing to output file: $!", $!);
@@ -683,7 +683,7 @@ sub _rd2
     }
 
     return $z->closeError(undef)
-        if $status < 0 ;
+        if $status +< 0 ;
 
     ${ *$self->{TrailingData} } = $z->trailingData()
         if defined *$self->{TrailingData} ;
@@ -731,7 +731,7 @@ sub readBlock
     
     my $status = $self->smartRead($buff, $size) ;
     return $self->saveErrorString(STATUS_ERROR, "Error Reading Data")
-        if $status < 0  ;
+        if $status +< 0  ;
 
     if ($status == 0 ) {
         *$self->{Closed} = 1 ;
@@ -768,7 +768,7 @@ sub _raw_read
         my $len = $self->smartRead(\$tmp_buff, *$self->{BlockSize}) ;
         
         return $self->saveErrorString(G_ERR, "Error reading data: $!", $!) 
-                if $len < 0 ;
+                if $len +< 0 ;
 
         if ($len == 0 ) {
             *$self->{EndStream} = 1 ;
@@ -783,7 +783,7 @@ sub _raw_read
 
     if (*$self->{NewStream}) {
 
-        $self->gotoNextStream() > 0
+        $self->gotoNextStream() +> 0
             or return G_ERR;
 
         # For the headers that actually uncompressed data, put the
@@ -915,10 +915,10 @@ sub gotoNextStream
         # TODO - make this more efficient if know the offset for the end of
         # the stream and seekable
         $status = $self->read($buffer) 
-            while $status > 0 ;
+            while $status +> 0 ;
 
         return $status
-            if $status < 0;
+            if $status +< 0;
     }
 
     *$self->{NewStream} = 0 ;
@@ -1006,7 +1006,7 @@ sub read
     $length = $length || 0;
 
     $self->croakError(*$self->{ClassName} . "::read: length parameter is negative")
-        if $length < 0 ;
+        if $length +< 0 ;
 
     $$buffer = '' unless *$self->{AppendOutput}  || $offset ;
 
@@ -1031,15 +1031,15 @@ sub read
     # or both are specified.
     my $out_buffer = *$self->{Pending} ;
 
-    while (! *$self->{EndStream} && length($out_buffer) < $length)
+    while (! *$self->{EndStream} && length($out_buffer) +< $length)
     {
         my $buf_len = $self->_raw_read(\$out_buffer);
         return $buf_len 
-            if $buf_len < 0 ;
+            if $buf_len +< 0 ;
     }
 
     $length = length $out_buffer 
-        if length($out_buffer) < $length ;
+        if length($out_buffer) +< $length ;
 
     return 0 
         if $length == 0 ;
@@ -1048,16 +1048,16 @@ sub read
     $out_buffer = \*$self->{Pending} ;
 
     if ($offset) { 
-        $$buffer .= "\x00" x ($offset - length($$buffer))
-            if $offset > length($$buffer) ;
+        $$buffer .= "\0" x ($offset - length($$buffer))
+            if $offset +> length($$buffer) ;
         #substr($$buffer, $offset) = substr($$out_buffer, 0, $length, '') ;
-        substr($$buffer, $offset) = substr($$out_buffer, 0, $length) ;
-        substr($$out_buffer, 0, $length) =  '' ;
+        substr($$buffer, $offset, undef, substr($$out_buffer, 0, $length)) ;
+        substr($$out_buffer, 0, $length,  '') ;
     }
     else {
         #$$buffer .= substr($$out_buffer, 0, $length, '') ;
         $$buffer .= substr($$out_buffer, 0, $length) ;
-        substr($$out_buffer, 0, $length) =  '' ;
+        substr($$out_buffer, 0, $length,  '') ;
     }
 
     return $length ;
@@ -1070,12 +1070,12 @@ sub _getline
     # Slurp Mode
     if ( ! defined $/ ) {
         my $data ;
-        1 while $self->read($data) > 0 ;
+        1 while $self->read($data) +> 0 ;
         return \$data ;
     }
 
     # Record Mode
-    if ( ref $/ eq 'SCALAR' && ${$/} =~ /^\d+$/ && ${$/} > 0) {
+    if ( ref $/ eq 'SCALAR' && ${$/} =~ m/^\d+$/ && ${$/} +> 0) {
         my $reclen = ${$/} ;
         my $data ;
         $self->read($data, $reclen) ;
@@ -1085,7 +1085,7 @@ sub _getline
     # Paragraph Mode
     if ( ! length $/ ) {
         my $paragraph ;    
-        while ($self->read($paragraph) > 0 ) {
+        while ($self->read($paragraph) +> 0 ) {
             if ($paragraph =~ s/^(.*?\n\n+)//s) {
                 *$self->{Pending}  = $paragraph ;
                 my $par = $1 ;
@@ -1102,17 +1102,17 @@ sub _getline
         my $p = \*$self->{Pending}  ;
 
         if (length(*$self->{Pending}) && 
-                    ($offset = index(*$self->{Pending}, $/)) >=0) {
+                    ($offset = index(*$self->{Pending}, $/)) +>=0) {
             my $l = substr(*$self->{Pending}, 0, $offset + length $/ );
-            substr(*$self->{Pending}, 0, $offset + length $/) = '';    
+            substr(*$self->{Pending}, 0, $offset + length $/, '');    
             return \$l;
         }
 
-        while ($self->read($line) > 0 ) {
+        while ($self->read($line) +> 0 ) {
             my $offset = index($line, $/);
-            if ($offset >= 0) {
+            if ($offset +>= 0) {
                 my $l = substr($line, 0, $offset + length $/ );
-                substr($line, 0, $offset + length $/) = '';    
+                substr($line, 0, $offset + length $/, '');    
                 $$p = $line;
                 return \$l;
             }
@@ -1204,7 +1204,7 @@ sub tell
 
     my $pending = length *$self->{Pending} ;
 
-    return 0 if $pending > $in ;
+    return 0 if $pending +> $in ;
     return $in - $pending ;
 }
 
@@ -1216,8 +1216,7 @@ sub close
 
     return 1 if *$self->{Closed} ;
 
-    untie *$self 
-        if $] >= 5.008 ;
+    untie *$self ;
 
     my $status = 1 ;
 
@@ -1226,7 +1225,7 @@ sub close
         #if ( *$self->{AutoClose}) {
             local $.; 
             $! = 0 ;
-            $status = *$self->{FH}->close();
+            $status = close(*$self->{FH});
             return $self->saveErrorString(0, $!, $!)
                 if !*$self->{InNew} && $self->saveStatus($!) != 0 ;
         }
@@ -1273,13 +1272,13 @@ sub seek
 
     # Outlaw any attempt to seek backwards
     $self->croakError( *$self->{ClassName} ."::seek: cannot seek backwards")
-        if $target < $here ;
+        if $target +< $here ;
 
     # Walk the file to the new offset
     my $offset = $target - $here ;
 
     my $got;
-    while (($got = $self->read(my $buffer, min($offset, *$self->{BlockSize})) ) > 0)
+    while (($got = $self->read(my $buffer, min($offset, *$self->{BlockSize})) ) +> 0)
     {
         $offset -= $got;
         last if $offset == 0 ;

@@ -23,7 +23,7 @@ my $Is_OS2     = $^O eq 'os2';
 my $Is_Solaris = $^O eq 'solaris';
 my $Is_VMS     = $^O eq 'VMS';
 my $Is_DGUX    = $^O eq 'dgux';
-my $Is_MPRAS   = $^O =~ /svr4/ && -f '/etc/.relid';
+my $Is_MPRAS   = $^O =~ m/svr4/ && -f '/etc/.relid';
 my $Is_Rhapsody= $^O eq 'rhapsody';
 
 my $Is_Dosish  = $Is_Dos || $Is_OS2 || $Is_MSWin32 || $Is_NetWare || $Is_Cygwin;
@@ -41,10 +41,10 @@ my $tmpfile_link = $tmpfile.'2';
 
 chmod 0666, $tmpfile;
 1 while unlink $tmpfile;
-open(FOO, ">$tmpfile") || DIE("Can't open temp test file: $!");
+open(FOO, ">", "$tmpfile") || DIE("Can't open temp test file: $!");
 close FOO;
 
-open(FOO, ">$tmpfile") || DIE("Can't open temp test file: $!");
+open(FOO, ">", "$tmpfile") || DIE("Can't open temp test file: $!");
 
 my($nlink, $mtime, $ctime) = (stat(*FOO))[$NLINK, $MTIME, $CTIME];
 
@@ -78,7 +78,7 @@ sleep 2;
 SKIP: {
     unlink $tmpfile_link;
     my $lnk_result = eval { link $tmpfile, $tmpfile_link };
-    skip "link() unimplemented", 6 if $@ =~ /unimplemented/;
+    skip "link() unimplemented", 6 if $@ =~ m/unimplemented/;
 
     is( $@, '',         'link() implemented' );
     ok( $lnk_result,    'linked tmp testfile' );
@@ -89,7 +89,7 @@ SKIP: {
     SKIP: {
         skip "No link count", 1 if $Config{dont_use_nlink};
         skip "Cygwin9X fakes hard links by copying", 1
-          if $Config{myuname} =~ /^cygwin_(?:9\d|me)\b/i;
+          if $Config{myuname} =~ m/^cygwin_(?:9\d|me)\b/i;
 
         is($nlink, 2,     'Link count on hard linked file' );
     }
@@ -126,7 +126,7 @@ DIAG
 }
 
 # truncate and touch $tmpfile.
-open(F, ">$tmpfile") || DIE("Can't open temp test file: $!");
+open(F, ">", "$tmpfile") || DIE("Can't open temp test file: $!");
 ok(-z \*F,     '-z on empty filehandle');
 ok(! -s \*F,   '   and -s');
 close F;
@@ -134,11 +134,11 @@ close F;
 ok(-z $tmpfile,     '-z on empty file');
 ok(! -s $tmpfile,   '   and -s');
 
-open(F, ">$tmpfile") || DIE("Can't open temp test file: $!");
+open(F, ">", "$tmpfile") || DIE("Can't open temp test file: $!");
 print F "hi\n";
 close F;
 
-open(F, "<$tmpfile") || DIE("Can't open temp test file: $!");
+open(F, "<", "$tmpfile") || DIE("Can't open temp test file: $!");
 ok(!-z *F,     '-z on empty filehandle');
 ok( -s *F,   '   and -s');
 close F;
@@ -198,7 +198,7 @@ ok(! -f $Curdir,          '!-f cwd' );
 SKIP: {
     unlink($tmpfile_link);
     my $symlink_rslt = eval { symlink $tmpfile, $tmpfile_link };
-    skip "symlink not implemented", 3 if $@ =~ /unimplemented/;
+    skip "symlink not implemented", 3 if $@ =~ m/unimplemented/;
 
     is( $@, '',     'symlink() implemented' );
     ok( $symlink_rslt,      'symlink() ok' );
@@ -266,8 +266,8 @@ SKIP: {
     }
 
     my $try = sub {
-	my @c1 = eval qq[\$DEV =~ /^$_[0].*/mg];
-	my @c2 = eval qq[grep { $_[1] "/dev/\$_" } \@DEV];
+	my @c1 = eval qq[\$DEV =~ m/^$_[0].*/mg];
+	my @c2 = eval qq[grep \{ $_[1] "/dev/\$_" \} \@DEV];
 	my $c1 = scalar @c1;
 	my $c2 = scalar @c2;
 	is($c1, $c2, "ls and $_[1] agreeing on /dev ($c1 $c2)");
@@ -303,7 +303,7 @@ SKIP: {
             $_ = "$bin/$_";
             $cnt++;
             $uid++ if -u;
-            last if $uid && $uid < $cnt;
+            last if $uid && $uid +< $cnt;
         }
     }
     closedir BIN;
@@ -312,7 +312,7 @@ SKIP: {
 
     isnt($cnt, 0,    'found some programs');
     isnt($uid, 0,    '  found some setuid programs');
-    ok($uid < $cnt,  "    they're not all setuid");
+    ok($uid +< $cnt,  "    they're not all setuid");
 }
 
 
@@ -328,7 +328,7 @@ SKIP: {
         skip "Test uses unixisms", 2 if $Is_MSWin32 || $Is_NetWare;
         skip "No TTY to test -t with", 2 unless -e $TTY;
 
-        open(TTY, $TTY) ||
+        open(TTY, "<", $TTY) ||
           warn "Can't open $TTY--run t/TEST outside of make.\n";
         ok(-t *TTY,  '-t');
         ok(-c *TTY,  'tty is -c');
@@ -347,7 +347,7 @@ SKIP: {
     skip "No null device to test with", 1 unless -e $Null;
     skip "We know Win32 thinks '$Null' is a TTY", 1 if $Is_MSWin32;
 
-    open(NULL, $Null) or DIE("Can't open $Null: $!");
+    open(NULL, "<", $Null) or DIE("Can't open $Null: $!");
     ok(! -t *NULL,   'null device is not a TTY');
     close(NULL);
 }
@@ -365,24 +365,24 @@ ok(-B $Perl,      '-B');
 
 ok(! -T $Perl,    '!-T');
 
-open(FOO,$statfile);
+open(FOO, "<",$statfile);
 SKIP: {
     eval { -T *FOO; };
-    skip "-T/B on filehandle not implemented", 15 if $@ =~ /not implemented/;
+    skip "-T/B on filehandle not implemented", 15 if $@ =~ m/not implemented/;
 
     is( $@, '',     '-T on filehandle causes no errors' );
 
     ok(-T *FOO,      '   -T');
     ok(! -B *FOO,    '   !-B');
 
-    $_ = <FOO>;
+    $_ = ~< *FOO;
     like($_, qr/perl/, 'after readline');
     ok(-T *FOO,      '   still -T');
     ok(! -B *FOO,    '   still -B');
     close(FOO);
 
-    open(FOO,$statfile);
-    $_ = <FOO>;
+    open(FOO, "<",$statfile);
+    $_ = ~< *FOO;
     like($_, qr/perl/,      'reopened and after readline');
     ok(-T *FOO,      '   still -T');
     ok(! -B *FOO,    '   still !-B');
@@ -392,7 +392,7 @@ SKIP: {
     ok(! -B *FOO,        '   still !-B');
 
     # It's documented this way in perlfunc *shrug*
-    () = <FOO>;
+    () = ~< *FOO;
     ok(eof FOO,         'at EOF');
     ok(-T *FOO,          '   still -T');
     ok(-B *FOO,          '   now -B');
@@ -455,15 +455,15 @@ print "# Zzz...\n";
 sleep(3);
 my $f = 'tstamp.tmp';
 unlink $f;
-ok (open(S, "> $f"), 'can create tmp file');
+ok (open(S, ">", "$f"), 'can create tmp file');
 close S or die;
 my @a = stat $f;
 print "# time=$^T, stat=(@a)\n";
 my @b = (-M _, -A _, -C _);
 print "# -MAC=(@b)\n";
-ok( (-M _) < 0, 'negative -M works');
-ok( (-A _) < 0, 'negative -A works');
-ok( (-C _) < 0, 'negative -C works');
+ok( (-M _) +< 0, 'negative -M works');
+ok( (-A _) +< 0, 'negative -A works');
+ok( (-C _) +< 0, 'negative -C works');
 ok(unlink($f), 'unlink tmp file');
 
 {
@@ -486,7 +486,7 @@ SKIP: {
     ok(-d *DIR, "-d on a dirhandle works");
 
     # And now for the ambigious bareword case
-    ok(open(DIR, "TEST"), 'Can open "TEST" dir')
+    ok(open(DIR, "<", "TEST"), 'Can open "TEST" dir')
 	|| diag "Can't open 'TEST':  $!";
     my $size = (stat(*DIR))[7];
     ok(defined $size, "stat() on bareword works");
@@ -501,8 +501,8 @@ SKIP: {
     # RT #8244: *FILE{IO} does not behave like *FILE for stat() and -X() operators
     ok(open(F, ">", $tmpfile), 'can create temp file');
     my @thwap = stat *F{IO};
-    ok(@thwap, "stat(*F{IO}) works");    
-    ok( -f *F{IO} , "single file tests work with *F{IO}");
+    ok(@thwap, "stat(*F\{IO\}) works");    
+    ok( -f *F{IO} , "single file tests work with *F\{IO\}");
     close F;
     unlink $tmpfile;
 
@@ -511,18 +511,18 @@ SKIP: {
     SKIP: {
         skip "No dirfd()", 9 unless $Config{d_dirfd} || $Config{d_dir_dd_fd};
         ok(opendir(DIR, "."), 'Can open "." dir') || diag "Can't open '.':  $!";
-        ok(stat(*DIR{IO}), "stat() on *DIR{IO} works");
+        ok(stat(*DIR{IO}), "stat() on *DIR\{IO\} works");
 	ok(-d _ , "The special file handle _ is set correctly"); 
-        ok(-d -r *DIR{IO} , "chained -x's on *DIR{IO}");
+        ok(-d -r *DIR{IO} , "chained -x's on *DIR\{IO\}");
 
 	# And now for the ambigious bareword case
-	ok(open(DIR, "TEST"), 'Can open "TEST" dir')
+	ok(open(DIR, "<", "TEST"), 'Can open "TEST" dir')
 	    || diag "Can't open 'TEST':  $!";
 	my $size = (stat(*DIR{IO}))[7];
-	ok(defined $size, "stat() on *THINGY{IO} works");
+	ok(defined $size, "stat() on *THINGY\{IO\} works");
 	is($size, -s "TEST",
-	   "size returned by stat of *THINGY{IO} is for the file");
-	ok(-f _, "ambiguous *THINGY{IO} uses file handle, not dir handle");
+	   "size returned by stat of *THINGY\{IO\} is for the file");
+	ok(-f _, "ambiguous *THINGY\{IO\} uses file handle, not dir handle");
 	ok(-f *DIR{IO});
 	closedir DIR or die $!;
 	close DIR or die $!;

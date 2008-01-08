@@ -580,8 +580,6 @@ PERLVARI(Iknown_layers, PerlIO_list_t *,NULL)
 PERLVARI(Idef_layerlist, PerlIO_list_t *,NULL)
 #endif
 
-PERLVARI(Iencoding,    SV*, NULL)              /* character encoding */
-
 PERLVAR(Idebug_pad,	struct perl_debug_pad)	/* always needed because of the re extension */
 
 #ifdef PL_OP_SLAB_ALLOC
@@ -638,6 +636,12 @@ PERLVARI(Irehash_seed, UV, 0)		/* 582 hash initializer */
 /* File descriptor to talk to the child which dumps scalars.  */
 PERLVARI(Idumper_fd, int, -1)
 #endif
+
+/* The last unconditional member of the interpreter structure when 5.10.0 was
+   released. The offset of the end of this is baked into a global variable in 
+   any shared perl library which will allow a sanity test in future perl
+   releases.  */
+#define PERL_LAST_5_10_0_INTERP_MEMBER	Iisarev
 
 #ifdef PERL_IMPLICIT_CONTEXT
 PERLVARI(Imy_cxt_size, int, 0)		/* size of PL_my_cxt_list */

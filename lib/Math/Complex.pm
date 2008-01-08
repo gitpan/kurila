@@ -15,20 +15,20 @@ BEGIN {
     unless ($^O eq 'unicosmk') {
         local $!;
 	# We do want an arithmetic overflow, Inf INF inf Infinity:.
-        undef $Inf unless eval <<'EOE' and $Inf =~ /^inf(?:inity)?$/i;
+        undef $Inf unless eval <<'EOE' and $Inf =~ m/^inf(?:inity)?$/i;
 	  local $SIG{FPE} = sub {die};
 	  my $t = CORE::exp 30;
 	  $Inf = CORE::exp $t;
 EOE
 	if (!defined $Inf) {		# Try a different method
-	  undef $Inf unless eval <<'EOE' and $Inf =~ /^inf(?:inity)?$/i;
+	  undef $Inf unless eval <<'EOE' and $Inf =~ m/^inf(?:inity)?$/i;
 	    local $SIG{FPE} = sub {die};
 	    my $t = 1;
 	    $Inf = $t + "1e99999999999999999999999999999999";
 EOE
 	}
     }
-    $Inf = "Inf" if !defined $Inf || !($Inf > 0); # Desperation.
+    $Inf = "Inf" if !defined $Inf || !($Inf +> 0); # Desperation.
 }
 
 use strict;
@@ -81,7 +81,7 @@ use overload
 	'/'	=> \&_divide,
 	'**'	=> \&_power,
 	'=='	=> \&_numeq,
-	'<=>'	=> \&_spaceship,
+	'<+>'	=> \&_spaceship,
 	'neg'	=> \&_negate,
 	'^~^'	=> \&_conjugate,
 	'abs'	=> \&abs,
@@ -123,19 +123,19 @@ sub _make {
     my $arg = shift;
     my ($p, $q);
 
-    if ($arg =~ /^$gre$/) {
+    if ($arg =~ m/^$gre$/) {
 	($p, $q) = ($1, 0);
-    } elsif ($arg =~ /^(?:$gre)?$gre\s*i\s*$/) {
+    } elsif ($arg =~ m/^(?:$gre)?$gre\s*i\s*$/) {
 	($p, $q) = ($1 || 0, $2);
-    } elsif ($arg =~ /^\s*\(\s*$gre\s*(?:,\s*$gre\s*)?\)\s*$/) {
+    } elsif ($arg =~ m/^\s*\(\s*$gre\s*(?:,\s*$gre\s*)?\)\s*$/) {
 	($p, $q) = ($1, $2 || 0);
     }
 
     if (defined $p) {
 	$p =~ s/^\+//;
-	$p =~ s/^(-?)inf$/"${1}9**9**9"/e;
+	$p =~ s/^(-?)inf$/{"${1}9**9**9"}/;
 	$q =~ s/^\+//;
-	$q =~ s/^(-?)inf$/"${1}9**9**9"/e;
+	$q =~ s/^(-?)inf$/{"${1}9**9**9"}/;
     }
 
     return ($p, $q);
@@ -145,21 +145,21 @@ sub _emake {
     my $arg = shift;
     my ($p, $q);
 
-    if ($arg =~ /^\s*\[\s*$gre\s*(?:,\s*$gre\s*)?\]\s*$/) {
+    if ($arg =~ m/^\s*\[\s*$gre\s*(?:,\s*$gre\s*)?\]\s*$/) {
 	($p, $q) = ($1, $2 || 0);
     } elsif ($arg =~ m!^\s*\[\s*$gre\s*(?:,\s*([-+]?\d*\s*)?pi(?:/\s*(\d+))?\s*)?\]\s*$!) {
 	($p, $q) = ($1, ($2 eq '-' ? -1 : ($2 || 1)) * pi() / ($3 || 1));
-    } elsif ($arg =~ /^\s*\[\s*$gre\s*\]\s*$/) {
+    } elsif ($arg =~ m/^\s*\[\s*$gre\s*\]\s*$/) {
 	($p, $q) = ($1, 0);
-    } elsif ($arg =~ /^\s*$gre\s*$/) {
+    } elsif ($arg =~ m/^\s*$gre\s*$/) {
 	($p, $q) = ($1, 0);
     }
 
     if (defined $p) {
 	$p =~ s/^\+//;
 	$q =~ s/^\+//;
-	$p =~ s/^(-?)inf$/"${1}9**9**9"/e;
-	$q =~ s/^(-?)inf$/"${1}9**9**9"/e;
+	$p =~ s/^(-?)inf$/{"${1}9**9**9"}/;
+	$q =~ s/^(-?)inf$/{"${1}9**9**9"}/;
     }
 
     return ($p, $q);
@@ -177,16 +177,16 @@ sub make {
 	($re, $im) = (0, 0);
     } elsif (@_ == 1) {
 	return (ref $self)->emake($_[0])
-	    if ($_[0] =~ /^\s*\[/);
+	    if ($_[0] =~ m/^\s*\[/);
 	($re, $im) = _make($_[0]);
     } elsif (@_ == 2) {
 	($re, $im) = @_;
     }
     if (defined $re) {
-	_cannot_make("real part",      $re) unless $re =~ /^$gre$/;
+	_cannot_make("real part",      $re) unless $re =~ m/^$gre$/;
     }
     $im ||= 0;
-    _cannot_make("imaginary part", $im) unless $im =~ /^$gre$/;
+    _cannot_make("imaginary part", $im) unless $im =~ m/^$gre$/;
     $self->_set_cartesian([$re, $im ]);
     $self->display_format('cartesian');
 
@@ -205,22 +205,22 @@ sub emake {
 	($rho, $theta) = (0, 0);
     } elsif (@_ == 1) {
 	return (ref $self)->make($_[0])
-	    if ($_[0] =~ /^\s*\(/ || $_[0] =~ /i\s*$/);
+	    if ($_[0] =~ m/^\s*\(/ || $_[0] =~ m/i\s*$/);
 	($rho, $theta) = _emake($_[0]);
     } elsif (@_ == 2) {
 	($rho, $theta) = @_;
     }
     if (defined $rho && defined $theta) {
-	if ($rho < 0) {
+	if ($rho +< 0) {
 	    $rho   = -$rho;
-	    $theta = ($theta <= 0) ? $theta + pi() : $theta - pi();
+	    $theta = ($theta +<= 0) ? $theta + pi() : $theta - pi();
 	}
     }
     if (defined $rho) {
-	_cannot_make("rho",   $rho)   unless $rho   =~ /^$gre$/;
+	_cannot_make("rho",   $rho)   unless $rho   =~ m/^$gre$/;
     }
     $theta ||= 0;
-    _cannot_make("theta", $theta) unless $theta =~ /^$gre$/;
+    _cannot_make("theta", $theta) unless $theta =~ m/^$gre$/;
     $self->_set_polar([$rho, $theta]);
     $self->display_format('polar');
 
@@ -403,8 +403,8 @@ sub _multiply {
 	    my ($r1, $t1) = @{$z1->_polar};
 	    my ($r2, $t2) = @{$z2->_polar};
 	    my $t = $t1 + $t2;
-	    if    ($t >   pi()) { $t -= pi2 }
-	    elsif ($t <= -pi()) { $t += pi2 }
+	    if    ($t +>   pi()) { $t -= pi2 }
+	    elsif ($t +<= -pi()) { $t += pi2 }
 	    unless (defined $regular) {
 		$z1->_set_polar([$r1 * $r2, $t]);
 		return $z1;
@@ -457,14 +457,14 @@ sub _divide {
 	    if ($inverted) {
 		_divbyzero "$z2/0" if ($r1 == 0);
 		$t = $t2 - $t1;
-		if    ($t >   pi()) { $t -= pi2 }
-		elsif ($t <= -pi()) { $t += pi2 }
+		if    ($t +>   pi()) { $t -= pi2 }
+		elsif ($t +<= -pi()) { $t += pi2 }
 		return (ref $z1)->emake($r2 / $r1, $t);
 	    } else {
 		_divbyzero "$z1/0" if ($r2 == 0);
 		$t = $t1 - $t2;
-		if    ($t >   pi()) { $t -= pi2 }
-		elsif ($t <= -pi()) { $t += pi2 }
+		if    ($t +>   pi()) { $t -= pi2 }
+		elsif ($t +<= -pi()) { $t += pi2 }
 		return (ref $z1)->emake($r1 / $r2, $t);
 	    }
 	} else {
@@ -500,10 +500,10 @@ sub _power {
 	my ($z1, $z2, $inverted) = @_;
 	if ($inverted) {
 	    return 1 if $z1 == 0 || $z2 == 1;
-	    return 0 if $z2 == 0 && Re($z1) > 0;
+	    return 0 if $z2 == 0 && Re($z1) +> 0;
 	} else {
 	    return 1 if $z2 == 0 || $z1 == 1;
-	    return 0 if $z1 == 0 && Re($z2) > 0;
+	    return 0 if $z1 == 0 && Re($z2) +> 0;
 	}
 	my $w = $inverted ? &exp($z1 * &log($z2))
 	                  : &exp($z2 * &log($z1));
@@ -524,8 +524,8 @@ sub _spaceship {
 	my ($re1, $im1) = ref $z1 ? @{$z1->_cartesian} : ($z1, 0);
 	my ($re2, $im2) = ref $z2 ? @{$z2->_cartesian} : ($z2, 0);
 	my $sgn = $inverted ? -1 : 1;
-	return $sgn * ($re1 <=> $re2) if $re1 != $re2;
-	return $sgn * ($im1 <=> $im2);
+	return $sgn * ($re1 <+> $re2) if $re1 != $re2;
+	return $sgn * ($im1 <+> $im2);
 }
 
 #
@@ -550,7 +550,7 @@ sub _negate {
 	my ($z) = @_;
 	if ($z->{c_dirty}) {
 		my ($r, $t) = @{$z->_polar};
-		$t = ($t <= 0) ? $t + pi : $t - pi;
+		$t = ($t +<= 0) ? $t + pi : $t - pi;
 		return (ref $z)->emake($r, $t);
 	}
 	my ($re, $im) = @{$z->_cartesian};
@@ -599,8 +599,8 @@ sub abs {
 sub _theta {
     my $theta = $_[0];
 
-    if    ($$theta >   pi()) { $$theta -= pi2 }
-    elsif ($$theta <= -pi()) { $$theta += pi2 }
+    if    ($$theta +>   pi()) { $$theta -= pi2 }
+    elsif ($$theta +<= -pi()) { $$theta += pi2 }
 }
 
 #
@@ -641,7 +641,7 @@ sub arg {
 sub sqrt {
 	my ($z) = @_;
 	my ($re, $im) = ref $z ? @{$z->_cartesian} : ($z, 0);
-	return $re < 0 ? cplx(0, CORE::sqrt(-$re)) : CORE::sqrt($re)
+	return $re +< 0 ? cplx(0, CORE::sqrt(-$re)) : CORE::sqrt($re)
 	    if $im == 0;
 	my ($r, $t) = @{$z->_polar};
 	return (ref $z)->emake(CORE::sqrt($r), $t/2);
@@ -656,9 +656,9 @@ sub sqrt {
 #
 sub cbrt {
 	my ($z) = @_;
-	return $z < 0 ?
+	return $z +< 0 ?
 	    -CORE::exp(CORE::log(-$z)/3) :
-		($z > 0 ? CORE::exp(CORE::log($z)/3): 0)
+		($z +> 0 ? CORE::exp(CORE::log($z)/3): 0)
 	    unless ref $z;
 	my ($r, $t) = @{$z->_polar};
 	return 0 if $r == 0;
@@ -692,16 +692,16 @@ sub _rootbad {
 #
 sub root {
 	my ($z, $n, $k) = @_;
-	_rootbad($n) if ($n < 1 or int($n) != $n);
+	_rootbad($n) if ($n +< 1 or int($n) != $n);
 	my ($r, $t) = ref $z ?
-	    @{$z->_polar} : (CORE::abs($z), $z >= 0 ? 0 : pi);
+	    @{$z->_polar} : (CORE::abs($z), $z +>= 0 ? 0 : pi);
 	my $theta_inc = pi2 / $n;
 	my $rho = $r ** (1/$n);
 	my $cartesian = ref $z && $z->{c_dirty} == 0;
 	if (@_ == 2) {
 	    my @root;
 	    for (my $i = 0, my $theta = $t / $n;
-		 $i < $n;
+		 $i +< $n;
 		 $i++, $theta += $theta_inc) {
 		my $w = cplxe($rho, $theta);
 		# Yes, $cartesian is loop invariant.
@@ -807,12 +807,12 @@ sub log {
 	my ($z) = @_;
 	unless (ref $z) {
 	    _logofzero("log") if $z == 0;
-	    return $z > 0 ? CORE::log($z) : cplx(CORE::log(-$z), pi);
+	    return $z +> 0 ? CORE::log($z) : cplx(CORE::log(-$z), pi);
 	}
 	my ($r, $t) = @{$z->_polar};
 	_logofzero("log") if $r == 0;
-	if    ($t >   pi()) { $t -= pi2 }
-	elsif ($t <= -pi()) { $t += pi2 }
+	if    ($t +>   pi()) { $t -= pi2 }
+	elsif ($t +<= -pi()) { $t += pi2 }
 	return (ref $z)->make(CORE::log($r), $t);
 }
 
@@ -950,7 +950,7 @@ sub cotan { Math::Complex::cot(@_) }
 sub acos {
 	my $z = $_[0];
 	return CORE::atan2(CORE::sqrt(1-$z*$z), $z)
-	    if (! ref $z) && CORE::abs($z) <= 1;
+	    if (! ref $z) && CORE::abs($z) +<= 1;
 	$z = cplx($z, 0) unless ref $z;
 	my ($x, $y) = @{$z->_cartesian};
 	return 0 if $x == 1 && $y == 0;
@@ -958,12 +958,12 @@ sub acos {
 	my $t2 = CORE::sqrt(($x-1)*($x-1) + $y*$y);
 	my $alpha = ($t1 + $t2)/2;
 	my $beta  = ($t1 - $t2)/2;
-	$alpha = 1 if $alpha < 1;
-	if    ($beta >  1) { $beta =  1 }
-	elsif ($beta < -1) { $beta = -1 }
+	$alpha = 1 if $alpha +< 1;
+	if    ($beta +>  1) { $beta =  1 }
+	elsif ($beta +< -1) { $beta = -1 }
 	my $u = CORE::atan2(CORE::sqrt(1-$beta*$beta), $beta);
 	my $v = CORE::log($alpha + CORE::sqrt($alpha*$alpha-1));
-	$v = -$v if $y > 0 || ($y == 0 && $x < -1);
+	$v = -$v if $y +> 0 || ($y == 0 && $x +< -1);
 	return (ref $z)->make($u, $v);
 }
 
@@ -975,7 +975,7 @@ sub acos {
 sub asin {
 	my $z = $_[0];
 	return CORE::atan2($z, CORE::sqrt(1-$z*$z))
-	    if (! ref $z) && CORE::abs($z) <= 1;
+	    if (! ref $z) && CORE::abs($z) +<= 1;
 	$z = cplx($z, 0) unless ref $z;
 	my ($x, $y) = @{$z->_cartesian};
 	return 0 if $x == 0 && $y == 0;
@@ -983,12 +983,12 @@ sub asin {
 	my $t2 = CORE::sqrt(($x-1)*($x-1) + $y*$y);
 	my $alpha = ($t1 + $t2)/2;
 	my $beta  = ($t1 - $t2)/2;
-	$alpha = 1 if $alpha < 1;
-	if    ($beta >  1) { $beta =  1 }
-	elsif ($beta < -1) { $beta = -1 }
+	$alpha = 1 if $alpha +< 1;
+	if    ($beta +>  1) { $beta =  1 }
+	elsif ($beta +< -1) { $beta = -1 }
 	my $u =  CORE::atan2($beta, CORE::sqrt(1-$beta*$beta));
 	my $v = -CORE::log($alpha + CORE::sqrt($alpha*$alpha-1));
-	$v = -$v if $y > 0 || ($y == 0 && $x < -1);
+	$v = -$v if $y +> 0 || ($y == 0 && $x +< -1);
 	return (ref $z)->make($u, $v);
 }
 
@@ -1045,7 +1045,7 @@ sub acosec { Math::Complex::acsc(@_) }
 sub acot {
 	my ($z) = @_;
 	_divbyzero "acot(0)"  if $z == 0;
-	return ($z >= 0) ? CORE::atan2(1, $z) : CORE::atan2(-1, -$z)
+	return ($z +>= 0) ? CORE::atan2(1, $z) : CORE::atan2(-1, -$z)
 	    unless ref $z;
 	_divbyzero "acot(i)"  if ($z - i == 0);
 	_logofzero "acot(-i)" if ($z + i == 0);
@@ -1175,9 +1175,9 @@ sub acosh {
 	my ($re, $im) = @{$z->_cartesian};
 	if ($im == 0) {
 	    return CORE::log($re + CORE::sqrt($re*$re - 1))
-		if $re >= 1;
+		if $re +>= 1;
 	    return cplx(0, CORE::atan2(CORE::sqrt(1 - $re*$re), $re))
-		if CORE::abs($re) < 1;
+		if CORE::abs($re) +< 1;
 	}
 	my $t = &sqrt($z * $z - 1) + $z;
 	# Try Taylor if looking bad (this usually means that
@@ -1186,8 +1186,8 @@ sub acosh {
 	$t = 1/(2 * $z) - 1/(8 * $z**3) + 1/(16 * $z**5) - 5/(128 * $z**7)
 	    if $t == 0;
 	my $u = &log($t);
-	$u->Im(-$u->Im) if $re < 0 && $im == 0;
-	return $re < 0 ? -$u : $u;
+	$u->Im(-$u->Im) if $re +< 0 && $im == 0;
+	return $re +< 0 ? -$u : $u;
 }
 
 #
@@ -1218,7 +1218,7 @@ sub asinh {
 sub atanh {
 	my ($z) = @_;
 	unless (ref $z) {
-	    return CORE::log((1 + $z)/(1 - $z))/2 if CORE::abs($z) < 1;
+	    return CORE::log((1 + $z)/(1 - $z))/2 if CORE::abs($z) +< 1;
 	    $z = cplx($z, 0);
 	}
 	_divbyzero 'atanh(1)',  "1 - $z" if (1 - $z == 0);
@@ -1264,7 +1264,7 @@ sub acoth {
 	my ($z) = @_;
 	_divbyzero 'acoth(0)'            if ($z == 0);
 	unless (ref $z) {
-	    return CORE::log(($z + 1)/($z - 1))/2 if CORE::abs($z) > 1;
+	    return CORE::log(($z + 1)/($z - 1))/2 if CORE::abs($z) +> 1;
 	    $z = cplx($z, 0);
 	}
 	_divbyzero 'acoth(1)',  "$z - 1" if ($z - 1 == 0);
@@ -1371,7 +1371,7 @@ sub _stringify {
 
 	$style = $DISPLAY_FORMAT{style} unless defined $style;
 
-	return $z->_stringify_polar if $style =~ /^p/i;
+	return $z->_stringify_polar if $style =~ m/^p/i;
 	return $z->_stringify_cartesian;
 }
 
@@ -1389,10 +1389,10 @@ sub _stringify_cartesian {
 	my $format = $format{format};
 
 	if ($x) {
-	    if ($x =~ /^NaN[QS]?$/i) {
+	    if ($x =~ m/^NaN[QS]?$/i) {
 		$re = $x;
 	    } else {
-		if ($x =~ /^-?$Inf$/oi) {
+		if ($x =~ m/^-?$Inf$/oi) {
 		    $re = $x;
 		} else {
 		    $re = defined $format ? sprintf($format, $x) : $x;
@@ -1403,10 +1403,10 @@ sub _stringify_cartesian {
 	}
 
 	if ($y) {
-	    if ($y =~ /^(NaN[QS]?)$/i) {
+	    if ($y =~ m/^(NaN[QS]?)$/i) {
 		$im = $y;
 	    } else {
-		if ($y =~ /^-?$Inf$/oi) {
+		if ($y =~ m/^-?$Inf$/oi) {
 		    $im = $y;
 		} else {
 		    $im =
@@ -1423,9 +1423,9 @@ sub _stringify_cartesian {
 	my $str = $re;
 
 	if (defined $im) {
-	    if ($y < 0) {
+	    if ($y +< 0) {
 		$str .= $im;
-	    } elsif ($y > 0 || $im =~ /^NaN[QS]?i$/i)  {
+	    } elsif ($y +> 0 || $im =~ m/^NaN[QS]?i$/i)  {
 		$str .= "+" if defined $re;
 		$str .= $im;
 	    }
@@ -1450,7 +1450,7 @@ sub _stringify_polar {
 	my %format = $z->display_format;
 	my $format = $format{format};
 
-	if ($t =~ /^NaN[QS]?$/i || $t =~ /^-?$Inf$/oi) {
+	if ($t =~ m/^NaN[QS]?$/i || $t =~ m/^-?$Inf$/oi) {
 	    $theta = $t; 
 	} elsif ($t == pi) {
 	    $theta = "pi";
@@ -1470,8 +1470,8 @@ sub _stringify_polar {
 	    my ($a, $b);
 	    for $a (2..9) {
 		$b = $t * $a / pi;
-		if ($b =~ /^-?\d+$/) {
-		    $b = $b < 0 ? "-" : "" if CORE::abs($b) == 1;
+		if ($b =~ m/^-?\d+$/) {
+		    $b = $b +< 0 ? "-" : "" if CORE::abs($b) == 1;
 		    $theta = "${b}pi/$a";
 		    last;
 		}

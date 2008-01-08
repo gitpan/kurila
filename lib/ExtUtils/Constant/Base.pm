@@ -7,9 +7,6 @@ use Text::Wrap;
 use ExtUtils::Constant::Utils qw(C_stringify perl_stringify);
 $VERSION = '0.04';
 
-use constant is_perl56 => ($] < 5.007 && $] > 5.005_50);
-
-
 =head1 NAME
 
 ExtUtils::Constant::Base - base class for ExtUtils::Constant objects
@@ -127,14 +124,14 @@ sub memEQ_clause {
   if (ref $checked_at) {
     # regexp won't work on 5.6.1 without use utf8; in turn that won't work
     # on 5.005_03.
-    substr ($name, 0, length $$checked_at,) = '';
+    substr ($name, 0, length $$checked_at, '');
     $front_chop = C_stringify ($$checked_at);
     undef $checked_at;
   }
   my $len = length $name;
 
-  if ($len < 2) {
-    return $indent . "{\n"
+  if ($len +< 2) {
+    return $indent . "\{\n"
 	if (defined $checked_at and $checked_at == 0) or $len == 0;
     # We didn't switch, drop through to the code for the 2 character string
     $checked_at = 1;
@@ -142,7 +139,7 @@ sub memEQ_clause {
 
   my $name_param = $self->name_param;
 
-  if ($len < 3 and defined $checked_at) {
+  if ($len +< 3 and defined $checked_at) {
     my $check;
     if ($checked_at == 1) {
       $check = 0;
@@ -154,7 +151,7 @@ sub memEQ_clause {
       # Placate 5.005 with a break in the string. I can't see a good way of
       # getting it to not take [ as introducing an array lookup, even with
       # ${name_param}[$check]
-      return $indent . "if ($name_param" . "[$check] == '$char') {\n";
+      return $indent . "if ($name_param" . "[$check] == '$char') \{\n";
     }
   }
   if (($len == 2 and !defined $checked_at)
@@ -162,13 +159,13 @@ sub memEQ_clause {
     my $char1 = C_stringify (substr $name, 0, 1);
     my $char2 = C_stringify (substr $name, 1, 1);
     return $indent .
-      "if ($name_param" . "[0] == '$char1' && $name_param" . "[1] == '$char2') {\n";
+      "if ($name_param" . "[0] == '$char1' && $name_param" . "[1] == '$char2') \{\n";
   }
   if (($len == 3 and defined ($checked_at) and $checked_at == 1)) {
     my $char1 = C_stringify (substr $name, 0, 1);
     my $char2 = C_stringify (substr $name, 2, 1);
     return $indent .
-      "if ($name_param" . "[0] == '$char1' && $name_param" . "[2] == '$char2') {\n";
+      "if ($name_param" . "[0] == '$char1' && $name_param" . "[2] == '$char2') \{\n";
   }
 
   my $pointer = '^';
@@ -181,7 +178,7 @@ sub memEQ_clause {
 
   $name = C_stringify ($name);
   my $memEQ = $self->memEQ();
-  my $body = $indent . "if ($memEQ($name_param, \"$name\", $len)) {\n";
+  my $body = $indent . "if ($memEQ($name_param, \"$name\", $len)) \{\n";
   # Put a little ^ under the letter we checked at
   # Screws up for non printable and non-7 bit stuff, but that's too hard to
   # get right.
@@ -252,7 +249,7 @@ sub dump_names {
   }
   if ($declare_types) {
     $result = $indent . 'my $types = {map {($_, 1)} qw('
-      . join (" ", sort keys %$what) . ")};\n";
+      . join (" ", sort keys %$what) . ")\};\n";
   }
   local $Text::Wrap::huge = 'overflow';
   local $Text::Wrap::columns = 80;
@@ -261,7 +258,7 @@ sub dump_names {
   if (@complex) {
     foreach my $item (sort {$a->{name} cmp $b->{name}} @complex) {
       my $name = perl_stringify $item->{name};
-      my $line = ",\n$indent            {name=>\"$name\"";
+      my $line = ",\n$indent            \{name=>\"$name\"";
       $line .= ", type=>\"$item->{type}\"" if defined $item->{type};
       foreach my $thing (qw (macro value default pre post def_pre def_post)) {
         my $value = $item->{$thing};
@@ -274,7 +271,7 @@ sub dump_names {
           }
         }
       }
-      $line .= "}";
+      $line .= "\}";
       # Ensure that the enclosing C comment doesn't end
       # by turning */  into *" . "/
       $line =~ s!\*\/!\*" . "/!gs;
@@ -309,11 +306,11 @@ sub assign {
   my $close;
   if ($pre) {
     chomp $pre;
-    $close = "$indent}\n";
-    $clause = $indent . "{\n";
+    $close = "$indent\}\n";
+    $clause = $indent . "\{\n";
     $indent .= "  ";
     $clause .= "$indent$pre";
-    $clause .= ";" unless $pre =~ /;$/;
+    $clause .= ";" unless $pre =~ m/;$/;
     $clause .= "\n";
   }
   confess "undef \$type" unless defined $type;
@@ -325,7 +322,7 @@ sub assign {
   chomp $post;
   if (length $post) {
     $clause .= "$post";
-    $clause .= ";" unless $post =~ /;$/;
+    $clause .= ";" unless $post =~ m/;$/;
     $clause .= "\n";
   }
   my $return = $self->return_statement_for_type($type);
@@ -418,11 +415,11 @@ sub match_clause {
   # In this case, $yes and $no both have item hashrefs.
   if ($either) {
     $body .= $self->return_clause ({indent=>4 + length $indent}, $either);
-    $body .= $indent . "  }\n";
+    $body .= $indent . "  \}\n";
   } else {
     $body .= $self->return_clause ({indent=>2 + length $indent}, $item);
   }
-  $body .= $indent . "}\n";
+  $body .= $indent . "\}\n";
 }
 
 
@@ -478,17 +475,12 @@ sub switch_clause {
   foreach my $i ($namelen - 1, 0 .. ($namelen - 2)) {
     my ($min, $max) = (^~^0, 0);
     my %spread;
-    if (is_perl56) {
-      # Need proper Unicode preserving hash keys for bytes in range 128-255
-      # here too, for some reason. grr 5.6.1 yet again.
-      tie %spread, 'ExtUtils::Constant::Aaargh56Hash';
-    }
     foreach (@names) {
       my $char = substr $_, $i, 1;
       my $ord = ord $char;
-      confess "char $ord is out of range" if $ord > 255;
-      $max = $ord if $ord > $max;
-      $min = $ord if $ord < $min;
+      confess "char $ord is out of range" if $ord +> 255;
+      $max = $ord if $ord +> $max;
+      $min = $ord if $ord +< $min;
       push @{$spread{$char}}, $_;
       # warn "$_ $char";
     }
@@ -509,7 +501,7 @@ sub switch_clause {
     my $ss;
     $ss += @$_ * @$_ foreach values %spread;
     my $rms = sqrt ($ss / keys %spread);
-    if ($rms < $best[0] || ($rms == $best[0] && ($max - $min) < $best[1])) {
+    if ($rms +< $best[0] || ($rms == $best[0] && ($max - $min) +< $best[1])) {
       @best = ($rms, $max - $min, $i, \%spread);
     }
   }
@@ -519,24 +511,24 @@ sub switch_clause {
   my ($offset, $best) = @best[2,3];
   $body .= $indent . "/* Offset $offset gives the best switch position.  */\n";
 
-  my $do_front_chop = $offset == 0 && $namelen > 2;
+  my $do_front_chop = $offset == 0 && $namelen +> 2;
   if ($do_front_chop) {
-    $body .= $indent . "switch (*" . $self->name_param() . "++) {\n";
+    $body .= $indent . "switch (*" . $self->name_param() . "++) \{\n";
   } else {
-    $body .= $indent . "switch (" . $self->name_param() . "[$offset]) {\n";
+    $body .= $indent . "switch (" . $self->name_param() . "[$offset]) \{\n";
   }
   foreach my $char (sort keys %$best) {
     confess sprintf "'$char' is %d bytes long, not 1", length $char
       if length ($char) != 1;
-    confess sprintf "char %#X is out of range", ord $char if ord ($char) > 255;
+    confess sprintf "char %#X is out of range", ord $char if ord ($char) +> 255;
     $body .= $indent . "case '" . C_stringify ($char) . "':\n";
     foreach my $thisone (sort {
 	# Deal with the case of an item actually being an array ref to 1 or 2
 	# hashrefs. Don't assign to $a or $b, as they're aliases to the orignal
-	my $l = ref $a eq 'ARRAY' ? ($a->[0] || $->[1]) : $a;
-	my $r = ref $b eq 'ARRAY' ? ($b->[0] || $->[1]) : $b;
+	my $l = ref $a eq 'ARRAY' ? ($a->[0] || $-+>[1]) : $a;
+	my $r = ref $b eq 'ARRAY' ? ($b->[0] || $-+>[1]) : $b;
 	# Sort by weight first
-	($r->{weight} || 0) <=> ($l->{weight} || 0)
+	($r->{weight} || 0) <+> ($l->{weight} || 0)
 	    # Sort equal weights by name
 	    or $l->{name} cmp $r->{name}}
 			 # If this looks evil, maybe it is.  $items is a
@@ -553,7 +545,7 @@ sub switch_clause {
     }
     $body .= $indent . "  break;\n";
   }
-  $body .= $indent . "}\n";
+  $body .= $indent . "\}\n";
   return $body;
 }
 
@@ -801,16 +793,11 @@ sub C_constant {
     ($namelen, $items) = @$breakout;
   } else {
     $items = {};
-    if (is_perl56) {
-      # Need proper Unicode preserving hash keys.
-      require ExtUtils::Constant::Aaargh56Hash;
-      tie %$items, 'ExtUtils::Constant::Aaargh56Hash';
-    }
     $breakout ||= 3;
     $default_type ||= $self->default_type();
     if (!ref $what) {
       # Convert line of the form IV,UV,NV to hash
-      $what = {map {$_ => 1} split /,\s*/, ($what || '')};
+      $what = {map {$_ => 1} split m/,\s*/, ($what || '')};
       # Figure out what types we're dealing with, and assign all unknowns to the
       # default type
     }
@@ -830,7 +817,7 @@ sub C_constant {
   $body .= ", " . $self->namelen_param_definition($params)
     unless defined $namelen;
   $body .= $self->C_constant_other_params_defintion($params);
-  $body .= ") {\n";
+  $body .= ") \{\n";
 
   if (defined $namelen) {
     # We are a child subroutine. Print the simple description
@@ -846,7 +833,7 @@ sub C_constant {
 			      default_type => $default_type, what => $what,
 			      indent => $indent, breakout => $breakout},
 			     @items);
-    $body .= '  switch ('.$self->namelen_param().") {\n";
+    $body .= '  switch ('.$self->namelen_param().") \{\n";
     # Need to group names of the same length
     my @by_length;
     foreach (@items) {
@@ -868,7 +855,7 @@ sub C_constant {
         } else {
           $body .= $self->match_clause (undef, $only_thing);
         }
-      } elsif (@{$by_length[$i]} < $breakout) {
+      } elsif (@{$by_length[$i]} +< $breakout) {
         $body .= $self->switch_clause ({indent=>4},
 				       $i, $items, @{$by_length[$i]});
       } else {
@@ -896,11 +883,11 @@ sub C_constant {
       }
       $body .= "    break;\n";
     }
-    $body .= "  }\n";
+    $body .= "  \}\n";
   }
   my $notfound = $self->return_statement_for_notfound();
   $body .= "  $notfound\n" if $notfound;
-  $body .= "}\n";
+  $body .= "\}\n";
   return (@subs, $body);
 }
 

@@ -7,13 +7,6 @@ use File::Path;
 use File::Spec;
 
 
-# create a typemap for Perl 5.6
-if ($] < 5.008) {
-    open(TYPEMAP, ">typemap") or die "fatal: can't write typemap: $!";
-    print TYPEMAP "const char *\t\tT_PV\n";
-    close(TYPEMAP);
-}
-
 # create a lib/ dir in order to avoid warnings in Test::Distribution
 mkdir "lib", 0755;
 
@@ -36,20 +29,20 @@ if ($use_eventlog) {
     # recreate the DLL from its uuencoded form if it's not here
     if (! -f File::Spec->catfile("win32", "$name.dll")) {
         # read the uuencoded data
-        open(UU, '<' . File::Spec->catfile("win32", "$name\_dll.uu"))
+        open(UU, "<", '' . File::Spec->catfile("win32", "$name\_dll.uu"))
             or die "fatal: Can't read file '$name\_dll.uu': $!";
-        my $uudata = do { local $/; <UU> };
+        my $uudata = do { local $/; ~< *UU };
         close(UU);
 
         # write the DLL
-        open(DLL, '>' . File::Spec->catfile("win32", "$name.dll"))
+        open(DLL, ">", '' . File::Spec->catfile("win32", "$name.dll"))
             or die "fatal: Can't write DLL '$name.dll': $!";
         binmode(DLL);
         print DLL unpack "u", $uudata;
         close(DLL);
     }
 }
-elsif ($^O =~ /Win32/) {
+elsif ($^O =~ m/Win32/) {
     print <<"NOTICE"
  *** You're running on a Win32 system,  but you lack the Win32::EventLog\a
  *** module, part of the libwin32 distribution. Although Sys::Syslog can 
@@ -159,13 +152,13 @@ if(eval {require ExtUtils::Constant; 1}) {
     );
 
     ExtUtils::Constant::WriteConstants(
-        ($] > 5.009002 ? (PROXYSUBS => 1) : ()),
+        PROXYSUBS => 1,
         NAME => 'Sys::Syslog',
         NAMES => [ @levels, @facilities, @options, @others_macros ],
     );
 
     my @names = map { ref $_ ? $_->{name} : $_ } @levels, @facilities, @options;
-    open(MACROS, '>macros.all') or warn "warning: Can't write 'macros.all': $!\n";
+    open(MACROS, ">", 'macros.all') or warn "warning: Can't write 'macros.all': $!\n";
     print MACROS join $/, @names;
     close(MACROS);
 }

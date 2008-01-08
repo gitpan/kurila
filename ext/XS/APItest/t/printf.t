@@ -3,7 +3,7 @@ BEGIN {
     @INC = '../lib';
     push @INC, "::lib:$MacPerl::Architecture:" if $^O eq 'MacOS';
     require Config; Config->import;
-    if ($Config{'extensions'} !~ /\bXS\/APItest\b/) {
+    if ($Config{'extensions'} !~ m/\bXS\/APItest\b/) {
         print "1..0 # Skip: XS::APItest was not built\n";
         exit 0;
     }
@@ -18,7 +18,7 @@ BEGIN { use_ok('XS::APItest') };
 my $ldok = have_long_double();
 
 # first some IO redirection
-ok open(my $oldout, ">&STDOUT"), "saving STDOUT";
+ok open(my $oldout, ">&", \*STDOUT), "saving STDOUT";
 ok open(STDOUT, '>', "foo.out"),"redirecting STDOUT";
 
 # Allow for it to be removed
@@ -37,12 +37,12 @@ print_flush();
 
 # Now redirect STDOUT and read from the file
 ok open(STDOUT, ">&", $oldout), "restore STDOUT";
-ok open(my $foo, "<foo.out"), "open foo.out";
+ok open(my $foo, "<", "foo.out"), "open foo.out";
 #print "# Test output by reading from file\n";
 # now test the output
-my @output = map { chomp; $_ } <$foo>;
+my @output = map { chomp; $_ } ~< $foo;
 close $foo;
-ok @output >= 4, "captured at least four output lines";
+ok @output +>= 4, "captured at least four output lines";
 
 is($output[0], "5.000", "print_double");
 is($output[1], "3", "print_int");

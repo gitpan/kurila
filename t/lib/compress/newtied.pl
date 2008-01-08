@@ -10,19 +10,7 @@ our ($BadPerl, $UncompressClass);
  
 BEGIN 
 { 
-    plan(skip_all => "Extra Tied Filehandle needs Perl 5.6 or better - you have Perl $]" )
-        if $] < 5.006 ;
-     
-    my $tests ;
-
-    $BadPerl = ($] >= 5.006 and $] <= 5.008) ;
-
-    if ($BadPerl) {
-        $tests = 78 ;
-    }
-    else {
-        $tests = 84 ;
-    }
+    my $tests = 84 ;
 
     # use Test::NoWarnings, if available
     my $extra = 0 ;
@@ -51,7 +39,7 @@ sub myGZreadFile
 
     my $data ;
     $data = $init if defined $init ;
-    1 while $fil->read($data) > 0;
+    1 while $fil->read($data) +> 0;
 
     $fil->close ;
     return $data ;
@@ -103,10 +91,7 @@ sub run
             my $foo = "1234567890";
             
             ok syswrite($io, $foo, length($foo)) == length($foo) ;
-            if ( $] < 5.6 )
-              { is $io->syswrite($foo, length $foo), length $foo }
-            else
-              { is $io->syswrite($foo), length $foo }
+            is $io->syswrite($foo), length $foo;
             ok $io->syswrite($foo, length($foo)) == length $foo;
             ok $io->write($foo, length($foo), 5) == 5;
             ok $io->write("xxx\n", 100, -1) == 1;
@@ -157,7 +142,7 @@ EOT
                 ok ! eof $io;
                 is $io->tell(), 0 ;
                 is tell($io), 0 ;
-                my @lines = <$io>;
+                my @lines = ~< $io;
                 is @lines, 6
                     or print "# Got " . scalar(@lines) . " lines, expected 6\n" ;
                 is $lines[1], "of a paragraph\n" ;
@@ -172,7 +157,7 @@ EOT
 
                 ok ! ( defined($io->getline)  ||
                           (@tmp = $io->getlines) ||
-                          defined(<$io>)         ||
+                          defined( ~< $io)         ||
                           defined($io->getc)     ||
                           read($io, $buf, 100)   != 0) ;
             }
@@ -188,7 +173,7 @@ EOT
             
                 $io = $UncompressClass->new($name);
                 ok ! $io->eof;
-                my $line = <$io>;
+                my $line = ~< $io;
                 ok $line eq $str;
                 ok $io->eof;
             }
@@ -197,7 +182,7 @@ EOT
                 local $/ = "";  # paragraph mode
                 my $io = $UncompressClass->new($name);
                 ok ! $io->eof;
-                my @lines = <$io>;
+                my @lines = ~< $io;
                 ok $io->eof;
                 ok @lines == 2 
                     or print "# Got " . scalar(@lines) . " lines, expected 2\n" ;
@@ -213,7 +198,7 @@ EOT
                 my $no = 0;
                 my $err = 0;
                 ok ! $io->eof;
-                while (<$io>) {
+                while ( ~< $io) {
                     push(@lines, $_);
                     $err++ if $. != ++$no;
                 }
@@ -301,7 +286,6 @@ EOT
             ok $io->eof;
         }
 
-        if (! $BadPerl)
         {
             # seek error cases
             my $b ;
@@ -342,7 +326,7 @@ EOM
 
             {
               my $fh ;
-              ok $fh = 'IO::File'->new( ">$name") ;
+              ok $fh = 'IO::File'->new( "$name", ">") ;
               my $x ;
               ok $x = $CompressClass-> new( $fh)  ;
 
@@ -356,12 +340,12 @@ EOM
             my $uncomp;
             {
               my $x ;
-              ok my $fh1 = 'IO::File'->new( "<$name") ;
+              ok my $fh1 = 'IO::File'->new( "$name", "<") ;
               ok $x = $UncompressClass-> new( $fh1, -Append => 1)  ;
               ok $x->fileno() == fileno $fh1 ;
               ok $x->fileno() == fileno $x ;
 
-              1 while $x->read($uncomp) > 0 ;
+              1 while $x->read($uncomp) +> 0 ;
 
               ok $x->close ;
             }

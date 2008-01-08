@@ -24,7 +24,7 @@ require_ok('Test::More');
 ok( 2 eq 2,             'two is two is two is two' );
 is(   "foo", "foo",       'foo is foo' );
 isnt( "foo", "bar",     'foo isnt bar');
-isn't("foo", "bar",     'foo isn\'t bar');
+isn't("foo", "bar",     q|foo isn't bar|);
 
 #'#
 like("fooble", '/^foo/',    'foo is like fooble');
@@ -143,7 +143,7 @@ is( Test::Builder->new, Test::More->builder,    'builder()' );
 
 cmp_ok(42, '==', 42,        'cmp_ok ==');
 cmp_ok('foo', 'eq', 'foo',  '       eq');
-cmp_ok(42.5, '<', 42.6,     '       <');
+cmp_ok(42.5, '+<', 42.6,     '       +<');
 cmp_ok(0, '||', 1,          '       ||');
 
 

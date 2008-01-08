@@ -103,7 +103,7 @@ BEGIN {
 	push @INC, "../../t";
     }
     require Config;
-    if (($Config::Config{'extensions'} !~ /\bB\b/) ){
+    if (($Config::Config{'extensions'} !~ m/\bB\b/) ){
         print "1..0 # Skip -- Perl configured without B module\n";
         exit 0;
     }
@@ -151,8 +151,7 @@ my $testpkgs = {
 		  formfeed end_av dowarn diehook defstash curstash
 		  cstring comppadlist check_av cchar cast_I32 bootstrap
 		  begin_av amagic_generation sub_generation address
-                  set_main_start set_main_root fudge
-		  ), $] > 5.009 ? ('unitcheck_av') : ()],
+                  set_main_start set_main_root fudge unitcheck_av)],
     },
 
     'B::Deparse' => { dflt => 'perl',	# 235 functions
@@ -174,12 +173,12 @@ my $testpkgs = {
 		     PMf_MULTILINE PMf_SINGLELINE
 		     POSTFIX SVf_FAKE SVf_IOK SVf_NOK SVf_POK SVf_ROK
 		     SVpad_OUR SVs_RMG SVs_SMG SWAP_CHILDREN OPpPAD_STATE
-		     /, $] > 5.009 ? ('RXf_SKIPWHITE') : ('PMf_SKIPWHITE')],
+		     /, 'RXf_SKIPWHITE'],
 		 },
 
     POSIX => { dflt => 'constant',			# all but 252/589
 	       skip => [qw/ _POSIX_JOB_CONTROL /],	# platform varying
-	       perl => [qw/ import croak AUTOLOAD load_imports
+	       perl => [qw/ import croak load_imports
                             usage redef unimpl assert tolower toupper closedir
                             opendir readdir rewinddir errno creat fcntl getgrgid
                             getgrnam atan2 cos exp fabs log pow sin sqrt getpwnam
@@ -197,6 +196,9 @@ my $testpkgs = {
                             chown execl execle execlp execv execve execvp fork getegid geteuid
                             getgid getgroups getlogin getpgrp getpid getppid getuid isatty link
                             rmdir setbuf setvbuf sleep unlink utime
+
+                            S_ISBLK S_ISCHR S_ISDIR S_ISFIFO S_ISREG WEXITSTATUS
+                            WIFEXITED WIFSIGNALED WIFSTOPPED WSTOPSIG WTERMSIG
                             /],
 
 	       XS => [qw/ write wctomb wcstombs uname tzset tzname
@@ -226,8 +228,8 @@ my $testpkgs = {
 			     register_domain recv protocol peername
 			     new listen import getsockopt croak
 			     connected connect configure confess close
-			     carp bind atmark accept
-			     /, $] > 5.009 ? ('blocking') : () ],
+			     carp bind atmark accept blocking
+                             /],
 
 		    XS => [qw/ unpack_sockaddr_un unpack_sockaddr_in
 			   sockatmark sockaddr_family pack_sockaddr_un
@@ -291,7 +293,7 @@ sub test_pkg {
     my (%stash) = map
 	( ($_ => 0)
 	  => ( grep exists &{*{Symbol::fetch_glob("$pkg\::$_")}}	# grab CODE symbols
-	       => grep !/__ANON__/		# but not anon subs
+	       => grep !m/__ANON__/		# but not anon subs
 	       => keys %{*{Symbol::fetch_glob($pkg.'::')}}		# from symbol table
 	       ));
 
@@ -357,7 +359,7 @@ sub render {
 sub corecheck {
     eval { require Module::CoreList };
     if ($@) {
-	warn "Module::CoreList not available on $]\n";
+	warn "Module::CoreList not available on $^V\n";
 	return;
     }
     my $mods = $Module::CoreList::version{'5.009002'};

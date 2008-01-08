@@ -17,7 +17,7 @@ sub test ($$$) {
     die "Unknown action 'act'";
   }
   if ($value == $result) {
-    if ($^O eq 'VMS' && length $string > 256) {
+    if ($^O eq 'VMS' && length $string +> 256) {
       $string = '';
     } else {
       $string = "\"$string\"";
@@ -25,10 +25,10 @@ sub test ($$$) {
     print "ok $test # $act $string\n";
   } else {
     my ($valstr, $resstr);
-    if ($act eq 'hex' or $string =~ /x/) {
+    if ($act eq 'hex' or $string =~ m/x/) {
       $valstr = sprintf "0x%X", $value;
       $resstr = sprintf "0x%X", $result;
-    } elsif ($string =~ /b/) {
+    } elsif ($string =~ m/b/) {
       $valstr = sprintf "0b%b", $value;
       $resstr = sprintf "0b%b", $result;
     } else {
@@ -98,17 +98,17 @@ else {
     print "\077_" eq "?_"                  ? "ok" : "not ok", " 40\n";
 }
 
-$_ = "\x_7_7";
+$_ = "\x[00]_7_7";
 print length eq 5                      ? "ok" : "not ok", " 41\n";
 print $_ eq "\0"."_"."7"."_"."7"       ? "ok" : "not ok", " 42\n";
 chop, chop, chop, chop;
 print $_ eq "\0"                       ? "ok" : "not ok", " 43\n";
 if (ord("\t") != 9) {
     # / is 97 in 1047, 037, && POSIX-BC
-    print "\x61_" eq "/_"                  ? "ok" : "not ok", " 44\n";
+    print "\x[61]_" eq "/_"                  ? "ok" : "not ok", " 44\n";
 }
 else {
-    print "\x2F_" eq "/_"                  ? "ok" : "not ok", " 44\n";
+    print "\x[2F]_" eq "/_"                  ? "ok" : "not ok", " 44\n";
 }
 
 $test = 45;

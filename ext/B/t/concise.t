@@ -9,7 +9,7 @@ BEGIN {
 	push @INC, "../../t";
     }
     require Config;
-    if (($Config::Config{'extensions'} !~ /\bB\b/) ){
+    if (($Config::Config{'extensions'} !~ m/\bB\b/) ){
         print "1..0 # Skip -- Perl configured without B module\n";
         exit 0;
     }
@@ -19,7 +19,7 @@ BEGIN {
 
 use strict;
 
-plan tests => 156;
+plan tests => 154;
 
 require_ok("B::Concise");
 
@@ -30,12 +30,12 @@ $out = runperl(switches => ["-MO=Concise"], prog => '$a', stderr => 1);
 # If either of the next two tests fail, it probably means you need to
 # fix the section labeled 'fragile kludge' in Concise.pm
 
-($op_base) = ($out =~ /^(\d+)\s*<0>\s*enter/m);
+($op_base) = ($out =~ m/^(\d+)\s*<0>\s*enter/m);
 
 is($op_base, 1, "Smallest OP sequence number");
 
 ($op_base_p1, $cop_base)
-  = ($out =~ /^(\d+)\s*<;>\s*nextstate\(main (-?\d+) /m);
+  = ($out =~ m/^(\d+)\s*<;>\s*nextstate\(main (-?\d+) /m);
 
 is($op_base_p1, 2, "Second-smallest OP sequence number");
 
@@ -205,11 +205,11 @@ SKIP: {
 
 	sub defd_empty {};
 	($res,$err) = render('-basic', \&defd_empty);
-	is(scalar split(/\n/, $res), 3,
-	   "'sub defd_empty {}' seen as 3 liner");
+	is(scalar split(m/\n/, $res), 3,
+	   "'sub defd_empty \{\}' seen as 3 liner");
 
-	is(1, $res =~ /leavesub/ && $res =~ /(next|db)state/,
-	   "'sub defd_empty {}' seen as 2 ops: leavesub,nextstate");
+	is(1, $res =~ m/leavesub/ && $res =~ m/(next|db)state/,
+	   "'sub defd_empty \{\}' seen as 2 ops: leavesub,nextstate");
 
 	($res,$err) = render('-basic', \&not_even_declared);
 	like ($res, qr/coderef CODE\(0x[0-9a-fA-F]+\) has no START/,
@@ -369,30 +369,6 @@ SKIP: {
     }
 }
 
-
-# test proper NULLING of pointer, derefd by CvSTART, when a coderef is
-# undefd.  W/o this, the pointer can dangle into freed and reused
-# optree mem, which no longer points to opcodes.
-
-# Using B::Concise to render Config::AUTOLOAD's optree at BEGIN-time
-# triggers this obscure bug, cuz AUTOLOAD has a bootstrap version,
-# which is used at load-time then undeffed.  It is normally
-# re-vivified later, but not in time for this (BEGIN/CHECK)-time
-# rendering.
-
-$out = runperl ( switches => ["-MO=Concise,Config::AUTOLOAD"],
-		 prog => 'use Config; BEGIN { $Config{awk} }',
-		 stderr => 1 );
-
-like($out, qr/Config::AUTOLOAD exists in stash, but has no START/,
-    "coderef properly undefined");
-
-$out = runperl ( switches => ["-MO=Concise,Config::AUTOLOAD"],
-		 prog => 'use Config; CHECK { $Config{awk} }',
-		 stderr => 1 );
-
-like($out, qr/Config::AUTOLOAD exists in stash, but has no START/,
-    "coderef properly undefined");
 
 # test -stash and -src rendering
 # todo: stderr=1 puts '-e syntax OK' into $out,

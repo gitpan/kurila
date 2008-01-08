@@ -302,7 +302,7 @@ STATIC const char*
 S_gv_ename(pTHX_ GV *gv)
 {
     SV* const tmpsv = sv_newmortal();
-    gv_efullname3(tmpsv, gv, NULL);
+    gv_efullname4(tmpsv, gv, NULL, TRUE);
     return SvPV_nolen_const(tmpsv);
 }
 
@@ -1429,10 +1429,6 @@ Perl_mod(pTHX_ OP *o, I32 type)
 	if (type != OP_SASSIGN)
 	    goto nomod;
 	goto lvalue_func;
-    case OP_SUBSTR:
-	if (o->op_private == 4) /* don't allow 4 arg substr as lvalue */
-	    goto nomod;
-	/* FALL THROUGH */
     case OP_POS:
     case OP_VEC:
 	if (type == OP_LEAVESUBLV)
@@ -3579,30 +3575,24 @@ Perl_utilize(pTHX_ int aver, I32 floor, OP *version, OP *idop, OP *arg)
     veop = NULL;
 
     if (version) {
-	SV * const vesv = ((SVOP*)version)->op_sv;
+	OP *pack;
+	SV *meth;
 
 	if (PL_madskills)
 	    op_getmad(version,pegop,'V');
-	if (!arg && !SvNIOKp(vesv)) {
-	    arg = version;
-	}
-	else {
-	    OP *pack;
-	    SV *meth;
 
-	    if (version->op_type != OP_CONST || !SvNIOKp(vesv))
-		Perl_croak(aTHX_ "Version number must be constant number");
+	if (version->op_type != OP_CONST)
+	    Perl_croak(aTHX_ "Version number must be constant number");
 
-	    /* Make copy of idop so we don't free it twice */
-	    pack = newSVOP(OP_CONST, 0, newSVsv(((SVOP*)idop)->op_sv));
+	/* Make copy of idop so we don't free it twice */
+	pack = newSVOP(OP_CONST, 0, newSVsv(((SVOP*)idop)->op_sv));
 
-	    /* Fake up a method call to VERSION */
-	    meth = newSVpvs_share("VERSION");
-	    veop = convert(OP_ENTERSUB, OPf_STACKED|OPf_SPECIAL,
-			    append_elem(OP_LIST,
-					prepend_elem(OP_LIST, pack, list(version)),
-					newSVOP(OP_METHOD_NAMED, 0, meth)));
-	}
+	/* Fake up a method call to VERSION */
+	meth = newSVpvs_share("VERSION");
+	veop = convert(OP_ENTERSUB, OPf_STACKED|OPf_SPECIAL,
+		       append_elem(OP_LIST,
+				   prepend_elem(OP_LIST, pack, list(version)),
+				   newSVOP(OP_METHOD_NAMED, 0, meth)));
     }
 
     /* Fake up an import/unimport */
@@ -3610,11 +3600,6 @@ Perl_utilize(pTHX_ int aver, I32 floor, OP *version, OP *idop, OP *arg)
 	if (PL_madskills)
 	    op_getmad(arg,pegop,'S');
 	imop = arg;		/* no import on explicit () */
-    }
-    else if (SvNIOKp(((SVOP*)idop)->op_sv)) {
-	imop = NULL;		/* use 5.0; */
-	if (!aver)
-	    idop->op_private |= OPpCONST_NOVER;
     }
     else {
 	SV *meth;
@@ -4224,9 +4209,11 @@ Perl_newCONDOP(pTHX_ I32 flags, OP *first, OP *trueop, OP *falseop)
 	if (PL_madskills) {
 	    /* This is all dead code when PERL_MAD is not defined.  */
 	    live = newUNOP(OP_NULL, 0, live);
+#ifdef PERL_MAD
 	    op_getmad(first, live, 'C');
 	    op_getmad(dead, live, left ? 'e' : 't');
 	    append_madprops_pv("const_cond", live, '<');
+#endif
 	} else {
 	    op_free(first);
 	    op_free(dead);
@@ -4877,7 +4864,7 @@ Perl_cv_ckproto_len(pTHX_ const CV *cv, const GV *gv, const char *p,
 	SV* name = NULL;
 
 	if (gv)
-	    gv_efullname3(name = sv_newmortal(), gv, NULL);
+	    gv_efullname4(name = sv_newmortal(), gv, NULL, TRUE);
 	sv_setpvs(msg, "Prototype mismatch:");
 	if (name)
 	    Perl_sv_catpvf(aTHX_ msg, " sub %"SVf, SVfARG(name));
@@ -5366,7 +5353,7 @@ Perl_newATTRSUB(pTHX_ I32 floor, OP *o, OP *proto, OP *attrs, OP *block)
 	    Perl_sv_setpvf(aTHX_ sv, "%s:%ld-%ld",
 			   CopFILE(PL_curcop),
 			   (long)PL_subline, (long)CopLINE(PL_curcop));
-	    gv_efullname3(tmpstr, gv, NULL);
+	    gv_efullname4(tmpstr, gv, NULL,TRUE);
 	    (void)hv_store(GvHV(PL_DBsub), SvPVX_const(tmpstr),
 		    SvCUR(tmpstr), sv, 0);
 	    hv = GvHVn(db_postponed);
@@ -6963,7 +6950,7 @@ Perl_ck_require(pTHX_ OP *o)
 	    for (; s < end; s++) {
 		if (*s == ':' && s[1] == ':') {
 		    *s = '/';
-		    Move(s+2, s+1, end - s, char);
+		    Move(s+2, s+1, end - s - 1, char);
 		    --end;
 		}
 	    }
@@ -7267,23 +7254,6 @@ Perl_ck_split(pTHX_ OP *o)
 	return too_many_arguments(o,OP_DESC(o));
 
     return o;
-}
-
-OP *
-Perl_ck_join(pTHX_ OP *o)
-{
-    const OP * const kid = cLISTOPo->op_first->op_sibling;
-    if (kid && kid->op_type == OP_MATCH) {
-	if (ckWARN(WARN_SYNTAX)) {
-            const REGEXP *re = PM_GETRE(kPMOP);
-	    const char *pmstr = re ? re->precomp : "STRING";
-	    const STRLEN len = re ? re->prelen : 6;
-	    Perl_warner(aTHX_ packWARN(WARN_SYNTAX),
-			"/%.*s/ should probably be written as \"%.*s\"",
-			(int)len, pmstr, (int)len, pmstr);
-	}
-    }
-    return ck_fun(o);
 }
 
 OP *
@@ -7779,8 +7749,9 @@ Perl_peep(pTHX_ register OP *o)
 		GV * const gv = cGVOPo_gv;
 		if (SvTYPE(gv) == SVt_PVGV && GvCV(gv) && SvPVX_const(GvCV(gv))) {
 		    /* XXX could check prototype here instead of just carping */
-		    SV * const sv = sv_newmortal();
-		    gv_efullname3(sv, gv, NULL);
+                    SV * const sv = sv_newmortal();
+                    gv_efullname4(sv, gv, NULL, TRUE);
+
 		    Perl_warner(aTHX_ packWARN(WARN_PROTOTYPE),
 				"%"SVf"() called too early to check prototype",
 				SVfARG(sv));
@@ -7788,7 +7759,8 @@ Perl_peep(pTHX_ register OP *o)
 	    }
 	    else if (o->op_next->op_type == OP_READLINE
 		    && o->op_next->op_next->op_type == OP_CONCAT
-		    && (o->op_next->op_next->op_flags & OPf_STACKED))
+		    && (o->op_next->op_next->op_flags & OPf_STACKED)
+         	    && !PL_madskills)
 	    {
 		/* Turn "$a .= <FH>" into an OP_RCATLINE. AMS 20010917 */
 		o->op_type   = OP_RCATLINE;

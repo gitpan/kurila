@@ -14,7 +14,7 @@ BEGIN {
 	unshift @INC, 't';
     }
     require Config; Config->import;
-    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bStorable\b/) {
+    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ m/\bStorable\b/) {
         print "1..0 # Skip: Storable was not built\n";
         exit 0;
     }
@@ -64,7 +64,7 @@ sub make {
 	$self->{h} = $h;
 	$self->{ref} = \%hash;
 	my @pool;
-	for (my $i = 0; $i < 5; $i++) {
+	for (my $i = 0; $i +< 5; $i++) {
 		push(@pool, SIMPLE->make($i));
 	}
 	$self->{obj} = \@pool;
@@ -89,15 +89,15 @@ my $r = ROOT->make;
 
 my $data = '';
 if (!$is_EBCDIC) {			# ASCII machine
-	while (<DATA>) {
-		next if /^#/;
+	while ( ~< *DATA) {
+		next if m/^#/;
 	    $data .= unpack("u", $_);
 	}
 } else {
-	while (<DATA>) {
-		next if /^#$/;		# skip comments
-		next if /^#\s+/;	# skip comments
-		next if /^[^#]/;	# skip uuencoding for ASCII machines
+	while ( ~< *DATA) {
+		next if m/^#$/;		# skip comments
+		next if m/^#\s+/;	# skip comments
+		next if m/^[^#]/;	# skip uuencoding for ASCII machines
 		s/^#//;				# prepare uuencoded data for EBCDIC machines
 		$data .= unpack("u", $_);
 	}
@@ -123,7 +123,7 @@ ok 7, $hash_fetch == 2;
 
 my $num = $r->num;
 my $ok = 1;
-for (my $i = 0; $i < @$num; $i++) {
+for (my $i = 0; $i +< @$num; $i++) {
 	do { $ok = 0; last } unless $num->[$i] == $y->num->[$i];
 }
 ok 8, $ok;

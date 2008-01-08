@@ -569,7 +569,7 @@ sub Head1Level {
    my $self = shift;
    if (@_) {
      my $arg = shift;
-     if ($arg =~ /^\d$/ && $arg <= $#LatexSections) {
+     if ($arg =~ m/^\d$/ && $arg +<= $#LatexSections) {
        $self->{Head1Level} = $arg;
      } else {
        carp "Head1Level supplied ($arg) must be integer in range 0 to ".$#LatexSections . "- Ignoring\n";
@@ -919,15 +919,15 @@ __TEX_COMMENT__
 
       # Roll our own
       $preamble = << "__TEX_HEADER__";
-\\documentclass{article}
-\\usepackage[T1]{fontenc}
-\\usepackage{textcomp}
+\\documentclass\{article\}
+\\usepackage[T1]\{fontenc\}
+\\usepackage\{textcomp\}
 
 $comment
 
 $makeindex
 
-\\begin{document}
+\\begin\{document\}
 
 $tableofcontents
 
@@ -971,7 +971,7 @@ sub end_pod {
 
       $makeindex = '%% '. $makeindex  unless $self->MakeIndex;
 
-      $end = "$makeindex\n\n\\end{document}\n";
+      $end = "$makeindex\n\n\\end\{document\}\n";
     }
   }
 
@@ -1051,7 +1051,7 @@ sub command {
   } elsif ($command eq 'begin') {
 
     # pass through if latex
-    if ($paragraph =~ /^latex/i) {
+    if ($paragraph =~ m/^latex/i) {
       # Make sure that subsequent paragraphs are not modfied before printing
       $self->{_dont_modify_any_para} = 1;
 
@@ -1073,11 +1073,11 @@ sub command {
 
     # The first line contains the format and the rest is the
     # raw code.
-    my ($format, $chunk) = split(/\n/, $rawpara, 2);
+    my ($format, $chunk) = split(m/\n/, $rawpara, 2);
 
     # If we have got some latex code print it out immediately
     # unmodified. Else do nothing.
-    if ($format =~ /^latex/i) {
+    if ($format =~ m/^latex/i) {
       # Make sure that next paragraph is not modfied before printing
       $self->_output( $chunk );
 
@@ -1116,7 +1116,7 @@ sub verbatim {
 
   } else {
 
-    return if $paragraph =~ /^\s+$/;
+    return if $paragraph =~ m/^\s+$/;
 
     # Clean trailing space
     $paragraph =~ s/\s+$//;
@@ -1126,11 +1126,11 @@ sub verbatim {
     # slightly modified by hsmyers@sdragons.com 10/22/01
     my @l = split("\n",$paragraph);
     foreach (@l) {
-      1 while s/(^|\n)([^\t\n]*)(\t+)/
+      1 while s/(^|\n)([^\t\n]*)(\t+)/{
 	$1. $2 . (" " x 
 		  (8 * length($3)
 		   - (length($2) % 8)))
-	  /sex;
+	  }/sx;
     }
     $paragraph = join("\n",@l);
     # End of change.
@@ -1177,14 +1177,14 @@ sub textblock {
   # Need to make sure this is called only on the first paragraph
   # following 'head1 NAME' and not on subsequent paragraphs that may be
   # present.
-  if ($self->{_CURRENT_HEAD1} =~ /^NAME/i && $self->ReplaceNAMEwithSection()) {
+  if ($self->{_CURRENT_HEAD1} =~ m/^NAME/i && $self->ReplaceNAMEwithSection()) {
 
     # Strip white space from start and end
     $paragraph =~ s/^\s+//;
     $paragraph =~ s/\s$//;
 
     # Split the string into 2 parts
-    my ($name, $purpose) = split(/\s+-\s+/, $expansion,2);
+    my ($name, $purpose) = split(m/\s+-\s+/, $expansion,2);
 
     # Now prevent this from triggering until a new head1 NAME is set
     $self->{_CURRENT_HEAD1} = '_NAME';
@@ -1226,15 +1226,15 @@ sub interior_sequence {
   my ($seq_command, $seq_argument, $pod_seq) = @_;
 
   if ($seq_command eq 'B') {
-    return "\\textbf{$seq_argument}";
+    return "\\textbf\{$seq_argument\}";
 
   } elsif ($seq_command eq 'I') {
-    return "\\textit{$seq_argument}";
+    return "\\textit\{$seq_argument\}";
 
   } elsif ($seq_command eq 'E') {
 
     # If it is simply a number
-    if ($seq_argument =~ /^\d+$/) {
+    if ($seq_argument =~ m/^\d+$/) {
       return chr($seq_argument);
     # Look up escape in hash table
     } elsif (exists $HTML_Escapes{$seq_argument}) {
@@ -1252,10 +1252,10 @@ sub interior_sequence {
     return '{}';
 
   } elsif ($seq_command eq 'C') {
-    return "\\texttt{$seq_argument}";
+    return "\\texttt\{$seq_argument\}";
 
   } elsif ($seq_command eq 'F') {
-    return "\\emph{$seq_argument}";
+    return "\\emph\{$seq_argument\}";
 
   } elsif ($seq_command eq 'S') {
     # non breakable spaces
@@ -1284,7 +1284,7 @@ sub interior_sequence {
       # Convert to a label
       $node = $self->_create_label($node);
 
-      return "\\S\\ref{$node}";
+      return "\\S\\ref\{$node\}";
 
     } else {
       # Use default markup for external references
@@ -1304,12 +1304,12 @@ sub interior_sequence {
     my $link = $seq_argument;
     $link =~ s|::|/|g;
 
-    my $ref = "\\emph{$seq_argument}";
+    my $ref = "\\emph\{$seq_argument\}";
     return $ref;
 
   } elsif ($seq_command eq 'Q') {
     # Special markup for Pod::Hyperlink
-    return "\\textsf{$seq_argument}";
+    return "\\textsf\{$seq_argument\}";
 
   } elsif ($seq_command eq 'X') {
     # Index entries
@@ -1318,7 +1318,7 @@ sub interior_sequence {
     # I will let '!' go through for now
     # not sure how sub categories are handled in X<>
     my $index = $self->_create_index($seq_argument);
-    return "\\index{$index}\n";
+    return "\\index\{$index\}\n";
 
   } else {
     carp "Unknown sequence $seq_command<$seq_argument>";
@@ -1384,8 +1384,8 @@ sub end_list {
   # Dont write anything if the list type is not set
   # iomplying that a list was created but no entries were
   # placed in it (eg because of a =begin/=end combination)
-  $self->_output("\\end{$type}\n")
-    if (defined $type && length($type) > 0);
+  $self->_output("\\end\{$type\}\n")
+    if (defined $type && length($type) +> 0);
   
   # Clear list
   pop(@{ $self->lists});
@@ -1432,14 +1432,14 @@ sub add_item {
     my $type;
     if (substr($paragraph, 0,1) eq '*') {
       $type = 'itemize';
-    } elsif ($paragraph =~ /^\d/) {
+    } elsif ($paragraph =~ m/^\d/) {
       $type = 'enumerate';
     } else {
       $type = 'description';
     }
     $self->lists->[-1]->type($type);
 
-    $self->_output("\\begin{$type}\n");
+    $self->_output("\\begin\{$type\}\n");
 
   }
 
@@ -1453,14 +1453,14 @@ sub add_item {
     my ($hunk1, $hunk2) = $self->_split_delimited( $paragraph, $maxlen );
 
     # Print the first hunk
-    $self->_output("\n\\item[{$hunk1}] ");
+    $self->_output("\n\\item[\{$hunk1\}] ");
 
     # and the second hunk if it is defined
     if ($hunk2) {
-      $self->_output("\\textbf{$hunk2}");
+      $self->_output("\\textbf\{$hunk2\}");
     } else {
       # Not there so make sure we have a new line
-      $self->_output("\\mbox{}");
+      $self->_output("\\mbox\{\}");
     }
 
   } else {
@@ -1504,7 +1504,7 @@ sub head {
   # If we are replace 'head1 NAME' with a section
   # we return immediately if we get it
   return 
-    if ($self->{_CURRENT_HEAD1} =~ /^NAME/i && $self->ReplaceNAMEwithSection());
+    if ($self->{_CURRENT_HEAD1} =~ m/^NAME/i && $self->ReplaceNAMEwithSection());
 
   # Create a label
   my $label = $self->_create_label($paragraph);
@@ -1518,7 +1518,7 @@ sub head {
   my $level = $self->Head1Level() - 1 + $num;
 
   # Warn if heading to large
-  if ($num > $#LatexSections) {
+  if ($num +> $#LatexSections) {
     my $line = $parobj->file_line;
     my $file = $self->input_file;
     warn "Heading level too large ($level) for LaTeX at line $line of file $file\n";
@@ -1526,10 +1526,10 @@ sub head {
   }
 
   # Check to see whether section should be unnumbered
-  my $star = ($level >= $self->LevelNoNum ? '*' : '');
+  my $star = ($level +>= $self->LevelNoNum ? '*' : '');
 
   # Section
-  $self->_output("\\" .$LatexSections[$level] .$star ."{$paragraph\\label{".$label ."}\\index{".$index."}}\n");
+  $self->_output("\\" .$LatexSections[$level] .$star ."\{$paragraph\\label\{".$label ."\}\\index\{".$index."\}\}\n");
 
 }
 
@@ -1647,7 +1647,7 @@ sub _replace_special_chars_late {
   $paragraph =~ s/(<|>)/\$$1\$/g;
 
   # Replace | with $|$
-  $paragraph =~ s'\|'$|$'g;
+  $paragraph =~ s/\|/{'$|$'}/g;
 
 
   return $paragraph;
@@ -1786,7 +1786,7 @@ sub _split_delimited {
   my $limit = shift;
 
   # Return immediately if already small
-  return ($input, '') if length($input) < $limit;
+  return ($input, '') if length($input) +< $limit;
 
   my @output;
   my $s = '';
@@ -1796,20 +1796,20 @@ sub _split_delimited {
 
   $input =~ s/\n/ /gm;
   $input .= ' ';
-  foreach ( split ( //, $input ) ) {
+  foreach ( split ( m//, $input ) ) {
     $token .= $_;
-    if (/\{/) {
+    if (m/\{/) {
       $depth++;
-    } elsif ( /}/ ) {
+    } elsif ( m/}/ ) {
       $depth--;
-    } elsif ( / / and $depth == 0) {
+    } elsif ( m/ / and $depth == 0) {
       push @output, $token if ( $token and $token ne ' ' );
       $token = '';
     }
   }
 
   foreach  (@output) {
-    if (length($s) < $limit) {
+    if (length($s) +< $limit) {
       $s .= $_;
     } else {
       $t .= $_;

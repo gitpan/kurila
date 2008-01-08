@@ -155,7 +155,7 @@ GetOptions(
 usage(0)
 	if $help;
 usage(1, "shasum: Ambiguous file mode\n")
-	if scalar(grep { defined $_ } ($binary, $portable, $text)) > 1;
+	if scalar(grep { defined $_ } ($binary, $portable, $text)) +> 1;
 usage(1, "shasum: --warn option used only when verifying checksums\n")
 	if $warn && !$check;
 usage(1, "shasum: --status option used only when verifying checksums\n")
@@ -182,7 +182,7 @@ if ($version) {
 	# explicitly overriden by command line "--text" or
 	# "--portable" options.
 
-my $isDOSish = ($^O =~ /^(MSWin\d\d|os2|dos|mint|cygwin)$/);
+my $isDOSish = ($^O =~ m/^(MSWin\d\d|os2|dos|mint|cygwin)$/);
 if ($isDOSish) { $binary = 1 unless $text || $portable }
 
 my $modesym = $binary ? '*' : ($portable ? '?' : ' ');
@@ -224,9 +224,9 @@ if ($check) {
 
 	die "shasum: $checkfile: $!\n"
 		unless $fh = FileHandle->new($checkfile, "r");
-	while (<$fh>) {
+	while ( ~< $fh) {
 		s/\s+$//;
-		($sum, $modesym, $fname) = /^(\S+) (.)(.*)$/;
+		($sum, $modesym, $fname) = m/^(\S+) (.)(.*)$/;
 		($binary, $portable, $text) =
 			map { $_ eq $modesym } ('*', '?', ' ');
 		unless ($alg = $len2alg{length($sum)}) {

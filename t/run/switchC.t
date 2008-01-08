@@ -29,11 +29,11 @@ like( $r, qr/^$b(?:\r?\n)?$/s, '-CO: no warning on UTF-8 output' );
 
 SKIP: {
     if (exists $ENV{PERL_UNICODE} &&
-	($ENV{PERL_UNICODE} eq "" || $ENV{PERL_UNICODE} =~ /[SO]/)) {
+	($ENV{PERL_UNICODE} eq "" || $ENV{PERL_UNICODE} =~ m/[SO]/)) {
 	skip(qq[cannot test with PERL_UNICODE locale "" or /[SO]/], 1);
     }
     $r = runperl( switches => [ '-CI', '-w' ],
-		  prog     => 'use utf8; print ord(<STDIN>)',
+		  prog     => 'use utf8; print ord( ~< *STDIN)',
 		  stderr   => 1,
 		  stdin    => $b );
     like( $r, qr/^256(?:\r?\n)?$/s, '-CI: read in UTF-8 input' );
@@ -45,14 +45,11 @@ $r = runperl( switches => [ '-CE', '-w' ],
 like( $r, qr/^$b(?:\r?\n)?$/s, '-CE: UTF-8 stderr' );
 
 $r = runperl( switches => [ '-Co', '-w' ],
-	      prog     => 'use utf8; open(F, q(>out)) or die $!; print F chr(256); close F',
-              stderr   => 1 );
-like( $r, qr/^$/s, '-Co: auto-UTF-8 open for output' );
-
+	      prog     => 'use utf8; open(F, q(>), q(out)) or die $!; print F chr(256); close F', stderr   => 1 ); like( $r, qr/^$/s, '-Co: auto-UTF-8 open for output' ); 
 push @tmpfiles, "out";
 
 $r = runperl( switches => [ '-Ci', '-w' ],
-	      prog     => 'use utf8; open(F, q(<out)); print ord(<F>); close F',
+	      prog     => 'use utf8; open(F, q(<), q(out)); print ord(~< *F); close F',
               stderr   => 1 );
 like( $r, qr/^256(?:\r?\n)?$/s, '-Ci: auto-UTF-8 open for input' );
 

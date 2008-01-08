@@ -11,13 +11,13 @@ BEGIN {
 	exit 0;
     }
     eval 'use Encode';
-    if ($@ =~ /dynamic loading not available/) {
+    if ($@ =~ m/dynamic loading not available/) {
         print "1..0 # miniperl cannot load Encode\n";
 	exit 0;
     }
     # Makes testing easier.
     $ENV{PERLIO} = 'stdio' if exists $ENV{PERLIO} && $ENV{PERLIO} eq '';
-    if (exists $ENV{PERLIO} && $ENV{PERLIO} !~ /^(stdio|perlio|mmap)$/) {
+    if (exists $ENV{PERLIO} && $ENV{PERLIO} !~ m/^(stdio|perlio|mmap)$/) {
 	# We are not prepared for anything else.
 	print "1..0 # PERLIO='$ENV{PERLIO}' unknown\n";
 	exit 0;
@@ -27,8 +27,8 @@ BEGIN {
 
 use Config;
 
-my $DOSISH    = $^O =~ /^(?:MSWin32|os2|dos|NetWare|mint)$/ ? 1 : 0;
-   $DOSISH    = 1 if !$DOSISH and $^O =~ /^uwin/;
+my $DOSISH    = $^O =~ m/^(?:MSWin32|os2|dos|NetWare|mint)$/ ? 1 : 0;
+   $DOSISH    = 1 if !$DOSISH and $^O =~ m/^uwin/;
 my $NONSTDIO  = exists $ENV{PERLIO} && $ENV{PERLIO} ne 'stdio'     ? 1 : 0;
 my $FASTSTDIO = $Config{d_faststdio} && $Config{usefaststdio}      ? 1 : 0;
 my $UTF8_STDIN;
@@ -63,7 +63,7 @@ __EOH__
 SKIP: {
     # FIXME - more of these could be tested without Encode or full perl
     skip("This perl does not have Encode", $NTEST)
-	unless " $Config{extensions} " =~ / Encode /;
+	unless " $Config{extensions} " =~ m/ Encode /;
     skip("miniperl does not have Encode", $NTEST) if $ENV{PERL_CORE_MINITEST};
 
     sub check {
@@ -92,12 +92,12 @@ SKIP: {
 	    }
 	} elsif (!$FASTSTDIO && !$DOSISH) {
 	    splice(@$result, 0, 2, "stdio")
-		if @$result >= 2 &&
+		if @$result +>= 2 &&
 		   $result->[0] eq "unix" &&
 		   $result->[1] eq "perlio";
 	} elsif ($DOSISH) {
 	    splice(@$result, 0, 2, "stdio")
-		if @$result >= 2 &&
+		if @$result +>= 2 &&
 		   $result->[0] eq "unix" &&
 		   $result->[1] eq "crlf";
 	}
@@ -109,7 +109,7 @@ SKIP: {
 	}
 	my $n = scalar @$expected;
 	is(scalar @$result, $n, "$id - layers == $n");
-	for (my $i = 0; $i < $n; $i++) {
+	for (my $i = 0; $i +< $n; $i++) {
 	    my $j = $expected->[$i];
 	    if (ref $j eq 'CODE') {
 		ok($j->($result->[$i]), "$id - $i is ok");
@@ -183,7 +183,7 @@ SKIP: {
 	splice(@results, 1, 2) if $NONSTDIO;
 
 	check([ @results ],
-	      [ "stdio",    undef,        sub { $_[0] > 0 },
+	      [ "stdio",    undef,        sub { $_[0] +> 0 },
 		"encoding", "iso-8859-1", sub { $_[0] ^&^ PerlIO::F_UTF8() } ],
 	      ":raw:encoding(latin1)");
     }
@@ -199,8 +199,8 @@ SKIP: {
     {
 	use open(IN => ":crlf", OUT => ":encoding(cp1252)");
 
-	open F, "<afile";
-	open G, ">afile";
+	open F, "<", "afile";
+	open G, ">", "afile";
 
 	check([ PerlIO::get_layers('F', input  => 1) ],
 	      [ qw(stdio crlf) ],

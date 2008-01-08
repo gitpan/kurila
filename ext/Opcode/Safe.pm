@@ -94,7 +94,7 @@ sub new {
 
     if (defined($root)) {
 	croak "Can't use \"$root\" as root name"
-	    if $root =~ /^main\b/ or $root !~ /^\w[:\w]*$/;
+	    if $root =~ m/^main\b/ or $root !~ m/^\w[:\w]*$/;
 	$obj->{Root}  = $root;
 	$obj->{Erase} = 0;
     }
@@ -115,7 +115,7 @@ sub new {
     # the whole glob *_ rather than $_ and @_ separately, otherwise
     # @_ in non default packages within the compartment don't work.
     $obj->share_from('main', $default_share);
-    Opcode::_safe_pkg_prep($obj->{Root}) if($Opcode::VERSION > 1.04);
+    Opcode::_safe_pkg_prep($obj->{Root}) if($Opcode::VERSION +> 1.04);
     return $obj;
 }
 

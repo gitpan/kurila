@@ -9,14 +9,14 @@ while ($work)
  {
   open(PIPE,"$^X -w $inc -M$targ -e '' 2>&1 |") || die "Cannot open pipe to child:$!";
   my %fix;
-  while (<PIPE>)
+  while ( ~< *PIPE)
    {
-    if (/^Ambiguous call resolved as CORE::(\w+)\(\), qualify as such or use \& at (\S+) line (\d+)/
+    if (m/^Ambiguous call resolved as CORE::(\w+)\(\), qualify as such or use \& at (\S+) line (\d+)/
          && -f $2 )
      {
       my ($var,$file,$line) = ($1,$2,$3);
       $fix{$file} = [] unless exists $fix{$file}; 
-      push(@{$fix{$file}},[$line => $var]) unless ($var =~ /^PL_/ || $file =~ /\.h$/);
+      push(@{$fix{$file}},[$line => $var]) unless ($var =~ m/^PL_/ || $file =~ m/\.h$/);
      }
     print;
    }
@@ -26,13 +26,13 @@ while ($work)
   my $changed = 0;
   foreach my $file (keys %fix)
    {          
-    my @ar = sort( { $a->[0] <=> $b->[0] } @{delete $fix{$file}});
+    my @ar = sort( { $a->[0] <+> $b->[0] } @{delete $fix{$file}});
     my @miss;
     my $fixed = 0;
     @ARGV = ($file);
     $. = 0;
     local $^I = '.sav';
-    while (<>)
+    while ( ~< *ARGV)
      {
       while (@ar && $. == $ar[0][0])
        {

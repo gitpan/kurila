@@ -5,7 +5,7 @@ our $VERSION = '1.03';
 use Carp;
 use XSLoader;
 
-@libs = split(/;/, $ENV{'PERL5REXX'} || $ENV{'PERLREXX'} || $ENV{'LIBPATH'} || $ENV{'PATH'});
+@libs = split(m/;/, $ENV{'PERL5REXX'} || $ENV{'PERLREXX'} || $ENV{'LIBPATH'} || $ENV{'PATH'});
 %dlls = ();
 
 # Preloaded methods go here.  Autoload methods go after __END__, and are
@@ -44,29 +44,29 @@ my $new_dll = sub {
 };
 
 sub new {
-  confess 'Usage: OS2::DLL->new( <file> [<dirs>] )' unless @_ >= 2;
+  confess 'Usage: OS2::DLL->new( <file> [<dirs>] )' unless @_ +>= 2;
   $new_dll->(1, @_);
 }
 
 sub module {
-  confess 'Usage: OS2::DLL->module( <file> [<dirs>] )' unless @_ >= 2;
+  confess 'Usage: OS2::DLL->module( <file> [<dirs>] )' unless @_ +>= 2;
   $new_dll->(0, @_);
 }
 
 sub load {
-  confess 'Usage: load OS2::DLL <file> [<dirs>]' unless $#_ >= 1;
+  confess 'Usage: load OS2::DLL <file> [<dirs>]' unless $#_ +>= 1;
   $load_with_dirs->(@_, @libs);
 }
 
 sub libPath_find {
   my ($name, $flags, @path) = (shift, shift);
   $flags = 0x7 unless defined $flags;
-  push @path, split /;/, OS2::extLibpath	if $flags ^&^ 0x1;	# BEGIN
-  push @path, split /;/, OS2::libPath		if $flags ^&^ 0x2;
-  push @path, split /;/, OS2::extLibpath(1)	if $flags ^&^ 0x4;	# END
+  push @path, split m/;/, OS2::extLibpath	if $flags ^&^ 0x1;	# BEGIN
+  push @path, split m/;/, OS2::libPath		if $flags ^&^ 0x2;
+  push @path, split m/;/, OS2::extLibpath(1)	if $flags ^&^ 0x4;	# END
   s,(?![/\\])$,/,  for @path;
   s,\\,/,g	   for @path;
-  $name .= ".dll" unless $name =~ /\.[^\\\/]*$/;
+  $name .= ".dll" unless $name =~ m/\.[^\\\/]*$/;
   $_ .= $name for @path;
   return grep -f $_, @path if $flags ^&^ 0x8;
   -f $_ and return $_ for @path;
@@ -78,7 +78,7 @@ use Carp;
 @ISA = 'OS2::DLL';
 
 sub AUTOLOAD {
-    $AUTOLOAD =~ /^OS2::DLL::dll::.+::(.+)$/
+    $AUTOLOAD =~ m/^OS2::DLL::dll::.+::(.+)$/
       or confess("Undefined subroutine &$AUTOLOAD called");
     return undef if $1 eq "DESTROY";
     die "AUTOLOAD loop" if $1 eq "AUTOLOAD";
@@ -94,7 +94,7 @@ sub wrapper_REXX {
 	my $prefix = exists($self->{Prefix}) ? $self->{Prefix} : "";
 	my $queue  = $self->{Queue};
 	my $name = shift;
-	$prefix = '' if $name =~ /^#\d+/;	# loading by ordinal
+	$prefix = '' if $name =~ m/^#\d+/;	# loading by ordinal
 	my $addr = (DynaLoader::dl_find_symbol($handle, uc $prefix.$name)
 		    || DynaLoader::dl_find_symbol($handle, $prefix.$name));
 	return sub {

@@ -13,7 +13,7 @@ BEGIN {
 	unshift @INC, 't';
     }
     require Config;
-    if (($Config::Config{'extensions'} !~ /\bB\b/) ){
+    if (($Config::Config{'extensions'} !~ m/\bB\b/) ){
         print "1..0 # Skip -- Perl configured without B module\n";
         exit 0;
     }
@@ -22,7 +22,7 @@ BEGIN {
 use warnings;
 use strict;
 use feature ":5.10";
-use Test::More tests => 54;
+use Test::More tests => 55;
 
 use B::Deparse;
 my $deparse = B::Deparse->new();
@@ -39,19 +39,19 @@ ok($deparse);
 }
 
 $/ = "\n####\n";
-while (<DATA>) {
+while ( ~< *DATA) {
     chomp;
     s/#\s*(.*)$//mg;
     my ($num, $testname) = $1 =~ m/(\d+)\s*(.*)/;
     my ($input, $expected);
-    if (/(.*)\n>>>>\n(.*)/s) {
+    if (m/(.*)\n>>>>\n(.*)/s) {
 	($input, $expected) = ($1, $2);
     }
     else {
 	($input, $expected) = ($_, $_);
     }
 
-    my $coderef = eval "sub {$input}";
+    my $coderef = eval "sub \{$input\}";
 
     if ($@) {
 	diag("$num deparsed: $@");
@@ -71,7 +71,7 @@ use constant 'c', 'stuff';
 is((eval "sub ".$deparse->coderef2text(\&c))->(), 'stuff');
 
 my $a = 0;
-is("{\n    (-1) ** \$a;\n}", $deparse->coderef2text(sub{(-1) ** $a }));
+is("\{\n    (-1) ** \$a;\n\}", $deparse->coderef2text(sub{(-1) ** $a }));
 
 use constant cr => ['hello'];
 my $string = "sub " . $deparse->coderef2text(\&cr);
@@ -94,7 +94,7 @@ $b = <<'EOF';
 BEGIN { $^I = ".bak"; }
 BEGIN { $^W = 1; }
 BEGIN { $/ = "\n"; $\ = "\n"; }
-LINE: while (defined($_ = <ARGV>)) {
+LINE: while (defined($_ = ~< *ARGV)) {
     chomp $_;
     our(@F) = split(' ', $_, 0);
     '???';
@@ -206,7 +206,7 @@ $x{warn()};
 ####
 # 13
 my $foo;
-$_ .= <ARGV> . <$foo>;
+$_ .= ~<(*ARGV) . ~<($foo);
 ####
 # 14
 use utf8;
@@ -215,7 +215,7 @@ my $foo = "Ab\x{100}\200\x{200}\377Cd\000Ef\x{1000}\cA\x{2000}\cZ";
 my $foo = "Ab\304\200\200\310\200\377Cd\000Ef\341\200\200\cA\342\200\200\cZ";
 ####
 # 15
-s/x/'y';/e;
+s/x/{ 'y' }/;
 ####
 # 16 - various lypes of loop
 { my $x; }
@@ -231,17 +231,17 @@ my($x, @a);
 $x = 1 foreach (@a);
 ####
 # 19
-for (my $i = 0; $i < 2;) {
+for (my $i = 0; $i +< 2;) {
     my $z = 1;
 }
 ####
 # 20
-for (my $i = 0; $i < 2; ++$i) {
+for (my $i = 0; $i +< 2; ++$i) {
     my $z = 1;
 }
 ####
 # 21
-for (my $i = 0; $i < 2; ++$i) {
+for (my $i = 0; $i +< 2; ++$i) {
     my $z = 1;
 }
 ####
@@ -292,7 +292,7 @@ print((sort {$b cmp $a} @x));
 ####
 # 31
 my @x;
-print((reverse sort {$b <=> $a} @x));
+print((reverse sort {$b <+> $a} @x));
 ####
 # 32
 our @a;
@@ -360,3 +360,8 @@ $a = sub {
     return $x++;
 }
 ;
+####
+# 49 match
+{
+    $a =~ m/foo/;
+}

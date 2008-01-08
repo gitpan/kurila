@@ -26,8 +26,7 @@ sub handle_file {
 
     open my $fh, "<", $file
         or do { warn "Could not open input file $file: $!"; exit 0 };
-    binmode $fh;
-    my $str = do { local $/; <$fh> };
+    my $str = do { local $/; ~< $fh };
 
     ### unpack?
     my $outstr;
@@ -36,7 +35,7 @@ sub handle_file {
             $outfile = $file;
             $outfile =~ s/\.packed\z//;
         }
-        my ($head, $body) = split /__UU__\n/, $str;
+        my ($head, $body) = split m/__UU__\n/, $str;
         die "Can't unpack malformed data in '$file'\n"
             if !$head;
         $outstr = unpack 'u', $body;
@@ -98,13 +97,13 @@ sub bulk_process {
 
     my $count = 0;
     my $lines = 0;
-    while( my $line = <$fh> ) {
+    while( my $line = ~< $fh ) {
         chomp $line;
-        my ($file) = split /\s+/, $line;
+        my ($file) = split m/\s+/, $line;
 
         $lines++;
 
-        next unless $file =~ /\.packed/;
+        next unless $file =~ m/\.packed/;
 
         $count++;
 
@@ -117,7 +116,7 @@ sub bulk_process {
             ( $out, $file ) = ( $file, $out ) if $opts->{'p'};
             if (-e $out) {
                 my $changed = -M _;
-                if ($changed < $LastUpdate and $changed < -M $file) {
+                if ($changed +< $LastUpdate and $changed +< -M $file) {
                     print "Skipping '$file' as '$out' is up-to-date.\n"
                         if $opts->{'v'};
                     next;

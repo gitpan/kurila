@@ -68,11 +68,11 @@ is($?,0,"outer lex scope of vmsish [POSIX status]");
 
   $msg = do_a_perl('-e "use vmsish qw(hushed); exit 1"');
   $msg =~ s/\n/\\n/g; # keep output on one line
-  ok(($msg !~ /ABORT/),"POSIX ERR exit, vmsish hushed, DCL error message check");
+  ok(($msg !~ m/ABORT/),"POSIX ERR exit, vmsish hushed, DCL error message check");
 
   $msg = do_a_perl('-e "use vmsish qw(exit hushed); exit 44"');
     $msg =~ s/\n/\\n/g; # keep output on one line
-  ok(($msg !~ /ABORT/),"vmsish ERR exit, vmsish hushed, DCL error message check");
+  ok(($msg !~ m/ABORT/),"vmsish ERR exit, vmsish hushed, DCL error message check");
 
   $msg = do_a_perl('-e "use vmsish qw(exit hushed); no vmsish qw(hushed); exit 44"');
   $msg =~ s/\n/\\n/g; # keep output on one line
@@ -80,25 +80,25 @@ is($?,0,"outer lex scope of vmsish [POSIX status]");
 
   $msg = do_a_perl('-e "use vmsish qw(hushed); die(qw(blah));"');
   $msg =~ s/\n/\\n/g; # keep output on one line
-  ok(($msg !~ /ABORT/),"die, vmsish hushed, DCL error message check");
+  ok(($msg !~ m/ABORT/),"die, vmsish hushed, DCL error message check");
 
   $msg = do_a_perl('-e "use vmsish qw(hushed); use Carp; croak(qw(blah));"');
   $msg =~ s/\n/\\n/g; # keep output on one line
-  ok(($msg !~ /ABORT/),"croak, vmsish hushed, DCL error message check");
+  ok(($msg !~ m/ABORT/),"croak, vmsish hushed, DCL error message check");
 
   $msg = do_a_perl('-e "use vmsish qw(exit); vmsish::hushed(1); exit 44;"');
   $msg =~ s/\n/\\n/g; # keep output on one line
-  ok(($msg !~ /ABORT/),"vmsish ERR exit, vmsish hushed at runtime, DCL error message check");
+  ok(($msg !~ m/ABORT/),"vmsish ERR exit, vmsish hushed at runtime, DCL error message check");
 
   local *TEST;
-  open(TEST,'>vmsish_test.pl') || die('not ok ?? : unable to open "vmsish_test.pl" for writing');  
+  open(TEST, ">",'vmsish_test.pl') || die('not ok ?? : unable to open "vmsish_test.pl" for writing');  
   print TEST "#! perl\n";
   print TEST "use vmsish qw(hushed);\n";
   print TEST "\$obvious = (\$compile(\$error;\n";
   close TEST;
   $msg = do_a_perl('vmsish_test.pl');
   $msg =~ s/\n/\\n/g; # keep output on one line
-  ok(($msg !~ /ABORT/),"compile ERR exit, vmsish hushed, DCL error message check");
+  ok(($msg !~ m/ABORT/),"compile ERR exit, vmsish hushed, DCL error message check");
   unlink 'vmsish_test.pl';
 }
 
@@ -112,7 +112,7 @@ is($?,0,"outer lex scope of vmsish [POSIX status]");
   if (not $ENV{'SYS$TIMEZONE_DIFFERENTIAL'}) {
     $oldtz = $ENV{'SYS$TIMEZONE_DIFFERENTIAL'};
     $ENV{'SYS$TIMEZONE_DIFFERENTIAL'} = 3600;
-    eval "END { \$ENV{'SYS\$TIMEZONE_DIFFERENTIAL'} = $oldtz; }";
+    eval "END \{ \$ENV\{'SYS\$TIMEZONE_DIFFERENTIAL'\} = $oldtz; \}";
     gmtime(0); # Force reset of tz offset
   }
 
@@ -122,7 +122,7 @@ is($?,0,"outer lex scope of vmsish [POSIX status]");
   # we create a file rather than using an existing one for the stat() test.
 
   my $file = 'sys$scratch:vmsish_t_flirble.tmp';
-  open TMP, ">$file" or die "Couldn't open file $file";
+  open TMP, ">", "$file" or die "Couldn't open file $file";
   close TMP;
   END { 1 while unlink $file; }
 
@@ -148,23 +148,23 @@ is($?,0,"outer lex scope of vmsish [POSIX status]");
   # since it's unlikely local time will differ from UTC by so small
   # an amount, and it renders the test resistant to delays from
   # things like stat() on a file mounted over a slow network link.
-  ok(abs($utctime - $vmstime + $offset) <= 10,"(time) UTC: $utctime VMS: $vmstime");
+  ok(abs($utctime - $vmstime + $offset) +<= 10,"(time) UTC: $utctime VMS: $vmstime");
 
   $utcval = $utclocal[5] * 31536000 + $utclocal[7] * 86400 +
             $utclocal[2] * 3600     + $utclocal[1] * 60 + $utclocal[0];
   $vmsval = $vmslocal[5] * 31536000 + $vmslocal[7] * 86400 +
             $vmslocal[2] * 3600     + $vmslocal[1] * 60 + $vmslocal[0];
-  ok(abs($vmsval - $utcval + $offset) <= 10, "(localtime) UTC: $utcval  VMS: $vmsval");
+  ok(abs($vmsval - $utcval + $offset) +<= 10, "(localtime) UTC: $utcval  VMS: $vmsval");
   print "# UTC: @utclocal\n# VMS: @vmslocal\n";
 
   $utcval = $utcgmtime[5] * 31536000 + $utcgmtime[7] * 86400 +
             $utcgmtime[2] * 3600     + $utcgmtime[1] * 60 + $utcgmtime[0];
   $vmsval = $vmsgmtime[5] * 31536000 + $vmsgmtime[7] * 86400 +
             $vmsgmtime[2] * 3600     + $vmsgmtime[1] * 60 + $vmsgmtime[0];
-  ok(abs($vmsval - $utcval + $offset) <= 10, "(gmtime) UTC: $utcval  VMS: $vmsval");
+  ok(abs($vmsval - $utcval + $offset) +<= 10, "(gmtime) UTC: $utcval  VMS: $vmsval");
   print "# UTC: @utcgmtime\n# VMS: @vmsgmtime\n";
 
-  ok(abs($utcmtime - $vmsmtime + $offset) <= 10,"(stat) UTC: $utcmtime  VMS: $vmsmtime");
+  ok(abs($utcmtime - $vmsmtime + $offset) +<= 10,"(stat) UTC: $utcmtime  VMS: $vmsmtime");
 }
 }
 
@@ -172,7 +172,7 @@ is($?,0,"outer lex scope of vmsish [POSIX status]");
 #       they were turned off in invoking procedure
 sub do_a_perl {
     local *P;
-    open(P,'>vmsish_test.com') || die('not ok ?? : unable to open "vmsish_test.com" for writing');
+    open(P, ">",'vmsish_test.com') || die('not ok ?? : unable to open "vmsish_test.com" for writing');
     print P "\$ set message/facil/sever/ident/text\n";
     print P "\$ define/nolog/user sys\$error _nla0:\n";
     print P "\$ $Invoke_Perl @_\n";

@@ -45,10 +45,10 @@ sub testread ($$$$$$$) {
   my ($fh, $str, $read_c, $how_r, $write_c, $how_w, $why) = @_;
   my $buf = '';
   if ($how_r eq 'readline_all') {
-    $buf .= $_ while <$fh>;
+    $buf .= $_ while ~< $fh;
   } elsif ($how_r eq 'readline') {
     $/ = \$read_c;
-    $buf .= $_ while <$fh>;
+    $buf .= $_ while ~< $fh;
   } elsif ($how_r eq 'read') {
     my($in, $c);
     $buf .= $in while $c = read($fh, $in, $read_c);
@@ -60,7 +60,7 @@ sub testread ($$$$$$$) {
   }
   close $fh or die "close: $!";
   # The only contamination allowed is with sysread/prints
-  $buf =~ s/\r\n/\n/g if $how_r eq 'sysread' and $how_w =~ /print/;
+  $buf =~ s/\r\n/\n/g if $how_r eq 'sysread' and $how_w =~ m/print/;
   is(length $buf, length $str, "length with wrc=$write_c, rdc=$read_c, $how_w, $how_r, $why");
   is($buf, $str, "content with wrc=$write_c, rdc=$read_c, $how_w, $how_r, $why");
 }
@@ -71,13 +71,14 @@ sub testpipe ($$$$$$) {
   my $fh;
   if ($how_w eq 'print') {	# AUTOFLUSH???
     # Should be shell-neutral:
-    open $fh, '-|', qq[$Perl -we "$set_out;print for grep length, split /(.{1,$write_c})/s, qq($quoted)"] or die "open: $!";
+    open $fh, '-|', qq[$Perl -we "$set_out;print for grep length, split m/(.\{1,$write_c\})/s, qq($quoted)"] or die "open: $!";
   } elsif ($how_w eq 'print/flush') {
     # shell-neutral and miniperl-enabled autoflush? qq(\x24\x7c) eq '$|'
-    open $fh, '-|', qq[$Perl -we "$set_out;eval qq(\\x24\\x7c = 1) or die;print for grep length, split /(.{1,$write_c})/s, qq($quoted)"] or die "open: $!";
+    open $fh, '-|', qq[$Perl -we "$set_out;eval qq(\\x24\\x7c = 1) or die;print for grep length, split m/(.\{1,$write_c\})/s, qq($quoted)"] or die "open: $!";
   } elsif ($how_w eq 'syswrite') {
     ### How to protect \$_
-    open $fh, '-|', qq[$Perl -we "$set_out;eval qq(sub w {syswrite STDOUT, \\x24_} 1) or die; w() for grep length, split /(.{1,$write_c})/s, qq($quoted)"] or die "open: $!";
+    my $cmd = qq[$Perl -we "$set_out;eval qq(sub w \\\{syswrite STDOUT, \\x[24]_\\\} 1) or die; w() for grep \{ length \} split m/(.\{1,$write_c\})/s, qq($quoted)"];
+    open $fh, '-|', $cmd or die "open '$cmd': $!";
   } else {
     die "Unrecognized write: '$how_w'";
   }
@@ -88,7 +89,7 @@ sub testpipe ($$$$$$) {
 
 sub testfile ($$$$$$) {
   my ($str, $write_c, $read_c, $how_w, $how_r, $why) = @_;
-  my @data = grep length, split /(.{1,$write_c})/s, $str;
+  my @data = grep length, split m/(.{1,$write_c})/s, $str;
 
   open my $fh, '>', 'io_io.tmp' or die;
   select $fh;
@@ -113,7 +114,7 @@ sub testfile ($$$$$$) {
 }
 
 # shell-neutral and miniperl-enabled autoflush? qq(\x24\x7c) eq '$|'
-open my $fh, '-|', qq[$Perl -we "eval qq(\\x24\\x7c = 1) or die; binmode STDOUT; sleep 1, print for split //, qq(a\nb\n\nc\n\n\n)"] or die "open: $!";
+open my $fh, '-|', qq[$Perl -we "eval qq(\\x24\\x7c = 1) or die; binmode STDOUT; sleep 1, print for split m//, qq(a\nb\n\nc\n\n\n)"] or die "open: $!";
 ok(1, 'open pipe');
 binmode $fh, q(:crlf);
 ok(1, 'binmode');

@@ -15,7 +15,7 @@ use strict;
 use Test::More;
 
 BEGIN {
-	if ($^O =~ /cygwin/i) {
+	if ($^O =~ m/cygwin/i) {
 		plan tests => 11;
 	} else {
 		plan skip_all => "This is not cygwin";
@@ -85,7 +85,7 @@ like( $res, qr/pure_all.*foo.*foo.1/s, '... should add MAN3PODS targets' );
 # init_linker
 {
     my $libperl = $Config{libperl} || 'libperl.a';
-    $libperl =~ s/\.a/.dll.a/ if $] >= 5.006002;
+    $libperl =~ s/\.a/.dll.a/;
     $libperl = "\$(PERL_INC)/$libperl";
 
     my $export  = '';

@@ -9,10 +9,10 @@ my $name = shift || 'PerlLog';
 
 # get the version from the message file
 open(my $msgfh, '<', "$name.mc") or die "fatal: Can't read file '$name.mc': $!\n";
-my $top = <$msgfh>;
+my $top = ~< $msgfh;
 close($msgfh);
 
-my ($version) = $top =~ /Sys::Syslog Message File (\d+\.\d+\.\d+)/
+my ($version) = $top =~ m/Sys::Syslog Message File (\d+\.\d+\.\d+)/
         or die "error: File '$name.mc' doesn't have a version number\n";
 
 # compile the message text files
@@ -25,7 +25,7 @@ system(qq{ link -nodefaultlib -incremental:no -release /nologo -base:0x60000000 
 # uuencode the resource file
 open(my $rsrc, '<', "$name.RES") or die "fatal: Can't read resource file '$name.RES': $!";
 binmode($rsrc);
-my $uudata = pack "u", do { local $/; <$rsrc> };
+my $uudata = pack "u", do { local $/; ~< $rsrc };
 close($rsrc);
 
 open(my $uufh, '>', "$name\_RES.uu") or die "fatal: Can't write file '$name\_RES.uu': $!";
@@ -35,7 +35,7 @@ close($uufh);
 # uuencode the DLL
 open(my $dll, '<', "$name.dll") or die "fatal: Can't read DLL '$name.dll': $!";
 binmode($dll);
-$uudata = pack "u", do { local $/; <$dll> };
+$uudata = pack "u", do { local $/; ~< $dll };
 close($dll);
 
 open($uufh, '>', "$name\_dll.uu") or die "fatal: Can't write file '$name\_dll.uu': $!";
@@ -47,11 +47,11 @@ open(my $header, '<', "$name.h") or die "fatal: Can't read header file '$name.h'
 my %vals;    
 my $max = 0;
 
-while (<$header>) {
-    if (/^#define\s+(\w+)\s+(\d+)$/ || /^#define\s+(\w+)\s+\(\(DWORD\)(\d+)L\)/) {
+while ( ~< $header) {
+    if (m/^#define\s+(\w+)\s+(\d+)$/ || m/^#define\s+(\w+)\s+\(\(DWORD\)(\d+)L\)/) {
         $vals{$1} = $2;
         if (substr($1, 0, 1) eq 'C') {
-            $max = $2 if $max < $2;
+            $max = $2 if $max +< $2;
         }
     }
 }
@@ -60,27 +60,27 @@ close($header);
 
 my ($hash, $f2c, %fac);
 
-for my $name (sort { substr($a,0,1) cmp substr($b,0,1) || $vals{$a} <=> $vals{$b} } keys %vals) {
+for my $name (sort { substr($a,0,1) cmp substr($b,0,1) || $vals{$a} <+> $vals{$b} } keys %vals) {
     $hash .= "    $name => $vals{$name},\n" ;
-    if ($name =~ /^CAT_(\w+)$/) {
+    if ($name =~ m/^CAT_(\w+)$/) {
         $fac{$1} = $vals{$name};
     }
 }
 
-for my $name (sort {$fac{$a} <=> $fac{$b}} keys %fac) {
+for my $name (sort {$fac{$a} <+> $fac{$b}} keys %fac) {
     $f2c .= "    Sys::Syslog::LOG_$name() => '$name',\n";
 }    
 
 # write the Sys::Syslog::Win32 module
 open my $out, '>', "Win32.pm" or die "fatal: Can't write Win32.pm: $!";
-my $template = join '', <DATA>;
+my $template = join '', ~< *DATA;
 $template =~ s/__CONSTANT__/$hash/;
 $template =~ s/__F2C__/$f2c/;
 $template =~ s/__NAME_VER__/$name/;
 $template =~ s/__VER__/$version/;
 $max = sprintf "0x%08x", $max;
 $template =~ s/__MAX__/'$max'/g;
-$template =~ s/__TIME__/localtime()/ge;
+$template =~ s/__TIME__/{localtime()}/g;
 print $out $template;
 close $out;
 print "Updated Win32.pm and relevent message files\n";
@@ -181,13 +181,7 @@ sub _install {
 
         # on Cygwin, convert the Unix path into absolute Windows path
         if ($is_Cygwin) {
-            if ($] > 5.009005) {
                 chomp($file = Cygwin::posix_to_win_path($file, 1));
-            }
-            else {
-                local $ENV{PATH} = '';
-                chomp($dll = `/usr/bin/cygpath --absolute --windows "$dll"`);
-            }
         }
 
         $dll =~ s![\\/]+!\\!g;     # must be backslashes!

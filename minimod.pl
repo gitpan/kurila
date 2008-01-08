@@ -33,9 +33,9 @@ require Exporter;
 $head= <<'EOF!HEAD';
 END
 
-open MINI, "miniperlmain.c";
-while (<MINI>) {
-    last if /Do not delete this line--writemain depends on it/;
+open MINI, "<", "miniperlmain.c";
+while ( ~< *MINI) {
+    last if m/Do not delete this line--writemain depends on it/;
     print;
 }
 
@@ -44,8 +44,8 @@ EOF!HEAD
 $tail=<<'EOF!TAIL';
 END
 
-while (<MINI>) {
-    print unless /dXSUB_SYS/;
+while ( ~< *MINI) {
+    print unless m/dXSUB_SYS/;
 }
 close MINI;
 

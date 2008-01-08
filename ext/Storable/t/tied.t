@@ -14,7 +14,7 @@ sub BEGIN {
 	unshift @INC, 't';
     }
     require Config; Config->import;
-    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bStorable\b/) {
+    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ m/\bStorable\b/) {
         print "1..0 # Skip: Storable was not built\n";
         exit 0;
     }
@@ -187,7 +187,7 @@ ok 9, tied %{$thash};
 @new = ($scalar_fetch, $array_fetch, $hash_fetch);
 
 # Tests 10..15
-for ($i = 0; $i < @new; $i++) {
+for ($i = 0; $i +< @new; $i++) {
 	print "not " unless $new[$i] == $old[$i] + 1;
 	printf "ok %d\n", 10 + 2*$i;	# Tests 10,12,14
 	print "not " unless ref $tied[$i] eq $type[$i];

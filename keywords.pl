@@ -3,7 +3,7 @@ use strict;
 
 require 'regen_lib.pl';
 safer_unlink ("keywords.h");
-open(KW, ">keywords.h") || die "Can't create keywords.h: $!\n";
+open(KW, ">", "keywords.h") || die "Can't create keywords.h: $!\n";
 binmode KW;
 select KW;
 
@@ -27,10 +27,10 @@ EOM
 # Read & print data.
 
 my $keynum = 0;
-while (<DATA>) {
+while ( ~< *DATA) {
     chop;
     next unless $_;
-    next if /^#/;
+    next if m/^#/;
     my ($keyword) = split;
     print &tab(5, "#define KEY_$keyword"), $keynum++, "\n";
 }
@@ -54,7 +54,6 @@ __LINE__
 __PACKAGE__
 __DATA__
 __END__
-AUTOLOAD
 BEGIN
 UNITCHECK
 CORE

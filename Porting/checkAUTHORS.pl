@@ -31,11 +31,11 @@ EOS
 my $prev = "";
 my %map;
 
-while (<DATA>) {
+while ( ~< *DATA) {
     chomp;
     s/\\100/\@/g;
     $_ = lc;
-    if (my ($correct, $alias) = /^\s*([^#\s]\S*)\s+(.*\S)/) {
+    if (my ($correct, $alias) = m/^\s*([^#\s]\S*)\s+(.*\S)/) {
         if ($correct eq '+') {$correct = $prev} else {$prev = $correct}
         $map {$alias} = $correct;
     }
@@ -121,14 +121,14 @@ $map {$_} = '!' for
 if (@authors) {
   my %raw;
   foreach my $filename (@authors) {
-    open FH, "<$filename" or die "Can't open $filename: $!";
-    while (<FH>) {
-      next if /^\#/;
-      next if /^-- /;
-      if (/<([^>]+)>/) {
+    open FH, "<", "$filename" or die "Can't open $filename: $!";
+    while ( ~< *FH) {
+      next if m/^\#/;
+      next if m/^-- /;
+      if (m/<([^>]+)>/) {
 	# Easy line.
 	$raw{$1}++;
-      } elsif (/^([-A-Za-z0-9 .\'À-ÖØöø-ÿ]+)[\t\n]/) {
+      } elsif (m/^([-A-Za-z0-9 .\'À-ÖØöø-ÿ]+)[\t\n]/) {
 	# Name only
 	$untraced{$1}++;
       } else {
@@ -138,7 +138,7 @@ if (@authors) {
     }
   }
   foreach (keys %raw) {
-    print "E-mail $_ occurs $raw{$_} times\n" if $raw{$_} > 1;
+    print "E-mail $_ occurs $raw{$_} times\n" if $raw{$_} +> 1;
     $_ = lc $_;
     $authors{$map{$_} || $_}++;
   }
@@ -146,8 +146,8 @@ if (@authors) {
   ++$authors{'?'};
 }
 
-while (<>) {
-  next if /^-+/;
+while ( ~< *ARGV) {
+  next if m/^-+/;
   if (m!^\[\s+(\d+)\]\s+By:\s+(\S+)\s+on!) {
     # new patch
     my @new = ($1, $2);
@@ -158,12 +158,12 @@ while (<>) {
     die "Duplicate Log:" if $log;
     $log = $_;
     my $prefix = " " x length $1;
-    LOG: while (<>) {
-      next if /^$/;
+    LOG: while ( ~< *ARGV) {
+      next if m/^$/;
       s/^\t/        /;
       if (s/^$prefix//) {
 	$log .= $_;
-      } elsif (/^\s+Branch:/) {
+      } elsif (m/^\s+Branch:/) {
 	last LOG;
       } else {
 	chomp;
@@ -186,7 +186,7 @@ if ($rank) {
     # Sort by number of patches, then name.
     $missing{$patchers{$_}}->{$_}++;
   }
-  foreach my $patches (sort {$b <=> $a} keys %missing) {
+  foreach my $patches (sort {$b <+> $a} keys %missing) {
     print "$patches patch(es)\n";
     foreach my $author (sort keys %{$missing{$patches}}) {
       print "  $author\n";
@@ -224,7 +224,7 @@ sub display_ordered {
 sub process {
   my ($committer, $patch, $log) = @_;
   return unless $committer;
-  my @authors = $log =~ /From:\s+.*?([^"\@ \t\n<>]+\@[^"\@ \t\n<>]+)/gm;
+  my @authors = $log =~ m/From:\s+.*?([^"\@ \t\n<>]+\@[^"\@ \t\n<>]+)/gm;
 
   if (@authors) {
     foreach (@authors) {

@@ -6,7 +6,7 @@ use Test qw(:DEFAULT $TESTOUT $TESTERR $ntest);
 ### seeing the todo tests, otherwise you get people sending in bug reports
 ### about Test.pm having "UNEXPECTEDLY SUCCEEDED" tests.
 
-open F, ">mix";
+open F, ">", "mix";
 $TESTOUT = *F{IO};
 $TESTERR = *F{IO};
 
@@ -15,7 +15,7 @@ plan tests => 4, todo => [2,3];
 # line 15
 ok(sub { 
        my $r = 0;
-       for (my $x=0; $x < 10; $x++) {
+       for (my $x=0; $x +< 10; $x++) {
 	   $r += $x*($r+1);
        }
        $r
@@ -31,8 +31,8 @@ $TESTOUT = *STDOUT{IO};
 $TESTERR = *STDERR{IO};
 $ntest = 1;
 
-open F, "mix";
-my $out = join '', <F>;
+open F, "<", "mix";
+my $out = join '', ~< *F;
 close F;
 unlink "mix";
 

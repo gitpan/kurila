@@ -9,7 +9,7 @@ use bytes;
 #use lib qw(t t/compress);
 
 use Carp ;
-#use Test::More ; 
+use Test::More ; 
 
 
 sub title
@@ -80,15 +80,15 @@ sub readFile
     {
         my $pos = tell($f);
         seek($f, 0,0);
-        @strings = <$f> ;	
+        @strings = ~< $f ;	
         seek($f, 0, $pos);
     }
     else
     {
-        open (F, "<$f") 
+        open (F, "<", "$f") 
             or croak "Cannot open $f: $!\n" ;
         binmode F;
-        @strings = <F> ;	
+        @strings = ~< *F ;	
         close F ;
     }
 
@@ -105,7 +105,7 @@ sub writeFile
 {
     my($filename, @strings) = @_ ;
     1 while unlink $filename ;
-    open (F, ">$filename") 
+    open (F, ">", "$filename") 
         or croak "Cannot open $filename: $!\n" ;
     binmode F;
     foreach (@strings) {
@@ -125,7 +125,7 @@ sub GZreadFile
         or croak "Cannopt open '$filename': $Compress::Zlib::gzerrno" ;
 
     $uncomp .= $line 
-        while $fil->gzread($line) > 0;
+        while $fil->gzread($line) +> 0;
 
     $fil->gzclose ;
     return $uncomp ;
@@ -153,7 +153,7 @@ sub hexDump
     $d = '' unless defined $d ;
     #while (read(STDIN, $data, 16)) {
     while (my $data = substr($d, 0, 16)) {
-        substr($d, 0, 16) = '' ;
+        substr($d, 0, 16, '') ;
         printf "# %8.8lx    ", $offset;
         $offset += 16;
 
@@ -162,7 +162,7 @@ sub hexDump
             printf('%2.2x ', $_);
         }
         print "   " x (16 - @array)
-            if @array < 16 ;
+            if @array +< 16 ;
         $data =~ tr/\0-\37\177-\377/./;
         print "  $data\n";
     }
@@ -230,7 +230,7 @@ sub uncompressBuffer
 
     my $out ;
     my $obj = $mapping{$compWith}->new( \$buffer, -Append => 1);
-    1 while $obj->read($out) > 0 ;
+    1 while $obj->read($out) +> 0 ;
     return $out ;
 
 }
@@ -433,7 +433,7 @@ sub anyUncompress
     {
 
         my $got = substr($data, 0, length($already));
-        substr($data, 0, length($already)) = '';
+        substr($data, 0, length($already), '');
 
         is $got, $already, '  Already OK' ;
     }
@@ -446,7 +446,7 @@ sub anyUncompress
                     @opts)
         or croak "Cannot open buffer/file: $AnyUncompressError" ;
 
-    1 while $o->read($out) > 0 ;
+    1 while $o->read($out) +> 0 ;
 
     croak "Error uncompressing -- " . $o->error()
         if $o->error() ;
@@ -493,7 +493,7 @@ sub getHeaders
     {
 
         my $got = substr($data, 0, length($already));
-        substr($data, 0, length($already)) = '';
+        substr($data, 0, length($already), '');
 
         is $got, $already, '  Already OK' ;
     }
@@ -507,7 +507,7 @@ sub getHeaders
                 @opts)
         or croak "Cannot open buffer/file: $AnyUncompressError" ;
 
-    1 while $o->read($out) > 0 ;
+    1 while $o->read($out) +> 0 ;
 
     croak "Error uncompressing -- " . $o->error()
         if $o->error() ;
@@ -566,7 +566,7 @@ sub mkErr
 
     $file = quotemeta($file);
 
-    return "/$string\\s+at $file line $line/" if $] >= 5.006 ;
+    return "/$string\\s+at $file line $line/";
     return "/$string\\s+at /" ;
 }
 
@@ -595,7 +595,7 @@ sub dumpObj
     my $max = 0 ;;
     foreach my $k (keys %{ *$obj })
     {
-        $max = length $k if length $k > $max ;
+        $max = length $k if length $k +> $max ;
     }
 
     foreach my $k (sort keys %{ *$obj })
@@ -613,7 +613,7 @@ sub getMultiValues
 {
     my $class = shift ;
 
-    return (0,0) if $class =~ /lzf/i;
+    return (0,0) if $class =~ m/lzf/i;
     return (1,0);
 }
 

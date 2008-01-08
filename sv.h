@@ -357,8 +357,6 @@ perform the upgrade if necessary.  See C<svtype>.
 /* This is only set true on a PVGV when it's playing "PVBM", but is tested for
    on any regular scalar (anything <= PVLV) */
 #define SVpbm_VALID	0x40000000
-/* ??? */
-#define SVrepl_EVAL	0x40000000  /* Replacement part of s///e */
 
 /* IV, PVIV, PVNV, PVMG, PVGV and (I assume) PVLV  */
 /* Presumably IVs aren't stored in pads */
@@ -727,9 +725,6 @@ Unsets the PV status of an SV.
 Tells an SV that it is a string and disables all other OK bits.
 Will also turn off the UTF-8 status.
 
-=for apidoc Am|bool|SvVOK|SV* sv
-Returns a boolean indicating whether the SV contains a v-string.
-
 =for apidoc Am|U32|SvOOK|SV* sv
 Returns a U32 indicating whether the SvIVX is a valid offset value for
 the SvPVX.  This hack is used internally to speed up removal of characters
@@ -883,12 +878,6 @@ in gv.h: */
 						  SVf_IVisUV),	\
 				    SvFLAGS(sv) |= (SVf_POK|SVp_POK))
 
-#define SvVOK(sv)		(SvMAGICAL(sv)				\
-				 && mg_find(sv,PERL_MAGIC_vstring))
-/* returns the vstring magic, if any */
-#define SvVSTRING_mg(sv)	(SvMAGICAL(sv) \
-				 ? mg_find(sv,PERL_MAGIC_vstring) : NULL)
-
 #define SvOOK(sv)		(SvFLAGS(sv) & SVf_OOK)
 #define SvOOK_on(sv)		((void)SvIOK_off(sv), SvFLAGS(sv) |= SVf_OOK)
 #define SvOOK_off(sv)		((void)(SvOOK(sv) && sv_backoff(sv)))
@@ -991,10 +980,6 @@ the scalar's value cannot change unless written to.
 #define SvCOMPILED(sv)		(SvFLAGS(sv) & SVpfm_COMPILED)
 #define SvCOMPILED_on(sv)	(SvFLAGS(sv) |= SVpfm_COMPILED)
 #define SvCOMPILED_off(sv)	(SvFLAGS(sv) &= ~SVpfm_COMPILED)
-
-#define SvEVALED(sv)		(SvFLAGS(sv) & SVrepl_EVAL)
-#define SvEVALED_on(sv)		(SvFLAGS(sv) |= SVrepl_EVAL)
-#define SvEVALED_off(sv)	(SvFLAGS(sv) &= ~SVrepl_EVAL)
 
 #if defined (DEBUGGING) && defined(__GNUC__) && !defined(PERL_GCC_BRACE_GROUPS_FORBIDDEN)
 #  define SvVALID(sv)		({ SV *const thwacke = (SV *) (sv);	\

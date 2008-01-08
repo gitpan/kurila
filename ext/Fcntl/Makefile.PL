@@ -1,5 +1,5 @@
 use ExtUtils::MakeMaker;
-use ExtUtils::Constant 0.11 'WriteConstants';
+use ExtUtils::Constant v0.11 'WriteConstants';
 WriteMakefile(
     NAME 	=> 'Fcntl',
     MAN3PODS 	=> {}, 	# Pods will be built by installman.
@@ -40,7 +40,7 @@ my @names = (qw(
             {name=>"SEEK_END", default=>["IV", "2"]},
             {name=>"_S_IFMT", macro=>"S_IFMT", value=>"S_IFMT"});
 WriteConstants(
-    ($] > 5.009002 ? (PROXYSUBS => 1) : ()),
+    PROXYSUBS => 1,
     NAME => 'Fcntl',
     NAMES => \@names,
 );

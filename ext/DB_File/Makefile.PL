@@ -26,12 +26,8 @@ WriteMakefile(
             ?  ('LICENSE'  => 'perl')
             : ()
     ),
-    (
-        $] >= 5.005
-            ? (ABSTRACT_FROM => 'DB_File.pm',
-                AUTHOR       => 'Paul Marquess <pmqs@cpan.org>')
-            : ()
-    ),
+              ABSTRACT_FROM => 'DB_File.pm',
+              AUTHOR       => 'Paul Marquess <pmqs@cpan.org>',
 
 	'depend'	=> {'version$(OBJ_EXT)' => 'version.c'},
 	'clean'		=> {FILES => 'constants.h constants.xs'},
@@ -70,16 +66,16 @@ my @names = qw(
 
     # Check the constants above all appear in @EXPORT in DB_File.pm
     my %names = map { $_, 1} @names;
-    open F, "<DB_File.pm" or die "Cannot open DB_File.pm: $!\n";
-    while (<F>)
+    open F, "<", "DB_File.pm" or die "Cannot open DB_File.pm: $!\n";
+    while ( ~< *F)
     {
-        last if /^\s*\@EXPORT\s+=\s+qw\(/ ;
+        last if m/^\s*\@EXPORT\s+=\s+qw\(/ ;
     }
 
-    while (<F>)
+    while ( ~< *F)
     {
-        last if /^\s*\)/ ;
-        /(\S+)/ ;
+        last if m/^\s*\)/ ;
+        m/(\S+)/ ;
         delete $names{$1} if defined $1 ;
     }
     close F ;
@@ -96,4 +92,5 @@ my @names = qw(
                     NAMES => \@names,
                     C_FILE  => 'constants.h',
                     XS_FILE  => 'constants.xs',
+                    PROXYSUBS => 1,
                   );

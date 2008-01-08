@@ -281,8 +281,6 @@ PP(pp_substcont)
 			     NULL, 0);
 	}
 	i = m - orig;
-	if (DO_UTF8(sv))
-	    sv_pos_b2u(sv, &i);
 	mg->mg_len = i;
     }
     if (old != rx)
@@ -1034,7 +1032,7 @@ PP(pp_caller)
 	/* So is ccstack[dbcxix]. */
 	if (isGV(cvgv)) {
 	    SV * const sv = newSV(0);
-	    gv_efullname3(sv, cvgv, NULL);
+	    gv_efullname4(sv, cvgv, NULL, TRUE);
 	    PUSHs(sv_2mortal(sv));
 	    PUSHs(sv_2mortal(newSViv((I32)cx->blk_sub.hasargs)));
 	}
@@ -1688,17 +1686,9 @@ PP(pp_goto)
 	    if (!CvROOT(cv) && !CvXSUB(cv)) {
 		const GV * const gv = CvGV(cv);
 		if (gv) {
-		    GV *autogv;
 		    SV *tmpstr;
-		    /* autoloaded stub? */
-		    if (cv != GvCV(gv) && (cv = GvCV(gv)))
-			goto retry;
-		    autogv = gv_autoload4(GvSTASH(gv), GvNAME(gv),
-					  GvNAMELEN(gv), FALSE);
-		    if (autogv && (cv = GvCV(autogv)))
-			goto retry;
 		    tmpstr = sv_newmortal();
-		    gv_efullname3(tmpstr, gv, NULL);
+		    gv_efullname4(tmpstr, gv, NULL, TRUE);
 		    DIE(aTHX_ "Goto undefined subroutine &%"SVf"", SVfARG(tmpstr));
 		}
 		DIE(aTHX_ "Goto undefined subroutine");
@@ -2769,17 +2759,10 @@ PP(pp_require)
 
     PUTBACK;
 
-    /* Store and reset encoding. */
-    encoding = PL_encoding;
-    PL_encoding = NULL;
-
     if (doeval(gimme, NULL, NULL, PL_curcop->cop_seq))
 	op = DOCATCH(PL_eval_start);
     else
 	op = PL_op->op_next;
-
-    /* Restore encoding. */
-    PL_encoding = encoding;
 
     return op;
 }

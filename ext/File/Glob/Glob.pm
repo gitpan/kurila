@@ -2,7 +2,7 @@ package File::Glob;
 
 use strict;
 our($VERSION, @ISA, @EXPORT_OK, @EXPORT_FAIL, %EXPORT_TAGS,
-    $AUTOLOAD, $DEFAULT_FLAGS);
+    $DEFAULT_FLAGS);
 
 use XSLoader ();
 
@@ -61,8 +61,8 @@ $VERSION = '1.06';
 sub import {
     require Exporter;
     my $i = 1;
-    while ($i < @_) {
-	if ($_[$i] =~ /^:(case|nocase|globally)$/) {
+    while ($i +< @_) {
+	if ($_[$i] =~ m/^:(case|nocase|globally)$/) {
 	    splice(@_, $i, 1);
 	    $DEFAULT_FLAGS ^&^= ^~^GLOB_NOCASE() if $1 eq 'case';
 	    $DEFAULT_FLAGS ^|^= GLOB_NOCASE() if $1 eq 'nocase';
@@ -75,22 +75,6 @@ sub import {
 	++$i;
     }
     goto &Exporter::import;
-}
-
-sub AUTOLOAD {
-    # This AUTOLOAD is used to 'autoload' constants from the constant()
-    # XS function.  If a constant is not found then control is passed
-    # to the AUTOLOAD in AutoLoader.
-
-    my $constname;
-    ($constname = $AUTOLOAD) =~ s/.*:://;
-    my ($error, $val) = constant($constname);
-    if ($error) {
-	require Carp;
-	Carp::croak($error);
-    }
-    eval "sub $AUTOLOAD { $val }";
-    goto &{Symbol::fetch_glob($AUTOLOAD)};
 }
 
 XSLoader::load 'File::Glob', $VERSION;
@@ -110,7 +94,7 @@ sub GLOB_CSH () {
 }
 
 $DEFAULT_FLAGS = GLOB_CSH();
-if ($^O =~ /^(?:MSWin32|VMS|os2|dos|riscos|MacOS)$/) {
+if ($^O =~ m/^(?:MSWin32|VMS|os2|dos|riscos|MacOS)$/) {
     $DEFAULT_FLAGS ^|^= GLOB_NOCASE();
 }
 
@@ -118,7 +102,7 @@ if ($^O =~ /^(?:MSWin32|VMS|os2|dos|riscos|MacOS)$/) {
 
 sub bsd_glob {
     my ($pat,$flags) = @_;
-    $flags = $DEFAULT_FLAGS if @_ < 2;
+    $flags = $DEFAULT_FLAGS if @_ +< 2;
     return doglob($pat,$flags);
 }
 
@@ -145,7 +129,7 @@ sub csh_glob {
     $pat =~ s/^\s+//;	# Protect against empty elements in
     $pat =~ s/\s+$//;	# things like < *.c> and <*.c >.
 			# These alone shouldn't trigger ParseWords.
-    if ($pat =~ /\s/) {
+    if ($pat =~ m/\s/) {
         # XXX this is needed for compatibility with the csh
 	# implementation in Perl.  Need to support a flag
 	# to disable this behavior.

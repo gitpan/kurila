@@ -6,7 +6,7 @@ BEGIN {
 	@INC = '../lib';
 	require Config; Config->import;
 	keys %Config; # Silence warning
-	if ($Config{extensions} !~ /\bList\/Util\b/) {
+	if ($Config{extensions} !~ m/\bList\/Util\b/) {
 	    print "1..0 # Skip: List::Util was not built\n";
 	    exit 0;
 	}
@@ -32,5 +32,5 @@ is( 0+@r,	0+@in,	'arg count');
 
 isnt( "@r",	"@in",	'result different to args');
 
-my @s = sort { $a <=> $b } @r;
+my @s = sort { $a <+> $b } @r;
 is( "@in",	"@s",	'values');

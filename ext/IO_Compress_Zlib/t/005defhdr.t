@@ -47,7 +47,7 @@ sub ReadHeaderInfo
     #ok $inf->read($uncomp) ;
     my $actual = 0 ;
     my $status = 1 ;
-    while (($status = $inf->read($uncomp)) > 0) {
+    while (($status = $inf->read($uncomp)) +> 0) {
         $actual += $status ;
     }
 
@@ -77,7 +77,7 @@ sub ReadHeaderInfoZlib
     #ok $inf->read($uncomp) ;
     my $actual = 0 ;
     my $status = 1 ;
-    while (($status = $inf->read($uncomp)) > 0) {
+    while (($status = $inf->read($uncomp)) +> 0) {
         $actual += $status ;
     }
 
@@ -174,7 +174,7 @@ EOM
 
         while (my ($k, $v) = each %$expect)
         {
-            if (ZLIB_VERNUM >= 0x1220)
+            if (ZLIB_VERNUM +>= 0x1220)
               { is $hdr->{$k}, $v, "  $k is $v" }
             else
               { ok 1, "  Skip test for $k" }
@@ -217,7 +217,7 @@ EOM
     {
         title "Header Corruption - FCHECK failure - 1st byte wrong";
         my $buffer = $good ;
-        substr($buffer, 0, 1) = "\x00" ;
+        substr($buffer, 0, 1, "\x00") ;
 
         ok ! IO::Uncompress::Inflate->new( \$buffer, -Transparent => 0)  ;
         like $IO::Uncompress::Inflate::InflateError, '/Header Error: CRC mismatch/',
@@ -227,7 +227,7 @@ EOM
     {
         title "Header Corruption - FCHECK failure - 2nd byte wrong";
         my $buffer = $good ;
-        substr($buffer, 1, 1) = "\x00" ;
+        substr($buffer, 1, 1, "\x00") ;
 
         ok ! IO::Uncompress::Inflate->new( \$buffer, -Transparent => 0)  ;
         like $IO::Uncompress::Inflate::InflateError, '/Header Error: CRC mismatch/',
@@ -258,7 +258,7 @@ EOM
         my $buffer = $good ;
         my $header = mkZlibHdr(3, 6, 0, 3);
 
-        substr($buffer, 0, 2) = $header;
+        substr($buffer, 0, 2, $header);
 
         my $un = IO::Uncompress::Inflate->new( \$buffer, -Transparent => 0)  ;
         ok ! IO::Uncompress::Inflate->new( \$buffer, -Transparent => 0)  ;
@@ -288,16 +288,16 @@ EOM
             title "Trailer Corruption - Trailer truncated to $got bytes, strict $s" ;
             my $buffer = $good ;
             my $expected_trailing = substr($good, -4, 4) ;
-            substr($expected_trailing, $trim) = '';
+            substr($expected_trailing, $trim, undef, '');
 
-            substr($buffer, $trim) = '';
+            substr($buffer, $trim, undef, '');
             writeFile($name, $buffer) ;
 
             ok my $gunz = IO::Uncompress::Inflate->new( $name, Strict => $s);
             my $uncomp ;
             if ($s)
             {
-                ok $gunz->read($uncomp) < 0 ;
+                ok $gunz->read($uncomp) +< 0 ;
                 like $IO::Uncompress::Inflate::InflateError,"/Trailer Error: trailer truncated. Expected 4 bytes, got $got/",
                     "Trailer Error";
             }
@@ -316,12 +316,12 @@ EOM
         title "Trailer Corruption - CRC Wrong, strict" ;
         my $buffer = $good ;
         my $crc = unpack("N", substr($buffer, -4, 4));
-        substr($buffer, -4, 4) = pack('N', $crc+1);
+        substr($buffer, -4, 4, pack('N', $crc+1));
         writeFile($name, $buffer) ;
 
         ok my $gunz = IO::Uncompress::Inflate->new( $name, Strict => 1);
         my $uncomp ;
-        ok $gunz->read($uncomp) < 0 ;
+        ok $gunz->read($uncomp) +< 0 ;
         like $IO::Uncompress::Inflate::InflateError,'/Trailer Error: CRC mismatch/',
             "Trailer Error: CRC mismatch";
         ok $gunz->eof() ;
@@ -334,12 +334,12 @@ EOM
         title "Trailer Corruption - CRC Wrong, no strict" ;
         my $buffer = $good ;
         my $crc = unpack("N", substr($buffer, -4, 4));
-        substr($buffer, -4, 4) = pack('N', $crc+1);
+        substr($buffer, -4, 4, pack('N', $crc+1));
         writeFile($name, $buffer) ;
 
         ok my $gunz = IO::Uncompress::Inflate->new( $name, Strict => 0);
         my $uncomp ;
-        ok $gunz->read($uncomp) >= 0  ;
+        ok $gunz->read($uncomp) +>= 0  ;
         ok $gunz->eof() ;
         ok ! $gunz->trailingData() ;
         ok $uncomp eq $string;

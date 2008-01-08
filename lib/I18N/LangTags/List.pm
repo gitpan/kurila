@@ -13,7 +13,7 @@ $VERSION = '0.35';
   my $count = 0;
   my($disrec,$tag,$name);
   my $last_name = '';
-  while(<I18N::LangTags::List::DATA>) {
+  while( ~< *I18N::LangTags::List::DATA) {
     if($seeking) {
       $seeking = 0 if m/=for woohah/;
     } elsif( ($disrec, $tag, $name) =
@@ -50,7 +50,7 @@ sub name {
   
   my $subform = '';
   my $name = '';
-  print "Input: {$tag}\n" if $Debug;
+  print "Input: \{$tag\}\n" if $Debug;
   while(length $tag) {
     last if $name = $Name{$tag};
     last if $name = $Name{$alt};
@@ -62,11 +62,11 @@ sub name {
       $alt =~ s/(-[a-z0-9]+)$//s && $Debug && print " alt -> $alt\n";
     } else {
       # we're trying to pull a subform off a primary tag. TILT!
-      print "Aborting on: {$name}{$subform}\n" if $Debug;
+      print "Aborting on: \{$name\}\{$subform\}\n" if $Debug;
       last;
     }
   }
-  print "Output: {$name}{$subform}\n" if $Debug;
+  print "Output: \{$name\}\{$subform\}\n" if $Debug;
   
   return unless $name;   # Failure
   return $name unless $subform;   # Exact match
@@ -83,7 +83,7 @@ sub is_decent {
 
   return 0 unless
     $tag =~ 
-    /^(?:  # First subtag
+    m/^(?:  # First subtag
          [xi] | [a-z]{2,3}
       )
       (?:  # Subtags thereafter

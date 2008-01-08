@@ -35,10 +35,6 @@ Perl stores its global variables.
 #include "perl.h"
 #include "overload.c"
 
-static const char S_autoload[] = "AUTOLOAD";
-static const STRLEN S_autolen = sizeof(S_autoload)-1;
-
-
 #ifdef PERL_DONT_CREATE_GVSV
 GV *
 Perl_gv_SVadd(pTHX_ GV *gv)
@@ -213,7 +209,8 @@ Perl_gv_init(pTHX_ GV *gv, HV *stash, const char *name, STRLEN len, int multi)
     dVAR;
     const U32 old_type = SvTYPE(gv);
     const bool doproto = old_type > SVt_NULL;
-    const char * const proto = (doproto && SvPOK(gv)) ? SvPVX_const(gv) : NULL;
+    char * const proto = (doproto && SvPOK(gv)) ? SvPVX(gv) : NULL;
+    const STRLEN protolen = proto ? SvCUR(gv) : 0;
     SV *const has_constant = doproto && SvROK(gv) ? SvRV(gv) : NULL;
     const U32 exported_constant = has_constant ? SvPCS_IMPORTED(gv) : 0;
 
@@ -279,8 +276,8 @@ Perl_gv_init(pTHX_ GV *gv, HV *stash, const char *name, STRLEN len, int multi)
 	CvFILE_set_from_cop(GvCV(gv), PL_curcop);
 	CvSTASH(GvCV(gv)) = PL_curstash;
 	if (proto) {
-	    sv_setpv((SV*)GvCV(gv), proto);
-	    Safefree(proto);
+	    sv_usepvn_flags((SV*)GvCV(gv), proto, protolen,
+			    SV_HAS_TRAILING_NUL);
 	}
     }
 }
@@ -472,66 +469,12 @@ Perl_gv_fetchmeth(pTHX_ HV *stash, const char *name, STRLEN len, I32 level)
 }
 
 /*
-=for apidoc gv_fetchmeth_autoload
-
-Same as gv_fetchmeth(), but looks for autoloaded subroutines too.
-Returns a glob for the subroutine.
-
-For an autoloaded subroutine without a GV, will create a GV even
-if C<level < 0>.  For an autoloaded subroutine without a stub, GvCV()
-of the result may be zero.
-
-=cut
-*/
-
-GV *
-Perl_gv_fetchmeth_autoload(pTHX_ HV *stash, const char *name, STRLEN len, I32 level)
-{
-    GV *gv = gv_fetchmeth(stash, name, len, level);
-
-    if (!gv) {
-	CV *cv;
-	GV **gvp;
-
-	if (!stash)
-	    return NULL;	/* UNIVERSAL::AUTOLOAD could cause trouble */
-	if (len == S_autolen && strnEQ(name, S_autoload, S_autolen))
-	    return NULL;
-	if (!(gv = gv_fetchmeth(stash, S_autoload, S_autolen, FALSE)))
-	    return NULL;
-	cv = GvCV(gv);
-	if (!(CvROOT(cv) || CvXSUB(cv)))
-	    return NULL;
-	/* Have an autoload */
-	if (level < 0)	/* Cannot do without a stub */
-	    gv_fetchmeth(stash, name, len, 0);
-	gvp = (GV**)hv_fetch(stash, name, len, (level >= 0));
-	if (!gvp)
-	    return NULL;
-	return *gvp;
-    }
-    return gv;
-}
-
-/*
-=for apidoc gv_fetchmethod_autoload
+=for apidoc gv_fetchmethod
 
 Returns the glob which contains the subroutine to call to invoke the method
-on the C<stash>.  In fact in the presence of autoloading this may be the
-glob for "AUTOLOAD".  In this case the corresponding variable $AUTOLOAD is
-already setup.
+on the C<stash>.
 
-The third parameter of C<gv_fetchmethod_autoload> determines whether
-AUTOLOAD lookup is performed if the given method is not present: non-zero
-means yes, look for AUTOLOAD; zero means no, don't look for AUTOLOAD.
-Calling C<gv_fetchmethod> is equivalent to calling C<gv_fetchmethod_autoload>
-with a non-zero C<autoload> parameter.
-
-These functions grant C<"SUPER"> token as a prefix of the method name. Note
-that if you want to keep the returned glob for a long time, you need to
-check for it being "AUTOLOAD", since at the later time the call may load a
-different subroutine due to $AUTOLOAD changing its value. Use the glob
-created via a side effect to do this.
+These functions grant C<"SUPER"> token as a prefix of the method name.
 
 These functions have the same side-effects and as C<gv_fetchmeth> with
 C<level==0>.  C<name> should be writable if contains C<':'> or C<'
@@ -573,7 +516,7 @@ S_gv_get_super_pkg(pTHX_ const char* name, I32 namelen)
 }
 
 GV *
-Perl_gv_fetchmethod_autoload(pTHX_ HV *stash, const char *name, I32 autoload)
+Perl_gv_fetchmethod(pTHX_ HV *stash, const char *name)
 {
     dVAR;
     register const char *nend;
@@ -622,109 +565,10 @@ Perl_gv_fetchmethod_autoload(pTHX_ HV *stash, const char *name, I32 autoload)
     if (!gv) {
 	if (strEQ(name,"import") || strEQ(name,"unimport"))
 	    gv = (GV*)&PL_sv_yes;
-	else if (autoload)
-	    gv = gv_autoload4(ostash, name, nend - name, TRUE);
-    }
-    else if (autoload) {
-	CV* const cv = GvCV(gv);
-	if (!CvROOT(cv) && !CvXSUB(cv)) {
-	    GV* stubgv;
-	    GV* autogv;
-
-	    if (CvANON(cv))
-		stubgv = gv;
-	    else {
-		stubgv = CvGV(cv);
-		if (GvCV(stubgv) != cv)		/* orphaned import */
-		    stubgv = gv;
-	    }
-	    autogv = gv_autoload4(GvSTASH(stubgv),
-				  GvNAME(stubgv), GvNAMELEN(stubgv), TRUE);
-	    if (autogv)
-		gv = autogv;
-	}
     }
 
     return gv;
 }
-
-GV*
-Perl_gv_autoload4(pTHX_ HV *stash, const char *name, STRLEN len, I32 method)
-{
-    dVAR;
-    GV* gv;
-    CV* cv;
-    HV* varstash;
-    GV* vargv;
-    SV* varsv;
-    const char *packname = "";
-    STRLEN packname_len = 0;
-
-    if (len == S_autolen && strnEQ(name, S_autoload, S_autolen))
-	return NULL;
-    if (stash) {
-	if (SvTYPE(stash) < SVt_PVHV) {
-	    packname = SvPV_const((SV*)stash, packname_len);
-	    stash = NULL;
-	}
-	else {
-	    packname = HvNAME_get(stash);
-	    packname_len = HvNAMELEN_get(stash);
-	}
-    }
-    if (!(gv = gv_fetchmeth(stash, S_autoload, S_autolen, FALSE)))
-	return NULL;
-    cv = GvCV(gv);
-
-    if (!(CvROOT(cv) || CvXSUB(cv)))
-	return NULL;
-
-    /*
-     * Inheriting AUTOLOAD for non-methods works ... for now.
-     */
-    if (!method && (GvCVGEN(gv) || GvSTASH(gv) != stash)
-	&& ckWARN2(WARN_DEPRECATED, WARN_SYNTAX)
-    )
-	Perl_warner(aTHX_ packWARN2(WARN_DEPRECATED, WARN_SYNTAX),
-	  "Use of inherited AUTOLOAD for non-method %s::%.*s() is deprecated",
-	     packname, (int)len, name);
-
-    if (CvISXSUB(cv)) {
-        /* rather than lookup/init $AUTOLOAD here
-         * only to have the XSUB do another lookup for $AUTOLOAD
-         * and split that value on the last '::',
-         * pass along the same data via some unused fields in the CV
-         */
-        CvSTASH(cv) = stash;
-        SvPV_set(cv, (char *)name); /* cast to lose constness warning */
-        SvCUR_set(cv, len);
-        return gv;
-    }
-
-    /*
-     * Given &FOO::AUTOLOAD, set $FOO::AUTOLOAD to desired function name.
-     * The subroutine's original name may not be "AUTOLOAD", so we don't
-     * use that, but for lack of anything better we will use the sub's
-     * original package to look up $AUTOLOAD.
-     */
-    varstash = GvSTASH(CvGV(cv));
-    vargv = *(GV**)hv_fetch(varstash, S_autoload, S_autolen, TRUE);
-    ENTER;
-
-    if (!isGV(vargv)) {
-	gv_init(vargv, varstash, S_autoload, S_autolen, FALSE);
-#ifdef PERL_DONT_CREATE_GVSV
-	GvSV(vargv) = newSV(0);
-#endif
-    }
-    LEAVE;
-    varsv = GvSVn(vargv);
-    sv_setpvn(varsv, packname, packname_len);
-    sv_catpvs(varsv, "::");
-    sv_catpvn(varsv, name, len);
-    return gv;
-}
-
 
 /* require_tie_mod() internal routine for requiring a module
  * that implements the logic of automatical ties like %! and %-
@@ -1316,10 +1160,7 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 	    break;
 	case ']':
 	{
-	    SV * const sv = GvSVn(gv);
-	    /* pretend we are 5.10.0 */
-	    sv_setpv(sv, "5.010000");
-	    SvREADONLY_on(GvSV(gv));
+	    Perl_croak(aTHX "$] is obsolete. Use $^V or $kurila::VERSION");
 	}
 	break;
 	case '\026':	/* $^V */
@@ -1589,48 +1430,17 @@ Perl_Gv_AMupdate(pTHX_ HV *stash)
 	   But if B overloads "bool", we may want to use it for
 	   numifying instead of C's "+0". */
 	if (i >= DESTROY_amg)
-	    gv = Perl_gv_fetchmeth_autoload(aTHX_ stash, cooky, l, 0);
+	    gv = Perl_gv_fetchmeth(aTHX_ stash, cooky, l, 0);
 	else				/* Autoload taken care of below */
 	    gv = Perl_gv_fetchmeth(aTHX_ stash, cooky, l, -1);
         cv = 0;
         if (gv && (cv = GvCV(gv))) {
-	    const char *hvname;
-	    if (GvNAMELEN(CvGV(cv)) == 3 && strEQ(GvNAME(CvGV(cv)), "nil")
-		&& strEQ(hvname = HvNAME_get(GvSTASH(CvGV(cv))), "overload")) {
-		/* This is a hack to support autoloading..., while
-		   knowing *which* methods were declared as overloaded. */
-		/* GvSV contains the name of the method. */
-		GV *ngv = NULL;
-		SV *gvsv = GvSV(gv);
-
-		DEBUG_o( Perl_deb(aTHX_ "Resolving method \"%"SVf256\
-			"\" for overloaded \"%s\" in package \"%.256s\"\n",
-			     (void*)GvSV(gv), cp, hvname) );
-		if (!gvsv || !SvPOK(gvsv)
-		    || !(ngv = gv_fetchmethod_autoload(stash, SvPVX_const(gvsv),
-						       FALSE)))
-		{
-		    /* Can be an import stub (created by "can"). */
-		    const char * const name = (gvsv && SvPOK(gvsv)) ?  SvPVX_const(gvsv) : "???";
-		    if (PL_dirty) 
-			continue; /* ignore error during global destruction */
-		    Perl_croak(aTHX_ "%s method \"%.256s\" overloading \"%s\" "\
-				"in package \"%.256s\"",
-			       (GvCVGEN(gv) ? "Stub found while resolving"
-				: "Can't resolve"),
-			       name, cp, hvname);
-		}
-		cv = GvCV(gv = ngv);
-	    }
 	    DEBUG_o( Perl_deb(aTHX_ "Overloading \"%s\" in package \"%.256s\" via \"%.256s::%.256s\"\n",
 			 cp, HvNAME_get(stash), HvNAME_get(GvSTASH(CvGV(cv))),
 			 GvNAME(CvGV(cv))) );
 	    filled = 1;
 	    if (i < DESTROY_amg)
 		have_ovl = 1;
-	} else if (gv) {		/* Autoloaded... */
-	    cv = (CV*)gv;
-	    filled = 1;
 	}
 	amt.table[i]=(CV*)SvREFCNT_inc_simple(cv);
     }
@@ -1680,16 +1490,6 @@ Perl_gv_handler(pTHX_ HV *stash, I32 id)
 	goto do_update;
     if (AMT_AMAGIC(amtp)) {
 	CV * const ret = amtp->table[id];
-	if (ret && isGV(ret)) {		/* Autoloading stab */
-	    /* Passing it through may have resulted in a warning
-	       "Inherited AUTOLOAD for a non-method deprecated", since
-	       our caller is going through a function call, not a method call.
-	       So return the CV for AUTOLOAD, setting $AUTOLOAD. */
-	    GV * const gv = gv_fetchmethod(stash, PL_AMG_names[id]);
-
-	    if (gv && GvCV(gv))
-		return GvCV(gv);
-	}
 	return ret;
     }
 
@@ -2010,7 +1810,7 @@ Perl_amagic_call(pTHX_ SV *left, SV *right, int method, int flags)
     PUSHs(lr>0? left: right);
     PUSHs( lr > 0 ? &PL_sv_yes : ( assign ? &PL_sv_undef : &PL_sv_no ));
     if (notfound) {
-      PUSHs( sv_2mortal(newSVpv(AMG_id2name(method + assignshift),0)));
+	PUSHs( sv_2mortal(newSVpv(AMG_id2name(method + assignshift), 0)));
     }
     PUSHs((SV*)cv);
     PUTBACK;

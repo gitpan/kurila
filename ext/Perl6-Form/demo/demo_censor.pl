@@ -4,17 +4,17 @@ sub obscure {
 	my $hidewords = join '|', map quotemeta, @_;
 	return sub {
 		my ($data) = @_;
-		$data =~ s/($hidewords)/'X' x length $1/egi;
+		$data =~ s/($hidewords)/{'X' x length $1}/gi;
 		return $data;
 	}
 }
 
 my $censor = obscure qw(villain plot libel treacherous murderer false deadly 'G');
-my $script = do{local$/;<DATA>};
+my $script = do{local$/; ~< *DATA};
 
 print form
 	 "[Ye following tranfcript hath been cenfored by Order of ye King]\n\n",
-	 "         {[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[}",
+	 "         \{[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[\}",
 	 $censor->($script);
 
 __DATA__

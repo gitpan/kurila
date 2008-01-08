@@ -10,7 +10,7 @@ my %subsys = (NATIVE    => 1,
               POSIX     => 7,
               WINDOWSCE => 9);
 
-unless (0 < @ARGV && @ARGV < 3) {
+unless (0 +< @ARGV && @ARGV +< 3) {
     printf "Usage: $0 exefile [%s]\n", join '|', sort keys %subsys;
     exit;
 }
@@ -23,7 +23,7 @@ unless (@ARGV == 1 || defined $subsys{$ARGV[1]}) {
 }
 
 my ($record,$magic,$signature,$offset,$size);
-open EXE, "+< $ARGV[0]" or die "Cannot open $ARGV[0]: $!\n";
+open EXE, "+<", "$ARGV[0]" or die "Cannot open $ARGV[0]: $!\n";
 binmode EXE;
 
 # read IMAGE_DOS_HEADER structure

@@ -1,12 +1,12 @@
 use Perl6::Form 'drill';
 
-@data = map [split /[\t\n]+/], <DATA>;
+@data = map [split m/[\t\n]+/], ~< *DATA;
 ($name, $payment) = drill @data, [], [0..1];
 
 print form
   'Name              Payment (per unit)',
   {under=>"=-"},
-  "{[[[[[[[[[[[}       {]],]]].[[[}",
+  "\{[[[[[[[[[[[\}       \{]],]]].[[[\}",
   $name,               {lfill=>'* ', rfill=>'0'},
 				       $payment;
 

@@ -10,7 +10,7 @@ BEGIN {
         our %Config;
         require Config; Config->import;
         no warnings 'once';
-        if ($Config{'extensions'} !~ /\bData\/Dumper\b/) {
+        if ($Config{'extensions'} !~ m/\bData\/Dumper\b/) {
             print "1..0 # Skip: Data::Dumper was not built\n";
             exit 0;
         }
@@ -26,7 +26,7 @@ no warnings qw(once);
 require_ok 'Data::Dumper';
 
 my $HASH = { alpha => 'beta', gamma => 'vlissides' };
-my $WANT = q({'alpha' => 'beta','gamma' => 'vlissides'});
+my $WANT = q({"alpha" => "beta","gamma" => "vlissides"});
 
 $Data::Dumper::Useperl = 1;
 $Data::Dumper::Indent = 0;

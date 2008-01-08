@@ -158,9 +158,9 @@ sub check_install {
         return;
     }
 
-    my $file     = File::Spec->catfile( split /::/, $args->{module} ) . '.pm';
+    my $file     = File::Spec->catfile( split m/::/, $args->{module} ) . '.pm';
     my $file_inc = File::Spec::Unix->catfile( 
-                        split /::/, $args->{module} 
+                        split m/::/, $args->{module} 
                     ) . '.pm';
 
     ### where we store the return value ###
@@ -236,14 +236,14 @@ sub check_install {
             if( $FIND_VERSION ) {
                 
                 my $in_pod = 0;
-                while (local $_ = <$fh> ) {
+                while (local $_ = ~< $fh ) {
     
                     ### stolen from EU::MM_Unix->parse_version to address
                     ### #24062: "Problem with CPANPLUS 0.076 misidentifying
                     ### versions after installing Text::NSP 1.03" where a 
                     ### VERSION mentioned in the POD was found before
                     ### the real $VERSION declaration.
-                    $in_pod = /^=(?!cut)/ ? 1 : /^=cut/ ? 0 : $in_pod;
+                    $in_pod = m/^=(?!cut)/ ? 1 : m/^=cut/ ? 0 : $in_pod;
                     next if $in_pod;
                     
                     ### try to find a version declaration in this string.
@@ -269,7 +269,7 @@ sub check_install {
 
             ### if we got here, we didn't find the version
             warn loc(q[Could not check version on '%1'], $args->{module} )
-                    if $args->{verbose} and $args->{version} > 0;
+                    if $args->{verbose} and $args->{version} +> 0;
         }
         $href->{uptodate} = 1;
 
@@ -281,7 +281,7 @@ sub check_install {
         ### ie ones containing _ as well. This addresses bug report
         ### #29348: Version compare logic doesn't handle alphas?
         $href->{uptodate} = 
-            qv( $args->{version} ) <= qv( $href->{version} ) ? 1 : 0;
+            qv( $args->{version} ) +<= qv( $href->{version} ) ? 1 : 0;
     }
 
     return $href;
@@ -293,7 +293,7 @@ sub _parse_version {
     my $verbose = shift or 0;
 
     ### skip commented out lines, they won't eval to anything.
-    return if $str =~ /^\s*#/;
+    return if $str =~ m/^\s*#/;
         
     ### the following regexp & eval statement comes from the 
     ### ExtUtils::MakeMaker source (EU::MM_Unix->parse_version) 
@@ -302,7 +302,7 @@ sub _parse_version {
     ### it captures the entire expression, and eval /that/
     ### rather than $_, which is insecure.
 
-    if( $str =~ /(?<!\\)([\$*])(([\w\:\']*)\bVERSION)\b.*\=/ ) {
+    if( $str =~ m/(?<!\\)([\$*])(([\w\:\']*)\bVERSION)\b.*\=/ ) {
         
         print "Evaluating: $str\n" if $verbose;
         
@@ -320,9 +320,9 @@ sub _parse_version {
             no strict;
 
             local $1$2;
-            \$$2=undef; do {
+            \$$2=undef; do \{
                 $str
-            }; \$$2
+            \}; \$$2
         };
         
         print "Evaltext: $eval\n" if $verbose;
@@ -428,7 +428,7 @@ sub can_load {
             ### #29348: Version compare logic doesn't handle alphas?
             if (    !$args->{nocache}
                     && defined $CACHE->{$mod}->{usable}
-                    && (qv($CACHE->{$mod}->{version}||0) >= qv($href->{$mod}))
+                    && (qv($CACHE->{$mod}->{version}||0) +>= qv($href->{$mod}))
             ) {
                 $error = loc( q[Already tried to use '%1', which was unsuccessful], $mod);
                 last BLOCK;
@@ -520,7 +520,7 @@ sub requires {
     my $cmd = qq[$^X $lib -M$who -e"print(join(qq[\\n],keys(%INC)))"];
 
     return  sort
-                grep { !/^$who$/  }
+                grep { !m/^$who$/  }
                 map  { chomp; s|/|::|g; $_ }
                 grep { s|\.pm$||i; }
             `$cmd`;

@@ -136,9 +136,9 @@ that the file will not exist by the time the caller opens the filename.
 # People would like a version on 5.004 so give them what they want :-)
 use strict;
 use Carp;
-use File::Spec 0.8;
+use File::Spec v0.8;
 use File::Path qw/ rmtree /;
-use Fcntl 1.03;
+use Fcntl v1.03;
 use IO::Seekable; # For SEEK_*
 use Errno;
 require VMS::Stdio if $^O eq 'VMS';
@@ -150,12 +150,9 @@ require VMS::Stdio if $^O eq 'VMS';
 # switch the calls to croak from _gettemp() to use die.
 require Carp::Heavy;
 
-# Need the Symbol package if we are running older perl
-require Symbol if $] < 5.006;
-
 ### For the OO interface
 use base qw/ IO::Handle IO::Seekable /;
-use overload '""' => "STRINGIFY", fallback => 1;
+use overload '""' => \&STRINGIFY, fallback => 1;
 
 # use 'our' on v5.6.0
 use vars qw($VERSION @EXPORT_OK %EXPORT_TAGS $DEBUG $KEEP_ALL);
@@ -314,7 +311,7 @@ unless ($^O eq 'MacOS') {
 sub _gettemp {
 
   croak 'Usage: ($fh, $name) = _gettemp($template, OPTIONS);'
-    unless scalar(@_) >= 1;
+    unless scalar(@_) +>= 1;
 
   # the internal error string - expect it to be overridden
   # Need this in case the caller decides not to supply us a value
@@ -466,16 +463,11 @@ sub _gettemp {
 
 
   # Now try MAX_TRIES time to open the file
-  for (my $i = 0; $i < MAX_TRIES; $i++) {
+  for (my $i = 0; $i +< MAX_TRIES; $i++) {
 
     # Try to open the file if requested
     if ($options{"open"}) {
       my $fh;
-
-      # If we are running before perl5.6.0 we can not auto-vivify
-      if ($] < 5.006) {
-	$fh = &Symbol::gensym;
-      }
 
       # Try to make sure this will be marked close-on-exec
       # XXX: Win32 doesn't respect this, nor the proper fcntl,
@@ -568,10 +560,10 @@ sub _gettemp {
 
       $counter++;
 
-    } until ($path ne $original || $counter > $MAX_GUESS);
+    } until ($path ne $original || $counter +> $MAX_GUESS);
 
     # Check for out of control looping
-    if ($counter > $MAX_GUESS) {
+    if ($counter +> $MAX_GUESS) {
       ${$options{ErrStr}} = "Tried to get a new temp name different to the previous value $MAX_GUESS times.\nSomething wrong with template?? ($template)";
       return ();
     }
@@ -624,9 +616,12 @@ sub _replace_XX {
   # Don't want to always use substr when not required though.
 
   if ($ignore) {
-    substr($path, 0, - $ignore) =~ s/X(?=X*\z)/$CHARS[ int( rand( $#CHARS ) ) ]/ge;
+      (my $x = substr($path, 0, - $ignore)) =~ s/X(?=X*\z)/{$CHARS[ int( rand( $#CHARS ) ) ]
+}/g;
+      substr($path, 0, - $ignore, $x);
   } else {
-    $path =~ s/X(?=X*\z)/$CHARS[ int( rand( $#CHARS ) ) ]/ge;
+    $path =~ s/X(?=X*\z)/{$CHARS[ int( rand( $#CHARS ) ) ]
+}/g;
   }
   return $path;
 }
@@ -675,7 +670,7 @@ sub _is_safe {
   # Check to see whether owner is neither superuser (or a system uid) nor me
   # Use the effective uid from the $> variable
   # UID is in [4]
-  if ($info[4] > File::Temp->top_system_uid() && $info[4] != $>) {
+  if ($info[4] +> File::Temp->top_system_uid() && $info[4] != $>) {
 
     Carp::cluck(sprintf "uid=$info[4] topuid=%s euid=$< path='$path'",
 		File::Temp->top_system_uid());
@@ -1916,7 +1911,7 @@ sub cmpstat {
   }
   return unless @fh;
 
-  if ($fh[3] > 1 && $^W) {
+  if ($fh[3] +> 1 && $^W) {
     carp "unlink0: fstat found too many links; SB=@fh" if $^W;
   }
 
@@ -2114,11 +2109,6 @@ simply examine the return value of C<safe_level>.
       if (($level != STANDARD) && ($level != MEDIUM) && ($level != HIGH)) {
 	carp "safe_level: Specified level ($level) not STANDARD, MEDIUM or HIGH - ignoring\n" if $^W;
       } else {
-	# Dont allow this on perl 5.005 or earlier
-	if ($] < 5.006 && $level != STANDARD) {
-	  # Cant do MEDIUM or HIGH checks
-	  croak "Currently requires perl 5.006 or newer to do the safe checks";
-	}
 	# Check that we are allowed to change level
 	# Silently ignore if we can not.
         $LEVEL = $level if _can_do_level($level);
@@ -2157,7 +2147,7 @@ The value is only relevant when C<safe_level> is set to MEDIUM or higher.
     if (@_) {
       my $newuid = shift;
       croak "top_system_uid: UIDs should be numeric"
-        unless $newuid =~ /^\d+$/s;
+        unless $newuid =~ m/^\d+$/s;
       $TopSystemUID = $newuid;
     }
     return $TopSystemUID;

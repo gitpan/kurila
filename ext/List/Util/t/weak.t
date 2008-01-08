@@ -6,7 +6,7 @@ BEGIN {
 	@INC = '../lib';
 	require Config; Config->import;
 	keys %Config; # Silence warning
-	if ($Config{extensions} !~ /\bList\/Util\b/) {
+	if ($Config{extensions} !~ m/\bList\/Util\b/) {
 	    print "1..0 # Skip: List::Util was not built\n";
 	    exit 0;
 	}
@@ -14,7 +14,7 @@ BEGIN {
 }
 
 use Scalar::Util ();
-use Test::More  (grep { /weaken/ } @Scalar::Util::EXPORT_FAIL)
+use Test::More  (grep { m/weaken/ } @Scalar::Util::EXPORT_FAIL)
 			? (skip_all => 'weaken requires XS version')
 			: (tests => 22);
 
@@ -180,9 +180,6 @@ ok(!isweak($x->{Z}));
 #
 
 SKIP: {
-    # Doesn't work for older perls, see bug [perl #24506]
-    skip("Test does not work with perl < 5.8.3", 5) if $] < 5.008003;
-
     # in a MAD build, constants have refcnt 2, not 1
     skip("Test does not work with MAD", 5) if exists $Config{mad};
 

@@ -17,7 +17,7 @@ sub BEGIN {
 	unshift @INC, 't';
     }
     require Config; Config->import;
-    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bStorable\b/) {
+    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ m/\bStorable\b/) {
         print "1..0 # Skip: Storable was not built\n";
         exit 0;
     }
@@ -26,7 +26,7 @@ sub BEGIN {
 use Storable qw(store retrieve);
 
 # problems with 5.00404 when in an BEGIN block, so this is defined here
-if (!eval { require File::Spec; 1 } || $File::Spec::VERSION < 0.8) {
+if (!eval { require File::Spec; 1 } || $File::Spec::VERSION +< 0.8) {
     print "1..0 # Skip: File::Spec 0.8 needed\n";
     exit 0;
     # Mention $File::Spec::VERSION again, as 5.00503's harness seems to have
@@ -49,13 +49,13 @@ $Storable::forgive_me=1;
 
 my $devnull = File::Spec->devnull;
 
-open(SAVEERR, ">&STDERR");
-open(STDERR, ">$devnull") or 
+open(SAVEERR, ">&", \*STDERR);
+open(STDERR, ">", "$devnull") or 
   ( print SAVEERR "Unable to redirect STDERR: $!\n" and exit(1) );
 
 eval {$result = store ($bad , 'store')};
 
-open(STDERR, ">&SAVEERR");
+open(STDERR, ">&", \*SAVEERR);
 
 print ((defined $result)?"ok $test\n":"not ok $test\n"); $test++;
 print (($@ eq '')?"ok $test\n":"not ok $test\n"); $test++;

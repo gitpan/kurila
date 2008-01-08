@@ -1,7 +1,7 @@
 #!./perl -w
 
 BEGIN {
-    unless(grep /blib/, @INC) {
+    unless(grep m/blib/, @INC) {
 	chdir 't' if -d 't';
 	@INC = '../lib';
     }
@@ -10,7 +10,7 @@ BEGIN {
 use strict;
 use bytes;
 require($ENV{PERL_CORE} ? "./test.pl" : "./t/test.pl");
-plan(tests => ($^O =~ /MSWin32/ ? 9 : 6));
+plan(tests => ($^O =~ m/MSWin32/ ? 9 : 6));
 
 my $Class       = 'IO::File';
 my $All_Chars   = join '', "\r\n", map( chr, 1..255 ), "zzz\n\r";
@@ -24,7 +24,7 @@ can_ok( $Class,                 "binmode" );
 ### use standard open to make sure we can compare binmodes
 ### on both.
 {   my $tmp;
-    open $tmp, ">$File" or die "Could not open '$File': $!";
+    open $tmp, ">", "$File" or die "Could not open '$File': $!";
     binmode $tmp;
     print $tmp $All_Chars; 
     close $tmp;
@@ -32,13 +32,13 @@ can_ok( $Class,                 "binmode" );
 
 ### now read in the file, once without binmode, once with.
 ### without binmode should fail at least on win32...
-if( $^O =~ /MSWin32/ ) {
+if( $^O =~ m/MSWin32/ ) {
     my $fh = $Class->new;
 
     isa_ok( $fh,                $Class );
     ok( $fh->open($File),       "   Opened '$File'" );
     
-    my $cont = do { local $/; <$fh> };
+    my $cont = do { local $/; ~< $fh };
     unlike( $cont, qr/$Expect/, "   Content match fails without binmode" );
 }    
 
@@ -49,7 +49,7 @@ if( $^O =~ /MSWin32/ ) {
     ok( $fh->open($File),       "   Opened '$File' $!" );
     ok( $fh->binmode,           "   binmode enabled" );
     
-    my $cont = do { local $/; <$fh> };
+    my $cont = do { local $/; ~< $fh };
     like( $cont, qr/$Expect/,   "   Content match passes with binmode" );
 }
     

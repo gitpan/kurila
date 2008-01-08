@@ -42,7 +42,7 @@ cmp_ok( $?, '==', 0, 'Makefile.PL exited with zero' ) ||
   diag(@mpl_out);
 
 my $makefile = makefile_name();
-ok( grep(/^Writing $makefile for Big::Dummy/, 
+ok( grep(m/^Writing $makefile for Big::Dummy/, 
          @mpl_out) == 1,
                                            'Makefile.PL output looks right');
 
@@ -71,11 +71,11 @@ foreach my $file (@installed_files) {
 
 # nmake outputs its damned logo
 # Send STDERR off to oblivion.
-open(SAVERR, ">&STDERR") or die $!;
-open(STDERR, ">".File::Spec->devnull) or die $!;
+open(SAVERR, ">", "&STDERR") or die $!;
+open(STDERR, ">", "".File::Spec->devnull) or die $!;
 
 my $realclean_out = run("$make realclean");
 is( $?, 0, 'realclean' ) || diag($realclean_out);
 
-open(STDERR, ">&SAVERR") or die $!;
+open(STDERR, ">", "&SAVERR") or die $!;
 close SAVERR;

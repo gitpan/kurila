@@ -8,7 +8,7 @@ BEGIN {
 	        unshift @INC, 't';
         }
 	require Config;
-	if (($Config::Config{'extensions'} !~ /\bB\b/) ){
+	if (($Config::Config{'extensions'} !~ m/\bB\b/) ){
 		print "1..0 # Skip -- Perl configured without B module\n";
 		exit 0;
 	}
@@ -46,11 +46,11 @@ my %ops = map { $_ => qr/$_ $hex$op/ }
 
 # split up the output lines into individual ops (terse is, well, terse!)
 # use an array here so $_ is modifiable
-my @lines = split(/\n+/, $out->read);
+my @lines = split(m/\n+/, $out->read);
 foreach (@lines) {
-	next unless /\S/;
+	next unless m/\S/;
 	s/^\s+//;
-	if (/^([A-Z]+)\s+/) {
+	if (m/^([A-Z]+)\s+/) {
 		my $op = $1;
 		next unless exists $ops{$op};
 		like( $_, $ops{$op}, "$op " );

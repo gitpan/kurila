@@ -5,7 +5,7 @@ use strict ;
 $::VERSION = '2.006' ;
 
 use private::MakeUtil;
-use ExtUtils::MakeMaker 5.16 ;
+use ExtUtils::MakeMaker v5.16 ;
 
 UpDowngrade(getPerlFiles('MANIFEST')) 
     unless $ENV{PERL_CORE};
@@ -34,14 +34,10 @@ WriteMakefile(
 	      )
     ),
        
-    (
-    $] >= 5.005
-        ? (ABSTRACT_FROM => 'lib/Compress/Zlib.pm',
-            AUTHOR       => 'Paul Marquess <pmqs@cpan.org>')
-        : ()
-    ),
+     ABSTRACT_FROM => 'lib/Compress/Zlib.pm',
+     AUTHOR       => 'Paul Marquess <pmqs@cpan.org>',
 
-    INSTALLDIRS => ($] >= 5.009 ? 'perl' : 'site'),
+    INSTALLDIRS => 'perl',
 
     ((ExtUtils::MakeMaker->VERSION() gt '6.30') ?
         ('LICENSE'  => 'perl')         : ()),    

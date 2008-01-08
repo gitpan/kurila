@@ -7,7 +7,7 @@ use FileHandle;
 use Locale::Maketext::Simple Style => 'gettext';
 
 BEGIN {
-    use vars        qw[$VERSION $AUTOLOAD];
+    use vars        qw[$VERSION];
     $VERSION    =   0.01;
 }
 
@@ -19,7 +19,7 @@ sub new {
     ### and/or a default configuration object
     ### and remove them from the argument hash
     my %special =   map { lc, delete $hash{$_} }
-                    grep /^config|default$/i, keys %hash;
+                    grep m/^config|default$/i, keys %hash;
 
     ### allow provided arguments to override the values from the config ###
     my $tmpl = {
@@ -74,13 +74,13 @@ sub _read_config_file {
                         return {}
                     );
 
-    while(<$FH>) {
-        next if     /\s*#/;
-        next unless /\S/;
+    while( ~< $FH) {
+        next if     m/\s*#/;
+        next unless m/\S/;
 
         chomp; s/^\s*//; s/\s*$//;
 
-        my ($param,$val) = split /\s*=\s*/;
+        my ($param,$val) = split m/\s*=\s*/;
 
         if( (lc $param) eq 'include' ) {
             load $val;
@@ -95,14 +95,8 @@ sub _read_config_file {
     return $conf;
 }
 
-sub AUTOLOAD {
-    $AUTOLOAD =~ s/.+:://;
-
-    my $self = shift;
-
-    return $self->{ lc $AUTOLOAD } if exists $self->{ lc $AUTOLOAD };
-
-    die loc(q[No such accessor '%1' for class '%2'], $AUTOLOAD, ref $self);
+for my $name (qw|private verbose tag level remove chrono|) {
+    Symbol::fetch_glob($name)->* = sub { return $_[0]->{$name} };
 }
 
 sub DESTROY { 1 }

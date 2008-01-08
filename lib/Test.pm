@@ -160,7 +160,7 @@ sub plan {
     my $max=0;
     while (@_) {
 	my ($k,$v) = splice(@_, 0, 2);
-	if ($k =~ /^test(s)?$/) { $max = $v; }
+	if ($k =~ m/^test(s)?$/) { $max = $v; }
 	elsif ($k eq 'todo' or
 	       $k eq 'failok') { for (@$v) { $todo{$_}=1; }; }
 	elsif ($k eq 'onfail') {
@@ -169,14 +169,14 @@ sub plan {
 	}
 	else { carp "Test::plan(): skipping unrecognized directive '$k'" }
     }
-    my @todo = sort { $a <=> $b } keys %todo;
+    my @todo = sort { $a <+> $b } keys %todo;
     if (@todo) {
 	print $TESTOUT "1..$max todo ".join(' ', @todo).";\n";
     } else {
 	print $TESTOUT "1..$max\n";
     }
     ++$planned;
-    print $TESTOUT "# Running under perl version $] for $^O",
+    print $TESTOUT "# Running under perl version $^V for $^O",
       (chr(65) eq 'A') ? "\n" : " in a non-ASCII world\n";
 
     print $TESTOUT "# Win32::BuildNumber ", &Win32::BuildNumber(), "\n"
@@ -199,8 +199,8 @@ sub _read_program {
   my($file) = shift;
   return unless defined $file and length $file
     and -e $file and -f _ and -r _;
-  open(SOURCEFILE, "<$file") || return;
-  $Program_Lines{$file} = [<SOURCEFILE>];
+  open(SOURCEFILE, "<", "$file") || return;
+  $Program_Lines{$file} = [ ~< *SOURCEFILE];
   close(SOURCEFILE);
 
   foreach my $x (@{$Program_Lines{$file}})
@@ -239,9 +239,9 @@ sub _quote {
     $str =~ s/\n/\\n/g;
     $str =~ s/\r/\\r/g;
     $str =~ s/\t/\\t/g;
-    $str =~ s/([\0-\037])(?!\d)/sprintf('\\%o',ord($1))/eg;
-    $str =~ s/([\0-\037\177-\377])/sprintf('\\x%02X',ord($1))/eg;
-    $str =~ s/([^\0-\176])/sprintf('\\x{%X}',ord($1))/eg;
+    $str =~ s/([\0-\037])(?!\d)/{sprintf('\\%o',ord($1))}/g;
+    $str =~ s/([\0-\037\177-\377])/{sprintf('\\x%02X',ord($1))}/g;
+    $str =~ s/([^\0-\176])/{sprintf('\\x{%X}',ord($1))}/g;
     #if( $_[1] ) {
     #  substr( $str , 218-3 ) = "..."
     #   if length($str) >= 218 and !$ENV{PERL_TEST_NO_TRUNC};
@@ -373,7 +373,7 @@ sub ok ($;$$) {
     my ($pkg,$file,$line) = caller($TestLevel);
     my $repetition = ++$history{"$file:$line"};
     my $context = ("$file at line $line".
-		   ($repetition > 1 ? " fail \#$repetition" : ''));
+		   ($repetition +> 1 ? " fail \#$repetition" : ''));
 
     # Are we comparing two values?
     my $compare = 0;
@@ -391,11 +391,11 @@ sub ok ($;$$) {
 	} elsif (!defined $result) {
 	    $ok = 0;
 	} elsif (ref($expected) eq 'Regexp') {
-	    $ok = $result =~ /$expected/;
+	    $ok = $result =~ m/$expected/;
             $regex = $expected;
 	} elsif (($regex) = ($expected =~ m,^ / (.+) / $,sx) or
 	    (undef, $regex) = ($expected =~ m,^ m([^\w\s]) (.+) \1 $,sx)) {
-	    $ok = $result =~ /$regex/;
+	    $ok = $result =~ m/$regex/;
 	} else {
 	    $ok = $result eq $expected;
 	}
@@ -457,7 +457,7 @@ sub _complain {
            $diag ? " ($diag)" : (), "\n";
 
         _diff_complain( $result, $expected, $detail, $prefix )
-          if defined($expected) and 2 < ($expected =~ tr/\n//);
+          if defined($expected) and 2 +< ($expected =~ tr/\n//);
     }
 
     if(defined $Program_Lines{ $$detail{file} }[ $$detail{line} ]) {
@@ -512,7 +512,7 @@ sub _diff_complain_external {
         print $TESTERR "#\n# $prefix $diff_cmd\n";
         if (open(DIFF, "$diff_cmd |")) {
             local $_;
-            while (<DIFF>) {
+            while ( ~< *DIFF) {
                 print $TESTERR "# $prefix $_";
             }
             close(DIFF);
@@ -533,8 +533,8 @@ sub _diff_complain_external {
 sub _diff_complain_algdiff {
     my($result, $expected, $detail, $prefix) = @_;
 
-    my @got = split(/^/, $result);
-    my @exp = split(/^/, $expected);
+    my @got = split(m/^/, $result);
+    my @exp = split(m/^/, $expected);
 
     my $diff_kind;
     my @diff_lines;
@@ -553,7 +553,7 @@ sub _diff_complain_algdiff {
                 print $TESTERR "# $prefix  + " . _quote($got[$i->[0]]) . "\n";
             }
         } elsif ($diff_kind eq "EXP") {
-            if ($count_lines > 1) {
+            if ($count_lines +> 1) {
                 my $last_line = $diff_lines[-1][0] + 1;
                 print $TESTERR "Lines $first_line-$last_line are";
             }
@@ -565,7 +565,7 @@ sub _diff_complain_algdiff {
                 print $TESTERR "# $prefix  - " . _quote($exp[$i->[1]]) . "\n";
             }
         } elsif ($diff_kind eq "CH") {
-            if ($count_lines > 1) {
+            if ($count_lines +> 1) {
                 my $last_line = $diff_lines[-1][0] + 1;
                 print $TESTERR "Lines $first_line-$last_line are";
             }

@@ -59,7 +59,7 @@ skip_all("Win32")    if $Is_Win32;
 sub make_tmp_file {
     my ($fname, $fcontents) = @_;
     local *FHTMP;
-    open   FHTMP, ">$fname"  or die "open  '$fname': $!";
+    open   FHTMP, ">", "$fname"  or die "open  '$fname': $!";
     print  FHTMP $fcontents  or die "print '$fname': $!";
     close  FHTMP             or die "close '$fname': $!";
 }
@@ -80,8 +80,8 @@ make_tmp_file($tmpfile2, $tmpfile2_contents);
 my $Child_prog = <<'CHILD_PROG';
 my $fd = shift;
 print qq{childfd=$fd\n};
-open INHERIT, qq{<&=$fd} or die qq{open $fd: $!};
-my $line = <INHERIT>;
+open INHERIT, qq{<&=}, qq{$fd} or die qq{open $fd: $!};
+my $line = ~< *INHERIT;
 close INHERIT or die qq{close $fd: $!};
 print $line
 CHILD_PROG
@@ -94,11 +94,11 @@ sub test_not_inherited {
     ok( -f $tmpfile2, "tmpfile '$tmpfile2' exists" );
     my $cmd = qq{$Perl -e $quote$Child_prog$quote $expected_fd};
     # Expect 'Bad file descriptor' or similar to be written to STDERR.
-    local *SAVERR; open SAVERR, ">&STDERR";  # save original STDERR
-    open STDERR, ">$tmperr" or die "open '$tmperr': $!";
+    local *SAVERR; open SAVERR, ">&", \*STDERR;  # save original STDERR
+    open STDERR, ">", "$tmperr" or die "open '$tmperr': $!";
     my $out = `$cmd`;
     my $rc  = $? >> 8;
-    open STDERR, ">&SAVERR" or die "error: restore STDERR: $!";
+    open STDERR, ">&", \*SAVERR or die "error: restore STDERR: $!";
     close SAVERR or die "error: close SAVERR: $!";
     # XXX: it seems one cannot rely on a non-zero return code,
     # at least not on Tru64.
@@ -117,7 +117,7 @@ sub test_inherited {
     my $rc  = $? >> 8;
     cmp_ok( $rc, '==', 0,
         "child return code=$rc (zero means inherited fd=$expected_fd ok)" );
-    my @lines = split(/^/, $out);
+    my @lines = split(m/^/, $out);
     cmp_ok( $out =~ tr/\n//, '==', 2, 'child stdout: has 2 newlines' );
     cmp_ok( scalar(@lines),  '==', 2, 'child stdout: split into 2 lines' );
     is( $lines[0], "childfd=$expected_fd\n", 'child stdout: fd' );
@@ -127,40 +127,40 @@ sub test_inherited {
 $^F == 2 or print STDERR "# warning: \$^F is $^F (not 2)\n";
 
 # Should not be able to inherit > $^F in the default case.
-open FHPARENT2, "<$tmpfile2" or die "open '$tmpfile2': $!";
+open FHPARENT2, "<", "$tmpfile2" or die "open '$tmpfile2': $!";
 my $parentfd2 = fileno FHPARENT2;
 defined $parentfd2 or die "fileno: $!";
-cmp_ok( $parentfd2, '>', $^F, "parent open fd=$parentfd2 (\$^F=$^F)" );
+cmp_ok( $parentfd2, '+>', $^F, "parent open fd=$parentfd2 (\$^F=$^F)" );
 test_not_inherited($parentfd2);
 close FHPARENT2 or die "close '$tmpfile2': $!";
 
 # Should be able to inherit $^F after setting to $parentfd2
 # Need to set $^F before open because close-on-exec set at time of open.
 $^F = $parentfd2;
-open FHPARENT1, "<$tmpfile1" or die "open '$tmpfile1': $!";
+open FHPARENT1, "<", "$tmpfile1" or die "open '$tmpfile1': $!";
 my $parentfd1 = fileno FHPARENT1;
 defined $parentfd1 or die "fileno: $!";
-cmp_ok( $parentfd1, '<=', $^F, "parent open fd=$parentfd1 (\$^F=$^F)" );
+cmp_ok( $parentfd1, '+<=', $^F, "parent open fd=$parentfd1 (\$^F=$^F)" );
 test_inherited($parentfd1);
 close FHPARENT1 or die "close '$tmpfile1': $!";
 
 # ... and test that you cannot inherit fd = $^F+n.
-open FHPARENT1, "<$tmpfile1" or die "open '$tmpfile1': $!";
-open FHPARENT2, "<$tmpfile2" or die "open '$tmpfile2': $!";
+open FHPARENT1, "<", "$tmpfile1" or die "open '$tmpfile1': $!";
+open FHPARENT2, "<", "$tmpfile2" or die "open '$tmpfile2': $!";
 $parentfd2 = fileno FHPARENT2;
 defined $parentfd2 or die "fileno: $!";
-cmp_ok( $parentfd2, '>', $^F, "parent open fd=$parentfd2 (\$^F=$^F)" );
+cmp_ok( $parentfd2, '+>', $^F, "parent open fd=$parentfd2 (\$^F=$^F)" );
 test_not_inherited($parentfd2);
 close FHPARENT2 or die "close '$tmpfile2': $!";
 close FHPARENT1 or die "close '$tmpfile1': $!";
 
 # ... and now you can inherit after incrementing.
 $^F = $parentfd2;
-open FHPARENT2, "<$tmpfile2" or die "open '$tmpfile2': $!";
-open FHPARENT1, "<$tmpfile1" or die "open '$tmpfile1': $!";
+open FHPARENT2, "<", "$tmpfile2" or die "open '$tmpfile2': $!";
+open FHPARENT1, "<", "$tmpfile1" or die "open '$tmpfile1': $!";
 $parentfd1 = fileno FHPARENT1;
 defined $parentfd1 or die "fileno: $!";
-cmp_ok( $parentfd1, '<=', $^F, "parent open fd=$parentfd1 (\$^F=$^F)" );
+cmp_ok( $parentfd1, '+<=', $^F, "parent open fd=$parentfd1 (\$^F=$^F)" );
 test_inherited($parentfd1);
 close FHPARENT1 or die "close '$tmpfile1': $!";
 close FHPARENT2 or die "close '$tmpfile2': $!";

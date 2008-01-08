@@ -40,8 +40,8 @@ sub import {
     # Quiet pseudo-hash deprecation warning for uses of fields::new.
     bless \%{*{Symbol::fetch_glob("$package\::FIELDS")}}, 'pseudohash';
 
-    if ($next > $fattr->[0]
-        and ($fields->{$_[0]} || 0) >= $fattr->[0])
+    if ($next +> $fattr->[0]
+        and ($fields->{$_[0]} || 0) +>= $fattr->[0])
     {
         # There are already fields not belonging to base classes.
         # Looks like a possible module reload...
@@ -54,21 +54,17 @@ sub import {
         # have not changed.
         if ($fno and $fno != $next) {
             require Carp;
-            if ($fno < $fattr->[0]) {
-              if ($] < 5.006001) {
-                warn("Hides field '$f' in base class") if $^W;
-              } else {
+            if ($fno +< $fattr->[0]) {
                 warnings::warnif("Hides field '$f' in base class") ;
-              }
             } else {
                 Carp::croak("Field name '$f' already in use");
             }
         }
         $fields->{$f} = $next;
-        $fattr->[$next] = ($f =~ /^_/) ? PRIVATE : PUBLIC;
+        $fattr->[$next] = ($f =~ m/^_/) ? PRIVATE : PUBLIC;
         $next += 1;
     }
-    if (@$fattr > $next) {
+    if (@$fattr +> $next) {
         # Well, we gave them the benefit of the doubt by guessing the
         # module was reloaded, but they appear to be declaring fields
         # in more than one place.  We can't be sure (without some extra
@@ -93,7 +89,7 @@ sub _dump  # sometimes useful for debugging
         }
         print "\n";
         my $fields = \%{*{Symbol::fetch_glob("$pkg\::FIELDS")}};
-        for my $f (sort {$fields->{$a} <=> $fields->{$b}} keys %$fields) {
+        for my $f (sort {$fields->{$a} <+> $fields->{$b}} keys %$fields) {
             my $no = $fields->{$f};
             print "   $no: $f";
             my $fattr = $attr{$pkg}[$no];
@@ -109,14 +105,7 @@ sub _dump  # sometimes useful for debugging
     }
 }
 
-if ($] < 5.009) {
-  *new = sub {
-    my $class = shift;
-    $class = ref $class if ref $class;
-    return bless [\%{*{Symbol::fetch_glob($class . "::FIELDS")}}], $class;
-  }
-} else {
-  *new = sub {
+sub new {
     my $class = shift;
     $class = ref $class if ref $class;
     require Hash::Util;
@@ -125,7 +114,6 @@ if ($] < 5.009) {
     # The lock_keys() prototype won't work since we require Hash::Util :(
     &Hash::Util::lock_keys(\%$self, _accessible_keys($class));
     return $self;
-  }
 }
 
 sub _accessible_keys {
@@ -137,38 +125,7 @@ sub _accessible_keys {
 }
 
 sub phash {
-    die "Pseudo-hashes have been removed from Perl" if $] >= 5.009;
-    my $h;
-    my $v;
-    if (@_) {
-       if (ref $_[0] eq 'ARRAY') {
-           my $a = shift;
-           @$h{@$a} = 1 .. @$a;
-           if (@_) {
-               $v = shift;
-               unless (! @_ and ref $v eq 'ARRAY') {
-                   require Carp;
-                   Carp::croak ("Expected at most two array refs\n");
-               }
-           }
-       }
-       else {
-           if (@_ % 2) {
-               require Carp;
-               Carp::croak ("Odd number of elements initializing pseudo-hash\n");
-           }
-           my $i = 0;
-           @$h{grep ++$i % 2, @_} = 1 .. @_ / 2;
-           $i = 0;
-           $v = [grep $i++ % 2, @_];
-       }
-    }
-    else {
-       $h = {};
-       $v = [];
-    }
-    [ $h, @$v ];
-
+    die "Pseudo-hashes have been removed from Perl";
 }
 
 1;

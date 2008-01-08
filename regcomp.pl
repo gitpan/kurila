@@ -3,41 +3,42 @@ BEGIN {
     require 'regen_lib.pl';
 }
 #use Fatal qw(open close rename chmod unlink);
+use kurila;
 use strict;
 use warnings;
 
-open DESC, 'regcomp.sym';
+open DESC, "<", 'regcomp.sym';
 
 my $ind = 0;
 my (@name,@rest,@type,@code,@args,@longj);
 my ($desc,$lastregop);
-while (<DESC>) {
+while ( ~< *DESC) {
     s/#.*$//;
-    next if /^\s*$/;
+    next if m/^\s*$/;
     s/\s*\z//;
-    if (/^-+\s*$/) {
+    if (m/^-+\s*$/) {
         $lastregop= $ind;
         next;
     }
     unless ($lastregop) {
         $ind++;
-        ($name[$ind], $desc, $rest[$ind]) = split /\t+/, $_, 3;  
+        ($name[$ind], $desc, $rest[$ind]) = split m/\t+/, $_, 3;  
         ($type[$ind], $code[$ind], $args[$ind], $longj[$ind]) 
-          = split /[,\s]\s*/, $desc, 4;
+          = split m/[,\s]\s*/, $desc, 4;
     } else {
-        my ($type,@lists)=split /\s*\t+\s*/, $_;
+        my ($type,@lists)=split m/\s*\t+\s*/, $_;
         die "No list? $type" if !@lists;
         foreach my $list (@lists) {
-            my ($names,$special)=split /:/, $list , 2;
+            my ($names,$special)=split m/:/, $list , 2;
             $special ||= "";
-            foreach my $name (split /,/,$names) {
+            foreach my $name (split m/,/,$names) {
                 my $real= $name eq 'resume' 
                         ? "resume_$type" 
                         : "${type}_$name";
                 my @suffix;
                 if (!$special) {
                    @suffix=("");
-                } elsif ($special=~/\d/) {
+                } elsif ($special=~m/\d/) {
                     @suffix=(1..$special);
                 } elsif ($special eq 'FAIL') {
                     @suffix=("","_fail");
@@ -62,13 +63,13 @@ $lastregop ||= $ind;
 my $tot = $ind;
 close DESC;
 die "Too many regexp/state opcodes! Maximum is 256, but there are $lastregop in file!"
-    if $lastregop>256;
+    if $lastregop+>256;
 
 my $tmp_h = 'tmp_reg.h';
 
 unlink $tmp_h if -f $tmp_h;
 
-open OUT, ">$tmp_h";
+open OUT, ">", "$tmp_h";
 #*OUT=\*STDOUT;
 binmode OUT;
 
@@ -90,13 +91,13 @@ EOP
 ;
 
 
-for ($ind=1; $ind <= $lastregop ; $ind++) {
+for ($ind=1; $ind +<= $lastregop ; $ind++) {
   my $oind = $ind - 1;
   printf OUT "#define\t%*s\t%d\t/* %#04x %s */\n",
     -$width, $name[$ind], $ind-1, $ind-1, $rest[$ind];
 }
 print OUT "\t/* ------------ States ------------- */\n";
-for ( ; $ind <= $tot ; $ind++) {
+for ( ; $ind +<= $tot ; $ind++) {
   printf OUT "#define\t%*s\t(REGNODE_MAX + %d)\t/* %s */\n",
     -$width, $name[$ind], $ind - $lastregop, $rest[$ind];
 }
@@ -108,11 +109,11 @@ print OUT <<EOP;
 #ifndef DOINIT
 EXTCONST U8 PL_regkind[];
 #else
-EXTCONST U8 PL_regkind[] = {
+EXTCONST U8 PL_regkind[] = \{
 EOP
 
 $ind = 0;
-while (++$ind <= $tot) {
+while (++$ind +<= $tot) {
   printf OUT "\t%*s\t/* %*s */\n",
              -1-$twidth, "$type[$ind],", -$width, $name[$ind];
   print OUT "\t/* ------------ States ------------- */\n"
@@ -120,17 +121,17 @@ while (++$ind <= $tot) {
 }
 
 print OUT <<EOP;
-};
+\};
 #endif
 
 /* regarglen[] - How large is the argument part of the node (in regnodes) */
 
 #ifdef REG_COMP_C
-static const U8 regarglen[] = {
+static const U8 regarglen[] = \{
 EOP
 
 $ind = 0;
-while (++$ind <= $lastregop) {
+while (++$ind +<= $lastregop) {
   my $size = 0;
   $size = "EXTRA_SIZE(struct regnode_$args[$ind])" if $args[$ind];
   
@@ -139,15 +140,15 @@ while (++$ind <= $lastregop) {
 }
 
 print OUT <<EOP;
-};
+\};
 
 /* reg_off_by_arg[] - Which argument holds the offset to the next node */
 
-static const char reg_off_by_arg[] = {
+static const char reg_off_by_arg[] = \{
 EOP
 
 $ind = 0;
-while (++$ind <= $lastregop) {
+while (++$ind +<= $lastregop) {
   my $size = $longj[$ind] || 0;
 
   printf OUT "\t%d,\t/* %*s */\n",
@@ -155,7 +156,7 @@ while (++$ind <= $lastregop) {
 }
 
 print OUT <<EOP;
-};
+\};
 
 #endif /* REG_COMP_C */
 
@@ -164,13 +165,13 @@ print OUT <<EOP;
 #ifndef DOINIT
 EXTCONST char * PL_reg_name[];
 #else
-EXTCONST char * const PL_reg_name[] = {
+EXTCONST char * const PL_reg_name[] = \{
 EOP
 
 $ind = 0;
 my $ofs = 1;
 my $sym = "";
-while (++$ind <= $tot) {
+while (++$ind +<= $tot) {
   my $size = $longj[$ind] || 0;
 
   printf OUT "\t%*s\t/* $sym%#04x */\n",
@@ -184,7 +185,7 @@ while (++$ind <= $tot) {
 }
 
 print OUT <<EOP;
-};
+\};
 #endif /* DOINIT */
 
 /* PL_reg_extflags_name[] - Opcode/state names in string form, for debugging */
@@ -192,16 +193,16 @@ print OUT <<EOP;
 #ifndef DOINIT
 EXTCONST char * PL_reg_extflags_name[];
 #else
-EXTCONST char * const PL_reg_extflags_name[] = {
+EXTCONST char * const PL_reg_extflags_name[] = \{
 EOP
 
 open my $fh,"<","regexp.h" or die "Can't read regexp.h: $!";
 my %rxfv;
 my $val;
-while (<$fh>) {
-    if (/#define\s+(RXf_\w+)\s+(0x[A-F\d]+)/i) {
+while ( ~< $fh) {
+    if (m/#define\s+(RXf_\w+)\s+(0x[A-F\d]+)/i) {
         $rxfv{$1}= eval $2;
-        $val|=$rxfv{$1};
+        $val^|^=$rxfv{$1};
     }
 }    
 my %vrxf=reverse %rxfv;
@@ -214,7 +215,7 @@ for (0..31) {
 }  
  
 print OUT <<EOP;
-};
+\};
 #endif /* DOINIT */
 
 /* ex: set ro: */

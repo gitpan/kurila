@@ -7,7 +7,7 @@ BEGIN {
     require Config; Config->import;
     if (!$Config{'d_fork'}
        # open2/3 supported on win32 (but not Borland due to CRT bugs)
-       && (($^O ne 'MSWin32' && $^O ne 'NetWare') || $Config{'cc'} =~ /^bcc/i))
+       && (($^O ne 'MSWin32' && $^O ne 'NetWare') || $Config{'cc'} =~ m/^bcc/i))
     {
 	print "1..0\n";
 	exit 0;
@@ -19,7 +19,6 @@ BEGIN {
 use strict;
 use IO::Handle;
 use IPC::Open2;
-#require 'open2.pl'; use subs 'open2';
 
 my $perl = './perl';
 
@@ -50,9 +49,9 @@ STDERR->autoflush;
 print "1..7\n";
 
 ok 1, $pid = open2 'READ', 'WRITE', $perl, '-e',
-	cmd_line('print scalar <STDIN>');
+	cmd_line('print scalar ~< *STDIN');
 ok 2, print WRITE "hi kid\n";
-ok 3, <READ> =~ /^hi kid\r?\n$/;
+ok 3, (~< *READ) =~ m/^hi kid\r?\n$/;
 ok 4, close(WRITE), $!;
 ok 5, close(READ), $!;
 $reaped_pid = waitpid $pid, 0;

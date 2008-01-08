@@ -3,7 +3,7 @@
 my $perl;
 
 BEGIN {
-    unless(grep /blib/, @INC) {
+    unless(grep m/blib/, @INC) {
 	$perl = './perl';
 	chdir 't' if -d 't';
 	@INC = '../lib';
@@ -19,10 +19,10 @@ BEGIN {
     my $can_fork = $Config{d_fork} ||
 		    (($^O eq 'MSWin32' || $^O eq 'NetWare') and
 		     $Config{useithreads} and 
-		     $Config{ccflags} =~ /-DPERL_IMPLICIT_SYS/
+		     $Config{ccflags} =~ m/-DPERL_IMPLICIT_SYS/
 		    );
     my $reason;
-    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bIO\b/) {
+    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ m/\bIO\b/) {
 	$reason = 'IO extension unavailable';
     }
     elsif (!$can_fork) {
@@ -48,7 +48,7 @@ if ($is_win32) {
     print "ok $_ # skipped: $is_win32\n" for 1..4;
 } else {
     $pipe = IO::Pipe->new()->reader($perl, '-e', 'print qq(not ok 1\n)');
-    while (<$pipe>) {
+    while ( ~< $pipe) {
       s/^not //;
       print;
     }
@@ -78,7 +78,7 @@ if($pid)
   print $pipe "Xk 5\n";
   print $pipe "oY 6\n";
   $pipe->close;
-  wait;
+  waitpid($pid, 0);
  }
 elsif(defined $pid)
  {
@@ -101,7 +101,7 @@ if ($is_win32) {
     if($pid)
  {
   $pipe->reader;
-  while(<$pipe>) {
+  while( ~< $pipe) {
       s/^not //;
       print;
   }
@@ -122,6 +122,7 @@ if ($is_win32) {
   die;
  }
 }
+
 if ($is_win32) {
     print "ok $_ # skipped: $is_win32\n" for 9;
 } else {

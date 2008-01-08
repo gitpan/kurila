@@ -26,7 +26,7 @@ print <<'EOF';
 .nf
 .na
 EOF
-while (<>) {
+while ( ~< *ARGV) {
     #chomp;
     s/Index://;
     ($type, $page, $desc) = split ' ', $_, 3;
@@ -48,8 +48,8 @@ while (<>) {
     } elsif ($type eq 'Subsection') {
 	print ".br\n", $page, "\t\t", $desc;
     } elsif ($type eq 'Item') {
-	next if $desc =~ /\\bu/;
-	next unless $name =~ /POSIX|func/i;
+	next if $desc =~ m/\\bu/;
+	next unless $name =~ m/POSIX|func/i;
 	print ".br\n", $page, "\t\t\t", $desc;
     }
 } 

@@ -24,13 +24,13 @@ sub eight_dot_three {
     my $file = $base . ( defined $ext ? ".$ext" : "" );
     $base = substr($base, 0, 8);
     $ext  = substr($ext,  0, 3) if defined $ext;
-    if (defined $dir && $dir =~ /\./)  {
+    if (defined $dir && $dir =~ m/\./)  {
 	print "directory name contains '.': $dir\n";
     }
-    if ($file =~ /[^A-Za-z0-9\._-]/) {
+    if ($file =~ m/[^A-Za-z0-9\._-]/) {
 	print "filename contains non-portable characters: $_[0]\n";
     }
-    if (length $file > $maxl) {
+    if (length $file +> $maxl) {
 	print "filename longer than $maxl characters: $file\n";
     }
     if (defined $dir) {
@@ -42,19 +42,19 @@ sub eight_dot_three {
 
 my %dir;
 
-if (open(MANIFEST, "MANIFEST")) {
-    while (<MANIFEST>) {
+if (open(MANIFEST, "<", "MANIFEST")) {
+    while ( ~< *MANIFEST) {
 	chomp;
 	s/\s.+//;
 	unless (-f) {
 	    print "missing: $_\n";
 	    next;
 	}
-	if (tr/././ > 1) {
+	if (tr/././ +> 1) {
 	    print "more than one dot: $_\n";
 	    next;
 	}
-	if ((my $slashes = $_ =~ tr|\/|\/|) > 7) {
+	if ((my $slashes = $_ =~ tr|\/|\/|) +> 7) {
 	    print "more than eight levels deep: $_\n";
 	    next;
 	}
@@ -72,7 +72,7 @@ if (open(MANIFEST, "MANIFEST")) {
 for my $dir (sort keys %dir) {
     for my $edt (keys %{$dir{$dir}}) {
 	my @files = @{$dir{$dir}{$edt}};
-	if (@files > 1) {
+	if (@files +> 1) {
 	    print "conflict on filename $edt:\n", map "    $_\n", @files;
 	}
     }

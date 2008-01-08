@@ -3,7 +3,7 @@
 use strict ;
 
 use private::MakeUtil;
-use ExtUtils::MakeMaker 5.16 ;
+use ExtUtils::MakeMaker v5.16 ;
 use ExtUtils::Install (); # only needed to check for version
 
 my $ZLIB_LIB ;
@@ -22,7 +22,7 @@ my $USE_PPPORT_H = ($ENV{PERL_CORE}) ? '' : '-DUSE_PPPORT_H';
 # ExtUtils::Install.
 
 # Don't ask if MM_USE_DEFAULT is set -- enables perl core building on cygwin
-if ($^O =~ /cygwin/i and $ExtUtils::Install::VERSION < 1.39 
+if ($^O =~ m/cygwin/i and $ExtUtils::Install::VERSION +< 1.39 
         and not ($ENV{PERL_MM_USE_DEFAULT} or $ENV{PERL_CORE}))
 {
     print <<EOM ;
@@ -41,9 +41,9 @@ by hand by running 'make install' under the directory
 EOM
 
     print "Do you want to continue? [Y/N]: " ;
-    my $answer = <STDIN> ;
+    my $answer = ~< STDIN ;
 
-    if ($answer =~ /^yes|y/i)
+    if ($answer =~ m/^yes|y/i)
     {
 	print "continuing...\n" 
     }
@@ -89,13 +89,11 @@ WriteMakefile(
     ),
       
     (
-      $] >= 5.005
-        ? (ABSTRACT_FROM => 'lib/Compress/Raw/Zlib.pm',
-            AUTHOR       => 'Paul Marquess <pmqs@cpan.org>')
-        : ()
+     (ABSTRACT_FROM => 'lib/Compress/Raw/Zlib.pm',
+      AUTHOR       => 'Paul Marquess <pmqs@cpan.org>')
     ),
 
-    INSTALLDIRS => ($] >= 5.009 ? 'perl' : 'site'),
+    INSTALLDIRS => ('perl'),
 
     ((ExtUtils::MakeMaker->VERSION() gt '6.30') ?
         ('LICENSE'  => 'perl')         : ()),    
@@ -142,19 +140,21 @@ my @names = qw(
 );
     #ZLIB_VERNUM
 
-if (eval {require ExtUtils::Constant; 1}) {
+require ExtUtils::Constant;
+
+{
     # Check the constants above all appear in @EXPORT in Zlib.pm
     my %names = map { $_, 1} @names, 'ZLIB_VERSION';
-    open F, "<lib/Compress/Raw/Zlib.pm" or die "Cannot open Zlib.pm: $!\n";
-    while (<F>)
+    open F, "<", "lib/Compress/Raw/Zlib.pm" or die "Cannot open Zlib.pm: $!\n";
+    while (~< *F)
     {
-        last if /^\s*\@EXPORT\s+=\s+qw\(/ ;
+        last if m/^\s*\@EXPORT\s+=\s+qw\(/ ;
     }
 
-    while (<F>)
+    while (~< *F)
     {
-        last if /^\s*\)/ ;
-        /(\S+)/ ;
+        last if m/^\s*\)/ ;
+        m/(\S+)/ ;
         delete $names{$1} if defined $1 ;
     }
     close F ;
@@ -169,21 +169,13 @@ if (eval {require ExtUtils::Constant; 1}) {
     push @names, {name => 'ZLIB_VERSION', type => 'PV' };
 
     ExtUtils::Constant::WriteConstants(
-                                     NAME => 'Zlib',
-                                     NAMES => \@names,
-                                     C_FILE  => 'constants.h',
-                                     XS_FILE  => 'constants.xs',
-                                                                       
+                                       NAME => 'Compress::Raw::Zlib',
+                                       NAMES => \@names,
+                                       C_FILE  => 'constants.h',
+                                       XS_FILE  => 'constants.xs',
+                                       PROXYSUBS => 1,
                                     );
 } 
-else {
-    foreach my $name (qw( constants.h constants.xs ))
-    {
-        my $from = catfile('fallback', $name);
-        copy ($from, $name)
-          or die "Can't copy $from to $name: $!";
-    }
-}
 
 sub ParseCONFIG
 {
@@ -197,13 +189,13 @@ sub ParseCONFIG
 
     print "Parsing $CONFIG...\n" ;
 
-    open(F, "<$CONFIG") or die "Cannot open file $CONFIG: $!\n" ;
-    while (<F>) {
+    open(F, "<", "$CONFIG") or die "Cannot open file $CONFIG: $!\n" ;
+    while (~< *F) {
 	s/^\s*|\s*$//g ;
-	next if /^\s*$/ or /^\s*#/ ;
+	next if m/^\s*$/ or m/^\s*#/ ;
 	s/\s*#\s*$// ;
 
-	($k, $v) = split(/\s+=\s+/, $_, 2) ;
+	($k, $v) = split(m/\s+=\s+/, $_, 2) ;
 	$k = uc $k ;
 	if ($ValidOption{$k}) {
 	    delete $Parsed{$k} ;
@@ -232,11 +224,11 @@ sub ParseCONFIG
     }
 
     my $y = $ENV{'OLD_ZLIB'} || $Info{'OLD_ZLIB'} ;
-    $OLD_ZLIB = '-DOLD_ZLIB' if $y and $y =~ /^yes|on|true|1$/i;
+    $OLD_ZLIB = '-DOLD_ZLIB' if $y and $y =~ m/^yes|on|true|1$/i;
 
     my $x = $ENV{'BUILD_ZLIB'} || $Info{'BUILD_ZLIB'} ;
 
-    if ($x and $x =~ /^yes|on|true|1$/i ) {
+    if ($x and $x =~ m/^yes|on|true|1$/i ) {
 
         $BUILD_ZLIB = 1 ;
 
@@ -264,7 +256,7 @@ sub ParseCONFIG
 
 	die "GZIP_OS_CODE not 'AUTO_DETECT' or a number between 0 and 255\n"
 	   unless uc $GZIP_OS_CODE eq 'AUTO_DETECT'
-                    || ( $GZIP_OS_CODE =~ /^(\d+)$/ && $1 >= 0 && $1 <= 255) ;
+                    || ( $GZIP_OS_CODE =~ m/^(\d+)$/ && $1 +>= 0 && $1 +<= 255) ;
 
     if (uc $GZIP_OS_CODE eq 'AUTO_DETECT')
     {

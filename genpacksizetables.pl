@@ -28,7 +28,7 @@ sub make_tables {
     my $chrmap = shift;
     foreach (@_) {
         my ($letter, $shriek, $unpredictable, $nocsum, $size, $condition) =
-            /^([A-Za-z])(!?)\t(\S*)\t(\S*)\t([^\t\n]+)(?:\t+(.*))?$/ or
+            m/^([A-Za-z])(!?)\t(\S*)\t(\S*)\t([^\t\n]+)(?:\t+(.*))?$/ or
             die "Can't parse '$_'";
 
         $size = "sizeof($size)" unless $size =~ s/^=//;
@@ -38,7 +38,7 @@ sub make_tables {
                       $unpredictable, $nocsum, $size, $condition);
     }
 
-    my $text = "STATIC const packprops_t packprops[512] = {\n";
+    my $text = "STATIC const packprops_t packprops[512] = \{\n";
     foreach my $arrayname (qw(normal shrieking)) {
         my $array = $arrays{$arrayname} ||
             die "No defined entries in $arrayname";
@@ -54,14 +54,14 @@ sub make_tables {
     $text =~ s/((?:\b0, ){15}0,) /$1\n    /g;
     # Clean up final ,
     $text =~ s/,$//;
-    $text .= "};";
+    $text .= "\};";
     return $text;
 }
 
 my @lines = grep {
     s/#.*//;
-    /\S/;
-} <DATA>;
+    m/\S/;
+} ~< *DATA;
 
 my %asciimap  = map {chr $_, chr $_} 0..255;
 my %ebcdicmap = map {chr $_, Encode::encode("posix-bc", chr $_)} 0..255;

@@ -64,7 +64,7 @@ my $LONG_FILE = qq[directory/really-really-really-really-really-really-really-re
 
 ### wintendo can't deal with too long paths, so we might have to skip tests ###
 my $TOO_LONG    =   ($^O eq 'MSWin32' or $^O eq 'cygwin' or $^O eq 'VMS')
-                    && length( cwd(). $LONG_FILE ) > 247;
+                    && length( cwd(). $LONG_FILE ) +> 247;
 
 ### warn if we are going to skip long file names
 if ($TOO_LONG) {
@@ -248,7 +248,7 @@ chmod 0644, $COMPRESS_FILE;
 
         SKIP: {
             skip( "You are building perl using symlinks", 1)
-                if ($ENV{PERL_CORE} and $Config{config_args} =~/Dmksymlinks/);
+                if ($ENV{PERL_CORE} and $Config{config_args} =~m/Dmksymlinks/);
 
             is( $files[0]->is_file, 1,  
                                     "   Proper type" );
@@ -662,8 +662,8 @@ sub check_tgz_file {
     is( TAR_END x 2, substr($contents, -(BLOCK*2)),
                                 "   Ends with 1024 null bytes" );
 
-    cmp_ok( $filesize, '<',  $uncompressedsize,
-                                "   Compressed size < uncompressed size" );
+    cmp_ok( $filesize, '+<',  $uncompressedsize,
+                                "   Compressed size +< uncompressed size" );
 
     return $contents;
 }
@@ -714,12 +714,12 @@ sub check_tar_extract {
         ok( -e $path,               "   File '$path' exists" );
 
         my $fh;
-        open $fh, "$path" or warn "Error opening file '$path': $!\n";
+        open $fh, "<", "$path" or warn "Error opening file '$path': $!\n";
         binmode $fh;
 
         ok( $fh,                    "   Opening file" );
 
-        my $content = do{local $/;<$fh>}; chomp $content;
+        my $content = do{local $/; ~< $fh}; chomp $content;
         like( $content, qr/$econtent/,
                                     "   Contents OK" );
 
@@ -761,7 +761,7 @@ sub slurp_binfile {
 
     binmode $fh;
     local $/;
-    return <$fh>;
+    return ~< $fh;
 }
 
 sub slurp_gzfile {
@@ -774,7 +774,7 @@ sub slurp_gzfile {
     $fh->open( $file, READ_ONLY->(1) )
         or warn( "Error opening '$file' with IO::Zlib" ), return undef;
 
-    $str .= $buff while $fh->read( $buff, 4096 ) > 0;
+    $str .= $buff while $fh->read( $buff, 4096 ) +> 0;
     $fh->close();
     return $str;
 }

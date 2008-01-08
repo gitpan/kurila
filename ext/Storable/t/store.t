@@ -14,7 +14,7 @@ sub BEGIN {
 	unshift @INC, 't';
     }
     require Config; Config->import;
-    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bStorable\b/) {
+    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ m/\bStorable\b/) {
         print "1..0 # Skip: Storable was not built\n";
         exit 0;
     }
@@ -65,7 +65,7 @@ $foo = FOO->make;
 print "not " unless $foo->store('store');
 print "ok 6\n";
 
-print "not " unless open(OUT, '>>store');
+print "not " unless open(OUT, ">>", 'store');
 print "ok 7\n";
 binmode OUT;
 
@@ -79,7 +79,7 @@ print "ok 10\n";
 print "not " unless close(OUT);
 print "ok 11\n";
 
-print "not " unless open(OUT, 'store');
+print "not " unless open(OUT, "<", 'store');
 binmode OUT;
 
 $r = fd_retrieve('::OUT');

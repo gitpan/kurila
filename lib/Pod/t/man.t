@@ -25,7 +25,6 @@ END {
 }
 
 use Pod::Man;
-use Encode;
 use charnames ':full';
 use utf8;
 
@@ -36,28 +35,26 @@ my $have_encoding = eval { require PerlIO::encoding; 1; } && ! $@;
 
 my $parser = Pod::Man->new or die "Cannot create parser\n";
 my $n = 2;
-while (<DATA>) {
+while ( ~< *DATA) {
     next until $_ eq "###\n";
 
     my $input = "";
-    while (<DATA>) {
+    while ( ~< *DATA) {
         no warnings 'utf8'; # No invalid unicode warnings.
-        $_ = Encode::decode('iso-8859-1', $_); # DATA is ISO 8859-e encoded
         last if $_ eq "###\n";
         $input .= $_;
     }
     my $expected = '';
-    while (<DATA>) {
+    while ( ~< *DATA) {
         last if $_ eq "###\n";
         $expected .= $_;
     }
 
-    open (TMP, '> tmp.pod') or die "Cannot create tmp.pod: $!\n";
+    open (TMP, ">", 'tmp.pod') or die "Cannot create tmp.pod: $!\n";
 
     # We have a test in ISO 8859-1 encoding.  Make sure that nothing strange
     # happens if Perl thinks the world is Unicode.  Wrap this in eval so that
     # older versions of Perl don't croak.
-    eval { binmode (\*TMP, ':encoding(iso-8859-1)') };
     no warnings 'utf8';
     print TMP $input;
     close TMP;
@@ -66,8 +63,7 @@ while (<DATA>) {
 
     unlink('tmp.pod');
 
-    open (TMP2, '> tmp.pod') or die "Cannot create tmp.pod: $!\n";
-    eval { binmode (\*TMP2, ':encoding(utf-8)') };
+    open (TMP2, ">", 'tmp.pod') or die "Cannot create tmp.pod: $!\n";
     print TMP2 "\N{BOM}";
     print TMP2 $input;
     close TMP2;
@@ -79,22 +75,22 @@ while (<DATA>) {
 sub test_outtmp {
     my $expected = shift;
     my $msg = shift;
-    open (OUT, '> out.tmp') or die "Cannot create out.tmp: $!\n";
+    open (OUT, ">", 'out.tmp') or die "Cannot create out.tmp: $!\n";
     $parser->parse_from_file ('tmp.pod', \*OUT);
     close OUT;
-    open (OUT, 'out.tmp') or die "Cannot open out.tmp: $!\n";
-    while (<OUT>) { last if /^\.nh/ }
+    open (OUT, "<", 'out.tmp') or die "Cannot open out.tmp: $!\n";
+    while ( ~< *OUT) { last if m/^\.nh/ }
     my $output;
     {
         local $/;
-        $output = <OUT>;
+        $output = ~< *OUT;
     }
     close OUT;
     if ($output eq $expected) {
         print "ok $n\n";
     } else {
         print "not ok $n\n";
-        print "$msg\n";
+        print "$msg\nEXPECTED:\n$expected\nOUTPUT:\n$output\n";
     }
     $n++;
 }
@@ -177,13 +173,13 @@ Also not a bullet.
 ###
 =head1 ACCENTS
 
-Beyoncé!  Beyoncé!  Beyoncé!!
+BeyoncÃ©!  BeyoncÃ©!  BeyoncÃ©!!
 
-    Beyoncé!  Beyoncé!
-      Beyoncé!  Beyoncé!
-        Beyoncé!  Beyoncé!
+    BeyoncÃ©!  BeyoncÃ©!
+      BeyoncÃ©!  BeyoncÃ©!
+        BeyoncÃ©!  BeyoncÃ©!
 
-Older versions didn't convert Beyoncé in verbatim.
+Older versions didn't convert BeyoncÃ© in verbatim.
 ###
 .SH "ACCENTS"
 .IX Header "ACCENTS"

@@ -14,7 +14,7 @@ BEGIN {
 	push @INC, "../../t";
     }
     require Config;
-    if (($Config::Config{'extensions'} !~ /\bB\b/) ){
+    if (($Config::Config{'extensions'} !~ m/\bB\b/) ){
         print "1..0 # Skip -- Perl configured without B module\n";
         exit 0;
     }
@@ -56,7 +56,7 @@ my ($out, $newlex);	# output, option-flag
 sub padrep {
     my ($varname,$newlex) = @_;
     return ($newlex)
-	? 'PVNV \(0x[0-9a-fA-F]+\) "\\'.$varname.'" = '
+	? 'PVNV \(0x[0-9a-fA-F]+\) "\'.$varname.'" = '
 	: "PVNV \\\(0x[0-9a-fA-F]+\\\) \\$varname\n";
 }
 
@@ -108,7 +108,7 @@ SKIP: {
 	my $total;
 	{ # inner block vars
 	    my (@fib)=(1,2);
-	    for (my $i=2; $i<10; $i++) {
+	    for (my $i=2; $i+<10; $i++) {
 		$fib[$i] = $fib[$i-2] + $fib[$i-1];
 	    }
 	    for my $i(0..10) {

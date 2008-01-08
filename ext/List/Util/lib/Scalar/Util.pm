@@ -17,15 +17,15 @@ $VERSION    = "1.19";
 $VERSION   = eval $VERSION;
 
 sub export_fail {
-  if (grep { /^(weaken|isweak)$/ } @_ ) {
+  if (grep { m/^(weaken|isweak)$/ } @_ ) {
     require Carp;
     Carp::croak("Weak references are not implemented in the version of perl");
   }
-  if (grep { /^(isvstring)$/ } @_ ) {
+  if (grep { m/^(isvstring)$/ } @_ ) {
     require Carp;
     Carp::croak("Vstrings are not implemented in the version of perl");
   }
-  if (grep { /^(dualvar|set_prototype)$/ } @_ ) {
+  if (grep { m/^(dualvar|set_prototype)$/ } @_ ) {
     require Carp;
     Carp::croak("$1 is only avaliable with the XS version");
   }
@@ -96,7 +96,7 @@ sub reftype ($) {
       $t = eval {
 	  # we have a GLOB or an IO. Stringify a GLOB gives it's name
 	  my $q = *$r;
-	  $q =~ /^\*/ ? "GLOB" : "IO";
+	  Symbol::glob_name($q) ? "GLOB" : "IO";
 	}
 	or do {
 	  # OK, if we don't have a GLOB what parts of
@@ -135,7 +135,7 @@ sub looks_like_number {
   return 0 if !defined($_) or ref($_);
   return 1 if (/^[+-]?\d+$/); # is a +/- integer
   return 1 if (/^([+-]?)(?=\d|\.\d)\d*(\.\d*)?([Ee]([+-]?\d+))?$/); # a C float
-  return 1 if ($] >= 5.008 and /^(Inf(inity)?|NaN)$/i) or ($] >= 5.006001 and /^Inf$/i);
+  return 1 if (/^(Inf(inity)?|NaN)$/i) or (/^Inf$/i);
 
   0;
 }

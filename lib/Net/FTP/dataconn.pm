@@ -70,7 +70,7 @@ sub close {
   $data->_close;
 
   $ftp->response() == CMD_OK
-    && $ftp->message =~ /unique file name:\s*(\S*)\s*\)/
+    && $ftp->message =~ m/unique file name:\s*(\S*)\s*\)/
     && (${*$ftp}{'net_ftp_unique'} = $1);
 
   $ftp->status == CMD_OK;
@@ -88,7 +88,7 @@ sub _select {
   while (1) {
     $nfound = select($rout = $rin, $wout = $win, undef, $tout = $timeout);
 
-    last if $nfound >= 0;
+    last if $nfound +>= 0;
 
     croak "select: $!"
       unless $!{EINTR};

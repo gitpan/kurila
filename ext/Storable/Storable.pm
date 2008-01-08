@@ -120,7 +120,7 @@ EOM
 sub file_magic {
     my $file = shift;
     my $fh = FileHandle->new();
-    open($fh, "<". $file) || die "Can't open '$file': $!";
+    open($fh, "<", "". $file) || die "Can't open '$file': $!";
     binmode($fh);
     defined(sysread($fh, my $buf, 32)) || die "Can't read from '$file': $!";
     close($fh);
@@ -148,17 +148,17 @@ sub read_magic {
     return undef unless length($buf);
 
     my $net_order;
-    if ($magic eq "perl-store" && ord(substr($buf, 0, 1)) > 1) {
+    if ($magic eq "perl-store" && ord(substr($buf, 0, 1)) +> 1) {
 	$info{version} = -1;
 	$net_order = 0;
     }
     else {
 	$net_order = ord(substr($buf, 0, 1, ""));
 	my $major = $net_order >> 1;
-	return undef if $major > 4; # sanity (assuming we never go that high)
+	return undef if $major +> 4; # sanity (assuming we never go that high)
 	$info{major} = $major;
 	$net_order ^&^= 0x01;
-	if ($major > 1) {
+	if ($major +> 1) {
 	    return undef unless length($buf);
 	    my $minor = ord(substr($buf, 0, 1, ""));
 	    $info{minor} = $minor;
@@ -175,13 +175,13 @@ sub read_magic {
     unless ($net_order) {
 	return undef unless length($buf);
 	my $len = ord(substr($buf, 0, 1, ""));
-	return undef unless length($buf) >= $len;
+	return undef unless length($buf) +>= $len;
 	return undef unless $len == 4 || $len == 8;  # sanity
 	$info{byteorder} = substr($buf, 0, $len, "");
 	$info{intsize} = ord(substr($buf, 0, 1, ""));
 	$info{longsize} = ord(substr($buf, 0, 1, ""));
 	$info{ptrsize} = ord(substr($buf, 0, 1, ""));
-	if ($info{version_nv} >= 2.002) {
+	if ($info{version_nv} +>= 2.002) {
 	    return undef unless length($buf);
 	    $info{nvsize} = ord(substr($buf, 0, 1, ""));
 	}
@@ -247,7 +247,7 @@ sub _store {
 	logcroak "wrong argument number" unless @_ == 2;	# No @foo in arglist
 	local *FILE;
 	if ($use_locking) {
-		open(FILE, ">>$file") || logcroak "can't write into $file: $!";
+		open(FILE, ">>", "$file") || logcroak "can't write into $file: $!";
 		unless (&CAN_FLOCK) {
 			logcarp "Storable::lock_store: fcntl/flock emulation broken on $^O";
 			return undef;
@@ -257,7 +257,7 @@ sub _store {
 		truncate *FILE, 0;
 		# Unlocking will happen when FILE is closed
 	} else {
-		open(FILE, ">$file") || logcroak "can't create $file: $!";
+		open(FILE, ">", "$file") || logcroak "can't create $file: $!";
 	}
 	binmode FILE;				# Archaic systems...
 	my $da = $@;				# Don't mess if called from exception handler
@@ -367,7 +367,7 @@ sub lock_retrieve {
 sub _retrieve {
 	my ($file, $use_locking) = @_;
 	local *FILE;
-	open(FILE, $file) || logcroak "can't open $file: $!";
+	open(FILE, "<", $file) || logcroak "can't open $file: $!";
 	binmode FILE;							# Archaic systems...
 	my $self;
 	my $da = $@;							# Could be from exception handler

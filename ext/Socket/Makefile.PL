@@ -1,10 +1,10 @@
 use ExtUtils::MakeMaker;
-use ExtUtils::Constant 0.11 'WriteConstants';
+use ExtUtils::Constant v0.11 'WriteConstants';
 use Config;
 WriteMakefile(
     NAME	 => 'Socket',
     VERSION_FROM => 'Socket.pm',
-   ($Config{libs} =~ /(-lsocks\S*)/ ? (LIBS => [ "$1" ] ) : ()),
+   ($Config{libs} =~ m/(-lsocks\S*)/ ? (LIBS => [ "$1" ] ) : ()),
     MAN3PODS  	 => {}, 	# Pods will be built by installman.
     XSPROTOARG   => '-noprototypes', 		# XXX remove later?
     realclean => {FILES=> 'const-c.inc const-xs.inc'},
@@ -70,7 +70,7 @@ push @names,
          foreach qw(INADDR_ANY INADDR_LOOPBACK INADDR_NONE INADDR_BROADCAST);
 
 WriteConstants(
-    ($] > 5.009002 ? (PROXYSUBS => 1) : ()),
+    PROXYSUBS => 1,
     NAME => 'Socket',
     NAMES => \@names,
 );

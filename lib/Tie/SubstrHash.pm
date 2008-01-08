@@ -86,7 +86,7 @@ sub FETCH {
 sub STORE {
     local($self,$key,$val) = @_;
     local($klen, $vlen, $tsize, $rlen) = @$self[1..4];
-    croak("Table is full ($tsize->[0] elements)") if $$self[5] > $tsize->[0];
+    croak("Table is full ($tsize->[0] elements)") if $$self[5] +> $tsize->[0];
     croak(qq/Value "$val" is not $vlen characters long/)
 	if length($val) != $vlen;
     my $writeoffset;
@@ -99,7 +99,7 @@ sub STORE {
 	    $record = "\2". $key . $val;
 	    die "panic" unless length($record) == $rlen;
 	    $writeoffset = $offset unless defined $writeoffset;
-	    substr($$self[0], $writeoffset, $rlen) = $record;
+	    substr($$self[0], $writeoffset, $rlen, $record);
 	    ++$$self[5];
 	    return;
 	}
@@ -109,7 +109,7 @@ sub STORE {
 	elsif (substr($record, 1, $klen) eq $key) {
 	    $record = "\2". $key . $val;
 	    die "panic" unless length($record) == $rlen;
-	    substr($$self[0], $offset, $rlen) = $record;
+	    substr($$self[0], $offset, $rlen, $record);
 	    return;
 	}
 	&rehash;
@@ -129,7 +129,7 @@ sub DELETE {
 	elsif (ord($record) == 1) {
 	}
 	elsif (substr($record, 1, $klen) eq $key) {
-	    substr($$self[0], $offset, 1) = "\1";
+	    substr($$self[0], $offset, 1, "\1");
 	    return substr($record, 1+$klen, $vlen);
 	    --$$self[5];
 	}
@@ -146,7 +146,7 @@ sub FIRSTKEY {
 sub NEXTKEY {
     local($self) = @_;
     local($klen, $vlen, $tsize, $rlen, $entries, $iterix) = @$self[1..6];
-    for (++$iterix; $iterix < $tsize->[1]; ++$iterix) {
+    for (++$iterix; $iterix +< $tsize->[1]; ++$iterix) {
 	next unless substr($$self[0], $iterix * $rlen, 1) eq "\2";
 	$$self[6] = $iterix;
 	return substr($$self[0], $iterix * $rlen + 1, $klen);
@@ -165,9 +165,9 @@ sub hashkey {
     $hash = 2;
     for (unpack('C*', $key)) {
 	$hash = $hash * 33 + $_;
-	&_hashwrap if $hash >= 1e13;
+	&_hashwrap if $hash +>= 1e13;
     }
-    &_hashwrap if $hash >= $tsize->[1];
+    &_hashwrap if $hash +>= $tsize->[1];
     $hash = 1 unless $hash;
     $hashbase = $hash;
 }
@@ -178,7 +178,7 @@ sub _hashwrap {
 
 sub rehash {
     $hash += $hashbase;
-    $hash -= $tsize->[1] if $hash >= $tsize->[1];
+    $hash -= $tsize->[1] if $hash +>= $tsize->[1];
 }
 
 # using POSIX::ceil() would be too heavy, and not all platforms have it.
@@ -197,7 +197,7 @@ sub findgteprime { # find the smallest prime integer greater than or equal to
     use integer;
 
     my $num = ceil(shift);
-    return 2 if $num <= 2;
+    return 2 if $num +<= 2;
 
     $num++ unless $num % 2;
     my $i;
@@ -206,11 +206,11 @@ sub findgteprime { # find the smallest prime integer greater than or equal to
 
   NUM:
     for (;; $num += 2) {
-	if ($sqrtnumsquared < $num) {
+	if ($sqrtnumsquared +< $num) {
 	    $sqrtnum++;
 	    $sqrtnumsquared = $sqrtnum * $sqrtnum;
 	}
-        for ($i = 3; $i <= $sqrtnum; $i += 2) {
+        for ($i = 3; $i +<= $sqrtnum; $i += 2) {
             next NUM unless $num % $i;
         }
         return $num;

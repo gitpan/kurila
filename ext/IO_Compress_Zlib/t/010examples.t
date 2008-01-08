@@ -17,9 +17,6 @@ use IO::Compress::Gzip 'gzip' ;
 
 BEGIN 
 { 
-    plan(skip_all => "Examples needs Perl 5.005 or better - you have Perl $]" )
-        if $] < 5.005 ;
-    
     # use Test::NoWarnings, if available
     my $extra = 0 ;
     $extra = 1
@@ -51,7 +48,7 @@ xuuuuuu
 the end
 EOM
 
-my @hello1 = grep(s/$/\n/, split(/\n/, $hello1)) ;
+my @hello1 = grep(s/$/\n/, split(m/\n/, $hello1)) ;
 
 my $hello2 = <<EOM;
 
@@ -64,7 +61,7 @@ xuuuuuu
 really the end
 EOM
 
-my @hello2 = grep(s/$/\n/, split(/\n/, $hello2)) ;
+my @hello2 = grep(s/$/\n/, split(m/\n/, $hello2)) ;
 
 my $file1 = "hello1.gz" ;
 my $file2 = "hello2.gz" ;
@@ -89,11 +86,11 @@ sub check
 
     my $aok = 1 ;
 
-    $aok ^&^= is $?, 0, "  exit status is 0" ;
+    $aok &&= is $?, 0, "  exit status is 0" ;
 
-    $aok ^&^= is readFile($stderr), '', "  no stderr" ;
+    $aok &&= is readFile($stderr), '', "  no stderr" ;
 
-    $aok ^&^= is $stdout, $expected, "  expected content is ok"
+    $aok &&= is $stdout, $expected, "  expected content is ok"
         if defined $expected ;
 
     if (! $aok) {
@@ -120,7 +117,7 @@ check "$Perl ${examples}/gzcat <$file1 ", $hello1;
 
 title "gzgrep";
 check "$Perl  ${examples}/gzgrep the $file1 $file2",
-        join('', grep(/the/, @hello1, @hello2));
+        join('', grep(m/the/, @hello1, @hello2));
 
 for ($file1, $file2, $stderr) { 1 while unlink $_ } ;
 

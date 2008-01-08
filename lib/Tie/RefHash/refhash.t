@@ -85,7 +85,7 @@ $h = eval { tie %h, 'Tie::RefHash' };
 warn $@ if $@;
 test(not $@);
 test(ref($h) eq 'Tie::RefHash');
-test(defined(tied(%h)) and tied(%h) =~ /^Tie::RefHash/);
+test(defined(tied(%h)) and tied(%h) =~ m/^Tie::RefHash/);
 $h{$ref} = 'cholet';
 test($h{$ref} eq 'cholet');
 test(exists $h{$ref});
@@ -119,13 +119,13 @@ $h = eval { tie %h, 'Tie::RefHash::Nestable' };
 warn $@ if $@;
 test(not $@);
 test(ref($h) eq 'Tie::RefHash::Nestable');
-test(defined(tied(%h)) and tied(%h) =~ /^Tie::RefHash::Nestable/);
+test(defined(tied(%h)) and tied(%h) =~ m/^Tie::RefHash::Nestable/);
 $h{$ref}->{$ref1} = 'bungo';
 test($h{$ref}->{$ref1} eq 'bungo');
 
 # Test that the nested hash is also tied (for current implementation)
 test(defined(tied(%{$h{$ref}}))
-     and tied(%{$h{$ref}}) =~ /^Tie::RefHash::Nestable=/ );
+     and tied(%{$h{$ref}}) =~ m/^Tie::RefHash::Nestable=/ );
 
 test((keys %h) == 1);
 test((keys %h)[0] eq $ref);
@@ -206,7 +206,7 @@ sub runtests {
         warn $@ if $@;
         test(not $@);
         test(ref($h) eq $class);
-        test(defined(tied(%h)) and tied(%h) =~ /^\Q$class\E/);
+        test(defined(tied(%h)) and tied(%h) =~ m/^\Q$class\E/);
     }
 
     foreach (@$tests) {
@@ -228,7 +228,7 @@ sub runtests {
         }
 
         my (@warnings, %seen);
-        foreach (split /\n/, $warning) {
+        foreach (split m/\n/, $warning) {
             push @warnings, $_ unless $seen{$_}++;
         }
         $warning = join("\n", @warnings);
@@ -271,16 +271,16 @@ END
   ;
 
     # Test storing and deleting 'foo'
-    push @r, split /\n/, <<"END"
+    push @r, split m/\n/, <<"END"
     $STD_TESTS;
     $FOO_TESTS;
-    \$h{foo} = undef;
+    \$h\{foo\} = undef;
     $STD_TESTS;
     $FOO_TESTS;
-    \$h{foo} = 'hello';
+    \$h\{foo\} = 'hello';
     $STD_TESTS;
     $FOO_TESTS;
-    delete  \$h{foo};
+    delete  \$h\{foo\};
     $STD_TESTS;
     $FOO_TESTS;
 END
@@ -290,17 +290,17 @@ END
     my @things = ('boink', 0, 1, '', undef);
     foreach my $key (map { dumped($_) } @things) {
         foreach my $value ((map { dumped($_) } @things), '$ref') {
-            push @r, split /\n/, <<"END"
-            \$h{$key} = $value;
+            push @r, split m/\n/, <<"END"
+            \$h\{$key\} = $value;
             $STD_TESTS;
-            defined \$h{$key};
-            exists \$h{$key};
-            \$h{$key};
-            delete \$h{$key};
+            defined \$h\{$key\};
+            exists \$h\{$key\};
+            \$h\{$key\};
+            delete \$h\{$key\};
             $STD_TESTS;
-            defined \$h{$key};
-            exists \$h{$key};
-            \$h{$key};
+            defined \$h\{$key\};
+            exists \$h\{$key\};
+            \$h\{$key\};
 END
   ;
         }
@@ -308,7 +308,7 @@ END
     
     # Test hash slices
     my @slicetests;
-    @slicetests = split /\n/, <<'END'
+    @slicetests = split m/\n/, <<'END'
     @h{'b'} = ();
     @h{'c'} = ('d');
     @h{'e'} = ('f', 'g');
@@ -321,11 +321,11 @@ END
     my @aaa = @slicetests;
     foreach (@slicetests) {
         push @r, $_;
-        push @r, split(/\n/, $STD_TESTS);
+        push @r, split(m/\n/, $STD_TESTS);
     }
 
     # Test CLEAR
-    push @r, '%h = ();', split(/\n/, $STD_TESTS);
+    push @r, '%h = ();', split(m/\n/, $STD_TESTS);
 
     return @r;
 }

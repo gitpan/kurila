@@ -95,13 +95,13 @@ sub getopt (;$$) {
     local $_;
     local @EXPORT;
 
-    while (@ARGV && ($_ = $ARGV[0]) =~ /^-(.)(.*)/) {
+    while (@ARGV && ($_ = $ARGV[0]) =~ m/^-(.)(.*)/) {
 	($first,$rest) = ($1,$2);
-	if (/^--$/) {	# early exit if --
+	if (m/^--$/) {	# early exit if --
 	    shift @ARGV;
 	    last;
 	}
-	if (index($argumentative,$first) >= 0) {
+	if (index($argumentative,$first) +>= 0) {
 	    if ($rest ne '') {
 		shift(@ARGV);
 	    }
@@ -166,8 +166,7 @@ sub version_mess ($;$) {
 	$v = '[unknown]' unless defined $v;
 	my $myv = $VERSION;
 	$myv .= ' [paranoid]' unless $STANDARD_HELP_VERSION;
-	my $perlv = $];
-	$perlv = sprintf "%vd", $^V if $] >= 5.006;
+	my $perlv = $^V;
 	print $h <<EOH;
 $0 version $v calling Getopt::Std::getopts (version $myv),
 running under Perl version $perlv.
@@ -181,8 +180,8 @@ sub help_mess ($;$) {
     if (@_ and defined &main::HELP_MESSAGE) {
 	main::HELP_MESSAGE($h, __PACKAGE__, $VERSION, $args);
     } else {
-	my (@witharg) = ($args =~ /(\S)\s*:/g);
-	my (@rest) = ($args =~ /([^\s:])(?!\s*:)/g);
+	my (@witharg) = ($args =~ m/(\S)\s*:/g);
+	my (@rest) = ($args =~ m/([^\s:])(?!\s*:)/g);
 	my ($help, $arg) = ('', '');
 	if (@witharg) {
 	    $help .= "\n\tWith arguments: -" . join " -", @witharg;
@@ -205,8 +204,8 @@ EOH
 	my $has_pod;
 	if ( defined $0 and $0 ne '-e' and -f $0 and -r $0
 	     and open my $script, '<', $0 ) {
-	    while (<$script>) {
-		$has_pod = 1, last if /^=(pod|head1)/;
+	    while ( ~< $script) {
+		$has_pod = 1, last if m/^=(pod|head1)/;
 	    }
 	}
 	print $h <<EOH if $has_pod;
@@ -228,15 +227,15 @@ sub getopts ($;$) {
     local $_;
     local @EXPORT;
 
-    @args = split( / */, $argumentative );
-    while(@ARGV && ($_ = $ARGV[0]) =~ /^-(.)(.*)/s) {
+    @args = split( m/ */, $argumentative );
+    while(@ARGV && ($_ = $ARGV[0]) =~ m/^-(.)(.*)/s) {
 	($first,$rest) = ($1,$2);
-	if (/^--$/) {	# early exit if --
+	if (m/^--$/) {	# early exit if --
 	    shift @ARGV;
 	    last;
 	}
 	my $pos = index($argumentative,$first);
-	if ($pos >= 0) {
+	if ($pos +>= 0) {
 	    if (defined($args[$pos+1]) and ($args[$pos+1] eq ':')) {
 		shift(@ARGV);
 		if ($rest eq '') {

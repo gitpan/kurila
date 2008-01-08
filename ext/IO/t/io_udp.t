@@ -1,7 +1,7 @@
 #!./perl
 
 BEGIN {
-    unless(grep /blib/, @INC) {
+    unless(grep m/blib/, @INC) {
 	chdir 't' if -d 't';
 	@INC = '../lib';
     }
@@ -12,10 +12,10 @@ use Config;
 BEGIN {
     my $reason;
 
-    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bSocket\b/) {
+    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ m/\bSocket\b/) {
       $reason = 'Socket was not built';
     }
-    elsif ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bIO\b/) {
+    elsif ($ENV{PERL_CORE} and $Config{'extensions'} !~ m/\bIO\b/) {
       $reason = 'IO was not built';
     }
     elsif ($^O eq 'apollo') {
@@ -33,14 +33,14 @@ sub compare_addr {
     my $a = shift;
     my $b = shift;
     if (length($a) != length $b) {
-	my $min = (length($a) < length $b) ? length($a) : length $b;
+	my $min = (length($a) +< length $b) ? length($a) : length $b;
 	if ($min and substr($a, 0, $min) eq substr($b, 0, $min)) {
 	    printf "# Apparently: %d bytes junk at the end of %s\n# %s\n",
 		abs(length($a) - length ($b)),
-		$_[length($a) < length ($b) ? 1 : 0],
+		$_[length($a) +< length ($b) ? 1 : 0],
 		"consider decreasing bufsize of recfrom.";
-	    substr($a, $min) = "";
-	    substr($b, $min) = "";
+	    substr($a, $min, undef, "");
+	    substr($b, $min, undef, "");
 	}
 	return 0;
     }

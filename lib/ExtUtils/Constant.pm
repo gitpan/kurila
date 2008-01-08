@@ -19,7 +19,7 @@ ExtUtils::Constant - generate XS code to import C header constants
 =head1 DESCRIPTION
 
 ExtUtils::Constant facilitates generating C and XS wrapper code to allow
-perl modules to AUTOLOAD constants defined in C library header files.
+perl modules to export constants defined in C library header files.
 It is principally used by the C<h2xs> utility, on which this code is based.
 It doesn't contain the routines to scan header files to extract these
 constants.
@@ -102,7 +102,7 @@ use ExtUtils::Constant::XS qw(%XS_Constant %XS_TypeSet);
 
 %EXPORT_TAGS = ( 'all' => [ qw(
 	XS_constant constant_types return_clause memEQ_clause C_stringify
-	C_constant autoload WriteConstants WriteMakefileSnippet
+	C_constant WriteConstants WriteMakefileSnippet
 ) ] );
 
 @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
@@ -177,7 +177,7 @@ sub XS_constant {
 
   if (!ref $what) {
     # Convert line of the form IV,UV,NV to hash
-    $what = {map {$_ => 1} split /,\s*/, ($what)};
+    $what = {map {$_ => 1} split m/,\s*/, ($what)};
   }
   my $params = ExtUtils::Constant::XS->params ($what);
   my $type;
@@ -241,7 +241,7 @@ EOT
   $xs .= << "EOT";
       /* Return 1 or 2 items. First is error message, or undef if no error.
            Second, if present, is found value */
-        switch (type) {
+        switch (type) \{
         case PERL_constant_NOTFOUND:
           sv =
 	    sv_2mortal(newSVpvf("%s is not a valid $package_sprintf_safe macro", s));
@@ -283,74 +283,11 @@ EOT
 	    "Unexpected return type %d while processing $package_sprintf_safe macro %s, used",
                type, s));
           PUSHs(sv);
-        }
+        \}
 EOT
 
   return $xs;
 }
-
-
-=item autoload PACKAGE, VERSION, AUTOLOADER
-
-A function to generate the AUTOLOAD subroutine for the module I<PACKAGE>
-I<VERSION> is the perl version the code should be backwards compatible with.
-It defaults to the version of perl running the subroutine.  If I<AUTOLOADER>
-is true, the AUTOLOAD subroutine falls back on AutoLoader::AUTOLOAD for all
-names that the constant() routine doesn't recognise.
-
-=cut
-
-# ' # Grr. syntax highlighters that don't grok pod.
-
-sub autoload {
-  my ($module, $compat_version, $autoloader) = @_;
-  $compat_version ||= $];
-  croak "Can't maintain compatibility back as far as version $compat_version"
-    if $compat_version < 5;
-  my $func = "sub AUTOLOAD {\n"
-  . "    # This AUTOLOAD is used to 'autoload' constants from the constant()\n"
-  . "    # XS function.";
-  $func .= "  If a constant is not found then control is passed\n"
-  . "    # to the AUTOLOAD in AutoLoader." if $autoloader;
-
-
-  $func .= "\n\n"
-  . "    my \$constname;\n";
-  $func .=
-    "    our \$AUTOLOAD;\n"  if ($compat_version >= 5.006);
-
-  $func .= <<"EOT";
-    (\$constname = \$AUTOLOAD) =~ s/.*:://;
-    croak "&${module}::constant not defined" if \$constname eq 'constant';
-    my (\$error, \$val) = constant(\$constname);
-EOT
-
-  if ($autoloader) {
-    $func .= <<'EOT';
-    if ($error) {
-	if ($error =~  /is not a valid/) {
-	    $AutoLoader::AUTOLOAD = $AUTOLOAD;
-	    goto &AutoLoader::AUTOLOAD;
-	} else {
-	    croak $error;
-	}
-    }
-EOT
-  } else {
-    $func .=
-      "    if (\$error) { croak \$error; }\n";
-  }
-
-  $func .= <<'END';
-    *{Symbol::fetch_glob($AUTOLOAD)} = sub { $val };
-    goto &{Symbol::fetch_glob($AUTOLOAD)};
-}
-
-END
-
-  return $func;
-}
-
 
 =item WriteMakefileSnippet
 
@@ -375,6 +312,7 @@ ExtUtils::Constant::WriteConstants(
                                    NAME         => '$args{NAME}',
                                    NAMES        => \\\@names,
                                    DEFAULT_TYPE => '$args{DEFAULT_TYPE}',
+                                   PROXYSUBS    => 1,
 EOT
   foreach (qw (C_FILE XS_FILE)) {
     next unless exists $args{$_};
@@ -385,7 +323,7 @@ EOT
                                 );
 EOT
 
-  $result =~ s/^/' 'x$indent/gem;
+  $result =~ s/^/{' 'x$indent}/gm;
   return ExtUtils::Constant::XS->dump_names({default_type=>$args{DEFAULT_TYPE},
 					     indent=>$indent,},
 					    @{$args{NAMES}})
@@ -474,25 +412,12 @@ sub WriteConstants {
 
   my $c_fh = $ARGS{C_FH};
   if (!$c_fh) {
-      if ($] <= 5.008) {
-	  # We need these little games, rather than doing things
-	  # unconditionally, because we're used in core Makefile.PLs before
-	  # IO is available (needed by filehandle), but also we want to work on
-	  # older perls where undefined scalars do not automatically turn into
-	  # anonymous file handles.
-	  require FileHandle;
-	  $c_fh = FileHandle->new();
-      }
-      open $c_fh, ">$ARGS{C_FILE}" or die "Can't open $ARGS{C_FILE}: $!";
+      open $c_fh, ">", "$ARGS{C_FILE}" or die "Can't open $ARGS{C_FILE}: $!";
   }
 
   my $xs_fh = $ARGS{XS_FH};
   if (!$xs_fh) {
-      if ($] <= 5.008) {
-	  require FileHandle;
-	  $xs_fh = FileHandle->new();
-      }
-      open $xs_fh, ">$ARGS{XS_FILE}" or die "Can't open $ARGS{XS_FILE}: $!";
+      open $xs_fh, ">", "$ARGS{XS_FILE}" or die "Can't open $ARGS{XS_FILE}: $!";
   }
 
   # As this subroutine is intended to make code that isn't edited, there's no

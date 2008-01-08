@@ -22,25 +22,25 @@ $|=1;
 our (@prgs, $tmpfile, $CAT, $status, $i);
 
 undef $/;
-@prgs = split "\n########\n", <DATA>;
+@prgs = split "\n########\n", ~< *DATA;
 print "1..", scalar @prgs, "\n";
 
 $tmpfile = "forktmp000";
 1 while -f ++$tmpfile;
 END { close TEST; unlink $tmpfile if $tmpfile; }
 
-$CAT = (($^O eq 'MSWin32') ? '.\perl -e "print <>"' : (($^O eq 'NetWare') ? 'perl -e "print <>"' : 'cat'));
+$CAT = (($^O eq 'MSWin32') ? '.\perl -e "print ~< *ARGV"' : (($^O eq 'NetWare') ? 'perl -e "print ~< *ARGV"' : 'cat'));
 
 for (@prgs){
     my $switch;
     if (s/^\s*(-\w.*)//){
 	$switch = $1;
     }
-    my($prog,$expected) = split(/\nEXPECT\n/, $_);
+    my($prog,$expected) = split(m/\nEXPECT\n/, $_);
     $expected =~ s/\n+$//;
     # results can be in any order, so sort 'em
-    my @expected = sort split /\n/, $expected;
-    open TEST, ">$tmpfile" or die "Cannot open $tmpfile: $!";
+    my @expected = sort split m/\n/, $expected;
+    open TEST, ">", "$tmpfile" or die "Cannot open $tmpfile: $!";
     print TEST $prog, "\n";
     close TEST or die "Cannot close $tmpfile: $!";
     my $results;
@@ -62,7 +62,7 @@ for (@prgs){
     $results =~ s/^(syntax|parse) error/syntax error/mig;
     $results =~ s/^\n*Process terminated by SIG\w+\n?//mg
 	if $^O eq 'os2';
-    my @results = sort split /\n/, $results;
+    my @results = sort split m/\n/, $results;
     if ( "@results" ne "@expected" ) {
 	print STDERR "PROG: $switch\n$prog\n";
 	print STDERR "EXPECTED:\n$expected\n";
@@ -126,7 +126,7 @@ sub forkit {
 	print "pid $$ failed to fork\n";
     }
 }
-while ($i++ < 3) { do { forkit(); }; }
+while ($i++ +< 3) { do { forkit(); }; }
 EXPECT
 iteration 1 start
 iteration 1 parent
@@ -253,7 +253,7 @@ if (fork) {
     $dir = "f$$.tst";
     mkdir $dir, 0755;
     chdir $dir;
-    print cwd() =~ /\Q$dir/i ? "ok 1 parent" : "not ok 1 parent";
+    print cwd() =~ m/\Q$dir/i ? "ok 1 parent" : "not ok 1 parent";
     chdir "..";
     rmdir $dir;
 }
@@ -262,7 +262,7 @@ else {
     $dir = "f$$.tst";
     mkdir $dir, 0755;
     chdir $dir;
-    print cwd() =~ /\Q$dir/i ? "ok 1 child" : "not ok 1 child";
+    print cwd() =~ m/\Q$dir/i ? "ok 1 child" : "not ok 1 child";
     chdir "..";
     rmdir $dir;
 }
@@ -274,10 +274,10 @@ $| = 1;
 $\ = "\n";
 my $getenv;
 if ($^O eq 'MSWin32' || $^O eq 'NetWare') {
-    $getenv = qq[$^X -e "print \$ENV{TST}"];
+    $getenv = qq[$^X -e "print \$ENV\{TST\}"];
 }
 else {
-    $getenv = qq[$^X -e 'print \$ENV{TST}'];
+    $getenv = qq[$^X -e 'print \$ENV\{TST\}'];
 }
 $ENV{TST} = 'foo';
 if (fork) {
@@ -382,8 +382,8 @@ sub pipe_to_fork ($$) {
 
 my ($parent, $child);
 
-open $parent;
-open $child;
+open $parent, "<", '';
+open $child, "<", '';
 if (pipe_to_fork($parent, $child)) {
     # parent
     print $parent "pipe_to_fork\n";
@@ -391,7 +391,7 @@ if (pipe_to_fork($parent, $child)) {
 }
 else {
     # child
-    while (<$child>) { print; }
+    while (~< $child) { print; }
     close $child;
     exit;
 }
@@ -408,7 +408,7 @@ sub pipe_from_fork ($$) {
 
 if (pipe_from_fork($parent, $child)) {
     # parent
-    while (<$parent>) { print; }
+    while (~< $parent) { print; }
     close $parent;
 }
 else {
@@ -457,7 +457,7 @@ if ($pid == 0) {
 } else {
     my $rand_parent = rand;
     close WTR;
-    chomp(my $rand_child  = <RDR>);
+    chomp(my $rand_child  = ~< *RDR);
     close RDR;
     print $rand_child ne $rand_parent, "\n";
 }

@@ -15,7 +15,7 @@ BEGIN {
     use Config;
     # Load threads::shared when threads are turned on.
     # 5.8.0's threads are so busted we no longer support them.
-    if( $] >= 5.008001 && $Config{useithreads} && $INC{'threads.pm'}) {
+    if( $Config{useithreads} && $INC{'threads.pm'}) {
         require threads::shared;
 
         # Hack around YET ANOTHER threads::shared bug.  It would 
@@ -294,7 +294,7 @@ sub expected_tests {
 
     if( @_ ) {
         $self->croak("Number of tests must be a positive integer.  You gave it '$max'")
-          unless $max =~ /^\+?\d+$/ and $max > 0;
+          unless $max =~ m/^\+?\d+$/ and $max +> 0;
 
         $self->{Expected_Tests} = $max;
         $self->{Have_Plan}      = 1;
@@ -395,7 +395,7 @@ sub ok {
     # In case $name is a string overloaded object, force it to stringify.
     $self->_unoverload_str(\$name);
 
-    $self->diag(<<ERR) if defined $name and $name =~ /^[\d\s]+$/;
+    $self->diag(<<ERR) if defined $name and $name =~ m/^[\d\s]+$/;
     You named your test '$name'.  You shouldn't use numbers for your test names.
     Very confusing.
 ERR
@@ -714,7 +714,7 @@ $code" . "\$got $type \$expect;";
     my $ok = $self->ok($test, $name);
 
     unless( $ok ) {
-        if( $type =~ /^(eq|==)$/ ) {
+        if( $type =~ m/^(eq|==)$/ ) {
             $self->_is_diag($got, $type, $expect);
         }
         else {
@@ -958,7 +958,7 @@ sub _regex_ok {
         # Yes, it has to look like this or 5.4.5 won't see the #line directive.
         # Don't ask me, man, I just work here.
         $test = eval "
-$code" . q{$test = $this =~ /$usable_regex/ ? 1 : 0};
+$code" . q{$test = $this =~ m/$usable_regex/ ? 1 : 0};
 
         $test = !$test if $cmp eq '!~';
 
@@ -1203,7 +1203,7 @@ sub diag {
     $msg =~ s/^/# /gm;
 
     # Stick a newline on the end if it needs it.
-    $msg .= "\n" unless $msg =~ /\n\Z/;
+    $msg .= "\n" unless $msg =~ m/\n\Z/;
 
     local $Level = $Level + 1;
     $self->_print_diag($msg);
@@ -1240,7 +1240,7 @@ sub _print {
     $msg =~ s/\n(.)/\n# $1/sg;
 
     # Stick a newline on the end if it needs it.
-    $msg .= "\n" unless $msg =~ /\n\Z/;
+    $msg .= "\n" unless $msg =~ m/\n\Z/;
 
     print $fh $msg;
 }
@@ -1332,7 +1332,7 @@ sub _new_fh {
     }
     else {
         $fh = do { local *FH };
-        open $fh, ">$file_or_fh" or
+        open $fh, ">", $file_or_fh or
             $self->croak("Can't open test output log $file_or_fh: $!");
 	_autoflush($fh);
     }
@@ -1372,8 +1372,8 @@ sub _open_testhandles {
     return if $Opened_Testhandles;
     # We dup STDOUT and STDERR so people can change them in their
     # test suites while still getting normal test output.
-    open(TESTOUT, ">&STDOUT") or die "Can't dup STDOUT:  $!";
-    open(TESTERR, ">&STDERR") or die "Can't dup STDERR:  $!";
+    open(TESTOUT, ">&", \*STDOUT) or die "Can't dup STDOUT:  $!";
+    open(TESTERR, ">&", \*STDERR) or die "Can't dup STDERR:  $!";
     $Opened_Testhandles = 1;
 }
 
@@ -1455,7 +1455,7 @@ sub current_test {
 
         # If the test counter is being pushed forward fill in the details.
         my $test_results = $self->{Test_Results};
-        if( $num > @$test_results ) {
+        if( $num +> @$test_results ) {
             my $start = @$test_results ? @$test_results : 0;
             for ($start..$num-1) {
                 $test_results->[$_] = &share({
@@ -1468,7 +1468,7 @@ sub current_test {
             }
         }
         # If backward, wipe history.  Its their funeral.
-        elsif( $num < @$test_results ) {
+        elsif( $num +< @$test_results ) {
             $#{$test_results} = $num - 1;
         }
     }
@@ -1618,7 +1618,7 @@ error message.
 sub _sanity_check {
     my $self = shift;
 
-    $self->_whoa($self->{Curr_Test} < 0,  'Says here you ran a negative number of tests!');
+    $self->_whoa($self->{Curr_Test} +< 0,  'Says here you ran a negative number of tests!');
     $self->_whoa(!$self->{Have_Plan} and $self->{Curr_Test}, 
           'Somehow your tests ran without a plan!');
     $self->_whoa($self->{Curr_Test} != @{ $self->{Test_Results} },
@@ -1677,7 +1677,7 @@ $SIG{__DIE__} = sub {
     # 5.004!
     my $in_eval = 0;
     for( my $stack = 1;  my $sub = (CORE::caller($stack))[3];  $stack++ ) {
-        $in_eval = 1 if $sub =~ /^\(eval\)/;
+        $in_eval = 1 if $sub =~ m/^\(eval\)/;
     }
     $Test->{Test_Died} = 1 unless $in_eval;
 };
@@ -1724,13 +1724,13 @@ sub _ending {
 
         my $num_extra = $self->{Curr_Test} - $self->{Expected_Tests};
 
-        if( $num_extra < 0 ) {
+        if( $num_extra +< 0 ) {
             my $s = $self->{Expected_Tests} == 1 ? '' : 's';
             $self->diag(<<"FAIL");
 Looks like you planned $self->{Expected_Tests} test$s but only ran $self->{Curr_Test}.
 FAIL
         }
-        elsif( $num_extra > 0 ) {
+        elsif( $num_extra +> 0 ) {
             my $s = $self->{Expected_Tests} == 1 ? '' : 's';
             $self->diag(<<"FAIL");
 Looks like you planned $self->{Expected_Tests} test$s but ran $num_extra extra.
@@ -1758,7 +1758,7 @@ FAIL
 
         my $exit_code;
         if( $num_failed ) {
-            $exit_code = $num_failed <= 254 ? $num_failed : 254;
+            $exit_code = $num_failed +<= 254 ? $num_failed : 254;
         }
         elsif( $num_extra != 0 ) {
             $exit_code = 255;

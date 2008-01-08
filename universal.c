@@ -161,7 +161,7 @@ Perl_sv_does(pTHX_ SV *sv, const char *name)
     XPUSHs(sv_2mortal(newSVpv(name, 0)));
     PUTBACK;
 
-    methodname = sv_2mortal(newSVpv("isa", 0));
+    methodname = sv_2mortal(newSVpvs("isa"));
     /* ugly hack: use the SvSCREAM flag so S_method_common
      * can figure out we're calling DOES() and not isa(),
      * and report eventual errors correctly. --rgs */
@@ -224,6 +224,8 @@ XS(XS_Tie_Hash_NamedCapture_SCALAR);
 XS(XS_Tie_Hash_NamedCapture_flags);
 XS(XS_Symbol_fetch_glob);
 XS(XS_Symbol_stash);
+XS(XS_Symbol_glob_name);
+XS(XS_dump_view);
 
 void
 Perl_boot_core_UNIVERSAL(pTHX)
@@ -247,7 +249,7 @@ Perl_boot_core_UNIVERSAL(pTHX)
 	newXS("version::numify", XS_version_numify, file);
 	newXS("version::normal", XS_version_normal, file);
 	newXS("version::(cmp", XS_version_vcmp, file);
-	newXS("version::(<=>", XS_version_vcmp, file);
+	newXS("version::(<+>", XS_version_vcmp, file);
 	newXS("version::vcmp", XS_version_vcmp, file);
 	newXS("version::(bool", XS_version_boolean, file);
 	newXS("version::boolean", XS_version_boolean, file);
@@ -287,7 +289,10 @@ Perl_boot_core_UNIVERSAL(pTHX)
     newXS("Tie::Hash::NamedCapture::SCALAR", XS_Tie_Hash_NamedCapture_SCALAR, file);
     newXS("Tie::Hash::NamedCapture::flags", XS_Tie_Hash_NamedCapture_flags, file);
     newXSproto("Symbol::fetch_glob", XS_Symbol_fetch_glob, file, "$");
+    newXSproto("Symbol::glob_name", XS_Symbol_glob_name, file, "$");
     newXSproto("Symbol::stash", XS_Symbol_stash, file, "$");
+
+    newXS("dump::view", XS_dump_view, file);
 }
 
 
@@ -350,7 +355,7 @@ XS(XS_UNIVERSAL_can)
     }
 
     if (pkg) {
-	GV * const gv = gv_fetchmethod_autoload(pkg, name, FALSE);
+	GV * const gv = gv_fetchmethod(pkg, name);
         if (gv && isGV(gv))
 	    rv = sv_2mortal(newRV((SV*)GvCV(gv)));
     }
@@ -681,16 +686,10 @@ XS(XS_version_qv)
     SP -= items;
     {
 	SV *	ver = ST(0);
-	if ( !SvVOK(ver) ) { /* only need to do with if not already v-string */
-	    SV * const rv = sv_newmortal();
-	    sv_setsv(rv,ver); /* make a duplicate */
-	    upg_version(rv, TRUE);
-	    PUSHs(rv);
-	}
-	else
-	{
-	    PUSHs(sv_2mortal(new_version(ver)));
-	}
+        SV * const rv = sv_newmortal();
+        sv_setsv(rv,ver); /* make a duplicate */
+        upg_version(rv, TRUE);
+        PUSHs(rv);
 
 	PUTBACK;
 	return;
@@ -1420,6 +1419,25 @@ XS(XS_Symbol_fetch_glob)
     XSRETURN(1);
 }
 
+XS(XS_Symbol_glob_name)
+{
+    dVAR; 
+    dXSARGS;
+    SV * const sv = sv_newmortal();
+    PERL_UNUSED_VAR(cv);
+
+    if (items != 1)
+       Perl_croak(aTHX_ "Usage: %s(%s)", "Symbol::glob_name", "gv");
+
+    if (SvTYPE(ST(0)) != SVt_PVGV)
+       Perl_croak(aTHX_ "Argument must be glob");
+
+    gv_efullname4(sv, (GV*)ST(0), NULL, TRUE);
+    ST(0) = sv;
+    
+    XSRETURN(1);
+}
+
 XS(XS_Symbol_stash)
 {
     dVAR; 
@@ -1433,6 +1451,155 @@ XS(XS_Symbol_stash)
     ST(0) = newRV_noinc(ST(0));
     XSRETURN(1);
 }
+
+XS(XS_dump_view)
+{
+    dVAR;
+    dXSARGS;
+    SV * const sv = TOPs;
+    SV * const retsv = ST(0) = sv_newmortal();
+
+    if (items != 1)
+       Perl_croak(aTHX_ "Usage: %s(%s)", "dump::view", "sv");
+
+    if (SvGMAGICAL(sv))
+	mg_get(sv);
+
+    if ( ! SvOK(sv) ) {
+	sv_setpv(retsv, "undef");
+	XSRETURN(1);
+    }
+
+    if (SvPOKp(sv)) {
+	/* mostly stoken from Data::Dumper/Dumper.xs */
+	char *r, *rstart;
+	const char * const src = SvPVX_const(sv);
+	const char * const send = src + SvCUR(sv);
+	const char *s;
+
+	STRLEN j, cur = 0;
+	/* Could count 128-255 and 256+ in two variables, if we want to
+	   be like &qquote and make a distinction.  */
+	STRLEN grow = 0;	/* bytes needed to represent chars 128+ */
+	/* STRLEN topbit_grow = 0;	bytes needed to represent chars 128-255 */
+	STRLEN backslashes = 0;
+	STRLEN single_quotes = 0;
+	STRLEN qq_escapables = 0;	/* " $ @ will need a \ in "" strings.  */
+	STRLEN normal = 0;
+	
+	/* this will need EBCDICification */
+	STRLEN charlen = 0;
+	for (s = src; s < send; s += charlen) {
+	    const UV k = utf8_to_uvchr((U8*)s, &charlen);
+
+	    if (k == 0 || s + charlen > send ) {
+		/* invalid character escape: \x[XX] */
+		grow += 6;
+		s += 1;
+		continue;
+	    } else if (k > 127) {
+		/* 4: \x{} then count the number of hex digits.  */
+		grow += 4 + (k <= 0xFF ? 2 : k <= 0xFFF ? 3 : k <= 0xFFFF ? 4 : 8);
+	    } else if ( ! isPRINT(k) ) {
+		switch (*s) {
+		case '\v' : 
+		case '\t' : 
+		case '\r' :
+		case '\n' :
+		case '\f' :
+		    grow += 2;
+		    break;
+		default:
+		    grow += 6;
+		}
+	    } else if (k == '\\') {
+		backslashes++;
+	    } else if (k == '\'') {
+		single_quotes++;
+	    } else if (k == '"' || k == '$' || k == '@' || k == '{' || k == '}') {
+		qq_escapables++;
+	    } else {
+		normal++;
+	    }
+	}
+	if (single_quotes || grow) {
+	    /* We have something needing hex. 3 is ""\0 */
+	    sv_grow(retsv, 3 + grow + 2*backslashes + single_quotes
+		    + 2*qq_escapables + normal);
+	    rstart = r = SvPVX(retsv);
+
+	    *r++ = '"';
+
+	    STRLEN charlen;
+	    for (s = src; s < send; s += charlen) {
+		const UV k = utf8_to_uvchr((U8*)s, &charlen);
+
+		if (k == 0 || s + charlen > send ) {
+		    /* invalid character */
+		    r = r + my_sprintf(r, "\\x[%02x]", (U8)*s);
+		    charlen = 1;
+		    continue;
+		} else if (k > 127) {
+		    r = r + my_sprintf(r, "\\x{%"UVxf"}", k);
+		} else if ( ! isPRINT(k) ) {
+		    *r++ = '\\';
+		    switch (*s) {
+		    case '\v': *r++ = 'v';  break;
+		    case '\t': *r++ = 't';  break;
+		    case '\r': *r++ = 'r';  break;
+		    case '\n': *r++ = 'n';  break;
+		    case '\f': *r++ = 'f';  break;
+		    default: 
+			r = r + my_sprintf(r, "x{%02"UVxf"}", k);
+		    }
+		} else if (k == '"' || k == '\\' || k == '$' || k == '@' || k == '{' || k == '}') {
+		    *r++ = '\\';
+		    *r++ = (char)k;
+		}
+		else {
+		    *r++ = (char)k;
+		}
+	    }
+	    *r++ = '"';
+	} else {
+	    /* Single quotes.  */
+	    sv_grow(retsv, 3 + backslashes + single_quotes + qq_escapables + normal);
+	    rstart = r = SvPVX(retsv);
+	    *r++ = '\'';
+	    for (s = src; s < send; s ++) {
+		*r++ = *s;
+	    }
+	    *r++ = '\'';
+	}
+	*r = '\0';
+	j = r - rstart;
+	SvCUR_set(retsv, j);
+	SvPOK_on(retsv);
+
+	XSRETURN(1);
+    }
+
+    if (SvIOKp(sv) || SvNOKp(sv)) {
+	sv_setsv(retsv, sv); /* let perl handle the stringification */
+	XSRETURN(1);
+    }
+
+    if (SvROK(sv)) {
+	sv_setpv(retsv, "REF");
+	XSRETURN(1);
+    }
+    
+    if (isGV(sv)) {
+	gv_efullname4(retsv, (GV*)sv, "*", TRUE);
+
+	XSRETURN(1);
+    }
+
+    Perl_croak(aTHX_ "Unknown scalar type");
+
+    XSRETURN(1);
+}
+
 
 /*
  * Local variables:

@@ -380,7 +380,7 @@ sub getCmdLine {	# import assistant
 	     turn on a flag by typing its name,
 	     select a value from list by typing name=val.\n    },
 	  mydumper(\%gOpts))
-	if grep /help/, @ARGV;
+	if grep m/help/, @ARGV;
 
     # replace values for each key !! MUST MARK UP %gOpts
     foreach my $opt (keys %gOpts) {
@@ -394,7 +394,7 @@ sub getCmdLine {	# import assistant
 	    # uhh this WORKS. but it's inscrutable
 	    # grep s/$opt=(\w+)/grep {$_ eq $1} @ARGV and $gOpts{$opt}=$1/e, @ARGV;
 	    my $tval;  # temp
-	    if (grep s/$opt=(\w+)/$tval=$1/e, @ARGV) {
+	    if (grep s/$opt=(\w+)/{$tval=$1}/, @ARGV) {
 		# check val before accepting
 		my @allowed = @{$gOpts{$opt}};
 		if (grep { $_ eq $tval } @allowed) {
@@ -410,10 +410,10 @@ sub getCmdLine {	# import assistant
         else { # handle scalars
 
 	    # if 'opt' is present, true
-	    $gOpts{$opt} = (grep /^$opt/, @ARGV) ? 1 : 0;
+	    $gOpts{$opt} = (grep m/^$opt/, @ARGV) ? 1 : 0;
 
 	    # override with 'foo' if 'opt=foo' appears
-	    grep s/$opt=(.*)/$gOpts{$opt}=$1/e, @ARGV;
+	    grep s/$opt=(.*)/{$gOpts{$opt}=$1}/, @ARGV;
 	}
      }
     print("$0 heres current state:\n", mydumper(\%gOpts))
@@ -528,7 +528,7 @@ sub getRendering {
 	    {
 		no strict;
 		no warnings;
-		$code = eval "$pkg sub { $code } }";
+		$code = eval "$pkg sub \{ $code \} \}";
 	    }
 	    # return errors
 	    if ($@) { chomp $@; push @errs, $@ }
@@ -587,7 +587,7 @@ sub checkErrs {
     @goterrs{@{$tc->{goterrs}}} = (1) x scalar @{$tc->{goterrs}};
     
     foreach my $k (keys %{$tc->{errs}}) {
-	if (@got = grep /^$k$/, keys %goterrs) {
+	if (@got = grep m/^$k$/, keys %goterrs) {
 	    delete $tc->{errs}{$k};
 	    delete $goterrs{$_} foreach @got;
 	}
@@ -674,14 +674,6 @@ sub mkCheckRex {
 
     $str =~ s/^\# //mg;	# ease cut-paste testcase authoring
 
-    if ($] < 5.009) {
-	# add 5.8 private flags, which bleadperl (5.9.1) doesn't have/use/render
-	# works because it adds no wildcards, which are butchered below..
-        $str =~ s|(mapstart l?K\*?)|$1/2|mg;
-        $str =~ s|(grepstart l?K\*?)|$1/2|msg;
-        $str =~ s|(mapwhile.*? l?K)|$1/1|msg;
-	$str =~ s|(grepwhile.*? l?K)|$1/1|msg;
-    }
     $tc->{wantstr} = $str;
 
     # make targ args wild
@@ -705,9 +697,10 @@ sub mkCheckRex {
 	       [^()]*?			# which might be followed by something
 	      )?
 	      \\\)			# closing literal )
-	     !'(?:next|db)state\\([^()]*?' .
-	      ($1 && '\\(eval \\d+\\)[^()]*')	# Match the eval if present
-	      . '\\)'!msgxe;
+	     !{'(?:next|db)state\([^()]*?' .
+	      ($1 && '\(eval \d+\)[^()]*')	# Match the eval if present
+	      . '\)'
+}!msgx;
     # widened for -terse mode
     $str =~ s/(?:next|db)state/(?:next|db)state/msg;
 
@@ -723,7 +716,7 @@ sub mkCheckRex {
     #$str =~ s/(\s*)\n/\n/msg;				# trailing spaces
     
     croak "no reftext found for $want: $tc->{name}"
-	unless $str =~ /\w+/; # fail unless a real test
+	unless $str =~ m/\w+/; # fail unless a real test
     
     # $str = '.*'	if 1;	# sanity test
     # $str .= 'FAIL'	if 1;	# sanity test
@@ -784,12 +777,12 @@ sub reduceDiffs {
 
     my $tc	= shift;
     my $got	= $tc->{got};
-    my @got	= split(/\n/, $got);
+    my @got	= split(m/\n/, $got);
     my $want	= $tc->{wantstr};
-    my @want	= split(/\n/, $want);
+    my @want	= split(m/\n/, $want);
 
     # split rexstr into units that should eat leading lines.
-    my @rexs = map qr/$_/, split (/\n/, $tc->{rexstr});
+    my @rexs = map qr/$_/, split (m/\n/, $tc->{rexstr});
 
     foreach my $rex (@rexs) {
         my $exp = shift @want;
@@ -940,11 +933,11 @@ sub preamble {
     return <<EO_HEADER;
 #!perl
 
-BEGIN {
+BEGIN \{
     chdir q(t);
     \@INC = qw(../lib ../ext/B/t);
     require q(./test.pl);
-}
+\}
 use OptreeCheck;
 plan tests => $testct;
 
@@ -957,14 +950,14 @@ sub OptreeCheck::wrap {
     $code =~ s/(?:(\#.*?)\n)//gsm;
     $code =~ s/\s+/ /mgs;	       
     chomp $code;
-    return unless $code =~ /\S/;
+    return unless $code =~ m/\S/;
     my $comment = $1;
     
     my $testcode = qq{
 	
-checkOptree(note   => q{$comment},
-	    bcopts => q{-exec},
-	    code   => q{$code},
+checkOptree(note   => q\{$comment\},
+	    bcopts => q\{-exec\},
+	    code   => q\{$code\},
 	    expect => <<EOT_EOT, expect_nt => <<EONT_EONT);
 ThreadedRef
     paste your 'golden-example' here, then retest
@@ -1015,9 +1008,9 @@ sub OptreeCheck::processExamples {
     # turned into optreeCheck tests,
 
     foreach my $file (@files) {
-	open (my $fh, $file) or die "cant open $file: $!\n";
+	open (my $fh, "<", $file) or die "cant open $file: $!\n";
 	$/ = "";
-	my @chunks = <$fh>;
+	my @chunks = ~< $fh;
 	print preamble (scalar @chunks);
 	foreach my $t (@chunks) {
 	    print "\n\n=for gentest\n\n# chunk: $t=cut\n\n";
@@ -1028,7 +1021,7 @@ sub OptreeCheck::processExamples {
 
 # OK - now for the final insult to your good taste...  
 
-if ($0 =~ /OptreeCheck\.pm/) {
+if ($0 =~ m/OptreeCheck\.pm/) {
 
     #use lib 't';
     require './t/test.pl';

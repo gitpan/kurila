@@ -154,14 +154,14 @@ Not yet supported.
 
 If the external F<gzip> is used, the following C<open>s are used:
 
-    open(FH, "gzip -dc $filename |")  # for read opens
-    open(FH, " | gzip > $filename")   # for write opens
+    open(FH, "-|", "gzip -dc $filename")  # for read opens
+    open(FH, "|-", "gzip > $filename")   # for write opens
 
 You can modify the 'commands' for example to hardwire
 an absolute path by e.g.
 
-    use IO::Zlib ':gzip_read_open'  => '/some/where/gunzip -c %s |';
-    use IO::Zlib ':gzip_write_open' => '| /some/where/gzip.exe > %s';
+    use IO::Zlib ':gzip_read_open'  => '/some/where/gunzip -c %s';
+    use IO::Zlib ':gzip_write_open' => '/some/where/gzip.exe > %s';
 
 The C<%s> is expanded to be the filename (C<sprintf> is used, so be
 careful to escape any other C<%> signs).  The 'commands' are checked
@@ -289,7 +289,7 @@ it and/or modify it under the same terms as Perl itself.
 
 use strict;
 use bytes;
-use vars qw($VERSION $AUTOLOAD @ISA);
+use vars qw($VERSION @ISA);
 
 use Carp;
 use Fcntl qw(SEEK_SET);
@@ -310,8 +310,8 @@ use Symbol;
 use Tie::Handle;
 
 # These might use some $^O logic.
-my $gzip_read_open   = "gzip -dc %s |";
-my $gzip_write_open  = "| gzip > %s";
+my $gzip_read_open   = "gzip -dc %s";
+my $gzip_write_open  = "gzip > %s";
 
 my $gzip_external;
 my $gzip_used;
@@ -352,7 +352,7 @@ sub _import {
 	    if (@_) {
 		$gzip_read_open = shift;
 		croak "$import: ':gzip_read_open' '$gzip_read_open' is illegal"
-		    unless $gzip_read_open =~ /^.+%s.+\|\s*$/;
+		    unless $gzip_read_open =~ m/^.+%s.+$/;
 	    } else {
 		croak "$import: ':gzip_read_open' requires an argument";
 	    }
@@ -362,7 +362,7 @@ sub _import {
 	    if (@_) {
 		$gzip_write_open = shift;
 		croak "$import: ':gzip_write_open' '$gzip_read_open' is illegal"
-		    unless $gzip_write_open =~ /^\s*\|.+%s.*$/;
+		    unless $gzip_write_open =~ m/^.+%s.*$/;
 	    } else {
 		croak "$import: ':gzip_write_open' requires an argument";
 	    }
@@ -463,9 +463,11 @@ sub READ
 
     $$bufref = "" unless defined($$bufref);
 
-    my $bytesread = $self->{'file'}->gzread(substr($$bufref,$offset),$nbytes);
+    my $mybuf;
+    my $bytesread = $self->{'file'}->gzread($mybuf,$nbytes);
+    substr($$bufref, $offset, undef, $mybuf);
 
-    return undef if $bytesread < 0;
+    return undef if $bytesread +< 0;
 
     return $bytesread;
 }
@@ -476,13 +478,13 @@ sub READLINE
 
     my $line;
 
-    return () if $self->{'file'}->gzreadline($line) <= 0;
+    return () if $self->{'file'}->gzreadline($line) +<= 0;
 
     return $line unless wantarray;
 
     my @lines = $line;
 
-    while ($self->{'file'}->gzreadline($line) > 0)
+    while ($self->{'file'}->gzreadline($line) +> 0)
     {
         push @lines, $line;
     }
@@ -497,7 +499,7 @@ sub WRITE
     my $length = shift;
     my $offset = shift;
 
-    croak "IO::Zlib::WRITE: too long LENGTH" unless $offset + $length <= length($buf);
+    croak "IO::Zlib::WRITE: too long LENGTH" unless $offset + $length +<= length($buf);
 
     return $self->{'file'}->gzwrite(substr($buf,$offset,$length));
 }
@@ -552,21 +554,19 @@ sub opened
     return defined tied(*{$self})->{'file'};
 }
 
-sub AUTOLOAD
-{
-    my $self = shift;
-
-    $AUTOLOAD =~ s/.*:://;
-    $AUTOLOAD =~ tr/a-z/A-Z/;
-
-    return tied(*{$self})->?$AUTOLOAD(@_);
+for my $name (qw|OPEN CLOSE READ READLINE PRINT PRINTF GETC BINMODE WRITE EOF TELL SEEK FILENO|) {
+    Symbol::fetch_glob(lc $name)->* =
+        sub {
+            my $self = shift;
+            tied(*{$self})->?$name(@_);
+        };
 }
 
 sub gzopen_external {
     my ($filename, $mode) = @_;
     require IO::Handle;
     my $fh = IO::Handle->new();
-    if ($mode =~ /r/) {
+    if ($mode =~ m/r/) {
 	# Because someone will try to read ungzipped files
 	# with this we peek and verify the signature.  Yes,
 	# this means that we open the file twice (if it is
@@ -574,13 +574,13 @@ sub gzopen_external {
 	# Plenty of race conditions exist in this code, but
 	# the alternative would be to capture the stderr of
 	# gzip and parse it, which would be a portability nightmare.
-	if (-e $filename && open($fh, $filename)) {
+	if (-e $filename && open($fh, "<", $filename)) {
 	    binmode $fh;
 	    my $sig;
 	    my $rdb = read($fh, $sig, 2);
-	    if ($rdb == 2 && $sig eq "\x1F\x8B") {
+	    if ($rdb == 2 && $sig eq "\x[1F8B]") {
 		my $ropen = sprintf $gzip_read_open, $filename;
-		if (open($fh, $ropen)) {
+		if (open($fh, "-|", $ropen)) {
 		    binmode $fh;
 		    return $fh;
 		} else {
@@ -593,9 +593,9 @@ sub gzopen_external {
 	} else {
 	    return undef;
 	}
-    } elsif ($mode =~ /w/) {
+    } elsif ($mode =~ m/w/) {
 	my $level = '';
-	$level = "-$1" if $mode =~ /([1-9])/;
+	$level = "-$1" if $mode =~ m/([1-9])/;
 	# To maximize portability we would need to open
 	# two filehandles here, one for "| gzip $level"
 	# and another for "> $filename", and then when
@@ -603,7 +603,7 @@ sub gzopen_external {
 	# We are using IO::Handle objects for now, however,
 	# and they can only contain one stream at a time.
 	my $wopen = sprintf $gzip_write_open, $filename;
-	if (open($fh, $wopen)) {
+	if (open($fh, "|-", $wopen)) {
 	    $fh->autoflush(1);
 	    binmode $fh;
 	    return $fh;

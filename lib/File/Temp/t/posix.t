@@ -46,7 +46,7 @@ if (defined $fh) {
   ok( $fh );
   print "# TMPFILE: tmpfile got FH $fh\n";
 
-  $fh->autoflush(1) if $] >= 5.006;
+  $fh->autoflush(1);
 
   # print something to it
   my $original = "Hello a test\n";
@@ -58,7 +58,7 @@ if (defined $fh) {
   ok( seek($fh,0,0) );
 
   # Read from it
-  my $line = <$fh>;
+  my $line = ~< $fh;
 
   print "# TMPFILE: Read line: $line";
   ok( $original, $line);

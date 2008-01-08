@@ -60,7 +60,7 @@ ok( close( $out ),			'closing encoding handle' );
 
 {
 local $/ = undef;
-ok( open( my $test,$file ),		'opening without layer' );
+ok( open( my $test, "<",$file ),		'opening without layer' );
 is( $encoded,readline( $test ),		'check encoded content' );
 ok( close( $test ),			'close test handle' );
 }
@@ -71,7 +71,7 @@ ok(
  open( my $in,'<:via(QuotedPrint)', $file ),
  "opening '$file' for reading"
 );
-is( $decoded,join( '',<$in> ),		'check decoding' );
+is( $decoded,join( '', ~< $in ),		'check decoding' );
 ok( close( $in ),			'close decoding handle' );
 
 # Remove whatever we created now

@@ -143,7 +143,7 @@ $VERSION = "1.14";
 eval {
     # Make all Fcntl O_XXX constants available for importing
     require Fcntl;
-    my @O = grep /^O_/, @Fcntl::EXPORT;
+    my @O = grep m/^O_/, @Fcntl::EXPORT;
     Fcntl->import(@O);  # first we import what we want to export
     push(@EXPORT, @O);
 };
@@ -155,7 +155,7 @@ eval {
 sub new {
     my $type = shift;
     my $class = ref($type) || $type || "IO::File";
-    @_ >= 0 && @_ <= 3
+    @_ +>= 0 && @_ +<= 3
 	or croak "usage: new $class [FILENAME [,MODE [,PERMS]]]";
     my $fh = $class->SUPER::new();
     if (@_) {
@@ -170,21 +170,22 @@ sub new {
 ##
 
 sub open {
-    @_ >= 2 && @_ <= 4 or croak 'usage: $fh->open(FILENAME [,MODE [,PERMS]])';
+    @_ +>= 2 && @_ +<= 4 or croak 'usage: $fh->open(FILENAME [,MODE [,PERMS]])';
     my ($fh, $file) = @_;
-    if (@_ > 2) {
+    if (@_ +> 2) {
 	my ($mode, $perms) = @_[2, 3];
-	if ($mode =~ /^\d+$/) {
+	if ($mode =~ m/^\d+$/) {
 	    defined $perms or $perms = 0666;
 	    return sysopen($fh, $file, $mode, $perms);
-	} elsif ($mode =~ /:/) {
+	} elsif ($mode =~ m/:/) {
 	    return open($fh, $mode, $file) if @_ == 3;
 	    croak 'usage: $fh->open(FILENAME, IOLAYERS)';
 	} else {
             return open($fh, IO::Handle::_open_mode_string($mode), $file);
         }
     }
-    open($fh, $file);
+    $file =~ m/^<|>>?/ and croak 'MODE may not be part of the filename';
+    open($fh, "<", $file);
 }
 
 ################################################

@@ -37,9 +37,9 @@ sub _hostname {
       $host = gethostbyaddr($a, Socket::AF_INET());
       last if defined $host;
     }
-    if (defined($host) && index($host, '.') > 0) {
+    if (defined($host) && index($host, '.') +> 0) {
       $fqdn = $host;
-      ($host, $domain) = $fqdn =~ /^([^\.]+)\.(.*)$/;
+      ($host, $domain) = $fqdn =~ m/^([^\.]+)\.(.*)$/;
     }
     return $host;
   }
@@ -49,9 +49,9 @@ sub _hostname {
   elsif ($^O eq 'VMS') {    ## multiple varieties of net s/w makes this hard
     $host = $ENV{'UCX$INET_HOST'}      if defined($ENV{'UCX$INET_HOST'});
     $host = $ENV{'MULTINET_HOST_NAME'} if defined($ENV{'MULTINET_HOST_NAME'});
-    if (index($host, '.') > 0) {
+    if (index($host, '.') +> 0) {
       $fqdn = $host;
-      ($host, $domain) = $fqdn =~ /^([^\.]+)\.(.*)$/;
+      ($host, $domain) = $fqdn =~ m/^([^\.]+)\.(.*)$/;
     }
     return $host;
   }
@@ -94,7 +94,7 @@ sub _hostname {
       }
 
       # Apollo pre-SR10
-      || eval { $host = (split(/[:\. ]/, `/com/host`, 6))[0]; }
+      || eval { $host = (split(m/[:\. ]/, `/com/host`, 6))[0]; }
 
       || eval { $host = ""; };
   }
@@ -127,10 +127,10 @@ sub _hostdomain {
   local *RES;
   local ($_);
 
-  if (open(RES, "/etc/resolv.conf")) {
-    while (<RES>) {
+  if (open(RES, "<", "/etc/resolv.conf")) {
+    while ( ~< *RES) {
       $domain = $1
-        if (/\A\s*(?:domain|search)\s+(\S+)/);
+        if (m/\A\s*(?:domain|search)\s+(\S+)/);
     }
     close(RES);
 
@@ -145,7 +145,7 @@ sub _hostdomain {
 
   @hosts = ($host, "localhost");
 
-  unless (defined($host) && $host =~ /\./) {
+  unless (defined($host) && $host =~ m/\./) {
     my $dom = undef;
     eval {
       my $tmp = "\0" x 256;    ## preload scalar
@@ -169,7 +169,7 @@ sub _hostdomain {
     }
 
     chop($dom = `domainname 2>/dev/null`)
-      unless (defined $dom || $^O =~ /^(?:cygwin|MSWin32)/);
+      unless (defined $dom || $^O =~ m/^(?:cygwin|MSWin32)/);
 
     if (defined $dom) {
       my @h = ();
@@ -191,8 +191,8 @@ sub _hostdomain {
 
     # look at real name & aliases
     my $site;
-    foreach $site ($info[0], split(/ /, $info[1])) {
-      if (rindex($site, ".") > 0) {
+    foreach $site ($info[0], split(m/ /, $info[1])) {
+      if (rindex($site, ".") +> 0) {
 
         # Extract domain from FQDN
 
@@ -232,14 +232,14 @@ sub domainname {
   return $fqdn = $host . "." . $domain
     if (defined $host
     and defined $domain
-    and $host !~ /\./
-    and $domain =~ /\./);
+    and $host !~ m/\./
+    and $domain =~ m/\./);
 
   # For hosts that have no name, just an IP address
-  return $fqdn = $host if defined $host and $host =~ /^\d+(\.\d+){3}$/;
+  return $fqdn = $host if defined $host and $host =~ m/^\d+(\.\d+){3}$/;
 
-  my @host   = defined $host   ? split(/\./, $host)   : ('localhost');
-  my @domain = defined $domain ? split(/\./, $domain) : ();
+  my @host   = defined $host   ? split(m/\./, $host)   : ('localhost');
+  my @domain = defined $domain ? split(m/\./, $domain) : ();
   my @fqdn   = ();
 
   # Determine from @host & @domain the FQDN

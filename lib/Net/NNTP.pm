@@ -101,8 +101,8 @@ sub debug_text {
   my $inout = shift;
   my $text  = shift;
 
-  if ( (ref($nntp) and $nntp->code == 350 and $text =~ /^(\S+)/)
-    || ($text =~ /^(authinfo\s+pass)/io))
+  if ( (ref($nntp) and $nntp->code == 350 and $text =~ m/^(\S+)/)
+    || ($text =~ m/^(authinfo\s+pass)/io))
   {
     $text = "$1 ....\n";
   }
@@ -119,7 +119,7 @@ sub postok {
 
 
 sub article {
-  @_ >= 1 && @_ <= 3 or croak 'usage: $nntp->article( [ MSGID ], [ FH ] )';
+  @_ +>= 1 && @_ +<= 3 or croak 'usage: $nntp->article( [ MSGID ], [ FH ] )';
   my $nntp = shift;
   my @fh;
 
@@ -132,7 +132,7 @@ sub article {
 
 
 sub articlefh {
-  @_ >= 1 && @_ <= 2 or croak 'usage: $nntp->articlefh( [ MSGID ] )';
+  @_ +>= 1 && @_ +<= 2 or croak 'usage: $nntp->articlefh( [ MSGID ] )';
   my $nntp = shift;
 
   return unless $nntp->_ARTICLE(@_);
@@ -159,7 +159,7 @@ sub authinfo_simple {
 
 
 sub body {
-  @_ >= 1 && @_ <= 3 or croak 'usage: $nntp->body( [ MSGID ], [ FH ] )';
+  @_ +>= 1 && @_ +<= 3 or croak 'usage: $nntp->body( [ MSGID ], [ FH ] )';
   my $nntp = shift;
   my @fh;
 
@@ -172,7 +172,7 @@ sub body {
 
 
 sub bodyfh {
-  @_ >= 1 && @_ <= 2 or croak 'usage: $nntp->bodyfh( [ MSGID ] )';
+  @_ +>= 1 && @_ +<= 2 or croak 'usage: $nntp->bodyfh( [ MSGID ] )';
   my $nntp = shift;
   return unless $nntp->_BODY(@_);
   return $nntp->tied_fh;
@@ -180,7 +180,7 @@ sub bodyfh {
 
 
 sub head {
-  @_ >= 1 && @_ <= 3 or croak 'usage: $nntp->head( [ MSGID ], [ FH ] )';
+  @_ +>= 1 && @_ +<= 3 or croak 'usage: $nntp->head( [ MSGID ], [ FH ] )';
   my $nntp = shift;
   my @fh;
 
@@ -193,7 +193,7 @@ sub head {
 
 
 sub headfh {
-  @_ >= 1 && @_ <= 2 or croak 'usage: $nntp->headfh( [ MSGID ] )';
+  @_ +>= 1 && @_ +<= 2 or croak 'usage: $nntp->headfh( [ MSGID ] )';
   my $nntp = shift;
   return unless $nntp->_HEAD(@_);
   return $nntp->tied_fh;
@@ -204,7 +204,7 @@ sub nntpstat {
   @_ == 1 || @_ == 2 or croak 'usage: $nntp->nntpstat( [ MSGID ] )';
   my $nntp = shift;
 
-  $nntp->_STAT(@_) && $nntp->message =~ /(<[^>]+>)/o
+  $nntp->_STAT(@_) && $nntp->message =~ m/(<[^>]+>)/o
     ? $1
     : undef;
 }
@@ -222,13 +222,13 @@ sub group {
 
   return wantarray ? () : undef
     unless $nntp->_GROUP($newgrp || $grp || "")
-    && $nntp->message =~ /(\d+)\s+(\d+)\s+(\d+)\s+(\S+)/;
+    && $nntp->message =~ m/(\d+)\s+(\d+)\s+(\d+)\s+(\S+)/;
 
   my ($count, $first, $last, $group) = ($1, $2, $3, $4);
 
   # group may be replied as '(current group)'
   $group = ${*$nntp}{'net_nntp_group'}
-    if $group =~ /\(/;
+    if $group =~ m/\(/;
 
   ${*$nntp}{'net_nntp_group'} = $group;
 
@@ -249,7 +249,7 @@ sub help {
 
 
 sub ihave {
-  @_ >= 2 or croak 'usage: $nntp->ihave( MESSAGE-ID [, MESSAGE ])';
+  @_ +>= 2 or croak 'usage: $nntp->ihave( MESSAGE-ID [, MESSAGE ])';
   my $nntp = shift;
   my $mid  = shift;
 
@@ -263,7 +263,7 @@ sub last {
   @_ == 1 or croak 'usage: $nntp->last()';
   my $nntp = shift;
 
-  $nntp->_LAST && $nntp->message =~ /(<[^>]+>)/o
+  $nntp->_LAST && $nntp->message =~ m/(<[^>]+>)/o
     ? $1
     : undef;
 }
@@ -280,7 +280,7 @@ sub list {
 
 
 sub newgroups {
-  @_ >= 2 or croak 'usage: $nntp->newgroups( SINCE [, DISTRIBUTIONS ])';
+  @_ +>= 2 or croak 'usage: $nntp->newgroups( SINCE [, DISTRIBUTIONS ])';
   my $nntp = shift;
   my $time = _timestr(shift);
   my $dist = shift || "";
@@ -295,7 +295,7 @@ sub newgroups {
 
 
 sub newnews {
-  @_ >= 2 && @_ <= 4
+  @_ +>= 2 && @_ +<= 4
     or croak 'usage: $nntp->newnews( SINCE [, GROUPS [, DISTRIBUTIONS ]])';
   my $nntp = shift;
   my $time = _timestr(shift);
@@ -319,14 +319,14 @@ sub next {
   @_ == 1 or croak 'usage: $nntp->next()';
   my $nntp = shift;
 
-  $nntp->_NEXT && $nntp->message =~ /(<[^>]+>)/o
+  $nntp->_NEXT && $nntp->message =~ m/(<[^>]+>)/o
     ? $1
     : undef;
 }
 
 
 sub post {
-  @_ >= 1 or croak 'usage: $nntp->post( [ MESSAGE ] )';
+  @_ +>= 1 or croak 'usage: $nntp->post( [ MESSAGE ] )';
   my $nntp = shift;
 
   $nntp->_POST() && $nntp->datasend(@_)
@@ -402,7 +402,7 @@ sub distribution_patterns {
 
   $nntp->_LIST('DISTRIB.PATS')
     && ($arr = $nntp->read_until_dot)
-    ? [grep { /^\d/ && (chomp, $_ = [split /:/]) } @$arr]
+    ? [grep { m/^\d/ && (chomp, $_ = [split m/:/]) } @$arr]
     : undef;
 }
 
@@ -466,7 +466,7 @@ sub xgtitle {
 
 
 sub xhdr {
-  @_ >= 2 && @_ <= 4 or croak 'usage: $nntp->xhdr( HEADER, [ MESSAGE-SPEC ] )';
+  @_ +>= 2 && @_ +<= 4 or croak 'usage: $nntp->xhdr( HEADER, [ MESSAGE-SPEC ] )';
   my $nntp = shift;
   my $hdr  = shift;
   my $arg  = _msg_arg(@_);
@@ -513,7 +513,7 @@ sub xpath {
 
   my $m;
   ($m = $nntp->message) =~ s/^\d+\s+//o;
-  my @p = split /\s+/, $m;
+  my @p = split m/\s+/, $m;
 
   wantarray ? @p : $p[0];
 }
@@ -535,7 +535,7 @@ sub date {
   my $nntp = shift;
 
   $nntp->_DATE
-    && $nntp->message =~ /(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/
+    && $nntp->message =~ m/(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/
     ? timegm($6, $5, $4, $3, $2 - 1, $1 - 1900)
     : undef;
 }
@@ -563,7 +563,7 @@ sub _msg_arg {
         $arg .= "-"
           if $spec->[1] != $spec->[0];
         $arg .= $spec->[1]
-          if $spec->[1] > $spec->[0];
+          if $spec->[1] +> $spec->[0];
       }
     }
     else {
@@ -593,7 +593,7 @@ sub _grouplist {
   my $ln;
 
   foreach $ln (@$arr) {
-    my @a = split(/[\s\n]+/, $ln);
+    my @a = split(m/[\s\n]+/, $ln);
     $hash->{$a[0]} = [@a[1, 2, 3]];
   }
 
@@ -610,7 +610,7 @@ sub _fieldlist {
   my $ln;
 
   foreach $ln (@$arr) {
-    my @a = split(/[\t\n]/, $ln);
+    my @a = split(m/[\t\n]/, $ln);
     my $m = shift @a;
     $hash->{$m} = [@a];
   }

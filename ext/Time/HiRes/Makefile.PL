@@ -19,7 +19,7 @@ my $SYSCALL_H;
 use vars qw($self); # Used in 'sourcing' the hints.
 
 my $ld_exeext = ($^O eq 'cygwin' ||
-                 $^O eq 'os2' && $Config{ldflags} =~ /-Zexe\b/) ? '.exe' : '';
+                 $^O eq 'os2' && $Config{ldflags} =~ m/-Zexe\b/) ? '.exe' : '';
 
 unless($ENV{PERL_CORE}) {
     $ENV{PERL_CORE} = 1 if grep { $_ eq 'PERL_CORE=1' } @ARGV;
@@ -29,7 +29,7 @@ unless($ENV{PERL_CORE}) {
 
 sub my_dirsep {
     $^O eq 'VMS' ? '.' :
-	$^O =~ /mswin32|netware|djgpp/i ? '\\' :
+	$^O =~ m/mswin32|netware|djgpp/i ? '\' :
 	    $^O eq 'MacOS' ? ':'
 		: '/';
 }
@@ -84,7 +84,7 @@ sub try_compile_and_link {
     my $obj_ext = $Config{obj_ext} || ".o";
     unlink("$tmp.c", "$tmp$obj_ext");
 
-    if (open(TMPC, ">$tmp.c")) {
+    if (open(TMPC, ">", "$tmp.c")) {
 	print TMPC $c;
 	close(TMPC);
 
@@ -199,14 +199,14 @@ sub has_gettimeofday {
     return 1 if try_compile_and_link(<<EOM);
 $TIME_HEADERS
 static int foo()
-{
+\{
     struct timeval tv;
     gettimeofday(&tv, 0);
-}
+\}
 int main(int argc, char** argv)
-{
+\{
     foo();
-}
+\}
 EOM
     return 0;
 }
@@ -233,9 +233,9 @@ sub has_x {
 #endif
 
 int main(int argc, char** argv)
-{
+\{
 	$x;
-}
+\}
 EOM
     return 0;
 }
@@ -252,7 +252,7 @@ sub has_nanosleep {
 
 /* int nanosleep(const struct timespec *rqtp, struct timespec *rmtp); */
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv) \{
     struct timespec ts1, ts2;
     int ret;
     ts1.tv_sec  = 0;
@@ -262,7 +262,7 @@ int main(int argc, char** argv) {
     errno = 0;
     ret = nanosleep(&ts1, &ts2); /* E.g. in AIX nanosleep() fails and sets errno to ENOSYS. */
     ret == 0 ? exit(0) : exit(errno ? errno : -1);
-}
+\}
 EOM
 }
 
@@ -276,9 +276,9 @@ sub has_include {
 
 #include <$inc>
 int main(int argc, char** argv)
-{
+\{
 	return 0;
-}
+\}
 EOM
     return 0;
 }
@@ -293,13 +293,13 @@ sub has_clock_xxx_syscall {
 #include "XSUB.h"
 #include <$SYSCALL_H>
 int main(int argc, char** argv)
-{
+\{
     struct timespec ts;
     /* Many Linuxes get ENOSYS even though the syscall exists. */
     /* All implementations are supposed to support CLOCK_REALTIME. */
     int ret = syscall(SYS_clock_$x, CLOCK_REALTIME, &ts);
     ret == 0 ? exit(0) : exit(errno ? errno : -1);
-}
+\}
 EOM
 }
 
@@ -311,12 +311,12 @@ sub has_clock_xxx {
 #include "perl.h"
 #include "XSUB.h"
 int main(int argc, char** argv)
-{
+\{
     struct timespec ts;
     int ret = clock_$xxx(CLOCK_REALTIME, &ts); /* Many Linuxes get ENOSYS. */
     /* All implementations are supposed to support CLOCK_REALTIME. */
     ret == 0 ? exit(0) : exit(errno ? errno : -1);
-}
+\}
 EOM
 }
 
@@ -327,11 +327,11 @@ sub has_clock {
 #include "perl.h"
 #include "XSUB.h"
 int main(int argc, char** argv)
-{
+\{
     clock_t tictoc;
     clock_t ret = clock();
     ret == (clock_t)-1 ? exit(errno ? errno : -1) : exit(0);
-}
+\}
 EOM
 }
 
@@ -343,7 +343,7 @@ sub has_clock_nanosleep {
 #include "XSUB.h"
 #include <time.h>
 int main(int argc, char** argv)
-{
+\{
     int ret;
     struct timespec ts1;
     struct timespec ts2;
@@ -351,14 +351,14 @@ int main(int argc, char** argv)
     ts1.tv_nsec = 750000000;;
     ret = clock_nanosleep(CLOCK_MONOTONIC, 0, &ts1, &ts2);
     ret == 0 ? exit(0) : exit(errno ? errno : -1);
-}
+\}
 EOM
 }
 
 sub DEFINE {
     my ($def, $val) = @_;
     my $define = defined $val ? "$def=$val" : $def ;
-    unless ($DEFINE =~ /(?:^| )-D\Q$define\E(?: |$)/) {
+    unless ($DEFINE =~ m/(?:^| )-D\Q$define\E(?: |$)/) {
 	$DEFINE .= " -D$define";
     }
 }
@@ -509,12 +509,12 @@ EOD
 	}
     }
     elsif (exists $Config{d_nanosleep}) {
-	print "believing \$Config{d_nanosleep}... ";
+	print "believing \$Config\{d_nanosleep\}... ";
 	if ($Config{d_nanosleep}) {
 	    $has_nanosleep++;
 	    $DEFINE .= ' -DTIME_HIRES_NANOSLEEP';
 	}
-    } elsif ($^O =~ /^(mpeix)$/) {
+    } elsif ($^O =~ m/^(mpeix)$/) {
 	# MPE/iX falsely finds nanosleep from its libc equivalent.
 	print "skipping because in $^O... ";
     } else {
@@ -548,7 +548,7 @@ EOD
     }
 
     if ($has_clock_gettime) {
-        if ($DEFINE =~ /-DTIME_HIRES_CLOCK_GETTIME_SYSCALL/) {
+        if ($DEFINE =~ m/-DTIME_HIRES_CLOCK_GETTIME_SYSCALL/) {
 	    print "found (via syscall).\n";
 	} else {
 	    print "found.\n";
@@ -570,7 +570,7 @@ EOD
     }
 
     if ($has_clock_getres) {
-        if ($DEFINE =~ /-DTIME_HIRES_CLOCK_GETRES_SYSCALL/) {
+        if ($DEFINE =~ m/-DTIME_HIRES_CLOCK_GETRES_SYSCALL/) {
 	    print "found (via syscall).\n";
 	} else {
 	    print "found.\n";
@@ -616,10 +616,10 @@ EOD
     if (try_compile_and_link(<<EOM)) {
 $TIME_HEADERS
 #include <sys/stat.h>
-int main(int argc, char** argv) {
+int main(int argc, char** argv) \{
     struct stat st;
     st.st_atimespec.tv_nsec = 0;
-}
+\}
 EOM
       $has_stat_st_xtimespec++;
       DEFINE('TIME_HIRES_STAT', 1);
@@ -636,10 +636,10 @@ EOM
     if (try_compile_and_link(<<EOM)) {
 $TIME_HEADERS
 #include <sys/stat.h>
-int main(int argc, char** argv) {
+int main(int argc, char** argv) \{
     struct stat st;
     st.st_atimensec = 0;
-}
+\}
 EOM
       $has_stat_st_xtimensec++;
       DEFINE('TIME_HIRES_STAT', 2);
@@ -656,10 +656,10 @@ EOM
     if (try_compile_and_link(<<EOM)) {
 $TIME_HEADERS
 #include <sys/stat.h>
-int main(int argc, char** argv) {
+int main(int argc, char** argv) \{
     struct stat st;
     st.st_atime_n = 0;
-}
+\}
 EOM
       $has_stat_st_xtime_n++;
       DEFINE('TIME_HIRES_STAT', 3);
@@ -676,10 +676,10 @@ EOM
     if (try_compile_and_link(<<EOM)) {
 $TIME_HEADERS
 #include <sys/stat.h>
-int main(int argc, char** argv) {
+int main(int argc, char** argv) \{
     struct stat st;
     st.st_atim.tv_nsec = 0;
-}
+\}
 EOM
       $has_stat_st_xtim++;
       DEFINE('TIME_HIRES_STAT', 4);
@@ -696,10 +696,10 @@ EOM
     if (try_compile_and_link(<<EOM)) {
 $TIME_HEADERS
 #include <sys/stat.h>
-int main(int argc, char** argv) {
+int main(int argc, char** argv) \{
     struct stat st;
     st.st_uatime = 0;
-}
+\}
 EOM
       $has_stat_st_uxtime++;
       DEFINE('TIME_HIRES_STAT', 5);
@@ -711,7 +711,7 @@ EOM
 	print "NOT found.\n";
     }
 
-   if ($DEFINE =~ /-DTIME_HIRES_STAT=\d+/) {
+   if ($DEFINE =~ m/-DTIME_HIRES_STAT=\d+/) {
     print "You seem to have stat() subsecond timestamps.\n";
     print "(Your struct stat has them, but the filesystems must help.)\n";
    } else {
@@ -735,7 +735,7 @@ EOM
 
     if ($DEFINE) {
         $DEFINE =~ s/^\s+//;
-        if (open(XDEFINE, ">xdefine")) {
+        if (open(XDEFINE, ">", "xdefine")) {
 	    print XDEFINE $DEFINE, "\n";
 	    close(XDEFINE);
         }
@@ -745,16 +745,12 @@ EOM
 sub doMakefile {
     my @makefileopts = ();
 
-    if ($] >= 5.005) {
-	push (@makefileopts,
-	    'AUTHOR'    => 'Jarkko Hietaniemi <jhi@iki.fi>',
-	    'ABSTRACT_FROM' => 'HiRes.pm',
-	);
 	DEFINE('ATLEASTFIVEOHOHFIVE');
-    }
 
     push (@makefileopts,
 	'NAME'	=> 'Time::HiRes',
+	'AUTHOR'    => 'Jarkko Hietaniemi <jhi@iki.fi>',
+	'ABSTRACT_FROM' => 'HiRes.pm',
 	'VERSION_FROM' => 'HiRes.pm', # finds $VERSION
 	'LIBS'	=> $LIBS,   # e.g., '-lm'
 	'DEFINE'	=> $DEFINE,     # e.g., '-DHAS_SOMETHING'
@@ -762,7 +758,7 @@ sub doMakefile {
 	  # Do not even think about 'INC' => '-I/usr/ucbinclude',
 	  # Solaris will avenge.
 	'INC'	=> '',     # e.g., '-I/usr/include/other'
-	'INSTALLDIRS' => ($] >= 5.008 ? 'perl' : 'site'),
+	'INSTALLDIRS' => 'perl',
 	'dist'      => {
 	    'CI'       => 'ci -l',
 	    'COMPRESS' => 'gzip -9f',
@@ -795,11 +791,11 @@ sub doConstants {
 		     d_nanosleep d_clock_gettime d_clock_getres
 		     d_clock d_clock_nanosleep d_hires_stat)) {
 	    my $macro = $_;
-	    if ($macro =~ /^(d_nanosleep|d_clock_gettime|d_clock_getres|d_clock|d_clock_nanosleep)$/) {
+	    if ($macro =~ m/^(d_nanosleep|d_clock_gettime|d_clock_getres|d_clock|d_clock_nanosleep)$/) {
 		$macro =~ s/^d_(.+)/TIME_HIRES_\U$1/;
-	    } elsif ($macro =~ /^(d_hires_stat)$/) {
+	    } elsif ($macro =~ m/^(d_hires_stat)$/) {
 		my $d_hires_stat = 0;
-		$d_hires_stat = $1 if ($DEFINE =~ /-DTIME_HIRES_STAT=(\d+)/);
+		$d_hires_stat = $1 if ($DEFINE =~ m/-DTIME_HIRES_STAT=(\d+)/);
 		push @names, {name => $_, macro => "TIME_HIRES_STAT", value => $d_hires_stat,
 			      default => ["IV", "0"]};
 		next;
@@ -812,6 +808,7 @@ sub doConstants {
 	ExtUtils::Constant::WriteConstants(
 					   NAME => 'Time::HiRes',
 					   NAMES => \@names,
+                                           PROXYSUBS => 1,
 					  );
     } else {
         my $file;
@@ -820,7 +817,7 @@ sub doConstants {
 	    local $/;
 	    open IN, "<$fallback" or die "Can't open $fallback: $!";
 	    open OUT, ">$file" or die "Can't open $file: $!";
-	    print OUT <IN> or die $!;
+	    print OUT ~< *IN or die $!;
 	    close OUT or die "Can't close $file: $!";
 	    close IN or die "Can't close $fallback: $!";
 	}
@@ -829,11 +826,8 @@ sub doConstants {
 
 sub main {
     print "Configuring Time::HiRes...\n";
-    if ($] == 5.007002) {
-	die "Cannot Configure Time::HiRes for Perl $], aborting.\n";
-    }
 
-    if ($^O =~ /Win32/i) {
+    if ($^O =~ m/Win32/i) {
       DEFINE('SELECT_IS_BROKEN');
       $LIBS = [];
       print "System is $^O, skipping full configure...\n";
@@ -847,9 +841,9 @@ sub main {
 	print  <<EOM;
 Now you may issue '$make'.  Do not forget also '$make test'.
 EOM
-       if ((exists $ENV{LC_ALL}   && $ENV{LC_ALL}   =~ /utf-?8/i) ||
-           (exists $ENV{LC_CTYPE} && $ENV{LC_CTYPE} =~ /utf-?8/i) ||
-           (exists $ENV{LANG}     && $ENV{LANG}     =~ /utf-?8/i)) {
+       if ((exists $ENV{LC_ALL}   && $ENV{LC_ALL}   =~ m/utf-?8/i) ||
+           (exists $ENV{LC_CTYPE} && $ENV{LC_CTYPE} =~ m/utf-?8/i) ||
+           (exists $ENV{LANG}     && $ENV{LANG}     =~ m/utf-?8/i)) {
             print  <<EOM;
 NOTE: if you get an error like this (the Makefile line number may vary):
 Makefile:91: *** missing separator

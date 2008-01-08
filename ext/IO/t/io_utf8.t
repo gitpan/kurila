@@ -1,11 +1,11 @@
 #!./perl
 
 BEGIN {
-    unless(grep /blib/, @INC) {
+    unless(grep m/blib/, @INC) {
 	chdir 't' if -d 't';
 	@INC = '../lib';
     }
-    unless ($] >= 5.008 and PerlIO::Layer->find( 'perlio')) {
+    unless (PerlIO::Layer->find( 'perlio')) {
 	print "1..0 # Skip: not perlio\n";
 	exit 0;
     }
@@ -29,7 +29,7 @@ undef $io;
 
 $io = IO::File->new;
 ok($io->open("io_utf8", "<:utf8"), "open <:utf8");
-is(ord(<$io>), 256, "readline chr(256)");
+is(ord( ~< $io), 256, "readline chr(256)");
 undef $io;
 
 END {

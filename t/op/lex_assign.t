@@ -15,7 +15,7 @@ $runme = $^X;
 %h = (1..6);
 $aref = \@a;
 $href = \%h;
-open OP, qq{$runme -le "print 'aaa Ok ok' for 1..100"|};
+open OP, '-|', qq{$runme -le "print 'aaa Ok ok' for 1..100"};
 $chopit = 'aaaaaa';
 @chopar = (113 .. 119);
 $posstr = '123456';
@@ -24,8 +24,8 @@ pos $posstr = 3;
 $nn = $n = 2;
 sub subb {"in s"}
 
-@INPUT = <DATA>;
-@simple_input = grep /^\s*\w+\s*\$\w+\s*[#\n]/, @INPUT;
+@INPUT = ~< *DATA;
+@simple_input = grep m/^\s*\w+\s*\$\w+\s*[#\n]/, @INPUT;
 print "1..", (11 + @INPUT + @simple_input), "\n";
 $ord = 0;
 
@@ -34,7 +34,7 @@ sub wrn {"@_"}
 # Check correct optimization of ucfirst etc
 $ord++;
 my $a = "AB";
-my $b = "\u\L$a";
+my $b = ucfirst(lc("$a"));
 print "not " unless $b eq 'Ab';
 print "ok $ord\n";
 
@@ -112,31 +112,31 @@ print "ok $ord\n";
 
 for (@INPUT) {
   $ord++;
-  ($op, undef, $comment) = /^([^\#]+)(\#\s+(.*))?/;
+  ($op, undef, $comment) = m/^([^\#]+)(\#\s+(.*))?/;
   $comment = $op unless defined $comment;
   chomp;
-  $op = "$op==$op" unless $op =~ /==/;
-  ($op, $expectop) = $op =~ /(.*)==(.*)/;
+  $op = "$op==$op" unless $op =~ m/==/;
+  ($op, $expectop) = $op =~ m/(.*)==(.*)/;
   
-  $skip = ($op =~ /^'\?\?\?'/ or $comment =~ /skip\(.*\Q$^O\E.*\)/i)
+  $skip = ($op =~ m/^'\?\?\?'/ or $comment =~ m/skip\(.*\Q$^O\E.*\)/i)
 	  ? "skip" : "# '$_'\nnot";
-  $integer = ($comment =~ /^i_/) ? "use integer" : '' ;
+  $integer = ($comment =~ m/^i_/) ? "use integer" : '' ;
   (print "#skipping $comment:\nok $ord\n"), next if $skip eq 'skip';
   
   eval <<EOE;
-  local \$SIG{__WARN__} = \\&wrn;
+  local \$SIG\{__WARN__\} = \\&wrn;
   my \$a = 'fake';
   $integer;
   \$a = $op;
   \$b = $expectop;
-  if (\$a ne \$b) {
+  if (\$a ne \$b) \{
     print "# \$comment: got `\$a', expected `\$b'\n";
     print "\$skip " if \$a ne \$b or \$skip eq 'skip';
-  }
+  \}
   print "ok \$ord\\n";
 EOE
   if ($@) {
-    if ($@ =~ /is unimplemented/) {
+    if ($@ =~ m/is unimplemented/) {
       print "# skipping $comment: unimplemented:\nok $ord\n";
     } else {
       warn $@;
@@ -147,12 +147,12 @@ EOE
 
 for (@simple_input) {
   $ord++;
-  ($op, undef, $comment) = /^([^\#]+)(\#\s+(.*))?/;
+  ($op, undef, $comment) = m/^([^\#]+)(\#\s+(.*))?/;
   $comment = $op unless defined $comment;
   chomp;
-  ($operator, $variable) = /^\s*(\w+)\s*\$(\w+)/ or warn "misprocessed '$_'\n";
+  ($operator, $variable) = m/^\s*(\w+)\s*\$(\w+)/ or warn "misprocessed '$_'\n";
   eval <<EOE;
-  local \$SIG{__WARN__} = \\&wrn;
+  local \$SIG\{__WARN__\} = \\&wrn;
   my \$$variable = "Ac# Ca\\nxxx";
   \$$variable = $operator \$$variable;
   \$toself = \$$variable;
@@ -162,9 +162,9 @@ for (@simple_input) {
   print "ok \$ord\\n";
 EOE
   if ($@) {
-    if ($@ =~ /is unimplemented/) {
+    if ($@ =~ m/is unimplemented/) {
       print "# skipping $comment: unimplemented:\nok $ord\n";
-    } elsif ($@ =~ /Can't (modify|take log of 0)/) {
+    } elsif ($@ =~ m/Can't (modify|take log of 0)/) {
       print "# skipping $comment: syntax not good for selfassign:\nok $ord\n";
     } else {
       warn $@;
@@ -196,7 +196,7 @@ ref $xref			# ref
 ref $cstr			# ref nonref
 `$runme -e "print qq[1\\n]"`				# backtick skip(MSWin32)
 `$undefed`			# backtick undef skip(MSWin32)
-<OP>				# readline
+~< *OP				# readline
 'faked'				# rcatline
 (@z = (1 .. 3))			# aassign
 chop $chopit			# chop
@@ -227,8 +227,8 @@ $n . $a=='2fake'		# concat with self
 "$n"				# stringify
 $n << $n			# left_shift
 $n >> $n			# right_shift
-$n <=> $n			# ncmp
-$n <=> $n			# i_ncmp
+$n <+> $n			# ncmp
+$n <+> $n			# i_ncmp
 $n cmp $n			# scmp
 $n ^&^ $n				# bit_and
 $n ^^^ $n				# bit_xor
@@ -268,7 +268,7 @@ values %h			# values
 keys %h				# keys
 %$href				# rv2hv
 pack "C2", $n,$n		# pack
-split /a/, "abad"		# split
+split m/a/, "abad"		# split
 join "a"; @a			# join
 push @a,3==6			# push
 unshift @aaa			# unshift
@@ -280,7 +280,7 @@ subb()				# entersub
 caller				# caller
 warn "ignore this\n"		# warn
 'faked'				# die
-open BLAH, "<non-existent"	# open
+open BLAH, "<", "non-existent"	# open
 fileno STDERR			# fileno
 umask 0				# umask
 select STDOUT			# sselect

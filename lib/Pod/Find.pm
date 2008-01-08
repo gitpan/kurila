@@ -142,7 +142,7 @@ sub pod_find
             for (@new_INC) {
                 if ( $_ eq '.' ) {
                     $_ = ':';
-                } elsif ( $_ =~ s|^((?:\.\./)+)|':' x (length($1)/3)|e ) {
+                } elsif ( $_ =~ s|^((?:\.\./)+)|{':' x (length($1)/3)}| ) {
                     $_ = ':'. $_;
                 } else {
                     $_ =~ s|^\./|:|;
@@ -216,9 +216,9 @@ sub pod_find
                 else {
                     $dirs_visited{$item} = 1;
                 }
-                if($opts{-perl} && /^(\d+\.[\d_]+)\z/s && eval "$1" != $]) {
+                if($opts{-perl} && m/^(\d+\.[\d_]+)\z/s && eval "$1" != $^V) {
                     $File::Find::prune = 1;
-                    warn "Perl $] version mismatch on $_, skipping.\n"
+                    warn "Perl $^V version mismatch on $_, skipping.\n"
                         if($opts{-verbose});
                 }
                 return;
@@ -250,7 +250,7 @@ sub _check_and_extract_name {
 
     # check extension or executable flag
     # this involves testing the .bat extension on Win32!
-    unless(-f $file && -T $file && ($file =~ /\.(pod|pm|plx?)\z/i || -x $file )) {
+    unless(-f $file && -T $file && ($file =~ m/\.(pod|pm|plx?)\z/i || -x $file )) {
       return undef;
     }
 
@@ -307,7 +307,7 @@ sub _simplify {
     # strip Perl's own extensions
     $_[0] =~ s/\.(pod|pm|plx?)\z//i;
     # strip meaningless extensions on Win32 and OS/2
-    $_[0] =~ s/\.(bat|exe|cmd)\z//i if($^O =~ /mswin|os2/i);
+    $_[0] =~ s/\.(bat|exe|cmd)\z//i if($^O =~ m/mswin|os2/i);
     # strip meaningless extensions on VMS
     $_[0] =~ s/\.(com)\z//i if($^O eq 'VMS');
 }
@@ -383,7 +383,7 @@ sub pod_where {
   my $pod = shift;
 
   # Split on :: and then join the name together using File::Spec
-  my @parts = split (/::/, $pod);
+  my @parts = split (m/::/, $pod);
 
   # Get full directory list
   my @search_dirs = @{ $options{'-dirs'} };
@@ -399,7 +399,7 @@ sub pod_where {
         for (@new_INC) {
             if ( $_ eq '.' ) {
                 $_ = ':';
-            } elsif ( $_ =~ s|^((?:\.\./)+)|':' x (length($1)/3)|e ) {
+            } elsif ( $_ =~ s|^((?:\.\./)+)|{':' x (length($1)/3)}| ) {
                 $_ = ':'. $_;
             } else {
                 $_ =~ s|^\./|:|;
@@ -458,7 +458,7 @@ sub pod_where {
     # have a case-tolerant file system, but File::Spec
     # does not recognize 'darwin' yet. And cygwin also has "pods",
     # but is not case tolerant. Oh well...
-    if((File::Spec->case_tolerant || $^O =~ /macos|darwin|cygwin/i)
+    if((File::Spec->case_tolerant || $^O =~ m/macos|darwin|cygwin/i)
      && -d File::Spec->catdir($dir,'pods')) {
       $dir = File::Spec->catdir($dir,'pods');
       redo Dir;
@@ -485,15 +485,15 @@ sub contains_pod {
   $verbose = shift if @_;
 
   # check for one line of POD
-  unless(open(POD,"<$file")) {
+  unless(open(POD, "<","$file")) {
     warn "Error: $file is unreadable: $!\n";
     return undef;
   }
   
   local $/ = undef;
-  my $pod = <POD>;
+  my $pod = ~< *POD;
   close(POD) || die "Error closing $file: $!\n";
-  unless($pod =~ /^=(head\d|pod|over|item)\b/m) {
+  unless($pod =~ m/^=(head\d|pod|over|item)\b/m) {
     warn "No POD in $file, skipping.\n"
       if($verbose);
     return 0;

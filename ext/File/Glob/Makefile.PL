@@ -1,5 +1,5 @@
 use ExtUtils::MakeMaker;
-use ExtUtils::Constant 0.11 'WriteConstants';
+use ExtUtils::Constant v0.11 'WriteConstants';
 WriteMakefile(
     NAME		=> 'File::Glob',
     VERSION_FROM	=> 'Glob.pm',
@@ -15,7 +15,7 @@ use Config;
 sub MY::cflags {
   package MY;
   my $inherited = shift->SUPER::cflags(@_);
-  if ($Config::Config{archname} =~ /^aix/ and 
+  if ($Config::Config{archname} =~ m/^aix/ and 
       $Config::Config{use64bitall} eq 'define') {
     $inherited =~ s/\s-O\d?//m;
   }
@@ -26,7 +26,7 @@ WriteConstants(
     NAME => 'File::Glob',
     NAMES => [qw(GLOB_ABEND GLOB_ALPHASORT GLOB_ALTDIRFUNC GLOB_BRACE GLOB_ERR
                  GLOB_LIMIT GLOB_MARK GLOB_NOCASE GLOB_NOCHECK GLOB_NOMAGIC
-                 GLOB_NOSORT GLOB_NOSPACE GLOB_QUOTE GLOB_TILDE),
-              {name=>"GLOB_ERROR", macro=>["#ifdef GLOB_ERROR\n\tdMY_CXT;\n\n","#endif\n"]}],
+                 GLOB_NOSORT GLOB_NOSPACE GLOB_QUOTE GLOB_TILDE)],
     BREAKOUT_AT => 8,
+    PROXYSUBS => 1,
 );

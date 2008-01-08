@@ -1,15 +1,8 @@
 #!./perl
 
 BEGIN {
-    chdir 't' if -d 't';
-    if ($^O eq 'MacOS') { 
-	@INC = qw(: ::lib ::macos:lib); 
-    } else { 
-	@INC = '.'; 
-	push @INC, '../lib'; 
-    }
     require Config; Config->import;
-    if ($Config{'extensions'} !~ /\bFile\/Glob\b/i) {
+    if ($Config{'extensions'} !~ m/\bFile\/Glob\b/i) {
         print "1..0\n";
         exit 0;
     }
@@ -32,7 +25,7 @@ $ENV{PATH} = "/bin";
 delete @ENV{'BASH_ENV', 'CDPATH', 'ENV', 'IFS'};
 @correct = ();
 if (opendir(D, $^O eq "MacOS" ? ":" : ".")) {
-   @correct = grep { !/^\./ } sort readdir(D);
+   @correct = grep { !m/^\./ } sort readdir(D);
    closedir D;
 }
 @a = File::Glob::glob("*", 0);
@@ -112,14 +105,14 @@ unless (@a == 2 and $a[0] eq 'a' and $a[1] eq 'b') {
 print "ok 7\n";
 
 @a = bsd_glob(
-    '{TES*,doesntexist*,a,b}',
+    '{TES?,doesntexist*,a,b}',
     GLOB_BRACE ^|^ GLOB_NOMAGIC ^|^ ($^O eq 'VMS' ? GLOB_NOCASE : 0)
 );
 
 # Working on t/TEST often causes this test to fail because it sees Emacs temp
 # and RCS files.  Filter them out, and .pm files too, and patch temp files.
-@a = grep !/(,v$|~$|\.(pm|ori?g|rej)$)/, @a;
-@a = (grep !/test.pl/, @a) if $^O eq 'VMS';
+@a = grep !m/(,v$|~$|\.(pm|ori?g|rej)$)/, @a;
+@a = (grep !m/test.pl/, @a) if $^O eq 'VMS';
 
 print "# @a\n";
 
@@ -156,7 +149,7 @@ if ($^O eq 'VMS') { # VMS is happily caseignorant
 }
 
 for (@f_names) {
-    open T, "> $_";
+    open T, ">", "$_";
     close T;
 }
 
@@ -202,7 +195,7 @@ print "ok 12\n";
     my $cwd = Cwd::cwd();
     chdir $dir
 	or die "Could not chdir to $dir: $!";
-    my(@glob_files) = glob("a*{d[e]}j");
+    my(@glob_files) = glob("a*\{d[e]\}j");
     if (!(@glob_files == 1 && "@glob_files" eq "a_dej")) {
 	print "not ";
     }

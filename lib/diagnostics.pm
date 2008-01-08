@@ -239,7 +239,7 @@ CONFIG: {
 	$PRETTY = $opt_p;
     }
 
-    if (open(POD_DIAG, $PODFILE)) {
+    if (open(POD_DIAG, "<", $PODFILE)) {
 	warn "Happy happy podfile from real $PODFILE\n" if $DEBUG;
 	last CONFIG;
     } 
@@ -248,10 +248,10 @@ CONFIG: {
 	INCPATH: {
 	    for my $file ( (map { "$_/$WHOAMI.pm" } @INC), $0) {
 		warn "Checking $file\n" if $DEBUG;
-		if (open(POD_DIAG, $file)) {
-		    while (<POD_DIAG>) {
+		if (open(POD_DIAG, "<", $file)) {
+		    while ( ~< *POD_DIAG) {
 			next unless
-			    /^__END__\s*# wish diag dbase were more accessible/;
+			    m/^__END__\s*# wish diag dbase were more accessible/;
 			print STDERR "podfile is $file\n" if $DEBUG;
 			last INCPATH;
 		    }
@@ -313,7 +313,7 @@ our %HTML_Escapes;
 
 my %transfmt = (); 
 my $transmo = <<EOFUNC;
-sub transmo {
+sub transmo \{
     #local \$^W = 0;  # recursive warnings we do NOT need!
     study;
 EOFUNC
@@ -324,24 +324,24 @@ my %msg;
     local $/ = '';
     my $header;
     my $for_item;
-    while (<POD_DIAG>) {
+    while ( ~< *POD_DIAG) {
 
 	unescape();
 	if ($PRETTY) {
 	    sub noop   { return $_[0] }  # spensive for a noop
 	    sub bold   { my $str =$_[0];  $str =~ s/(.)/$1\b$1/g; return $str; } 
 	    sub italic { my $str = $_[0]; $str =~ s/(.)/_\b$1/g;  return $str; } 
-	    s/C<<< (.*?) >>>|C<< (.*?) >>|[BC]<(.*?)>/bold($+)/ges;
-	    s/[LIF]<(.*?)>/italic($1)/ges;
+	    s/C<<< (.*?) >>>|C<< (.*?) >>|[BC]<(.*?)>/{bold($+)}/gs;
+	    s/[LIF]<(.*?)>/{italic($1)}/gs;
 	} else {
 	    s/C<<< (.*?) >>>|C<< (.*?) >>|[BC]<(.*?)>/$+/gs;
 	    s/[LIF]<(.*?)>/$1/gs;
 	} 
-	unless (/^=/) {
+	unless (m/^=/) {
 	    if (defined $header) { 
 		if ( $header eq 'DESCRIPTION' && 
-		    (   /Optional warnings are enabled/ 
-		     || /Some of these messages are generic./
+		    (   m/Optional warnings are enabled/ 
+		     || m/Some of these messages are generic./
 		    ) )
 		{
 		    next;
@@ -367,8 +367,8 @@ my %msg;
 	if( $for_item ) { $header = $for_item; undef $for_item } 
 	else {
 	    $header = $1;
-	    while( $header =~ /[;,]\z/ ) {
-		<POD_DIAG> =~ /^\s*(.*?)\s*\z/;
+	    while( $header =~ m/[;,]\z/ ) {
+		~< *POD_DIAG =~ m/^\s*(.*?)\s*\z/;
 		$header .= ' '.$1;
 	    }
 	}
@@ -376,8 +376,8 @@ my %msg;
 	# strip formatting directives from =item line
 	$header =~ s/[A-Z]<(.*?)>/$1/g;
 
-        my @toks = split( /(%l?[dx]|%c|%(?:\.\d+)?s)/, $header );
-	if (@toks > 1) {
+        my @toks = split( m/(%l?[dx]|%c|%(?:\.\d+)?s)/, $header );
+	if (@toks +> 1) {
             my $conlen = 0;
             for my $i (0..$#toks){
                 if( $i % 2 ){
@@ -388,7 +388,7 @@ my %msg;
                     } elsif( $toks[$i] eq '%s' ){
                         $toks[$i] = $i == $#toks ? '.*' : '.*?';
                     } elsif( $toks[$i] =~ '%.(\d+)s' ){
-                        $toks[$i] = ".{$1}";
+                        $toks[$i] = ".\{$1\}";
                      } elsif( $toks[$i] =~ '^%l*x$' ){
                         $toks[$i] = '[\da-f]+';
                    }
@@ -399,11 +399,11 @@ my %msg;
             }  
             my $lhs = join( '', @toks );
 	    $transfmt{$header}{pat} =
-              "    s{^$lhs}\n     {\Q$header\E}s\n\t&& return 1;\n";
+              "    s\{^$lhs\}\n     \{\Q$header\E\}s\n\t&& return 1;\n";
             $transfmt{$header}{len} = $conlen;
 	} else {
             $transfmt{$header}{pat} =
-	      "    m{^\Q$header\E} && return 1;\n";
+	      "    m\{^\Q$header\E\} && return 1;\n";
             $transfmt{$header}{len} = length( $header );
 	} 
 
@@ -414,17 +414,17 @@ my %msg;
     } 
 
 
-    close POD_DIAG unless *main::DATA eq *POD_DIAG;
+    close POD_DIAG unless Symbol::glob_name(*POD_DIAG) eq 'main::DATA';
 
     die "No diagnostics?" unless %msg;
 
     # Apply patterns in order of decreasing sum of lengths of fixed parts
     # Seems the best way of hitting the right one.
-    for my $hdr ( sort { $transfmt{$b}{len} <=> $transfmt{$a}{len} }
+    for my $hdr ( sort { $transfmt{$b}{len} <+> $transfmt{$a}{len} }
                   keys %transfmt ){
         $transmo .= $transfmt{$hdr}{pat};
     }
-    $transmo .= "    return 0;\n}\n";
+    $transmo .= "    return 0;\n\}\n";
     print STDERR $transmo if $DEBUG;
     eval $transmo;
     die $@ if $@;
@@ -432,7 +432,7 @@ my %msg;
 
 if ($standalone) {
     if (!@ARGV and -t *STDIN) { print STDERR "$0: Reading from STDIN\n" } 
-    while (defined (my $error = <>)) {
+    while (defined (my $error = ~< *ARGV)) {
 	splainthis($error) || print THITHER $error;
     } 
     exit;
@@ -449,27 +449,27 @@ sub import {
 
     for (@_) {
 
-	/^-d(ebug)?$/ 	   	&& do {
+	m/^-d(ebug)?$/ 	   	&& do {
 				    $DEBUG++;
 				    next;
 				   };
 
-	/^-v(erbose)?$/ 	&& do {
+	m/^-v(erbose)?$/ 	&& do {
 				    $VERBOSE++;
 				    next;
 				   };
 
-	/^-p(retty)?$/ 		&& do {
+	m/^-p(retty)?$/ 		&& do {
 				    print STDERR "$0: I'm afraid it's too late for prettiness.\n";
 				    $PRETTY++;
 				    next;
 			       };
 	# matches trace and traceonly for legacy doc mixup reasons
-	/^-t(race(only)?)?$/	&& do {
+	m/^-t(race(only)?)?$/	&& do {
 				    $TRACEONLY++;
 				    next;
 			       };
-	/^-w(arntrace)?$/ 	&& do {
+	m/^-w(arntrace)?$/ 	&& do {
 				    $WARNTRACE++;
 				    next;
 			       };
@@ -560,11 +560,11 @@ sub splainthis {
     # Discard 1st " at <file> line <no>" and all text beyond
     # but be aware of messsages containing " at this-or-that"
     my $real = 0;
-    my @secs = split( / at / );
+    my @secs = split( m/ at / );
     return unless @secs;
     $_ = $secs[0];
     for my $i ( 1..$#secs ){
-        if( $secs[$i] =~ /.+? (?:line|chunk) \d+/ ){
+        if( $secs[$i] =~ m/.+? (?:line|chunk) \d+/ ){
             $real = 1;
             last;
         } else {
@@ -618,7 +618,7 @@ sub unescape {
             E<  
             ( [A-Za-z]+ )       
             >   
-    } { 
+    } {{ 
          do {   
              exists $HTML_Escapes{$1}
                 ? do { $HTML_Escapes{$1} }
@@ -627,15 +627,15 @@ sub unescape {
                     "E<$1>";
                 } 
          } 
-    }egx;
+    }}gx;
 }
 
 sub shorten {
     my $line = $_[0];
-    if (length($line) > 79 and index($line, "\n") == -1) {
+    if (length($line) +> 79 and index($line, "\n") == -1) {
 	my $space_place = rindex($line, ' ', 79);
 	if ($space_place != -1) {
-	    substr($line, $space_place, 1) = "\n\t";
+	    substr($line, $space_place, 1, "\n\t");
 	} 
     } 
     return $line;

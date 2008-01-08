@@ -11,14 +11,14 @@ my @extra;
 
 if ($^O eq 'VMS') {
     if (defined($Config{ccname})) {
-        if (grep(/VMS_VAX/, @INC) && ($Config{ccname} eq 'DEC')) {
+        if (grep(m/VMS_VAX/, @INC) && ($Config{ccname} eq 'DEC')) {
             # VAX compiler optimizer even as late as v6.4 gets stuck
             push(@extra, OPTIMIZE => "/Optimize=(NODISJOINT)");
         }
     }
 }
 
-push(@extra, 'INSTALLDIRS'  => 'perl') if $] >= 5.008;
+push(@extra, 'INSTALLDIRS'  => 'perl');
 push(@extra, 'MAN3PODS' => {}) if $PERL_CORE; # Pods built by installman.
 
 WriteMakefile(
@@ -48,13 +48,13 @@ sub free_u32_alignment
        return 1;
     }
     
-    if ($^O eq 'hpux' && $Config{osvers} < 11.0) {
+    if ($^O eq 'hpux' && $Config{osvers} +< 11.0) {
        print "Will not test for free alignment on older HP-UX.\n";
        return 0;
     }
     
     print "Testing alignment requirements for U32... ";
-    open(ALIGN_TEST, ">u32align.c") or die "$!";
+    open(ALIGN_TEST, ">", "u32align.c") or die "$!";
     print ALIGN_TEST <<'EOT'; close(ALIGN_TEST);
 /*--------------------------------------------------------------*/
 /*  This program allocates a buffer of U8 (char) and then tries */
@@ -134,7 +134,7 @@ EOT
 
     return 1 unless $rc;
 
-    if ($rc > 0x80) {
+    if ($rc +> 0x80) {
 	(my $cp = $rc) >>= 8;
 	print "Test program exit status was $cp\n";
     }
@@ -142,6 +142,6 @@ EOT
 	$rc ^&^= ^~^0x80;
 	unlink("core") && print "Core dump deleted\n";
     }
-    print "signal $rc\n" if $rc && $rc < 0x80;
+    print "signal $rc\n" if $rc && $rc +< 0x80;
     return 0;
 }

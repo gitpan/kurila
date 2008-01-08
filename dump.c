@@ -123,7 +123,7 @@ Perl_dump_sub(pTHX_ const GV *gv)
 {
     SV * const sv = sv_newmortal();
 
-    gv_fullname3(sv, gv, NULL);
+    gv_fullname4(sv, gv, NULL,TRUE);
     Perl_dump_indent(aTHX_ 0, Perl_debug_log, "SUB %s = ", SvPVX_const(sv));
     if (CvISXSUB(GvCV(gv)))
 	Perl_dump_indent(aTHX_ 0, Perl_debug_log, "(xsub 0x%"UVxf" %d)\n",
@@ -1016,7 +1016,7 @@ static void S_dump_op_rest (pTHX_ I32 level, PerlIO *file, const OP *o)
 		SV * const tmpsv = newSV(0);
 		ENTER;
 		SAVEFREESV(tmpsv);
-		gv_fullname3(tmpsv, (GV*)cSVOPo->op_sv, NULL);
+		gv_fullname4(tmpsv, (GV*)cSVOPo->op_sv, NULL, TRUE);
 		Perl_dump_indent(aTHX_ level, file, "GV = %s\n",
 				 SvPV_nolen_const(tmpsv));
 		LEAVE;
@@ -1119,10 +1119,10 @@ Perl_gv_dump(pTHX_ GV *gv)
     }
     sv = sv_newmortal();
     PerlIO_printf(Perl_debug_log, "{\n");
-    gv_fullname3(sv, gv, NULL);
+    gv_fullname4(sv, gv, NULL, TRUE);
     Perl_dump_indent(aTHX_ 1, Perl_debug_log, "GV_NAME = %s", SvPVX_const(sv));
     if (gv != GvEGV(gv)) {
-	gv_efullname3(sv, GvEGV(gv), NULL);
+	gv_efullname4(sv, GvEGV(gv), NULL, TRUE);
 	Perl_dump_indent(aTHX_ 1, Perl_debug_log, "-> %s", SvPVX_const(sv));
     }
     PerlIO_putc(Perl_debug_log, '\n');
@@ -1174,8 +1174,6 @@ static const struct { const char type; const char *name; } magic_names[] = {
 	{ PERL_MAGIC_vec,            "vec(v)" },
 	{ PERL_MAGIC_vstring,        "vstring(V)" },
 	{ PERL_MAGIC_utf8,           "utf8(w)" },
-	{ PERL_MAGIC_substr,         "substr(x)" },
-	{ PERL_MAGIC_substr_utf8,    "substr(X)" },
 	{ PERL_MAGIC_defelem,        "defelem(y)" },
 	{ PERL_MAGIC_ext,            "ext(~)" },
 	/* this null string terminates the list */
@@ -1204,8 +1202,6 @@ Perl_do_magic_dump(pTHX_ I32 level, PerlIO *file, const MAGIC *mg, I32 nest, I32
             else if (v == &PL_vtbl_mglob)      s = "mglob";
             else if (v == &PL_vtbl_nkeys)      s = "nkeys";
             else if (v == &PL_vtbl_taint)      s = "taint";
-            else if (v == &PL_vtbl_substr)     s = "substr";
-            else if (v == &PL_vtbl_substr_utf8)s = "substr_utf8";
             else if (v == &PL_vtbl_vec)        s = "vec";
             else if (v == &PL_vtbl_pos)        s = "pos";
             else if (v == &PL_vtbl_bm)         s = "bm";
@@ -1462,7 +1458,6 @@ Perl_do_sv_dump(pTHX_ I32 level, PerlIO *file, SV *sv, I32 nest, I32 maxnest, bo
 	/* FALL THROUGH */
     default:
     evaled_or_uv:
-	if (SvEVALED(sv))	sv_catpv(d, "EVALED,");
 	if (SvIsUV(sv) && !(flags & SVf_ROK))	sv_catpv(d, "IsUV,");
 	break;
     case SVt_PVMG:
@@ -1883,7 +1878,7 @@ Perl_debop(pTHX_ const OP *o)
     case OP_GV:
 	if (cGVOPo_gv) {
 	    SV * const sv = newSV(0);
-	    gv_fullname3(sv, cGVOPo_gv, NULL);
+	    gv_fullname4(sv, cGVOPo_gv, NULL, TRUE);
 	    PerlIO_printf(Perl_debug_log, "(%s)", SvPV_nolen_const(sv));
 	    SvREFCNT_dec(sv);
 	}
@@ -2040,7 +2035,7 @@ Perl_xmldump_sub(pTHX_ const GV *gv)
 {
     SV * const sv = sv_newmortal();
 
-    gv_fullname3(sv, gv, NULL);
+    gv_fullname4(sv, gv, NULL, TRUE);
     Perl_xmldump_indent(aTHX_ 0, PL_xmlfp, "\nSUB %s = ", SvPVX(sv));
     if (CvXSUB(GvCV(gv)))
 	Perl_xmldump_indent(aTHX_ 0, PL_xmlfp, "(xsub 0x%"UVxf" %d)\n",
@@ -2537,7 +2532,7 @@ Perl_do_op_xmldump(pTHX_ I32 level, PerlIO *file, const OP *o)
 	    ENTER;
 	    SAVEFREESV(tmpsv1);
 	    SAVEFREESV(tmpsv2);
-	    gv_fullname3(tmpsv1, (GV*)cSVOPo->op_sv, NULL);
+	    gv_fullname4(tmpsv1, (GV*)cSVOPo->op_sv, NULL, TRUE);
 	    s = SvPV(tmpsv1,len);
 	    sv_catxmlpvn(tmpsv2, s, len);
 	    S_xmldump_attr(aTHX_ level, file, "gv=\"%s\"", SvPV(tmpsv2, len));

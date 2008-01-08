@@ -11,7 +11,7 @@ $VERSION = '1.6_01';
 
 # Some regexes we use for path splitting
 my $DRIVE_RX = '[a-zA-Z]:';
-my $UNC_RX = '(?:\\\\\\\\|//)[^\\\\/]+[\\\\/][^\\\\/]+';
+my $UNC_RX = '(?:\\\\|//)[^\\/]+[\\/][^\\/]+';
 my $VOL_RX = "(?:$DRIVE_RX|$UNC_RX)";
 
 
@@ -41,7 +41,7 @@ sub devnull {
     return "nul";
 }
 
-sub rootdir () { '\\' }
+sub rootdir () { '\' }
 
 
 =item tmpdir
@@ -167,7 +167,7 @@ On Win32 makes
 sub canonpath {
     my ($self,$path) = @_;
     
-    $path =~ s/^([a-z]:)/\u$1/s;
+    $path =~ s/^([a-z]:)/{uc($1)}/s;
     $path =~ s|/|\\|g;
     $path =~ s|([^\\])\\+|$1\\|g;                  # xx\\\\xx  -> xx\xx
     $path =~ s|(\\\.)+\\|\\|g;                     # xx\.\.\xx -> xx\xx
@@ -178,8 +178,8 @@ sub canonpath {
     $path =~ s|\\\.\.\.\\|\\\.\.\\\.\.\\|g; # \...\ is 2 levels up
     $path =~ s|^\.\.\.\\|\.\.\\\.\.\\|g;    # ...\ is 2 levels up
     return $path if $path =~ m|^\.\.|;      # skip relative paths
-    return $path unless $path =~ /\.\./;    # too few .'s to cleanup
-    return $path if $path =~ /\.\.\.\./;    # too many .'s to cleanup
+    return $path unless $path =~ m/\.\./;    # too few .'s to cleanup
+    return $path if $path =~ m/\.\.\.\./;    # too many .'s to cleanup
     $path =~ s{^\\\.\.$}{\\};                      # \..    -> \
     1 while $path =~ s{^\\\.\.}{};                 # \..\xx -> \xx
 
@@ -301,7 +301,7 @@ sub catpath {
          $file   =~ m@[^\\/]@
        ) {
         $volume =~ m@([\\/])@ ;
-        my $sep = $1 ? $1 : '\\' ;
+        my $sep = $1 ? $1 : '\' ;
         $volume .= $sep ;
     }
 

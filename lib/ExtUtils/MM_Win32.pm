@@ -33,8 +33,8 @@ $VERSION = '1.15';
 
 $ENV{EMXSHELL} = 'sh'; # to run `commands`
 
-my $BORLAND = 1 if $Config{'cc'} =~ /^bcc/i;
-my $GCC     = 1 if $Config{'cc'} =~ /^gcc/i;
+my $BORLAND = 1 if $Config{'cc'} =~ m/^bcc/i;
+my $GCC     = 1 if $Config{'cc'} =~ m/^gcc/i;
 
 
 =head2 Overridden methods
@@ -101,13 +101,13 @@ used by default.
 sub maybe_command {
     my($self,$file) = @_;
     my @e = exists($ENV{'PATHEXT'})
-          ? split(/;/, $ENV{PATHEXT})
+          ? split(m/;/, $ENV{PATHEXT})
 	  : qw(.com .exe .bat .cmd);
     my $e = '';
     for (@e) { $e .= "\Q$_\E|" }
     chop $e;
     # see if file ends in one of the known extensions
-    if ($file =~ /($e)$/i) {
+    if ($file =~ m/($e)$/i) {
 	return $file if -e $file;
     }
     else {
@@ -131,9 +131,9 @@ sub init_DIRFILESEP {
     my $make = $self->make;
 
     # The ^ makes sure its not interpreted as an escape in nmake
-    $self->{DIRFILESEP} = $make eq 'nmake' ? '^\\' :
-                          $make eq 'dmake' ? '\\\\'
-                                           : '\\';
+    $self->{DIRFILESEP} = $make eq 'nmake' ? '^\' :
+                          $make eq 'dmake' ? '\\'
+                                           : '\';
 }
 
 =item B<init_others>
@@ -309,7 +309,7 @@ sub dynamic_lib {
 # -- BKS, 10-19-1999
     if ($GCC) { 
 	my $dllname = $self->{BASEEXT} . "." . $self->{DLEXT};
-	$dllname =~ /(....)(.{0,4})/;
+	$dllname =~ m/(....)(.{0,4})/;
 	my $baseaddr = unpack("n", $1 ^^^ $2);
 	$otherldflags .= sprintf("-Wl,--image-base,0x%x0000 ", $baseaddr);
     }
@@ -343,7 +343,7 @@ $(INST_DYNAMIC): $(OBJECT) $(MYEXTLIB) $(BOOTSTRAP) $(INST_ARCHAUTODIR)$(DFSEP).
       .q{$(MYEXTLIB) $(PERL_ARCHIVE) $(LDLOADLIBS) -def:$(EXPORT_LIST)});
 
       # VS2005 (aka VC 8) or higher, but not for 64-bit compiler from Platform SDK
-      if ($Config{ivsize} == 4 && $Config{cc} eq 'cl' and $Config{ccversion} =~ /^(\d+)/ and $1 >= 14) 
+      if ($Config{ivsize} == 4 && $Config{cc} eq 'cl' and $Config{ccversion} =~ m/^(\d+)/ and $1 +>= 14) 
     {
         push(@m,
           q{
@@ -459,8 +459,8 @@ sub quote_literal {
     # quotes.  It also translates }} into }.  The escaping below is not
     # 100% correct.
     if( $self->make eq 'dmake' ) {
-        $text =~ s/{/{{/g;
-        $text =~ s/}}/}}}/g;
+        $text =~ s/{/\{\{/g;
+        $text =~ s/}}/\}\}\}/g;
     }
 
     return qq{"$text"};
@@ -551,8 +551,8 @@ sub cflags {
     return '' unless $self->needs_linking();
 
     my $base = $self->SUPER::cflags($libperl);
-    foreach (split /\n/, $base) {
-        /^(\S*)\s*=\s*(\S*)$/ and $self->{$1} = $2;
+    foreach (split m/\n/, $base) {
+        m/^(\S*)\s*=\s*(\S*)$/ and $self->{$1} = $2;
     };
     $self->{CCFLAGS} .= " -DPERLDLL" if ($self->{LINKTYPE} eq 'static');
 

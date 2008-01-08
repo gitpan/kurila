@@ -14,10 +14,6 @@ use Test::More ;
 use CompTestUtils;
 
 BEGIN {
-    plan(skip_all => "oneshot needs Perl 5.005 or better - you have Perl $]" )
-        if $] < 5.005 ;
-
-
     # use Test::NoWarnings, if available
     my $extra = 0 ;
     $extra = 1
@@ -109,7 +105,7 @@ sub zipGetHeader
     is $hdr->{Time} >> 1 , $useTime >> 1 , "  Time is $useTime";
 
     title "Filehandle doesn't have default Name or Time" ;
-    my $fh = IO::File->new( "< $file1")
+    my $fh = IO::File->new( "$file1", "<")
         or diag "Cannot open '$file1': $!\n" ;
     sleep 3 ; 
     my $before = time ;
@@ -117,8 +113,8 @@ sub zipGetHeader
     my $after = time ;
 
     ok ! defined $hdr->{Name}, "  Name is undef";
-    cmp_ok $hdr->{Time} >> 1, '>=', $before >> 1, "  Time is ok";
-    cmp_ok $hdr->{Time} >> 1, '<=', $after >> 1, "  Time is ok";
+    cmp_ok $hdr->{Time} >> 1, '+>=', $before >> 1, "  Time is ok";
+    cmp_ok $hdr->{Time} >> 1, '+<=', $after >> 1, "  Time is ok";
 
     $fh->close;
 
@@ -129,8 +125,8 @@ sub zipGetHeader
     $after = time ;
 
     ok ! defined $hdr->{Name}, "  Name is undef";
-    cmp_ok $hdr->{Time} >> 1, '>=', $before >> 1, "  Time is ok";
-    cmp_ok $hdr->{Time} >> 1, '<=', $after >> 1, "  Time is ok";
+    cmp_ok $hdr->{Time} >> 1, '+>=', $before >> 1, "  Time is ok";
+    cmp_ok $hdr->{Time} >> 1, '+<=', $after >> 1, "  Time is ok";
 }
 
 for my $stream (0, 1)

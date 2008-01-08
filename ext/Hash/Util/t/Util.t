@@ -6,7 +6,7 @@ BEGIN {
 	@INC = '../lib';
 	require Config; Config->import;
 	keys %Config; # Silence warning
-	if ($Config{extensions} !~ /\bHash\/Util\b/) {
+	if ($Config{extensions} !~ m/\bHash\/Util\b/) {
 	    print "1..0 # Skip: Hash::Util was not built\n";
 	    exit 0;
 	}
@@ -311,7 +311,7 @@ like( $@, qr/^Attempt to access disallowed key 'I_DONT_EXIST' in a restricted ha
 }
 
 my $hash_seed = hash_seed();
-ok($hash_seed >= 0, "hash_seed $hash_seed");
+ok($hash_seed +>= 0, "hash_seed $hash_seed");
 
 {
     package Minder;

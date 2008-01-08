@@ -474,8 +474,11 @@ PP(pp_defined)
 
 PP(pp_add)
 {
-    dVAR; dSP; dATARGET; bool useleft; tryAMAGICbin(add,opASSIGN);
-    useleft = USE_LEFT(TOPm1s);
+    dVAR; dSP; dATARGET; bool useleft; SV *svl, *svr;
+    tryAMAGICbin(add,opASSIGN);
+    svl = sv_2num(TOPm1s);
+    svr = sv_2num(TOPs);
+    useleft = USE_LEFT(svl);
 #ifdef PERL_PRESERVE_IVUV
     /* We must see if we can perform the addition with integers if possible,
        as the integer code detects overflow while the NV code doesn't.
@@ -523,8 +526,8 @@ PP(pp_add)
        unsigned code below is actually shorter than the old code. :-)
     */
 
-    SvIV_please(TOPs);
-    if (SvIOK(TOPs)) {
+    SvIV_please(svr);
+    if (SvIOK(svr)) {
 	/* Unless the left argument is integer in range we are going to have to
 	   use NV maths. Hence only attempt to coerce the right argument if
 	   we know the left is integer.  */
@@ -540,12 +543,12 @@ PP(pp_add)
 	       lots of code to speed up what is probably a rarish case.  */
 	} else {
 	    /* Left operand is defined, so is it IV? */
-	    SvIV_please(TOPm1s);
-	    if (SvIOK(TOPm1s)) {
-		if ((auvok = SvUOK(TOPm1s)))
-		    auv = SvUVX(TOPm1s);
+	    SvIV_please(svl);
+	    if (SvIOK(svl)) {
+		if ((auvok = SvUOK(svl)))
+		    auv = SvUVX(svl);
 		else {
-		    register const IV aiv = SvIVX(TOPm1s);
+		    register const IV aiv = SvIVX(svl);
 		    if (aiv >= 0) {
 			auv = aiv;
 			auvok = 1;	/* Now acting as a sign flag.  */
@@ -560,12 +563,12 @@ PP(pp_add)
 	    bool result_good = 0;
 	    UV result;
 	    register UV buv;
-	    bool buvok = SvUOK(TOPs);
+	    bool buvok = SvUOK(svr);
 	
 	    if (buvok)
-		buv = SvUVX(TOPs);
+		buv = SvUVX(svr);
 	    else {
-		register const IV biv = SvIVX(TOPs);
+		register const IV biv = SvIVX(svr);
 		if (biv >= 0) {
 		    buv = biv;
 		    buvok = 1;
@@ -623,13 +626,14 @@ PP(pp_add)
     }
 #endif
     {
-	dPOPnv;
+	NV value = SvNV(svr);
+	(void)POPs;
 	if (!useleft) {
 	    /* left operand is undef, treat as zero. + 0.0 is identity. */
 	    SETn(value);
 	    RETURN;
 	}
-	SETn( value + TOPn );
+	SETn( value + SvNV(svl) );
 	RETURN;
     }
 }
@@ -1486,7 +1490,7 @@ Perl_do_readline(pTHX)
 		    IoLINES(io) = 0;
 		    if (av_len(GvAVn(PL_last_in_gv)) < 0) {
 			IoFLAGS(io) &= ~IOf_START;
-			do_open(PL_last_in_gv,"-",1,FALSE,O_RDONLY,0,NULL);
+			do_openn(PL_last_in_gv,"-",1,FALSE,O_RDONLY,0,NULL,NULL,0);
 			sv_setpvn(GvSVn(PL_last_in_gv), "-", 1);
 			SvSETMAGIC(GvSV(PL_last_in_gv));
 			fp = IoIFP(io);
@@ -1707,8 +1711,8 @@ PP(pp_helem)
 			* element by using EXISTS and DELETE if possible.
 			* Fallback to FETCH and STORE otherwise */
 		    && (stash = SvSTASH(SvRV(SvTIED_obj((SV*)hv, mg))))
-		    && gv_fetchmethod_autoload(stash, "EXISTS", TRUE)
-		    && gv_fetchmethod_autoload(stash, "DELETE", TRUE)
+		    && gv_fetchmethod(stash, "EXISTS")
+		    && gv_fetchmethod(stash, "DELETE")
 		)
 	    ) ? hv_exists_ent(hv, keysv, 0) : 1;
     }
@@ -2619,17 +2623,10 @@ PP(pp_entersub)
 	/* should call AUTOLOAD now? */
 	else {
 try_autoload:
-	    if ((autogv = gv_autoload4(GvSTASH(gv), GvNAME(gv), GvNAMELEN(gv),
-				   FALSE)))
-	    {
-		cv = GvCV(autogv);
-	    }
 	    /* sorry */
-	    else {
-		sub_name = sv_newmortal();
-		gv_efullname3(sub_name, gv, NULL);
-		DIE(aTHX_ "Undefined subroutine &%"SVf" called", SVfARG(sub_name));
-	    }
+	    sub_name = sv_newmortal();
+	    gv_efullname4(sub_name, gv, NULL, TRUE);
+	    DIE(aTHX_ "Undefined subroutine &%"SVf" called", SVfARG(sub_name));
 	}
 	if (!cv)
 	    DIE(aTHX_ "Not a CODE reference");
@@ -2767,7 +2764,7 @@ Perl_sub_crush_depth(pTHX_ CV *cv)
 	Perl_warner(aTHX_ packWARN(WARN_RECURSION), "Deep recursion on anonymous subroutine");
     else {
 	SV* const tmpstr = sv_newmortal();
-	gv_efullname3(tmpstr, CvGV(cv), NULL);
+	gv_efullname4(tmpstr, CvGV(cv), NULL, TRUE);
 	Perl_warner(aTHX_ packWARN(WARN_RECURSION), "Deep recursion on subroutine \"%"SVf"\"",
 		    SVfARG(tmpstr));
     }
@@ -2984,7 +2981,7 @@ S_method_common(pTHX_ SV* meth, U32* hashp)
 	/* This code tries to figure out just what went wrong with
 	   gv_fetchmethod.  It therefore needs to duplicate a lot of
 	   the internals of that function.  We can't move it inside
-	   Perl_gv_fetchmethod_autoload(), however, since that would
+	   Perl_gv_fetchmethod(), however, since that would
 	   cause UNIVERSAL->can("NoSuchPackage::foo") to croak, and we
 	   don't want that.
 	*/

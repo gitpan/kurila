@@ -14,12 +14,12 @@ else { die "$0: Can't find miniperlmain.c\n"; }
 
 open (IN,"${dir}miniperlmain.c")
   || die "$0: Can't open ${dir}miniperlmain.c: $!\n";
-open (OUT,">${dir}perlmain.c")
+open (OUT, ">","${dir}perlmain.c")
   || die "$0: Can't open ${dir}perlmain.c: $!\n";
 
-while (<IN>) {
+while ( ~< *IN) {
   print OUT;
-  last if /Do not delete this line--writemain depends on it/;
+  last if m/Do not delete this line--writemain depends on it/;
 }
 $ok = !eof(IN);
 close IN;
@@ -42,7 +42,7 @@ if (@ARGV) {
   $names = join(' ',@ARGV);
   $names =~ tr/"//d;  # Plan9 doesn't remove "" on command line
   # Allow for multiple names in one quoted group
-  @exts = split(/\s+/,$names);
+  @exts = split(m/\s+/,$names);
 }
 
 if (@exts) {
@@ -69,5 +69,5 @@ if (@exts) {
   }
 }
 
-print OUT "}\n";
+print OUT "\}\n";
 close OUT;

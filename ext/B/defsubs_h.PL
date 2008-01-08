@@ -5,10 +5,10 @@
 use strict;
 use File::Spec;
 my (undef, $headerpath) = @ARGV;
-my ($out) = __FILE__ =~ /(^.*)\.PL/i;
+my ($out) = __FILE__ =~ m/(^.*)\.PL/i;
 $out =~ s/_h$/.h/;
 unlink $out if -l $out;
-open(OUT,">$out") || die "Cannot open $out:$!";
+open(OUT,">","$out") || die "Cannot open $out:$!";
 print "Extracting $out...\n";
 print OUT <<"END";
 /*
@@ -55,29 +55,17 @@ foreach my $const (qw(
   doconst($const);
  }
 
-if ($] < 5.009) {
-    # This is only present in 5.10, but it's useful to B::Deparse to be able
-    # to import a dummy value from B
-    doconst('OPpPAD_STATE');
-}
-
-if ($] >= 5.009) {
-    # Constant not present in 5.8.x
-    doconst('CVf_ISXSUB');
-} else {
-    # Constant not present after 5.8.x
-    doconst('AVf_REAL');
-}  
+doconst('CVf_ISXSUB');
 
 foreach my $tuple (['op.h'],['cop.h'],['regexp.h','RXf_'])
  {
   my $file = $tuple->[0];
   my $pfx = $tuple->[1] || '';
   my $path = File::Spec->catfile($headerpath, $file);
-  open(OPH,"$path") || die "Cannot open $path:$!";
-  while (<OPH>)
+  open(OPH,"<","$path") || die "Cannot open $path:$!";
+  while ( ~< *OPH)
    {  
-    doconst($1) if (/#define\s+($pfx\w+)\s+([\(\)\|\dx]+)\s*(?:$|\/\*)/);
+    doconst($1) if (m/#define\s+($pfx\w+)\s+([\(\)\|\dx]+)\s*(?:$|\/\*)/);
    }  
   close(OPH);
  }

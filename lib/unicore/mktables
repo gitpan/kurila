@@ -79,11 +79,11 @@ if ($FileList) {
     my @input;
     my @output;
     for my $list ( \@input, \@output ) {
-        while (<$fh>) {
+        while ( ~< $fh) {
             s/^ \s+ | \s+ $//xg;
-            next if /^ \s* (?: \# .* )? $/x;
-            last if /^ =+ $/x;
-            my ( $file ) = split /\t/, $_;
+            next if m/^ \s* (?: \# .* )? $/x;
+            last if m/^ =+ $/x;
+            my ( $file ) = split m/\t/, $_;
             push @$list, $file;
         }
         my %dupe;
@@ -109,7 +109,7 @@ if ($FileList) {
     foreach my $in (@input) {
         my $time = -M $in;
         die "Missing input file '$in'" unless defined $time;
-        $maxtime = $time if $maxtime < $time;
+        $maxtime = $time if $maxtime +< $time;
     }
 
     # now we check to see if any output files are older than maxtime, if
@@ -122,7 +122,7 @@ if ($FileList) {
             $ok = 0;
             last;
         }
-        if ( -M $out > $maxtime ) {
+        if ( -M $out +> $maxtime ) {
             print "'$out' is too old.\n"
                 if $Verbose;
             $ok = 0;
@@ -183,9 +183,9 @@ sub WriteIfChanged($\@)
     $file = File::Spec->catfile(@$file) if ref $file;
 
     my $TextToWrite = join '', @$lines;
-    if (open IN, $file) {
+    if (open IN, "<", $file) {
         local($/) = undef;
-        my $PreviousText = <IN>;
+        my $PreviousText = ~< *IN;
         close IN;
         if ($PreviousText eq $TextToWrite) {
             print "$file unchanged.\n" if $Verbose;
@@ -193,7 +193,7 @@ sub WriteIfChanged($\@)
         }
     }
     force_unlink ($file);
-    if (not open OUT, ">$file") {
+    if (not open OUT, ">", "$file") {
         die "$0: can't open $file for output: $!\n";
     }
     print "$file written.\n" if $Verbose;
@@ -233,7 +233,7 @@ sub CanonicalName($)
 {
     my $orig = shift;
     my $name = lc $orig;
-    $name =~ s/(?<![a-z])(\w)/\u$1/g;
+    $name =~ s/(?<![a-z])(\w)/{ucfirst($1)}/g;
     $name =~ s/[-_\s]+//g;
 
     $CanonicalToOrig{$name} = $orig if not $CanonicalToOrig{$name};
@@ -264,14 +264,14 @@ sub Build_Aliases()
     %utf8::PVA_reverse = ();
     %utf8::PVA_abbr_map = ();
 
-    open PA, "< PropertyAliases.txt"
+    open PA, "<", "PropertyAliases.txt"
 	or confess "Can't open PropertyAliases.txt: $!";
-    while (<PA>) {
+    while ( ~< *PA) {
 	s/#.*//;
 	s/\s+$//;
-	next if /^$/;
+	next if m/^$/;
 
-	my ($abbrev, $name) = split /\s*;\s*/;
+	my ($abbrev, $name) = split m/\s*;\s*/;
         next if $abbrev eq "n/a";
 	$PropertyAlias{$abbrev} = $name;
         $PA_reverse{$name} = $abbrev;
@@ -284,14 +284,14 @@ sub Build_Aliases()
     }
     close PA;
 
-    open PVA, "< PropValueAliases.txt"
+    open PVA, "<", "PropValueAliases.txt"
 	or confess "Can't open PropValueAliases.txt: $!";
-    while (<PVA>) {
+    while ( ~< *PVA) {
 	s/#.*//;
 	s/\s+$//;
-	next if /^$/;
+	next if m/^$/;
 
-	my ($prop, @data) = split /\s*;\s*/;
+	my ($prop, @data) = split m/\s*;\s*/;
 
 	if ($prop eq 'ccc') {
 	    $PropValueAlias{$prop}{$data[1]} = [ @data[0,2] ];
@@ -434,7 +434,7 @@ sub Table::Extend
 
     my $PrevMax = $Table->Max;
 
-    confess "oops ($codepoint <= $PrevMax)" if $codepoint <= $PrevMax;
+    confess "oops ($codepoint <= $PrevMax)" if $codepoint +<= $PrevMax;
 
     $Table->ExtendNoCheck($codepoint);
 }
@@ -518,7 +518,7 @@ sub Table::AppendRange
     $name = "" if not defined $name; ## warning: $name can be "0"
 
     $Table->Append($start, $name);
-    $Table->Extend($end) if $end > $start;
+    $Table->Extend($end) if $end +> $start;
 }
 
 ##
@@ -534,12 +534,12 @@ sub Table::Invert
     {
         my $start = $range->[RANGE_START];
         my $end   = $range->[RANGE_END];
-        if ($start-1 >= $max+1) {
+        if ($start-1 +>= $max+1) {
             $New->AppendRange($max+1, $start-1, "");
         }
         $max = $end;
     }
-    if ($max+1 < $LastUnicodeCodepoint) {
+    if ($max+1 +< $LastUnicodeCodepoint) {
         $New->AppendRange($max+1, $LastUnicodeCodepoint);
     }
     return $New;
@@ -574,9 +574,9 @@ sub Table::Merge
 
     ## sort by range start, with longer ranges coming first.
     my ($first, @Rest) = sort {
-        ($a->[RANGE_START] <=> $b->[RANGE_START])
+        ($a->[RANGE_START] <+> $b->[RANGE_START])
           or
-        ($b->[RANGE_END]   <=> $b->[RANGE_END])
+        ($b->[RANGE_END]   <+> $b->[RANGE_END])
     } @Records;
 
     my $New = Table->New();
@@ -590,9 +590,9 @@ sub Table::Merge
     {
         my $start = $set->[RANGE_START];
         my $end   = $set->[RANGE_END];
-        if ($start > $New->Max) {
+        if ($start +> $New->Max) {
             $New->AppendRange($start, $end);
-        } elsif ($end > $New->Max) {
+        } elsif ($end +> $New->Max) {
             $New->ExtendNoCheck($end);
         }
     }
@@ -642,10 +642,10 @@ sub Table::Write
 sub IsUsable($)
 {
     my $code = shift;
-    return 0 if $code <= 0x0000;                       ## don't use null
-    return 0 if $code >= $LastUnicodeCodepoint;        ## keep in range
-    return 0 if ($code >= 0xD800 and $code <= 0xDFFF); ## no surrogates
-    return 0 if ($code >= 0xFDD0 and $code <= 0xFDEF); ## utf8.c says no good
+    return 0 if $code +<= 0x0000;                       ## don't use null
+    return 0 if $code +>= $LastUnicodeCodepoint;        ## keep in range
+    return 0 if ($code +>= 0xD800 and $code +<= 0xDFFF); ## no surrogates
+    return 0 if ($code +>= 0xFDD0 and $code +<= 0xFDEF); ## utf8.c says no good
     return 0 if (($code ^&^ 0xFFFF) == 0xFFFE);          ## utf8.c says no good
     return 0 if (($code ^&^ 0xFFFF) == 0xFFFF);          ## utf8.c says no good
     return 1;
@@ -759,7 +759,7 @@ sub simple_dumper {
 	    if (ref $item eq 'ARRAY') {
 		push @lines, "[\n", simple_dumper (@$item), "],\n";
 	    } elsif (ref $item eq 'HASH') {
-		push @lines, "{\n", simple_dumper (%$item), "},\n";
+		push @lines, "\{\n", simple_dumper (%$item), "\},\n";
 	    } else {
 		die "Can't cope with $item";
 	    }
@@ -864,12 +864,12 @@ sub UnicodeData_Txt()
         ($General{$name} ||= Table->New)->?$op($code, $name);
 
         # 005F: SPACING UNDERSCORE
-        $Cat{Word}->?$op($code)  if $cat =~ /^[LMN]|Pc/;
-        $Cat{Alnum}->?$op($code) if $cat =~ /^[LM]|Nd/;
-        $Cat{Alpha}->?$op($code) if $cat =~ /^[LM]/;
+        $Cat{Word}->?$op($code)  if $cat =~ m/^[LMN]|Pc/;
+        $Cat{Alnum}->?$op($code) if $cat =~ m/^[LM]|Nd/;
+        $Cat{Alpha}->?$op($code) if $cat =~ m/^[LM]/;
 
 	my $isspace = 
-	    ($cat =~ /Zs|Zl|Zp/ &&
+	    ($cat =~ m/Zs|Zl|Zp/ &&
 	     $code != 0x200B) # 200B is ZWSP which is for line break control
 	     # and therefore it is not part of "space" even while it is "Zs".
                                 || $code == 0x0009  # 0009: HORIZONTAL TAB
@@ -892,26 +892,26 @@ sub UnicodeData_Txt()
 				     $code == 0x000C ||
 				     $code == 0x000D ||
 				     $code == 0x0085 ||
-				     $cat =~ /^Z[lp]/);
+				     $cat =~ m/^Z[lp]/);
 
         $Cat{Digit}->?$op($code) if $cat eq "Nd";
         $Cat{Upper}->?$op($code) if $cat eq "Lu";
         $Cat{Lower}->?$op($code) if $cat eq "Ll";
         $Cat{Title}->?$op($code) if $cat eq "Lt";
-        $Cat{ASCII}->?$op($code) if $code <= 0x007F;
-        $Cat{Cntrl}->?$op($code) if $cat =~ /^C/;
-	my $isgraph = !$isspace && $cat !~ /Cc|Cs|Cn/;
+        $Cat{ASCII}->?$op($code) if $code +<= 0x007F;
+        $Cat{Cntrl}->?$op($code) if $cat =~ m/^C/;
+	my $isgraph = !$isspace && $cat !~ m/Cc|Cs|Cn/;
         $Cat{Graph}->?$op($code) if $isgraph;
         $Cat{Print}->?$op($code) if $isgraph || $isspace;
-        $Cat{Punct}->?$op($code) if $cat =~ /^P/;
+        $Cat{Punct}->?$op($code) if $cat =~ m/^P/;
 
-        $Cat{XDigit}->?$op($code) if ($code >= 0x30 && $code <= 0x39)  ## 0..9
-                                 || ($code >= 0x41 && $code <= 0x46)  ## A..F
-                                 || ($code >= 0x61 && $code <= 0x66); ## a..f
+        $Cat{XDigit}->?$op($code) if ($code +>= 0x30 && $code +<= 0x39)  ## 0..9
+                                 || ($code +>= 0x41 && $code +<= 0x46)  ## A..F
+                                 || ($code +>= 0x61 && $code +<= 0x66); ## a..f
     }
 
     ## open ane read file.....
-    if (not open IN, "UnicodeData.txt") {
+    if (not open IN, "<", "UnicodeData.txt") {
         die "$0: UnicodeData.txt: $!\n";
     }
 
@@ -928,9 +928,9 @@ sub UnicodeData_Txt()
                                Desc  => '(for internal casefolding use)',
                                Fuzzy => 0);
 
-    while (<IN>)
+    while ( ~< *IN)
     {
-        next unless /^[0-9A-Fa-f]+;/;
+        next unless m/^[0-9A-Fa-f]+;/;
         s/\s+$//;
 
         my ($hexcode,   ## code point in hex (e.g. "0041")
@@ -948,7 +948,7 @@ sub UnicodeData_Txt()
             $upper,     ## uppercase mapping
             $lower,     ## lowercase mapping
             $title,     ## titlecase mapping
-              ) = split(/\s*;\s*/);
+              ) = split(m/\s*;\s*/);
 
 	# Note that in Unicode 3.2 there will be names like
 	# LINE FEED (LF), which probably means that \N{} needs
@@ -973,7 +973,7 @@ sub UnicodeData_Txt()
         ##   D7A3;<Hangul Syllable, Last>;Lo;0;L;;;;;N;;;;;
         ## that define ranges.
         ##
-        if ($name =~ /^<(.+), (First|Last)>$/)
+        if ($name =~ m/^<(.+), (First|Last)>$/)
         {
             $name = $1;
             gencat($name, $cat, $code, $2 eq 'First' ? 'Append' : 'Extend');
@@ -1010,7 +1010,7 @@ sub UnicodeData_Txt()
             if ($deco)
             {
                 $Deco->Append($code, $deco);
-                if ($deco =~/^<(\w+)>/)
+                if ($deco =~m/^<(\w+)>/)
                 {
 		    my $dshort = $PVA_reverse{dt}{ucfirst lc $1};
                     $DC{com}->Append($code);
@@ -1052,7 +1052,7 @@ sub UnicodeData_Txt()
 
     ## Any and All are all code points.
     my $Any = Table->New(Is    => 'Any',
-                         Desc  => sprintf("[\\x{0000}-\\x{%X}]",
+                         Desc  => sprintf("[\\x\{0000\}-\\x\{%X\}]",
                                           $LastUnicodeCodepoint),
                          Fuzzy => 0);
     $Any->RawAppendRange(0, $LastUnicodeCodepoint);
@@ -1086,12 +1086,12 @@ sub UnicodeData_Txt()
     ## ...and any character with a decomposition that starts with either of
     ## those code points, but only if the decomposition does not have any
     ## combining character with the "ABOVE" canonical combining class.
-    for my $code (sort { $a <=> $b} keys %CodeToDeco)
+    for my $code (sort { $a <+> $b} keys %CodeToDeco)
     {
         ## Need to ensure that all decomposition characters do not have
         ## a %HexCodeToComb in %AboveCombClasses.
         my $want = 1;
-        for my $deco_hexcode (split / /, $CodeToDeco{$code})
+        for my $deco_hexcode (split m/ /, $CodeToDeco{$code})
         {
             if (exists $_Above_HexCodes{$deco_hexcode}) {
                 ## one of the decmposition chars has an ABOVE combination
@@ -1175,16 +1175,16 @@ sub UnicodeData_Txt()
 ##
 sub LineBreak_Txt()
 {
-    if (not open IN, "LineBreak.txt") {
+    if (not open IN, "<", "LineBreak.txt") {
         die "$0: LineBreak.txt: $!\n";
     }
 
     my $Lbrk = Table->New();
     my %Lbrk;
 
-    while (<IN>)
+    while ( ~< *IN)
     {
-        next unless /^([0-9A-Fa-f]+)(?:\.\.([0-9A-Fa-f]+))?\s*;\s*(\w+)/;
+        next unless m/^([0-9A-Fa-f]+)(?:\.\.([0-9A-Fa-f]+))?\s*;\s*(\w+)/;
 
 	my ($first, $last, $lbrk) = (hex($1), hex($2||""), $3);
 
@@ -1216,7 +1216,7 @@ sub LineBreak_Txt()
 ##
 sub ArabicShaping_txt()
 {
-    if (not open IN, "ArabicShaping.txt") {
+    if (not open IN, "<", "ArabicShaping.txt") {
         die "$0: ArabicShaping.txt: $!\n";
     }
 
@@ -1225,12 +1225,12 @@ sub ArabicShaping_txt()
 
     my %JoinType;
 
-    while (<IN>)
+    while ( ~< *IN)
     {
-	next unless /^[0-9A-Fa-f]+;/;
+	next unless m/^[0-9A-Fa-f]+;/;
 	s/\s+$//;
 
-	my ($hexcode, $name, $link, $linkgroup) = split(/\s*;\s*/);
+	my ($hexcode, $name, $link, $linkgroup) = split(m/\s*;\s*/);
         my $code = hex($hexcode);
 	$ArabLink->Append($code, $link);
 	$ArabLinkGroup->Append($code, $linkgroup);
@@ -1257,21 +1257,21 @@ sub ArabicShaping_txt()
 ##
 sub EastAsianWidth_txt()
 {
-    if (not open IN, "EastAsianWidth.txt") {
+    if (not open IN, "<", "EastAsianWidth.txt") {
         die "$0: EastAsianWidth.txt: $!\n";
     }
 
     my %EAW;
 
-    while (<IN>)
+    while ( ~< *IN)
     {
-	next unless /^[0-9A-Fa-f]+(\.\.[0-9A-Fa-f]+)?;/;
+	next unless m/^[0-9A-Fa-f]+(\.\.[0-9A-Fa-f]+)?;/;
 	s/#.*//;
 	s/\s+$//;
 
-	my ($hexcodes, $pv) = split(/\s*;\s*/);
+	my ($hexcodes, $pv) = split(m/\s*;\s*/);
         $EAW{$pv} ||= Table->New(Is => "EastAsianWidth$pv");
-      my ($start, $end) = split(/\.\./, $hexcodes);
+      my ($start, $end) = split(m/\.\./, $hexcodes);
       if (defined $end) {
         $EAW{$pv}->AppendRange(hex($start), hex($end));
       } else {
@@ -1294,15 +1294,15 @@ sub EastAsianWidth_txt()
 ##
 sub HangulSyllableType_txt()
 {
-    if (not open IN, "HangulSyllableType.txt") {
+    if (not open IN, "<", "HangulSyllableType.txt") {
         die "$0: HangulSyllableType.txt: $!\n";
     }
 
     my %HST;
 
-    while (<IN>)
+    while ( ~< *IN)
     {
-        next unless /^([0-9A-Fa-f]+)(?:\.\.([0-9A-Fa-f]+))?\s*;\s*(\w+)/;
+        next unless m/^([0-9A-Fa-f]+)(?:\.\.([0-9A-Fa-f]+))?\s*;\s*(\w+)/;
 	my ($first, $last, $pv) = (hex($1), hex($2||""), $3);
 
         $HST{$pv} ||= Table->New(Is => "HangulSyllableType$pv");
@@ -1325,14 +1325,14 @@ sub HangulSyllableType_txt()
 ##
 sub Jamo_txt()
 {
-    if (not open IN, "Jamo.txt") {
+    if (not open IN, "<", "Jamo.txt") {
         die "$0: Jamo.txt: $!\n";
     }
     my $Short = Table->New();
 
-    while (<IN>)
+    while ( ~< *IN)
     {
-	next unless /^([0-9A-Fa-f]+)\s*;\s*(\w*)/;
+	next unless m/^([0-9A-Fa-f]+)\s*;\s*(\w*)/;
 	my ($code, $short) = (hex($1), $2);
 
 	$Short->Append($code, $short);
@@ -1348,11 +1348,11 @@ sub Scripts_txt()
 {
     my @ScriptInfo;
 
-    if (not open(IN, "Scripts.txt")) {
+    if (not open(IN, "<", "Scripts.txt")) {
         die "$0: Scripts.txt: $!\n";
     }
-    while (<IN>) {
-        next unless /^([0-9A-Fa-f]+)(?:\.\.([0-9A-Fa-f]+))?\s*;\s*(.+?)\s*\#/;
+    while ( ~< *IN) {
+        next unless m/^([0-9A-Fa-f]+)(?:\.\.([0-9A-Fa-f]+))?\s*;\s*(.+?)\s*\#/;
 
         # Wait until all the scripts have been read since
         # they are not listed in numeric order.
@@ -1365,7 +1365,7 @@ sub Scripts_txt()
     my %Script;
     my $Scripts = Table->New();
 
-    for my $script (sort { $a->[0] <=> $b->[0] } @ScriptInfo)
+    for my $script (sort { $a->[0] <+> $b->[0] } @ScriptInfo)
     {
         my ($first, $last, $name) = @$script;
         $Scripts->Append($first, $name);
@@ -1417,14 +1417,14 @@ sub Blocks_txt()
     my $Blocks = Table->New();
     my %Blocks;
 
-    if (not open IN, "Blocks.txt") {
+    if (not open IN, "<", "Blocks.txt") {
         die "$0: Blocks.txt: $!\n";
     }
 
-    while (<IN>)
+    while ( ~< *IN)
     {
         #next if not /Private Use$/;
-	next if not /^([0-9A-Fa-f]+)\.\.([0-9A-Fa-f]+)\s*;\s*(.+?)\s*$/;
+	next if not m/^([0-9A-Fa-f]+)\.\.([0-9A-Fa-f]+)\s*;\s*(.+?)\s*$/;
 
 	my ($first, $last, $name) = (hex($1), hex($2), $3);
 
@@ -1456,13 +1456,13 @@ sub PropList_txt()
 {
     my @PropInfo;
 
-    if (not open IN, "PropList.txt") {
+    if (not open IN, "<", "PropList.txt") {
         die "$0: PropList.txt: $!\n";
     }
 
-    while (<IN>)
+    while ( ~< *IN)
     {
-	next unless /^([0-9A-Fa-f]+)(?:\.\.([0-9A-Fa-f]+))?\s*;\s*(.+?)\s*\#/;
+	next unless m/^([0-9A-Fa-f]+)(?:\.\.([0-9A-Fa-f]+))?\s*;\s*(.+?)\s*\#/;
 
 	# Wait until all the extended properties have been read since
 	# they are not listed in numeric order.
@@ -1474,7 +1474,7 @@ sub PropList_txt()
     my $Props = Table->New();
     my %Prop;
 
-    for my $prop (sort { $a->[0] <=> $b->[0] } @PropInfo)
+    for my $prop (sort { $a->[0] <+> $b->[0] } @PropInfo)
     {
         my ($first, $last, $name) = @$prop;
         $Props->Append($first, $name);
@@ -1579,16 +1579,16 @@ sub GenTests($$$$)
     my $FailCode = shift;
 
     if (defined $MatchCode) {
-        printf $FH qq/Expect(1, "\\x{%04X}", '\\p{$Prop}' );\n/, $MatchCode;
-        printf $FH qq/Expect(0, "\\x{%04X}", '\\p{^$Prop}');\n/, $MatchCode;
-        printf $FH qq/Expect(0, "\\x{%04X}", '\\P{$Prop}' );\n/, $MatchCode;
-        printf $FH qq/Expect(1, "\\x{%04X}", '\\P{^$Prop}');\n/, $MatchCode;
+        printf $FH qq/Expect(1, "\\x\{%04X\}", '\\p\{$Prop\}' );\n/, $MatchCode;
+        printf $FH qq/Expect(0, "\\x\{%04X\}", '\\p\{^$Prop\}');\n/, $MatchCode;
+        printf $FH qq/Expect(0, "\\x\{%04X\}", '\\P\{$Prop\}' );\n/, $MatchCode;
+        printf $FH qq/Expect(1, "\\x\{%04X\}", '\\P\{^$Prop\}');\n/, $MatchCode;
     }
     if (defined $FailCode) {
-        printf $FH qq/Expect(0, "\\x{%04X}", '\\p{$Prop}' );\n/, $FailCode;
-        printf $FH qq/Expect(1, "\\x{%04X}", '\\p{^$Prop}');\n/, $FailCode;
-        printf $FH qq/Expect(1, "\\x{%04X}", '\\P{$Prop}' );\n/, $FailCode;
-        printf $FH qq/Expect(0, "\\x{%04X}", '\\P{^$Prop}');\n/, $FailCode;
+        printf $FH qq/Expect(0, "\\x\{%04X\}", '\\p\{$Prop\}' );\n/, $FailCode;
+        printf $FH qq/Expect(1, "\\x\{%04X\}", '\\p\{^$Prop\}');\n/, $FailCode;
+        printf $FH qq/Expect(1, "\\x\{%04X\}", '\\P\{$Prop\}' );\n/, $FailCode;
+        printf $FH qq/Expect(0, "\\x\{%04X\}", '\\P\{^$Prop\}');\n/, $FailCode;
     }
 }
 
@@ -1598,8 +1598,8 @@ sub ExpectError($$)
     my $FH = shift;
     my $prop = shift;
 
-    print $FH qq/Error('\\p{$prop}');\n/;
-    print $FH qq/Error('\\P{$prop}');\n/;
+    print $FH qq/Error('\\p\{$prop\}');\n/;
+    print $FH qq/Error('\\P\{$prop\}');\n/;
 }
 
 ## This used only for making the test script
@@ -1625,10 +1625,10 @@ sub RandomlyFuzzifyName($;$)
     my $WantError = shift;  ## if true, make an error
 
     my @parts;
-    for my $part (split /[-\s_]+/, $Name)
+    for my $part (split m/[-\s_]+/, $Name)
     {
         if (@parts) {
-            if ($WantError and rand() < 0.3) {
+            if ($WantError and rand() +< 0.3) {
                 push @parts, $BadSeps[rand(@BadSeps)];
                 $WantError = 0;
             } else {
@@ -1649,7 +1649,7 @@ sub RandomlyFuzzifyName($;$)
     my $new = join('', @parts);
 
     if ($WantError) {
-        if (rand() >= 0.5) {
+        if (rand() +>= 0.5) {
             $new .= $BadSeps[rand(@BadSeps)];
         } else {
             $new = $BadSeps[rand(@BadSeps)] . $new;
@@ -1663,10 +1663,10 @@ sub MakePropTestScript()
 {
     ## this written directly -- it's huge.
     force_unlink ("TestProp.pl");
-    if (not open OUT, ">TestProp.pl") {
+    if (not open OUT, ">", "TestProp.pl") {
         die "$0: TestProp.pl: $!\n";
     }
-    print OUT <DATA>;
+    print OUT ~< *DATA;
 
     while (my ($Name, $Table) = each %ExactNameToTest)
     {
@@ -1740,7 +1740,7 @@ sub RegisterFileForName($$$$)
         if ($Type eq 'Is') {
             die "oops[$CName]" if $Canonical{$CName};
             $Canonical{$CName} = $filename;
-            $CaComment{$CName} = $Name if $Name =~ tr/A-Z// >= 2;
+            $CaComment{$CName} = $Name if $Name =~ tr/A-Z// +>= 2;
         } else {
             die "oops[$Type$CName]" if $Canonical{lc "$Type$CName"};
             $Canonical{lc "$Type$CName"} = $filename;
@@ -1770,7 +1770,7 @@ sub WriteAllMappings()
     {
         my %RawNameToFile; ## a per-$Type cache
 
-        for my $Name (sort {length $a <=> length $b} keys %{$TableInfo{$Type}})
+        for my $Name (sort {length $a <+> length $b} keys %{$TableInfo{$Type}})
         {
             ## Note: $Name is already canonical
             my $Table   = $TableInfo{$Type}->{$Name};
@@ -1785,7 +1785,7 @@ sub WriteAllMappings()
 		    "$Type$Name";
 
                 $filename =~ s/[^\w_]+/_/g; # "L&" -> "L_"
-                substr($filename, 8) = '' if length($filename) > 8;
+                substr($filename, 8, undef, '') if length($filename) +> 8;
 
                 ##
                 ## Make sure the basename doesn't conflict with something we
@@ -1804,8 +1804,8 @@ sub WriteAllMappings()
                     ## than 8 characters, pre-truncate $filename so that the result
                     ## is acceptable.
                     my $delta = length($filename) + length($num) - 8;
-                    if ($delta > 0) {
-                        substr($filename, -$delta) = $num;
+                    if ($delta +> 0) {
+                        substr($filename, -$delta, undef, $num);
                     } else {
                         $filename .= $num;
                     }
@@ -1835,7 +1835,7 @@ sub WriteAllMappings()
                 for my $N (@Supported)
                 {
                     my $IsFuzzy = $FuzzyNames{$Type}->{$N};
-                    my $Prop    = "\\p{$TypeToShow$Name}";
+                    my $Prop    = "\\p\{$TypeToShow$Name\}";
                     $OrigProp = $Prop if not $OrigProp; #cache for aliases
                     if ($IsFuzzy) {
                         $Comment .= "\t$Prop (and fuzzy permutations)\n";
@@ -1873,7 +1873,7 @@ sub WriteAllMappings()
         }
 
         ## Register aliase info
-        for my $Name (sort {length $a <=> length $b} keys %{$AliasInfo{$Type}})
+        for my $Name (sort {length $a <+> length $b} keys %{$AliasInfo{$Type}})
         {
             my $Alias    = $AliasInfo{$Type}->{$Name};
             my $IsFuzzy  = $FuzzyNames{$Type}->{$Alias};
@@ -1901,7 +1901,7 @@ sub WriteAllMappings()
         my @OUT = (
                    "##\n",
                    "## This file created by $0\n",
-                   "## List of built-in \\p{...}/\\P{...} properties.\n",
+                   "## List of built-in \\p\{...\}/\\P\{...\} properties.\n",
                    "##\n",
                    "## '*' means name may be 'fuzzy'\n",
                    "##\n\n",
@@ -1979,15 +1979,15 @@ sub SpecialCasing_txt()
 
     my %CaseInfo;
 
-    if (not open IN, "SpecialCasing.txt") {
+    if (not open IN, "<", "SpecialCasing.txt") {
         die "$0: SpecialCasing.txt: $!\n";
     }
-    while (<IN>) {
-        next unless /^[0-9A-Fa-f]+;/;
+    while ( ~< *IN) {
+        next unless m/^[0-9A-Fa-f]+;/;
         s/\#.*//;
         s/\s+$//;
 
-        my ($code, $lower, $title, $upper, $condition) = split(/\s*;\s*/);
+        my ($code, $lower, $title, $upper, $condition) = split(m/\s*;\s*/);
 
         if ($condition) { # not implemented yet
             print "# SKIPPING $_\n" if $Verbose;
@@ -2021,10 +2021,10 @@ sub SpecialCasing_txt()
 	     "%utf8::ToSpec$case =\n(\n",
 	    );
 
-        for my $prop (sort { $a->[0] <=> $b->[0] } @{$CaseInfo{$case}}) {
+        for my $prop (sort { $a->[0] <+> $b->[0] } @{$CaseInfo{$case}}) {
             my ($ix, $code, $to) = @$prop;
             my $tostr =
-              join "", map { sprintf "\\x{%s}", $_ } split ' ', $to;
+              join "", map { sprintf "\\x\{%s\}", $_ } split ' ', $to;
             push @OUT, sprintf qq["%s" => "$tostr",\n], join("", map { sprintf "\\x[%02X]", $_ } unpack("U0C*", pack("U", $ix)));
 	    # Remove any single-character mappings for
 	    # the same character since we are going for
@@ -2048,16 +2048,16 @@ sub SpecialCasing_txt()
 #
 sub CaseFolding_txt()
 {
-    if (not open IN, "CaseFolding.txt") {
+    if (not open IN, "<", "CaseFolding.txt") {
 	die "$0: CaseFolding.txt: $!\n";
     }
 
     my $Fold = Table->New();
     my %Fold;
 
-    while (<IN>) {
+    while ( ~< *IN) {
 	# Skip status 'S', simple case folding
-	next unless /^([0-9A-Fa-f]+)\s*;\s*([CFI])\s*;\s*([0-9A-Fa-f]+(?: [0-9A-Fa-f]+)*)\s*;/;
+	next unless m/^([0-9A-Fa-f]+)\s*;\s*([CFI])\s*;\s*([0-9A-Fa-f]+(?: [0-9A-Fa-f]+)*)\s*;/;
 
 	my ($code, $status, $fold) = (hex($1), $2, $3);
 
@@ -2084,9 +2084,9 @@ sub CaseFolding_txt()
          "use utf8;\n",
 	 "%utf8::ToSpecFold =\n(\n",
 	);
-    for my $code (sort { $a <=> $b } keys %Fold) {
+    for my $code (sort { $a <+> $b } keys %Fold) {
         my $foldstr =
-          join "", map { sprintf "\\x{%s}", $_ } split ' ', $Fold{$code};
+          join "", map { sprintf "\\x\{%s\}", $_ } split ' ', $Fold{$code};
         push @OUT, sprintf qq["%s" => "$foldstr",\n], join("", map { sprintf "\\x[%02X]", $_ } unpack("U0C*", pack("U", $code)));
     }
     push @OUT, (
@@ -2156,7 +2156,7 @@ EOFHEADER
     File::Find::find({
         no_chdir=>1,
         wanted=>sub {
-          if (/\.pl$/) {
+          if (m/\.pl$/) {
             s!^\./!!;
             print $ofh "$_\n";
             $count++;

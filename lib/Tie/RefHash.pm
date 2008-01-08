@@ -113,7 +113,7 @@ BEGIN {
     require overload;
 
     *refaddr = sub {
-      if ( overload::StrVal($_[0]) =~ /\( 0x ([a-zA-Z0-9]+) \)$/x) {
+      if ( overload::StrVal($_[0]) =~ m/\( 0x ([a-zA-Z0-9]+) \)$/x) {
           return $1;
       } else {
         die "couldn't parse StrVal: " . overload::StrVal($_[0]);
@@ -140,7 +140,7 @@ sub TIEHASH {
       # but make this a weak reference, so that there are no leaks
       Scalar::Util::weaken( $thread_object_registry[-1] );
 
-      if ( ++$count > 1000 ) {
+      if ( ++$count +> 1000 ) {
         # this ensures we don't fill up with a huge array dead weakrefs
         @thread_object_registry = grep { defined } @thread_object_registry;
         $count = 0;

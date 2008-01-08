@@ -3436,12 +3436,6 @@ Perl_get_vtbl(pTHX_ int vtbl_id)
     case want_vtbl_taint:
 	result = &PL_vtbl_taint;
 	break;
-    case want_vtbl_substr:
-	result = &PL_vtbl_substr;
-	break;
-    case want_vtbl_substr_utf8:
-	result = &PL_vtbl_substr_utf8;
-	break;
     case want_vtbl_vec:
 	result = &PL_vtbl_vec;
 	break;
@@ -4420,25 +4414,7 @@ Perl_new_version(pTHX_ SV *ver)
 	(void)hv_stores((HV *)hv, "version", newRV_noinc((SV *)av));
 	return rv;
     }
-#ifdef SvVOK
-    {
-	const MAGIC* const mg = SvVSTRING_mg(ver);
-	if ( mg ) { /* already a v-string */
-	    const STRLEN len = mg->mg_len;
-	    char * const version = savepvn( (const char*)mg->mg_ptr, len);
-	    sv_setpvn(rv,version,len);
-	    /* this is for consistency with the pure Perl class */
-	    if ( *version != 'v' ) 
-		sv_insert(rv, 0, 0, "v", 1);
-	    Safefree(version);
-	}
-	else {
-#endif
-	sv_setsv(rv,ver); /* make a duplicate */
-#ifdef SvVOK
-	}
-    }
-#endif
+    sv_setsv(rv,ver); /* make a duplicate */
     return upg_version(rv, FALSE);
 }
 
@@ -4459,9 +4435,6 @@ SV *
 Perl_upg_version(pTHX_ SV *ver, bool qv)
 {
     const char *version, *s;
-#ifdef SvVOK
-    const MAGIC *mg;
-#endif
 
     if ( SvNOK(ver) && !( SvPOK(ver) && sv_len(ver) == 3 ) )
     {
@@ -4478,44 +4451,10 @@ Perl_upg_version(pTHX_ SV *ver, bool qv)
 	if ( tbuf[len-1] == '.' ) len--; /* eat the trailing decimal */
 	version = savepvn(tbuf, len);
     }
-#ifdef SvVOK
-    else if ( (mg = SvVSTRING_mg(ver)) ) { /* already a v-string */
-	version = savepvn( (const char*)mg->mg_ptr,mg->mg_len );
-	qv = 1;
-    }
-#endif
     else /* must be a string or something like a string */
     {
 	STRLEN len;
 	version = savepv(SvPV(ver,len));
-#ifndef SvVOK
-#  if PERL_VERSION > 5
-	/* This will only be executed for 5.6.0 - 5.8.0 inclusive */
-	if ( len == 3 && !instr(version,".") && !instr(version,"_") ) {
-	    /* may be a v-string */
-	    SV * const nsv = sv_newmortal();
-	    const char *nver;
-	    const char *pos;
-	    int saw_period = 0;
-	    sv_setpvf(nsv,"v%vd",ver);
-	    pos = nver = savepv(SvPV_nolen(nsv));
-
-	    /* scan the resulting formatted string */
-	    pos++; /* skip the leading 'v' */
-	    while ( *pos == '.' || isDIGIT(*pos) ) {
-		if ( *pos == '.' )
-		    saw_period++ ;
-		pos++;
-	    }
-
-	    /* is definitely a v-string */
-	    if ( saw_period == 2 ) {	
-		Safefree(version);
-		version = nver;
-	    }
-	}
-#  endif
-#endif
     }
 
     s = scan_version(version, ver, qv);
@@ -5866,15 +5805,11 @@ Perl_get_db_sub(pTHX_ SV **svp, CV *cv)
 	    SvREFCNT_dec(tmp);
 	}
 	else {
-	    gv_efullname3(dbsv, gv, NULL);
+	    gv_efullname4(dbsv, gv, NULL, TRUE);
 	}
     }
     else {
-	const int type = SvTYPE(dbsv);
-	if (type < SVt_PVIV && type != SVt_IV)
-	    sv_upgrade(dbsv, SVt_PVIV);
-	(void)SvIOK_on(dbsv);
-	SvIV_set(dbsv, PTR2IV(cv));	/* Do it the quickest way  */
+	sv_setiv(dbsv, PTR2IV(cv));
     }
 }
 

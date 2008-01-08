@@ -50,7 +50,7 @@ for my $target (@target) {
 
     my $srctarget = "$UREL\\$target.$suffix";
 
-    if ( $target =~ /^(miniperl|perl|perl${VERSION}(?:dll)?)$/ ) {
+    if ( $target =~ m/^(miniperl|perl|perl${VERSION}(?:dll)?)$/ ) {
         $copy{$srctarget} = "$dst\\$target.$suffix";
         print "\t$target.$suffix\n";
     }
@@ -72,10 +72,10 @@ for my $target (@target) {
         print "\tErrno.pm\n";
         $copy{"ext\\Errno\\Errno.pm"} = "$lib\\Perl\\$R_V_SV\\Errno.pm";
 
-        open( my $cfg, "symbian/install.cfg" )
+        open( my $cfg, "<", "symbian/install.cfg" )
           or die "$!: symbian/install.cfg: $!\n";
-        while (<$cfg>) {
-            next unless /^lib\s+(.+)/;
+        while ( ~< $cfg) {
+            next unless m/^lib\s+(.+)/;
             chomp;
             my $f = $1;
 	    unless (-f "lib/$f") {
@@ -98,8 +98,8 @@ for my $target (@target) {
             my $ext = $1;
             $ext =~ s!-!::!g;
             print "\t$ext\n";
-            if ( open( my $pkg, $lst ) ) {
-                while (<$pkg>) {
+            if ( open( my $pkg, "<", $lst ) ) {
+                while ( ~< $pkg) {
                     if (m!^"(.+)"-"(.+)"$!) {
                         my ( $src, $dst ) = ( $1, $2 );
                         $copy{$src} = $dst;
@@ -150,22 +150,22 @@ for my $target (@target) {
 
     die "$0: Bad version for $target\n"
       unless defined $MAJOR
-      && ( $MAJOR eq 0 || $MAJOR > 0 )
+      && ( $MAJOR eq 0 || $MAJOR +> 0 )
       && defined $MINOR
-      && ( $MINOR eq 0 || $MINOR > 0 )
+      && ( $MINOR eq 0 || $MINOR +> 0 )
       && defined $PATCH
-      && ( $PATCH eq 0 || $PATCH > 0 );
+      && ( $PATCH eq 0 || $PATCH +> 0 );
 
      my $ProductId =
          defined $S60SDK ?
-qq[;Supports Series 60 v0.9\n(0x101F6F88), 0, 0, 0, {"Series60ProductID"}\n] :
+qq[;Supports Series 60 v0.9\n(0x101F6F88), 0, 0, 0, \{"Series60ProductID"\}\n] :
          defined $S80SDK ?
-qq[;Supports Series 80 v2.0\n(0x101F8ED2), 0, 0, 0, {"Series80ProductID"}\n] :
+qq[;Supports Series 80 v2.0\n(0x101F8ED2), 0, 0, 0, \{"Series80ProductID"\}\n] :
          defined $S90SDK ?
-qq[;Supports Series 90 v1.1\n(0x101FBE05), 0, 0, 0, {"Series90ProductID"}\n] :
+qq[;Supports Series 90 v1.1\n(0x101FBE05), 0, 0, 0, \{"Series90ProductID"\}\n] :
          ";Supports Series NN";
 
-    open PKG, ">$pkg" or die "$0: failed to create $pkg: $!\n";
+    open PKG, ">", "$pkg" or die "$0: failed to create $pkg: $!\n";
     print PKG <<__EOF__;
 ; \u$target installation script
 ;
@@ -174,7 +174,7 @@ qq[;Supports Series 90 v1.1\n(0x101FBE05), 0, 0, 0, {"Series90ProductID"}\n] :
 ;
 ; The installation name and header data
 ;
-#{"\u$target"},($uid),$MAJOR,$MINOR,$PATCH
+#\{"\u$target"\},($uid),$MAJOR,$MINOR,$PATCH
 ;
 ; Private key and certificate (unused)
 ;

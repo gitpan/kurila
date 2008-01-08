@@ -18,9 +18,8 @@ sub OVERLOAD {
       $fb = $arg{$_};
     } else {
       $sub = $arg{$_};
-      if (not ref $sub and $sub !~ /::/) {
-	$ {*{Symbol::fetch_glob($package . "::(" . $_)}} = $sub;
-	$sub = \&nil;
+      if (not ref $sub) {
+          die "Overloading requires subref, got '$sub'";
       }
       #print STDERR "Setting `$ {'package'}::\cO$_' to \\&`$sub'.\n";
       *{Symbol::fetch_glob($package . "::(" . $_)} = \&{ $sub };
@@ -126,8 +125,8 @@ sub mycan {				# Real can would leave stubs.
 
 %ops = ( with_assign	  => "+ - * / % ** << >> x .",
 	 assign		  => "+= -= *= /= %= **= <<= >>= x= .=",
-	 num_comparison	  => "< <= >  >= == !=",
-	 '3way_comparison'=> "<=> cmp",
+	 num_comparison	  => "+< +<= +>  +>= == !=",
+	 '3way_comparison'=> "<+> cmp",
 	 str_comparison	  => "lt le gt ge eq ne",
 	 binary		  => '^&^ ^&^= ^|^ ^|^= ^^^ ^^^=',
 	 unary		  => "neg ! ^~^",
@@ -149,7 +148,7 @@ sub constant {
     elsif (!exists $constants {$_ [0]}) {
         warnings::warnif ("`$_[0]' is not an overloadable type");
     }
-    elsif (!ref $_ [1] || "$_[1]" !~ /CODE\(0x[\da-f]+\)$/) {
+    elsif (!ref $_ [1] || "$_[1]" !~ m/CODE\(0x[\da-f]+\)$/) {
         # Can't use C<ref $_[1] eq "CODE"> above as code references can be
         # blessed, and C<ref> would return the package the ref is blessed into.
         if (warnings::enabled) {

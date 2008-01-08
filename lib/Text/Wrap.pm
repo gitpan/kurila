@@ -33,10 +33,10 @@ sub wrap
 	local($Text::Tabs::tabstop) = $tabstop;
 	my $r = "";
 	my $tail = pop(@t);
-	my $t = expand(join("", (map { /\s+\z/ ? ( $_ ) : ($_, ' ') } @t), $tail));
+	my $t = expand(join("", (map { m/\s+\z/ ? ( $_ ) : ($_, ' ') } @t), $tail));
 	my $lead = $ip;
 	my $ll = $columns - length(expand($ip)) - 1;
-	$ll = 0 if $ll < 0;
+	$ll = 0 if $ll +< 0;
 	my $nll = $columns - length(expand($xp)) - 1;
 	my $nl = "";
 	my $remainder = "";
@@ -44,25 +44,25 @@ sub wrap
 	use re 'taint';
 
 	pos($t) = 0;
-	while ($t !~ /\G(?:$break)*\Z/gc) {
-		if ($t =~ /\G([^\n]{0,$ll})($break|\n+|\z)/xmgc) {
+	while ($t !~ m/\G(?:$break)*\Z/gc) {
+		if ($t =~ m/\G([^\n]{0,$ll})($break|\n+|\z)/xmgc) {
 			$r .= $unexpand 
 				? unexpand($nl . $lead . $1)
 				: $nl . $lead . $1;
 			$remainder = $2;
-		} elsif ($huge eq 'wrap' && $t =~ /\G([^\n]{$ll})/gc) {
+		} elsif ($huge eq 'wrap' && $t =~ m/\G([^\n]{$ll})/gc) {
 			$r .= $unexpand 
 				? unexpand($nl . $lead . $1)
 				: $nl . $lead . $1;
 			$remainder = defined($separator2) ? $separator2 : $separator;
-		} elsif ($huge eq 'overflow' && $t =~ /\G([^\n]*?)($break|\n+|\z)/xmgc) {
+		} elsif ($huge eq 'overflow' && $t =~ m/\G([^\n]*?)($break|\n+|\z)/xmgc) {
 			$r .= $unexpand 
 				? unexpand($nl . $lead . $1)
 				: $nl . $lead . $1;
 			$remainder = $2;
 		} elsif ($huge eq 'die') {
 			die "couldn't wrap '$t'";
-		} elsif ($columns < 2) {
+		} elsif ($columns +< 2) {
 			warnings::warnif "Increasing \$Text::Wrap::columns from $columns to 2";
 			$columns = 2;
 			return ($ip, $xp, @t);
@@ -98,7 +98,7 @@ sub fill
 	my @para;
 	my $pp;
 
-	for $pp (split(/\n\s+/, join("\n",@raw))) {
+	for $pp (split(m/\n\s+/, join("\n",@raw))) {
 		$pp =~ s/\s+/ /g;
 		my $x = wrap($ip, $xp, $pp);
 		push(@para, $x);
@@ -122,7 +122,7 @@ Text::Wrap - line wrapping to form simple paragraphs
 
 B<Example 1>
 
-	use Text::Wrap
+	use Text::Wrap;
 
 	$initial_tab = "\t";	# Tab before first line
 	$subsequent_tab = "";	# All other lines flush left
@@ -145,7 +145,7 @@ B<Example 2>
 
 B<Example 3>
 	
-	use Text::Wrap
+	use Text::Wrap;
 
 	$Text::Wrap::columns = 72;
 	print wrap('', '', @text);

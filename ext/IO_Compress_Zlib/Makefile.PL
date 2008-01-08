@@ -5,7 +5,7 @@ use strict ;
 $::VERSION = '2.006' ;
 
 use private::MakeUtil;
-use ExtUtils::MakeMaker 5.16 ;
+use ExtUtils::MakeMaker v5.16 ;
 
 UpDowngrade(getPerlFiles('MANIFEST')) 
     unless $ENV{PERL_CORE};
@@ -25,20 +25,14 @@ WriteMakefile(
 	    : (PREREQ_PM   => { 'Compress::Raw::Zlib'  => $::VERSION,
 		                    'IO::Compress::Base'   => $::VERSION,
 		                    'IO::Uncompress::Base' => $::VERSION,
-		                    $] >= 5.005 && $] < 5.006   
-                                ? ('File::BSDGlob' => 0) 
-                                : () }
+                            }
 	      )
     ),
        
-    (
-    $] >= 5.005
-        ? (ABSTRACT => 'Perl interface to zlib',
-            AUTHOR  => 'Paul Marquess <pmqs@cpan.org>')
-        : ()
-    ),
+    ABSTRACT => 'Perl interface to zlib',
+    AUTHOR  => 'Paul Marquess <pmqs@cpan.org>',
 
-    INSTALLDIRS => ($] >= 5.009 ? 'perl' : 'site'),
+    INSTALLDIRS => 'perl',
 
     ((ExtUtils::MakeMaker->VERSION() gt '6.30') ?
         ('LICENSE'  => 'perl')         : ()),    

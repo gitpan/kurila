@@ -13,7 +13,7 @@ our @stat;
 BEGIN {
     our $hasst;
     eval { my @n = stat "TEST" };
-    $hasst = 1 unless $@ && $@ =~ /unimplemented/;
+    $hasst = 1 unless $@ && $@ =~ m/unimplemented/;
     unless ($hasst) { plan skip_all => "no stat"; exit 0 }
     use Config;
     $hasst = 0 unless $Config{'i_sysstat'} eq 'define';
@@ -61,7 +61,7 @@ is( $stat->blocks, $stat[12], "number of blocks in position 12" );
 
 SKIP: {
 	local *STAT;
-	skip("Could not open file: $!", 2) unless open(STAT, 'TEST');
+	skip("Could not open file: $!", 2) unless open(STAT, "<", 'TEST');
 	ok( File::stat::stat('STAT'), '... should be able to find filehandle' );
 
 	package foo;

@@ -12,19 +12,19 @@ use Carp::Heavy ();
 BEGIN {
     if ($^O ne 'VMS') {
 	for (keys %ENV) { # untaint ENV
-	    ($ENV{$_}) = $ENV{$_} =~ /(.*)/;
+	    ($ENV{$_}) = $ENV{$_} =~ m/(.*)/;
 	}
     }
 
     # Remove insecure directories from PATH
     my @path;
     my $sep = $Config{path_sep};
-    foreach my $dir (split(/\Q$sep/,$ENV{'PATH'}))
+    foreach my $dir (split(m/\Q$sep/,$ENV{'PATH'}))
     {
 	##
 	## Match the directory taint tests in mg.c::Perl_magic_setenv()
 	##
-	push(@path,$dir) unless (length($dir) >= 256
+	push(@path,$dir) unless (length($dir) +>= 256
 				 or
 				 substr($dir,0,1) ne "/"
 				 or
@@ -224,7 +224,7 @@ sub file_path {
 
 sub file_path_name {
     my $path = file_path(@_);
-    $path = ":$path" if (($^O eq 'MacOS') && ($path !~ /:/));
+    $path = ":$path" if (($^O eq 'MacOS') && ($path !~ m/:/));
     return $path;
 }
 

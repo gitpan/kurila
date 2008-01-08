@@ -17,7 +17,7 @@
 package Term::ANSIColor;
 
 use strict;
-use vars qw($AUTOLOAD $AUTORESET $EACHLINE @ISA @EXPORT @EXPORT_OK
+use vars qw($AUTORESET $EACHLINE @ISA @EXPORT @EXPORT_OK
             %EXPORT_TAGS $VERSION %attributes %attributes_r);
 
 use Exporter ();
@@ -87,27 +87,17 @@ for (reverse sort keys %attributes) {
 # generated subs into pass-through functions that don't add any escape
 # sequences.  This is to make it easier to write scripts that also work on
 # systems without any ANSI support, like Windows consoles.
-sub AUTOLOAD {
+for my $attr (keys %attributes) {
     my $enable_colors = !defined $ENV{ANSI_COLORS_DISABLED};
-    my $sub;
-    ($sub = $AUTOLOAD) =~ s/^.*:://;
-    my $attr = $attributes{lc $sub};
-    if ($sub =~ /^[A-Z_]+$/ && defined $attr) {
-        $attr = $enable_colors ? "\e[" . $attr . 'm' : '';
-        eval qq {
-            sub $AUTOLOAD {
-                if (\$AUTORESET && \@_) {
-                    '$attr' . "\@_" . "\e[0m";
-                } else {
-                    ('$attr' . "\@_");
-                }
+    Symbol::fetch_glob(uc $attr)->* =
+        sub {
+            my $xattr = $enable_colors ? "\e[" . $attr . 'm' : '';
+            if (\$AUTORESET && \@_) {
+                '$xattr' . "\@_" . "\e[0m";
+            } else {
+                ('$xattr' . "\@_");
             }
         };
-        goto &{Symbol::fetch_glob($AUTOLOAD)};
-    } else {
-        require Carp;
-        Carp::croak ("undefined subroutine &$AUTOLOAD called");
-    }
 }
 
 ##############################################################################
@@ -140,11 +130,11 @@ sub uncolor {
         my $escape = $_;
         $escape =~ s/^\e\[//;
         $escape =~ s/m$//;
-        unless ($escape =~ /^((?:\d+;)*\d*)$/) {
+        unless ($escape =~ m/^((?:\d+;)*\d*)$/) {
             require Carp;
             Carp::croak ("Bad escape sequence $_");
         }
-        push (@nums, split (/;/, $1));
+        push (@nums, split (m/;/, $1));
     }
     for (@nums) {
 	$_ += 0; # Strip leading zeroes
@@ -180,8 +170,8 @@ sub colored {
         my $attr = color (@codes);
         join '',
             map { $_ ne $EACHLINE ? $attr . $_ . "\e[0m" : $_ }
-                grep { length ($_) > 0 }
-                    split (/(\Q$EACHLINE\E)/, $string);
+                grep { length ($_) +> 0 }
+                    split (m/(\Q$EACHLINE\E)/, $string);
     } else {
         color (@codes) . $string . "\e[0m";
     }

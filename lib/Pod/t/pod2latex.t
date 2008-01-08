@@ -30,8 +30,8 @@ ok(1);
 # the DATA filehandle and store it in a scalar.
 # Do this until we read an =pod
 my @reference;
-while (my $line = <DATA>) {
-  last if $line =~ /^=pod/;
+while (my $line = ~< *DATA) {
+  last if $line =~ m/^=pod/;
   push(@reference,$line);
 }
 
@@ -47,7 +47,7 @@ $parser->AddPostamble(1);
 $parser->TableOfContents(1);
 
 # Create an output file
-open(OUTFH, "> test.tex" ) or die "Unable to open test tex file: $!\n";
+open(OUTFH, ">", "test.tex" ) or die "Unable to open test tex file: $!\n";
 
 # Read from the DATA filehandle and write to a new output file
 # Really want to write this to a scalar
@@ -56,17 +56,17 @@ $parser->parse_from_filehandle(\*DATA,\*OUTFH);
 close(OUTFH) or die "Error closing OUTFH test.tex: $!\n";
 
 # Now read in OUTFH and compare
-open(INFH, "< test.tex") or die "Unable to read test tex file: $!\n";
-my @output = <INFH>;
+open(INFH, "<", "test.tex") or die "Unable to read test tex file: $!\n";
+my @output = ~< *INFH;
 
 ok(@output, @reference);
 for my $i (0..$#reference) {
-  next if $reference[$i] =~ /^%%/; # skip timestamp comments
+  next if $reference[$i] =~ m/^%%/; # skip timestamp comments
 
   # if we are running a new version of Pod::ParseUtils we need
   # to change the link text. This is a kluge until we drop support
   # for older versions of Pod::ParseUtils
-  if ($linkver < 0.29 && $output[$i] =~ /manpage/) {
+  if ($linkver +< 0.29 && $output[$i] =~ m/manpage/) {
     # convert our expectations from new to old new format 
     $reference[$i] =~ s/Standard link: \\emph\{Pod::LaTeX\}/Standard link: the \\emph\{Pod::LaTeX\} manpage/;
     $reference[$i] =~ s/\\textsf\{sec\} in \\emph\{Pod::LaTeX\}/the section on \\textsf\{sec\} in the \\emph\{Pod::LaTeX\} manpage/;

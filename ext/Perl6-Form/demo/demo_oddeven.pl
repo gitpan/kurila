@@ -1,24 +1,24 @@
 use Perl6::Form;
 
-my @text = <DATA>;
+my @text = ~< *DATA;
 
 my @title = ("Hamlet's Soliloquy","W. Shakespeare");
 
 my %header = (
 	first => sub { form({ page => {width=>$_[0]{page}{width}}},
-				        "{II{*}II}", \@title) . "\n";
+				        "\{II\{*\}II\}", \@title) . "\n";
 				 },
 	  odd => sub { form({ page => {width=>$_[0]{page}{width}}},
-				        "{]]{*}]]}", $title[0]) . "\n";
+				        "\{]]\{*\}]]\}", $title[0]) . "\n";
 				 },
 	 even => sub { form({ page => {width=>$_[0]{page}{width}}},
-				        "{[[{*}[[}", $title[1]) . "\n";
+				        "\{[[\{*\}[[\}", $title[1]) . "\n";
 				 },
 );
 
 sub footer {
 	form { page => {width=>$_[0]{page}{width}} },
-		 "\n{|{*}|}",
+		 "\n\{|\{*\}|\}",
 		 "(page $_[0]{page}{number})"
 }
 

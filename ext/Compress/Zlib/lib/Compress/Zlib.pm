@@ -6,15 +6,15 @@ use Carp ;
 use IO::Handle ;
 use Scalar::Util qw(dualvar);
 
-use IO::Compress::Base::Common 2.006 ;
-use Compress::Raw::Zlib 2.006 ;
-use IO::Compress::Gzip 2.006 ;
-use IO::Uncompress::Gunzip 2.006 ;
+use IO::Compress::Base::Common v2.006 ;
+use Compress::Raw::Zlib v2.006 ;
+use IO::Compress::Gzip v2.006 ;
+use IO::Uncompress::Gunzip v2.006 ;
 
 use strict ;
 use warnings ;
 use bytes ;
-our ($VERSION, $XS_VERSION, @ISA, @EXPORT, $AUTOLOAD);
+our ($VERSION, $XS_VERSION, @ISA, @EXPORT);
 
 $VERSION = '2.007';
 $XS_VERSION = $VERSION; 
@@ -39,14 +39,10 @@ BEGIN
     *zlib_version = \&Compress::Raw::Zlib::zlib_version;
 }
 
-sub AUTOLOAD {
-    my($constname);
-    ($constname = $AUTOLOAD) =~ s/.*:://;
-    my ($error, $val) = Compress::Raw::Zlib::constant($constname);
-    Carp::croak $error if $error;
-    no strict 'refs';
-    *{$AUTOLOAD} = sub { $val };
-    goto &{$AUTOLOAD};
+# typeglob constants.
+for my $name (qw|DEF_WBITS MAX_MEM_LEVEL MAX_WBITS OS_CODE|,
+              grep { m/^Z_/ } @Compress::Raw::Zlib::EXPORT) {
+    Symbol::fetch_glob($name)->* = Symbol::fetch_glob("Compress::Raw::Zlib::$name")->*;
 }
 
 use constant FLAG_APPEND             => 1 ;
@@ -76,7 +72,7 @@ sub _set_gzerr
     if ($value == 0) {
         $Compress::Zlib::gzerrno = 0 ;
     }
-    elsif ($value == Z_ERRNO() || $value > 2) {
+    elsif ($value == Z_ERRNO() || $value +> 2) {
         $Compress::Zlib::gzerrno = $! ;
     }
     else {
@@ -112,13 +108,13 @@ sub gzopen($$)
                   );
 
     my $writing ;
-    $writing = ! ($mode =~ /r/i) ;
-    $writing = ($mode =~ /[wa]/i) ;
+    $writing = ! ($mode =~ m/r/i) ;
+    $writing = ($mode =~ m/[wa]/i) ;
 
-    $defOpts{Level}    = $1               if $mode =~ /(\d)/;
-    $defOpts{Strategy} = Z_FILTERED()     if $mode =~ /f/i;
-    $defOpts{Strategy} = Z_HUFFMAN_ONLY() if $mode =~ /h/i;
-    $defOpts{Append}   = 1                if $mode =~ /a/i;
+    $defOpts{Level}    = $1               if $mode =~ m/(\d)/;
+    $defOpts{Strategy} = Z_FILTERED()     if $mode =~ m/f/i;
+    $defOpts{Strategy} = Z_HUFFMAN_ONLY() if $mode =~ m/h/i;
+    $defOpts{Append}   = 1                if $mode =~ m/a/i;
 
     my $infDef = $writing ? 'deflate' : 'inflate';
     my @params = () ;
@@ -127,7 +123,8 @@ sub gzopen($$)
         unless isaFilehandle $file || isaFilename $file  || 
                (ref $file && ref $file eq 'SCALAR');
 
-    return undef unless $mode =~ /[rwa]/i ;
+    croak "gzopen: invalid mode"
+      unless $mode =~ m/[rwa]/i ;
 
     _set_gzerr(0) ;
 
@@ -356,7 +353,7 @@ sub deflateInit(@)
 
     croak "Compress::Zlib::deflateInit: Bufsize must be >= 1, you specified " . 
             $got->value('Bufsize')
-        unless $got->value('Bufsize') >= 1;
+        unless $got->value('Bufsize') +>= 1;
 
     my $obj ;
  
@@ -387,7 +384,7 @@ sub inflateInit(@)
 
     croak "Compress::Zlib::inflateInit: Bufsize must be >= 1, you specified " . 
             $got->value('Bufsize')
-        unless $got->value('Bufsize') >= 1;
+        unless $got->value('Bufsize') +>= 1;
 
     my $status = 0 ;
     my $obj ;
@@ -441,7 +438,7 @@ sub inflate
 
 package Compress::Zlib ;
 
-use IO::Compress::Gzip::Constants 2.006 ;
+use IO::Compress::Gzip::Constants v2.006 ;
 
 sub memGzip($)
 {
@@ -462,7 +459,7 @@ sub _removeGzipHeader($)
     my $string = shift ;
 
     return Z_DATA_ERROR() 
-        if length($$string) < GZIP_MIN_HEADER_SIZE ;
+        if length($$string) +< GZIP_MIN_HEADER_SIZE ;
 
     my ($magic1, $magic2, $method, $flags, $time, $xflags, $oscode) = 
         unpack ('CCCCVCC', $$string);
@@ -470,20 +467,20 @@ sub _removeGzipHeader($)
     return Z_DATA_ERROR()
         unless $magic1 == GZIP_ID1 and $magic2 == GZIP_ID2 and
            $method == Z_DEFLATED() and !($flags ^&^ GZIP_FLG_RESERVED) ;
-    substr($$string, 0, GZIP_MIN_HEADER_SIZE) = '' ;
+    substr($$string, 0, GZIP_MIN_HEADER_SIZE, '') ;
 
     # skip extra field
     if ($flags ^&^ GZIP_FLG_FEXTRA)
     {
         return Z_DATA_ERROR()
-            if length($$string) < GZIP_FEXTRA_HEADER_SIZE ;
+            if length($$string) +< GZIP_FEXTRA_HEADER_SIZE ;
 
         my ($extra_len) = unpack ('v', $$string);
         $extra_len += GZIP_FEXTRA_HEADER_SIZE;
         return Z_DATA_ERROR()
-            if length($$string) < $extra_len ;
+            if length($$string) +< $extra_len ;
 
-        substr($$string, 0, $extra_len) = '';
+        substr($$string, 0, $extra_len, '');
     }
 
     # skip orig name
@@ -492,7 +489,7 @@ sub _removeGzipHeader($)
         my $name_end = index ($$string, GZIP_NULL_BYTE);
         return Z_DATA_ERROR()
            if $name_end == -1 ;
-        substr($$string, 0, $name_end + 1) =  '';
+        substr($$string, 0, $name_end + 1,  '');
     }
 
     # skip comment
@@ -501,15 +498,15 @@ sub _removeGzipHeader($)
         my $comment_end = index ($$string, GZIP_NULL_BYTE);
         return Z_DATA_ERROR()
             if $comment_end == -1 ;
-        substr($$string, 0, $comment_end + 1) = '';
+        substr($$string, 0, $comment_end + 1, '');
     }
 
     # skip header crc
     if ($flags ^&^ GZIP_FLG_FHCRC)
     {
         return Z_DATA_ERROR()
-            if length ($$string) < GZIP_FHCRC_SIZE ;
-        substr($$string, 0, GZIP_FHCRC_SIZE) = '';
+            if length ($$string) +< GZIP_FHCRC_SIZE ;
+        substr($$string, 0, GZIP_FHCRC_SIZE, '');
     }
     
     return Z_OK();
@@ -524,7 +521,7 @@ sub memGunzip($)
     _removeGzipHeader($string) == Z_OK() 
         or return undef;
      
-    my $bufsize = length $$string > 4096 ? length $$string : 4096 ;
+    my $bufsize = length $$string +> 4096 ? length $$string : 4096 ;
     my $x = Compress::Raw::Zlib::Inflate->new({-WindowBits => - MAX_WBITS(),
                          -Bufsize => $bufsize}) 
 
@@ -535,10 +532,10 @@ sub memGunzip($)
     return undef 
         unless $status == Z_STREAM_END();
 
-    if (length $$string >= 8)
+    if (length $$string +>= 8)
     {
         my ($crc, $len) = unpack ("VV", substr($$string, 0, 8));
-        substr($$string, 0, 8) = '';
+        substr($$string, 0, 8, '');
         return undef 
             unless $len == length($output) and
                    $crc == crc32($output);

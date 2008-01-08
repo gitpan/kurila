@@ -330,7 +330,7 @@ sub DESTROY {}
 
 sub _open_mode_string {
     my ($mode) = @_;
-    $mode =~ /^\+?(<|>>?)$/
+    $mode =~ m/^\+?(<|>>?)$/
       or $mode =~ s/^r(\+?)$/$1</
       or $mode =~ s/^w(\+?)$/$1>/
       or $mode =~ s/^a(\+?)$/$1>>/
@@ -341,19 +341,14 @@ sub _open_mode_string {
 sub fdopen {
     @_ == 3 or croak 'usage: $io->fdopen(FD, MODE)';
     my ($io, $fd, $mode) = @_;
-    local(*GLOB);
 
-    if (ref($fd) && "".$fd =~ /GLOB\(/o) {
-	# It's a glob reference; Alias it as we cannot get name of anon GLOBs
-	my $n = qualify(*GLOB);
-	*GLOB = *{*$fd};
-	$fd =  $n;
-    } elsif ($fd =~ m#^\d+$#) {
+    my $fdmode = '&';
+    if (!ref($fd) && $fd =~ m#^\d+$#) {
 	# It's an FD number; prefix with "=".
-	$fd = "=$fd";
+	$fdmode .= "=";
     }
 
-    open($io, _open_mode_string($mode) . '&' . $fd)
+    open($io, _open_mode_string($mode) . $fdmode, $fd)
 	? $io : undef;
 }
 
@@ -398,7 +393,7 @@ sub print {
 }
 
 sub printf {
-    @_ >= 2 or croak 'usage: $io->printf(FMT,[ARGS])';
+    @_ +>= 2 or croak 'usage: $io->printf(FMT,[ARGS])';
     my $this = shift;
     printf $this @_;
 }
@@ -406,7 +401,7 @@ sub printf {
 sub getline {
     @_ == 1 or croak 'usage: $io->getline()';
     my $this = shift;
-    return scalar <$this>;
+    return scalar ~< $this;
 } 
 
 *gets = \&getline;  # deprecated
@@ -414,9 +409,9 @@ sub getline {
 sub getlines {
     @_ == 1 or croak 'usage: $io->getlines()';
     wantarray or
-	croak 'Can\'t call $io->getlines in a scalar context, use $io->getline';
+	croak q|Can't call $io->getlines in a scalar context, use $io->getline|;
     my $this = shift;
-    return <$this>;
+    return ~< $this;
 }
 
 sub truncate {
@@ -435,14 +430,14 @@ sub sysread {
 }
 
 sub write {
-    @_ >= 2 && @_ <= 4 or croak 'usage: $io->write(BUF [, LEN [, OFFSET]])';
+    @_ +>= 2 && @_ +<= 4 or croak 'usage: $io->write(BUF [, LEN [, OFFSET]])';
     local($\) = "";
     $_[2] = length($_[1]) unless defined $_[2];
     print { $_[0] } substr($_[1], $_[3] || 0, $_[2]);
 }
 
 sub syswrite {
-    @_ >= 2 && @_ <= 4 or croak 'usage: $io->syswrite(BUF [, LEN [, OFFSET]])';
+    @_ +>= 2 && @_ +<= 4 or croak 'usage: $io->syswrite(BUF [, LEN [, OFFSET]])';
     if (defined($_[2])) {
 	syswrite($_[0], $_[1], $_[2], $_[3] || 0);
     } else {
@@ -462,7 +457,7 @@ sub stat {
 sub autoflush {
     my $old = SelectSaver->new( qualify($_[0], caller));
     my $prev = $|;
-    $| = @_ > 1 ? $_[1] : 1;
+    $| = @_ +> 1 ? $_[1] : 1;
     $prev;
 }
 
@@ -470,7 +465,7 @@ sub output_field_separator {
     carp "output_field_separator is not supported on a per-handle basis"
 	if ref($_[0]);
     my $prev = $,;
-    $, = $_[1] if @_ > 1;
+    $, = $_[1] if @_ +> 1;
     $prev;
 }
 
@@ -478,7 +473,7 @@ sub output_record_separator {
     carp "output_record_separator is not supported on a per-handle basis"
 	if ref($_[0]);
     my $prev = $\;
-    $\ = $_[1] if @_ > 1;
+    $\ = $_[1] if @_ +> 1;
     $prev;
 }
 
@@ -486,7 +481,7 @@ sub input_record_separator {
     carp "input_record_separator is not supported on a per-handle basis"
 	if ref($_[0]);
     my $prev = $/;
-    $/ = $_[1] if @_ > 1;
+    $/ = $_[1] if @_ +> 1;
     $prev;
 }
 
@@ -494,7 +489,7 @@ sub input_line_number {
     local $.;
     () = tell qualify($_[0], caller) if ref($_[0]);
     my $prev = $.;
-    $. = $_[1] if @_ > 1;
+    $. = $_[1] if @_ +> 1;
     $prev;
 }
 
@@ -502,7 +497,7 @@ sub format_page_number {
     my $old;
     $old = SelectSaver->new( qualify($_[0], caller)) if ref($_[0]);
     my $prev = $%;
-    $% = $_[1] if @_ > 1;
+    $% = $_[1] if @_ +> 1;
     $prev;
 }
 
@@ -510,7 +505,7 @@ sub format_lines_per_page {
     my $old;
     $old = SelectSaver->new( qualify($_[0], caller)) if ref($_[0]);
     my $prev = $=;
-    $= = $_[1] if @_ > 1;
+    $= = $_[1] if @_ +> 1;
     $prev;
 }
 
@@ -518,7 +513,7 @@ sub format_lines_left {
     my $old;
     $old = SelectSaver->new( qualify($_[0], caller)) if ref($_[0]);
     my $prev = $-;
-    $- = $_[1] if @_ > 1;
+    $- = $_[1] if @_ +> 1;
     $prev;
 }
 
@@ -526,7 +521,7 @@ sub format_name {
     my $old;
     $old = SelectSaver->new( qualify($_[0], caller)) if ref($_[0]);
     my $prev = $~;
-    $~ = qualify($_[1], caller) if @_ > 1;
+    $~ = qualify($_[1], caller) if @_ +> 1;
     $prev;
 }
 
@@ -534,7 +529,7 @@ sub format_top_name {
     my $old;
     $old = SelectSaver->new( qualify($_[0], caller)) if ref($_[0]);
     my $prev = $^;
-    $^ = qualify($_[1], caller) if @_ > 1;
+    $^ = qualify($_[1], caller) if @_ +> 1;
     $prev;
 }
 
@@ -542,7 +537,7 @@ sub format_line_break_characters {
     carp "format_line_break_characters is not supported on a per-handle basis"
 	if ref($_[0]);
     my $prev = $:;
-    $: = $_[1] if @_ > 1;
+    $: = $_[1] if @_ +> 1;
     $prev;
 }
 
@@ -550,7 +545,7 @@ sub format_formfeed {
     carp "format_formfeed is not supported on a per-handle basis"
 	if ref($_[0]);
     my $prev = $^L;
-    $^L = $_[1] if @_ > 1;
+    $^L = $_[1] if @_ +> 1;
     $prev;
 }
 
@@ -577,7 +572,7 @@ sub ioctl {
 sub constant {
     no strict 'refs';
     my $name = shift;
-    (($name =~ /^(SEEK_(SET|CUR|END)|_IO[FLN]BF)$/) && defined &{*{Symbol::fetch_glob($name)}})
+    (($name =~ m/^(SEEK_(SET|CUR|END)|_IO[FLN]BF)$/) && defined &{*{Symbol::fetch_glob($name)}})
 	? &{*{Symbol::fetch_glob($name)}}() : undef;
 }
 

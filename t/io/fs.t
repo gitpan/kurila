@@ -49,7 +49,7 @@ my $needs_fh_reopen =
 $needs_fh_reopen = 1 if (defined &Win32::IsWin95 && Win32::IsWin95());
 
 my $skip_mode_checks =
-    $^O eq 'cygwin' && $ENV{CYGWIN} !~ /ntsec/;
+    $^O eq 'cygwin' && $ENV{CYGWIN} !~ m/ntsec/;
 
 plan tests => 51;
 
@@ -83,9 +83,9 @@ SKIP: {
     is((umask(0)^&^0777), 022, 'umask'),
 }
 
-open(FH,'>x') || die "Can't create x";
+open(FH, ">",'x') || die "Can't create x";
 close(FH);
-open(FH,'>a') || die "Can't create a";
+open(FH, ">",'a') || die "Can't create a";
 close(FH);
 
 my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,$atime,$mtime,$ctime,
@@ -257,7 +257,7 @@ sub check_utime_result {
 	    pass('mtime');
 	}
 	else {
-	    if ($^O =~ /\blinux\b/i) {
+	    if ($^O =~ m/\blinux\b/i) {
 		print "# Maybe stat() cannot get the correct atime, ".
 		    "as happens via NFS on linux?\n";
 		$foo = (utime 400000000,500000000 + 2*$delta,'b');
@@ -315,7 +315,7 @@ SKIP: {
     skip "Win32/Netware specific test", 2
       unless ($^O eq 'MSWin32') || ($^O eq 'NetWare');
     skip "No symbolic links found to test with", 2
-      unless  `ls -l perl 2>nul` =~ /^l.*->/;
+      unless  `ls -l perl 2>nul` =~ m/^l.*->/;
 
     system("cp TEST TEST$$");
     # we have to copy because e.g. GNU grep gets huffy if we have
@@ -329,7 +329,7 @@ SKIP: {
 }
 
 unlink "Iofs.tmp";
-open IOFSCOM, ">Iofs.tmp" or die "Could not write IOfs.tmp: $!";
+open IOFSCOM, ">", "Iofs.tmp" or die "Could not write IOfs.tmp: $!";
 print IOFSCOM 'helloworld';
 close(IOFSCOM);
 
@@ -350,12 +350,12 @@ SKIP: {
 
 #these steps are necessary to check if file is really truncated
 #On Win95, FH is updated, but file properties aren't
-    open(FH, ">Iofs.tmp") or die "Can't create Iofs.tmp";
+    open(FH, ">", "Iofs.tmp") or die "Can't create Iofs.tmp";
     print FH "x\n" x 200;
     close FH;
 
 # Check truncating an open file.
-    open(FH, ">>Iofs.tmp") or die "Can't open Iofs.tmp for appending";
+    open(FH, ">>", "Iofs.tmp") or die "Can't open Iofs.tmp for appending";
 
     binmode FH;
     select FH;
@@ -369,7 +369,7 @@ SKIP: {
     }
 
     if ($needs_fh_reopen) {
-	close (FH); open (FH, ">>Iofs.tmp") or die "Can't reopen Iofs.tmp";
+	close (FH); open (FH, ">>", "Iofs.tmp") or die "Can't reopen Iofs.tmp";
     }
 
     SKIP: {
@@ -382,14 +382,14 @@ SKIP: {
 	ok(truncate(*FH, 0), "fh resize to zero");
 
 	if ($needs_fh_reopen) {
-	    close (FH); open (FH, ">>Iofs.tmp") or die "Can't reopen Iofs.tmp";
+	    close (FH); open (FH, ">>", "Iofs.tmp") or die "Can't reopen Iofs.tmp";
 	}
 
 	ok(-z "Iofs.tmp", "fh resize to zero working (filename check)");
 
 	close FH;
 
-	open(FH, ">>Iofs.tmp") or die "Can't open Iofs.tmp for appending";
+	open(FH, ">>", "Iofs.tmp") or die "Can't open Iofs.tmp for appending";
 
 	binmode FH;
 	select FH;
@@ -403,7 +403,7 @@ SKIP: {
 	}
 
 	if ($needs_fh_reopen) {
-	    close (FH); open (FH, ">>Iofs.tmp") or die "Can't reopen Iofs.tmp";
+	    close (FH); open (FH, ">>", "Iofs.tmp") or die "Can't reopen Iofs.tmp";
 	}
 
 	is(-s "Iofs.tmp", 100, "fh resize by IO slot working");
@@ -415,10 +415,10 @@ SKIP: {
 # check if rename() can be used to just change case of filename
 SKIP: {
     skip "Works in Cygwin only if check_case is set to relaxed", 1
-      if ($ENV{'CYGWIN'} && ($ENV{'CYGWIN'} =~ /check_case:(?:adjust|strict)/));
+      if ($ENV{'CYGWIN'} && ($ENV{'CYGWIN'} =~ m/check_case:(?:adjust|strict)/));
 
     chdir './tmp';
-    open(FH,'>x') || die "Can't create x";
+    open(FH, ">",'x') || die "Can't create x";
     close(FH);
     rename('x', 'X');
 

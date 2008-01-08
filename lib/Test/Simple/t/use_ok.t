@@ -42,19 +42,19 @@ use Test::More tests => 13;
 
 {
     package Foo::five;
-    ::use_ok("Symbol", 1.02);
+    ::use_ok("Symbol", v1.02);
 }
 
 {
     package Foo::six;
-    ::use_ok("NoExporter", 1.02);
+    ::use_ok("NoExporter", v1.02);
 }
 
 {
     package Foo::seven;
     local $SIG{__WARN__} = sub {
         # Old perls will warn on X.YY_ZZ style versions.  Not our problem
-        warn @_ unless $_[0] =~ /^Argument "\d+\.\d+_\d+" isn't numeric/;
+        warn @_ unless $_[0] =~ m/^Argument "\d+\.\d+_\d+" isn't numeric/;
     };
-    ::use_ok("Test::More", 0.47);
+    ::use_ok("Test::More", v0.47);
 }
