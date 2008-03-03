@@ -1,8 +1,6 @@
 #!./perl
 
 BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
     unless (PerlIO::Layer->find( 'perlio')) {
 	print "1..0 # Skip: not perlio\n";
 	exit 0;
@@ -20,6 +18,7 @@ use warnings;
 my $tmp = "via$$";
 
 use Test::More tests => 18;
+use bytes;
 
 my $fh;
 my $a = join("", map { chr } 0..255) x 10;
@@ -41,7 +40,7 @@ is($a, $b, 'compare original data with filtered version');
 
 {
     my $warnings = '';
-    local $SIG{__WARN__} = sub { $warnings = join '', @_ };
+    local ${^WARN_HOOK} = sub { $warnings = $_[0]->{description} };
 
     use warnings 'layer';
 

@@ -11,6 +11,17 @@
  *    Please see Changes*.* or the Perl Repository Browser for revision history.
  */
 
+/*
+ *               Yet small as was their hunted band
+ *               still fell and fearless was each hand,
+ *               and strong deeds they wrought yet oft,
+ *               and loved the woods, whose ways more soft
+ *               them seemed than thralls of that black throne
+ *               to live and languish in halls of stone.
+ *
+ *                           The Lay of Leithian, 135-40
+ */
+ 
 #include <acedef.h>
 #include <acldef.h>
 #include <armdef.h>
@@ -272,6 +283,7 @@ struct vs_str_st {
 #define do_tovmspath(a,b,c,d)		mp_do_tovmspath(aTHX_ a,b,c,d)
 #define do_rmsexpand(a,b,c,d,e,f,g)	mp_do_rmsexpand(aTHX_ a,b,c,d,e,f,g)
 #define do_vms_realpath(a,b,c)		mp_do_vms_realpath(aTHX_ a,b,c)
+#define do_vms_realname(a,b,c)		mp_do_vms_realname(aTHX_ a,b,c)
 #define do_tounixspec(a,b,c,d)		mp_do_tounixspec(aTHX_ a,b,c,d)
 #define do_tounixpath(a,b,c,d)		mp_do_tounixpath(aTHX_ a,b,c,d)
 #define do_vms_case_tolerant(a)		mp_do_vms_case_tolerant(a)
@@ -1166,7 +1178,7 @@ Perl_my_getenv(pTHX_ const char *lnm, bool sys)
        * for an optional name, and this "error" often shows up as the
        * (bogus) exit status for a die() call later on.  */
       if (sys && vaxc$errno == SS$_NOLOGNAM) SETERRNO(saverr,savvmserr);
-      return success ? eqv : Nullch;
+      return success ? eqv : NULL;
     }
 
 }  /* end of my_getenv() */
@@ -1272,7 +1284,7 @@ Perl_my_getenv_len(pTHX_ const char *lnm, unsigned long *len, bool sys)
        * for an optional name, and this "error" often shows up as the
        * (bogus) exit status for a die() call later on.  */
       if (sys && vaxc$errno == SS$_NOLOGNAM) SETERRNO(saverr,savvmserr);
-      return *len ? buf : Nullch;
+      return *len ? buf : NULL;
     }
 
 }  /* end of my_getenv_len() */
@@ -1292,7 +1304,7 @@ prime_env_iter(void)
   static int primed = 0;
   HV *seenhv = NULL, *envhv;
   SV *sv = NULL;
-  char cmd[LNM$C_NAMLENGTH+24], mbxnam[LNM$C_NAMLENGTH], *buf = Nullch;
+  char cmd[LNM$C_NAMLENGTH+24], mbxnam[LNM$C_NAMLENGTH], *buf = NULL;
   unsigned short int chan;
 #ifndef CLI$M_TRUSTED
 #  define CLI$M_TRUSTED 0x40  /* Missing from VAXC headers */
@@ -3587,7 +3599,7 @@ store_pipelocs(pTHX)
 	  temp[1] = '\0';
 	}
 
-        if ((tounixpath_utf8(temp, unixdir, NULL)) != Nullch) {
+        if ((tounixpath_utf8(temp, unixdir, NULL)) != NULL) {
             p = (pPLOC) PerlMem_malloc(sizeof(PLOC));
 	    if (p == NULL) _ckvmssts(SS$_INSFMEM);
             p->next = head_PLOC;
@@ -3610,7 +3622,7 @@ store_pipelocs(pTHX)
         if (SvROK(dirsv)) continue;
         dir = SvPVx(dirsv,n_a);
         if (strcmp(dir,".") == 0) continue;
-        if ((tounixpath_utf8(dir, unixdir, NULL)) == Nullch)
+        if ((tounixpath_utf8(dir, unixdir, NULL)) == NULL)
             continue;
 
         p = (pPLOC) PerlMem_malloc(sizeof(PLOC));
@@ -3623,7 +3635,7 @@ store_pipelocs(pTHX)
 /* most likely spot (ARCHLIB) put first in the list */
 
 #ifdef ARCHLIB_EXP
-    if ((tounixpath_utf8(ARCHLIB_EXP, unixdir, NULL)) != Nullch) {
+    if ((tounixpath_utf8(ARCHLIB_EXP, unixdir, NULL)) != NULL) {
         p = (pPLOC) PerlMem_malloc(sizeof(PLOC));
 	if (p == NULL) _ckvmssts(SS$_INSFMEM);
         p->next = head_PLOC;
@@ -4001,7 +4013,7 @@ static PerlIO * create_forked_xterm(pTHX_ const char *cmd, const char *mode)
     info->in         = 0;
     info->out        = 0;
     info->err        = 0;
-    info->fp         = Nullfp;
+    info->fp         = NULL;
     info->useFILE    = 0;
     info->waiting    = 0;
     info->in_done    = TRUE;
@@ -4086,7 +4098,7 @@ safe_popen(pTHX_ const char *cmd, const char *in_mode, int *psts)
         PerlIO * xterm_fd;
 
 	xterm_fd = create_forked_xterm(aTHX_ cmd, in_mode);
-	if (xterm_fd != Nullfp)
+	if (xterm_fd != NULL)
 	    return xterm_fd;
     }
 
@@ -4130,7 +4142,7 @@ safe_popen(pTHX_ const char *cmd, const char *in_mode, int *psts)
             if (ckWARN(WARN_PIPE)) {
                 Perl_warner(aTHX_ packWARN(WARN_PIPE),"unable to find VMSPIPE.COM for i/o piping");
             }
-        return Nullfp;
+        return NULL;
         }
         fgetname(tpipe,tfilebuf+1,1);
     }
@@ -4162,7 +4174,7 @@ safe_popen(pTHX_ const char *cmd, const char *in_mode, int *psts)
         Perl_warner(aTHX_ packWARN(WARN_PIPE),"Can't pipe \"%*s\": %s", strlen(cmd), cmd, Strerror(errno));
       }
       *psts = sts;
-      return Nullfp; 
+      return NULL; 
     }
     n = sizeof(Info);
     _ckvmssts(lib$get_vm(&n, &info));
@@ -4175,7 +4187,7 @@ safe_popen(pTHX_ const char *cmd, const char *in_mode, int *psts)
     info->in         = 0;
     info->out        = 0;
     info->err        = 0;
-    info->fp         = Nullfp;
+    info->fp         = NULL;
     info->useFILE    = 0;
     info->waiting    = 0;
     info->in_done    = TRUE;
@@ -4238,7 +4250,7 @@ safe_popen(pTHX_ const char *cmd, const char *in_mode, int *psts)
             n = sizeof(Info);
             _ckvmssts(lib$free_vm(&n, &info));
             *psts = RMS$_FNF;
-            return Nullfp;
+            return NULL;
         }
 
         info->err = pipe_mbxtofd_setup(aTHX_ fileno(stderr), err);
@@ -4302,7 +4314,7 @@ safe_popen(pTHX_ const char *cmd, const char *in_mode, int *psts)
             n = sizeof(Info);
             _ckvmssts(lib$free_vm(&n, &info));
             *psts = RMS$_FNF;
-            return Nullfp;
+            return NULL;
         }
         
 
@@ -5343,13 +5355,14 @@ mp_do_rmsexpand
       /* Unless we are forcing to VMS format, a UNIX input means
        * UNIX output, and that requires long names to be used
        */
+#if !defined(__VAX) && defined(NAML$C_MAXRSS)
       if ((opts & PERL_RMSEXPAND_M_VMS) == 0)
 	opts |= PERL_RMSEXPAND_M_LONG;
-      else {
+      else
+#endif
 	isunix = 0;
       }
     }
-  }
 
   rms_set_fna(myfab, mynam, (char *)filespec, strlen(filespec)); /* cast ok */
   rms_bind_fab_nam(myfab, mynam);
@@ -8890,7 +8903,7 @@ pipe_and_fork(pTHX_ char **cmargv)
     *p = '\0';
 
     fp = safe_popen(aTHX_ subcmd,"wbF",&sts);
-    if (fp == Nullfp) {
+    if (fp == NULL) {
         PerlIO_printf(Perl_debug_log,"Can't open output pipe (status %d)",sts);
     }
 }
@@ -9589,16 +9602,13 @@ Perl_readdir(pTHX_ DIR *dd)
     }
     dd->count++;
     /* Force the buffer to end with a NUL, and downcase name to match C convention. */
+    buff[res.dsc$w_length] = '\0';
+    p = buff + res.dsc$w_length;
+    while (--p >= buff) if (!isspace(*p)) break;  
+    *p = '\0';
     if (!decc_efs_case_preserve) {
-      buff[VMS_MAXRSS - 1] = '\0';
       for (p = buff; *p; p++) *p = _tolower(*p);
     }
-    else {
-      /* we don't want to force to lowercase, just null terminate */
-      buff[res.dsc$w_length] = '\0';
-    }
-    while (--p >= buff) if (!isspace(*p)) break;  /* Do we really need this? */
-    *p = '\0';
 
     /* Skip any directory component and just copy the name. */
     sts = vms_split_path
@@ -9778,7 +9788,7 @@ vms_execfree(struct dsc$descriptor_s *vmscmd)
 static char *
 setup_argstr(pTHX_ SV *really, SV **mark, SV **sp)
 {
-  char *junk, *tmps = Nullch;
+  char *junk, *tmps = NULL;
   register size_t cmdlen = 0;
   size_t rlen;
   register SV **idx;
@@ -10205,12 +10215,10 @@ Perl_vms_do_exec(pTHX_ const char *cmd)
 }  /* end of vms_do_exec() */
 /*}}}*/
 
-unsigned long int Perl_do_spawn(pTHX_ const char *);
-unsigned long int do_spawn2(pTHX_ const char *, int);
+int do_spawn2(pTHX_ const char *, int);
 
-/* {{{ unsigned long int do_aspawn(void *really,void **mark,void **sp) */
-unsigned long int
-Perl_do_aspawn(pTHX_ void *really,void **mark,void **sp)
+int
+Perl_do_aspawn(pTHX_ SV* really, SV** mark, SV** sp)
 {
 unsigned long int sts;
 char * cmd;
@@ -10223,9 +10231,9 @@ int flags = 0;
      * through do_aspawn is a value of 1, which means spawn without
      * waiting for completion -- other values are ignored.
      */
-    if (SvNIOKp(*((SV**)mark+1)) && !SvPOKp(*((SV**)mark+1))) {
+    if (SvNIOKp(*(mark+1)) && !SvPOKp(*(mark+1))) {
 	++mark;
-	flags = SvIVx(*(SV**)mark);
+	flags = SvIV(*mark);
     }
 
     if (flags && flags == 1)     /* the Win32 P_NOWAIT value */
@@ -10233,7 +10241,7 @@ int flags = 0;
     else
         flags = 0;
 
-    cmd = setup_argstr(aTHX_ (SV *)really,(SV **)mark,(SV **)sp);
+    cmd = setup_argstr(aTHX_ really, mark, sp);
     sts = do_spawn2(aTHX_ cmd, flags);
     /* pp_sys will clean up cmd */
     return sts;
@@ -10243,16 +10251,28 @@ int flags = 0;
 /*}}}*/
 
 
-/* {{{unsigned long int do_spawn(char *cmd) */
-unsigned long int
-Perl_do_spawn(pTHX_ const char *cmd)
+/* {{{int do_spawn(char* cmd) */
+int
+Perl_do_spawn(pTHX_ char* cmd)
 {
+    PERL_ARGS_ASSERT_DO_SPAWN;
+
     return do_spawn2(aTHX_ cmd, 0);
 }
 /*}}}*/
 
-/* {{{unsigned long int do_spawn2(char *cmd) */
-unsigned long int
+/* {{{int do_spawn_nowait(char* cmd) */
+int
+Perl_do_spawn_nowait(pTHX_ char* cmd)
+{
+    PERL_ARGS_ASSERT_DO_SPAWN_NOWAIT;
+
+    return do_spawn2(aTHX_ cmd, CLI$M_NOWAIT);
+}
+/*}}}*/
+
+/* {{{int do_spawn2(char *cmd) */
+int
 do_spawn2(pTHX_ const char *cmd, int flags)
 {
   unsigned long int sts, substs;
@@ -12091,7 +12111,7 @@ Perl_rmscopy(pTHX_ const char *spec_in, const char *spec_out, int preserve_dates
       return 0;
     }
 
-    esa = PerlMem_malloc(NAM$C_MAXRSS + 1);
+    esa = PerlMem_malloc(VMS_MAXRSS);
     if (esa == NULL) _ckvmssts(SS$_INSFMEM);
     esal = NULL;
 #if !defined(__VAX) && defined(NAML$C_MAXRSS)
@@ -12106,7 +12126,7 @@ Perl_rmscopy(pTHX_ const char *spec_in, const char *spec_out, int preserve_dates
     rms_bind_fab_nam(fab_in, nam);
     fab_in.fab$l_xab = (void *) &xabdat;
 
-    rsa = PerlMem_malloc(NAML$C_MAXRSS);
+    rsa = PerlMem_malloc(VMS_MAXRSS);
     if (rsa == NULL) _ckvmssts(SS$_INSFMEM);
     rsal = NULL;
 #if !defined(__VAX) && defined(NAML$C_MAXRSS)
@@ -12663,8 +12683,7 @@ mod2fname(pTHX_ CV *cv)
     if (counter) {
       strcat(work_name, "__");
     }
-    strcat(work_name, SvPV(*av_fetch(in_array, counter, FALSE),
-			   PL_na));
+    strcat(work_name, SvPV_nolen(*av_fetch(in_array, counter, FALSE)));
   }
 
   /* Check to see if we actually have to bother...*/
@@ -12903,20 +12922,19 @@ Perl_vms_start_glob
 }
 
 
-#ifdef HAS_SYMLINK
 static char *
 mp_do_vms_realpath(pTHX_ const char *filespec, char * rslt_spec,
 		   int *utf8_fl);
 
 void
-vms_realpath_fromperl(pTHX_ CV *cv)
+unixrealpath_fromperl(pTHX_ CV *cv)
 {
     dXSARGS;
     char *fspec, *rslt_spec, *rslt;
     STRLEN n_a;
 
     if (!items || items != 1)
-	Perl_croak(aTHX_ "Usage: VMS::Filespec::vms_realpath(spec)");
+	Perl_croak(aTHX_ "Usage: VMS::Filespec::unixrealpath(spec)");
 
     fspec = SvPV(ST(0),n_a);
     if (!fspec || !*fspec) XSRETURN_UNDEF;
@@ -12932,6 +12950,35 @@ vms_realpath_fromperl(pTHX_ CV *cv)
 	XSRETURN(1);
 }
 
+static char *
+mp_do_vms_realname(pTHX_ const char *filespec, char * rslt_spec,
+		   int *utf8_fl);
+
+void
+vmsrealpath_fromperl(pTHX_ CV *cv)
+{
+    dXSARGS;
+    char *fspec, *rslt_spec, *rslt;
+    STRLEN n_a;
+
+    if (!items || items != 1)
+	Perl_croak(aTHX_ "Usage: VMS::Filespec::vmsrealpath(spec)");
+
+    fspec = SvPV(ST(0),n_a);
+    if (!fspec || !*fspec) XSRETURN_UNDEF;
+
+    Newx(rslt_spec, VMS_MAXRSS + 1, char);
+    rslt = do_vms_realname(fspec, rslt_spec, NULL);
+
+    ST(0) = sv_newmortal();
+    if (rslt != NULL)
+	sv_usepvn(ST(0),rslt,strlen(rslt));
+    else
+	Safefree(rslt_spec);
+	XSRETURN(1);
+}
+
+#ifdef HAS_SYMLINK
 /*
  * A thin wrapper around decc$symlink to make sure we follow the 
  * standard and do not create a symlink with a zero-length name.
@@ -12948,24 +12995,28 @@ int my_symlink(const char *path1, const char *path2) {
 
 #endif /* HAS_SYMLINK */
 
-#if __CRTL_VER >= 70301000 && !defined(__VAX)
 int do_vms_case_tolerant(void);
 
 void
-vms_case_tolerant_fromperl(pTHX_ CV *cv)
+case_tolerant_process_fromperl(pTHX_ CV *cv)
 {
   dXSARGS;
   ST(0) = boolSV(do_vms_case_tolerant());
   XSRETURN(1);
 }
-#endif
+
+#ifdef USE_ITHREADS
 
 void  
 Perl_sys_intern_dup(pTHX_ struct interp_intern *src, 
                           struct interp_intern *dst)
 {
+    PERL_ARGS_ASSERT_SYS_INTERN_DUP;
+
     memcpy(dst,src,sizeof(struct interp_intern));
 }
+
+#endif
 
 void  
 Perl_sys_intern_clear(pTHX)
@@ -13010,21 +13061,16 @@ init_os_extras(void)
   newXSproto("DynaLoader::mod2fname", mod2fname, file, "$");
   newXS("File::Copy::rmscopy",rmscopy_fromperl,file);
   newXSproto("vmsish::hushed",hushexit_fromperl,file,";$");
-#ifdef HAS_SYMLINK
-  newXSproto("VMS::Filespec::vms_realpath",vms_realpath_fromperl,file,"$;$");
-#endif
-#if __CRTL_VER >= 70301000 && !defined(__VAX)
-  newXSproto("VMS::Filepec::vms_case_tolerant",
-             vms_case_tolerant_fromperl, file, "$");
-#endif
+  newXSproto("VMS::Filespec::unixrealpath",unixrealpath_fromperl,file,"$;$");
+  newXSproto("VMS::Filespec::vmsrealpath",vmsrealpath_fromperl,file,"$;$");
+  newXSproto("VMS::Filespec::case_tolerant_process",
+      case_tolerant_process_fromperl,file,"");
 
   store_pipelocs(aTHX);         /* will redo any earlier attempts */
 
   return;
 }
   
-#ifdef HAS_SYMLINK
-
 #if __CRTL_VER == 80200000
 /* This missed getting in to the DECC SDK for 8.2 */
 char *realpath(const char *file_name, char * resolved_name, ...);
@@ -13052,7 +13098,7 @@ int vms_fid_to_name(char * outname, int outlen, const char * name)
 {
 struct statbuf_t {
     char	   * st_dev;
-    __ino16_t	   st_ino[3];
+    unsigned short st_ino[3];
     unsigned short padw;
     unsigned long  padl[30];  /* plenty of room */
 } statbuf;
@@ -13087,8 +13133,15 @@ mp_do_vms_realpath(pTHX_ const char *filespec, char *outbuf,
 {
     char * rslt = NULL;
 
-    if (decc_posix_compliant_pathnames) 
+#ifdef HAS_SYMLINK
+    if (decc_posix_compliant_pathnames > 0 ) {
+	/* realpath currently only works if posix compliant pathnames are
+	 * enabled.  It may start working when they are not, but in that
+	 * case we still want the fallback behavior for backwards compatibility
+	 */
         rslt = realpath(filespec, outbuf);
+    }
+#endif
 
     if (rslt == NULL) {
         char * vms_spec;
@@ -13100,8 +13153,8 @@ mp_do_vms_realpath(pTHX_ const char *filespec, char *outbuf,
 
         Newx(vms_spec, VMS_MAXRSS + 1, char);
 
-	 sts = vms_fid_to_name(vms_spec, VMS_MAXRSS + 1, filespec);
-	 if (sts == 0) {
+	sts = vms_fid_to_name(vms_spec, VMS_MAXRSS + 1, filespec);
+	if (sts == 0) {
 
 
 	    /* Now need to trim the version off */
@@ -13121,34 +13174,99 @@ mp_do_vms_realpath(pTHX_ const char *filespec, char *outbuf,
 		   &vs_len);
 
 
-	     if (sts == 0) {
-	        int file_len;
+		if (sts == 0) {
+	            int haslower = 0;
+	            const char *cp;
 
-		/* Trim off the version */
-		file_len = v_len + r_len + d_len + n_len + e_len;
-		vms_spec[file_len] = 0;
+	            /* Trim off the version */
+	            int file_len = v_len + r_len + d_len + n_len + e_len;
+	            vms_spec[file_len] = 0;
 
-		/* The result is expected to be in UNIX format */
-		rslt = do_tounixspec(vms_spec, outbuf, 0, utf8_fl);
-	     }
-	 }
+	            /* The result is expected to be in UNIX format */
+		    rslt = do_tounixspec(vms_spec, outbuf, 0, utf8_fl);
+
+                    /* Downcase if input had any lower case letters and 
+	             * case preservation is not in effect. 
+	             */
+	            if (!decc_efs_case_preserve) {
+	                for (cp = filespec; *cp; cp++)
+	                    if (islower(*cp)) { haslower = 1; break; }
+
+	                if (haslower) __mystrtolower(rslt);
+	            }
+	        }
+	}
 
         Safefree(vms_spec);
     }
     return rslt;
 }
 
+static char *
+mp_do_vms_realname(pTHX_ const char *filespec, char *outbuf,
+		   int *utf8_fl)
+{
+    char * v_spec, * r_spec, * d_spec, * n_spec, * e_spec, * vs_spec;
+    int sts, v_len, r_len, d_len, n_len, e_len, vs_len;
+    int file_len;
+
+    /* Fall back to fid_to_name */
+
+    sts = vms_fid_to_name(outbuf, VMS_MAXRSS + 1, filespec);
+    if (sts != 0) {
+	return NULL;
+    }
+    else {
+
+
+	/* Now need to trim the version off */
+	sts = vms_split_path
+		  (outbuf,
+		   &v_spec,
+		   &v_len,
+		   &r_spec,
+		   &r_len,
+		   &d_spec,
+		   &d_len,
+		   &n_spec,
+		   &n_len,
+		   &e_spec,
+		   &e_len,
+		   &vs_spec,
+		   &vs_len);
+
+
+	if (sts == 0) {
+	    int haslower = 0;
+	    const char *cp;
+
+	    /* Trim off the version */
+	    int file_len = v_len + r_len + d_len + n_len + e_len;
+	    outbuf[file_len] = 0;
+
+	    /* Downcase if input had any lower case letters and 
+	     * case preservation is not in effect. 
+	     */
+	    if (!decc_efs_case_preserve) {
+	        for (cp = filespec; *cp; cp++)
+	            if (islower(*cp)) { haslower = 1; break; }
+
+	        if (haslower) __mystrtolower(outbuf);
+	    }
+	}
+    }
+    return outbuf;
+}
+
+
 /*}}}*/
 /* External entry points */
 char *Perl_vms_realpath(pTHX_ const char *filespec, char *outbuf, int *utf8_fl)
 { return do_vms_realpath(filespec, outbuf, utf8_fl); }
-#else
-char *Perl_vms_realpath(pTHX_ const char *filespec, char *outbuf, int *utf8_fl)
-{ return NULL; }
-#endif
 
+char *Perl_vms_realname(pTHX_ const char *filespec, char *outbuf, int *utf8_fl)
+{ return do_vms_realname(filespec, outbuf, utf8_fl); }
 
-#if __CRTL_VER >= 70301000 && !defined(__VAX)
 /* case_tolerant */
 
 /*{{{int do_vms_case_tolerant(void)*/
@@ -13161,6 +13279,7 @@ int do_vms_case_tolerant(void)
 }
 /*}}}*/
 /* External entry points */
+#if __CRTL_VER >= 70301000 && !defined(__VAX)
 int Perl_vms_case_tolerant(void)
 { return do_vms_case_tolerant(); }
 #else

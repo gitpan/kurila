@@ -8,7 +8,7 @@ BEGIN {
 	@INC = '../lib';
 	require './test.pl';
     }
-    $SIG{__WARN__} = sub { push @WARN, @_ };
+    ${^WARN_HOOK} = sub { push @WARN, $_[0]->{description} };
 }
 
 require File::Spec;
@@ -33,7 +33,7 @@ use charnames ":full";
 "Here: \N{CYRILLIC SMALL LETTER BE}!";
 1
 EOE
-      or $@ !~ m/above 0xFF/;
+      or $@->{description} !~ m/above 0xFF/;
   print "ok 2\n";
   # print "# \$res=$res \$\@='$@'\n";
 
@@ -43,7 +43,7 @@ use charnames 'cyrillic';
 "Here: \N{Be}!";
 1
 EOE
-      or $@ !~ m/CYRILLIC CAPITAL LETTER BE.*above 0xFF/;
+      or $@->{description} !~ m/CYRILLIC CAPITAL LETTER BE.*above 0xFF/;
   print "ok 3\n";
 }
 

@@ -72,13 +72,13 @@ is($y, "c 20");
 
 
 eval 'local($$e)';
-like($@, qr/Can't localize through a reference/);
+like($@->{description}, qr/Can't localize through a reference/);
 
 eval '$e = []; local(@$e)';
-like($@, qr/Can't localize through a reference/);
+like($@->{description}, qr/Can't localize through a reference/);
 
 eval '$e = {}; local(%$e)';
-like($@, qr/Can't localize through a reference/);
+like($@->{description}, qr/Can't localize through a reference/);
 
 # Array and hash elements
 
@@ -218,22 +218,22 @@ is($a[0].$a[1], "Xb");
 # now try the same for %SIG
 
 eval { $SIG{TERM} = 'foo' };
-like $@, qr/signal handler should be glob or .../;
+like $@->{description}, qr/signal handler should be glob or .../;
 $SIG{INT} = \&foo;
-$SIG{__WARN__} = $SIG{INT};
+${^WARN_HOOK} = $SIG{INT};
 {
     local($SIG{TERM}) = $SIG{TERM};
     local($SIG{INT}) = $SIG{INT};
-    local($SIG{__WARN__}) = $SIG{__WARN__};
+    local(${^WARN_HOOK}) = ${^WARN_HOOK};
     is($SIG{TERM}, undef);
     is($SIG{INT}, \&foo);
-    is($SIG{__WARN__}, \&foo);
+    is(${^WARN_HOOK}, \&foo);
     local($SIG{INT});
-    delete $SIG{__WARN__};
+    ${^WARN_HOOK} = undef;
 }
 is($SIG{TERM}, undef);
 is($SIG{INT}, \&foo);
-is($SIG{__WARN__}, \&foo);
+is(${^WARN_HOOK}, \&foo);
 {
     my $d = join("\n", map { "$_=>$SIG{$_}" } sort keys %SIG);
     local %SIG = %SIG;
@@ -320,14 +320,14 @@ while (m/(o.+?),/gc) {
 # local() and readonly magic variables
 
 eval { local $1 = 1 };
-like($@, qr/Modification of a read-only value attempted/);
+like($@->{description}, qr/Modification of a read-only value attempted/);
 
 eval { for ($1) { local $_ = 1 } };
-like($@, qr/Modification of a read-only value attempted/);
+like($@->{description}, qr/Modification of a read-only value attempted/);
 
 # make sure $1 is still read-only
 eval { for ($1) { local $_ = 1 } };
-like($@, qr/Modification of a read-only value attempted/);
+like($@->{description}, qr/Modification of a read-only value attempted/);
 
 # The s/// adds 'g' magic to $_, but it should remain non-readonly
 eval { for("a") { for $x (1,2) { local $_="b"; s/(.*)/+$1/ } } };

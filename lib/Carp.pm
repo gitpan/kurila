@@ -31,14 +31,14 @@ sub shortmess { goto &shortmess_jmp }
 sub longmess_jmp  {
     local($@, $!);
     eval { require Carp::Heavy };
-    return $@ if $@;
+    die if $@;
     goto &longmess_real;
 }
 sub shortmess_jmp  {
     local($@, $!);
     eval { require Carp::Heavy };
-    return $@ if $@;
-    goto &shortmess_real;
+    die if $@;
+    goto &longmess_real;
 }
 
 sub croak   { die  shortmess @_ }

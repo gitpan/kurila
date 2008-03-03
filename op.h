@@ -45,6 +45,8 @@
 #  define MADPROP_IN_BASEOP
 #endif
 
+typedef PERL_BITFIELD16 optype;
+
 #ifdef BASEOP_DEFINITION
 #define BASEOP BASEOP_DEFINITION
 #else
@@ -54,21 +56,28 @@
     OP*		(CPERLscope(*op_ppaddr))(pTHX);		\
     MADPROP_IN_BASEOP			\
     PADOFFSET	op_targ;		\
-    unsigned	op_type:9;		\
-    unsigned	op_opt:1;		\
-    unsigned	op_latefree:1;		\
-    unsigned	op_latefreed:1;		\
-    unsigned	op_attached:1;		\
-    unsigned	op_spare:3;		\
+    PERL_BITFIELD16 op_type:9;		\
+    PERL_BITFIELD16 op_opt:1;		\
+    PERL_BITFIELD16 op_latefree:1;	\
+    PERL_BITFIELD16 op_latefreed:1;	\
+    PERL_BITFIELD16 op_attached:1;	\
+    PERL_BITFIELD16 op_spare:3;		\
     U8		op_flags;		\
     U8		op_private;
 #endif
+
+/* If op_type:9 is changed to :10, also change PUSHEVAL in cop.h.
+   Also, if the type of op_type is ever changed (e.g. to PERL_BITFIELD32)
+   then all the other bit-fields before/after it should change their
+   types too to let VC pack them into the same 4 byte integer.*/
 
 #define OP_GIMME(op,dfl) \
 	(((op)->op_flags & OPf_WANT) == OPf_WANT_VOID   ? G_VOID   : \
 	 ((op)->op_flags & OPf_WANT) == OPf_WANT_SCALAR ? G_SCALAR : \
 	 ((op)->op_flags & OPf_WANT) == OPf_WANT_LIST   ? G_ARRAY   : \
 	 dfl)
+
+#define OP_GIMME_REVERSE(flags)	((flags) & G_WANT)
 
 /*
 =head1 "Gimme" Values
@@ -103,8 +112,6 @@ Deprecated.  Use C<GIMME_V> instead.
 #define OPf_STACKED	64	/* Some arg is arriving on the stack. */
 #define OPf_SPECIAL	128	/* Do something weird for this op: */
 				/*  On local LVAL, don't init local value. */
-				/*  On OP_CONST, value is the hints hash for
-				    eval, so return a copy from pp_const() */
 				/*  On OP_SORT, subroutine is inlined. */
 				/*  On OP_NOT, inversion was implicit. */
 				/*  On OP_LEAVE, don't restore curpm. */
@@ -183,7 +190,7 @@ Deprecated.  Use C<GIMME_V> instead.
 #define OPpENTERSUB_DB		16	/* Debug subroutine. */
 #define OPpENTERSUB_HASTARG	32	/* Called from OP tree. */
 #define OPpENTERSUB_NOMOD	64	/* Immune to mod() for :attrlist. */
-  /* OP_RV2CV only */
+  /* OP_ENTERSUB and OP_RV2CV only */
 #define OPpENTERSUB_AMPER	8	/* Used & form to call. */
 #define OPpENTERSUB_NOPAREN	128	/* bare sub call (without parens) */
 #define OPpENTERSUB_INARGS	4	/* Lval used as arg to a sub. */
@@ -245,9 +252,6 @@ Deprecated.  Use C<GIMME_V> instead.
 #define OPpSORT_QSORT		32	/* Use quicksort (not mergesort) */
 #define OPpSORT_STABLE		64	/* Use a stable algorithm */
 
-/* Private for OP_THREADSV */
-#define OPpDONE_SVREF		64	/* Been through newSVREF once */
-
 /* Private for OP_OPEN and OP_BACKTICK */
 #define OPpOPEN_IN_RAW		16	/* binmode(F,":raw") on input fh */
 #define OPpOPEN_IN_CRLF		32	/* binmode(F,":crlf") on input fh */
@@ -261,13 +265,6 @@ Deprecated.  Use C<GIMME_V> instead.
 /* Private for OP_FTXXX */
 #define OPpFT_ACCESS		2	/* use filetest 'access' */
 #define OPpFT_STACKED		4	/* stacked filetest, as in "-f -x $f" */
-#define OP_IS_FILETEST_ACCESS(op) 		\
-	(((op)->op_type) == OP_FTRREAD  ||	\
-	 ((op)->op_type) == OP_FTRWRITE ||	\
-	 ((op)->op_type) == OP_FTREXEC  ||	\
-	 ((op)->op_type) == OP_FTEREAD  ||	\
-	 ((op)->op_type) == OP_FTEWRITE ||	\
-	 ((op)->op_type) == OP_FTEEXEC)
 
 /* Private for OP_(MAP|GREP)(WHILE|START) */
 #define OPpGREP_LEX		2	/* iterate over lexical $_ */
@@ -326,18 +323,24 @@ struct pmop {
 };
 
 #ifdef USE_ITHREADS
-#define PM_GETRE(o)     (INT2PTR(REGEXP*,SvIVX(PL_regex_pad[(o)->op_pmoffset])))
-#define PM_SETRE(o,r)   STMT_START { \
-                            SV* const sv = PL_regex_pad[(o)->op_pmoffset]; \
-                            sv_setiv(sv, PTR2IV(r)); \
+#define PM_GETRE(o)	(SvTYPE(PL_regex_pad[(o)->op_pmoffset]) == SVt_REGEXP \
+		 	 ? (REGEXP*)(PL_regex_pad[(o)->op_pmoffset]) : NULL)
+/* The assignment is just to enforce type safety (or at least get a warning).
+ */
+/* With first class regexps not via a reference one needs to assign
+   &PL_sv_undef under ithreads. (This would probably work unthreaded, but NULL
+   is cheaper. I guess we could allow NULL, but the check above would get
+   more complex, and we'd have an AV with (SV*)NULL in it, which feels bad */
+/* BEWARE - something that calls this macro passes (r) which has a side
+   effect.  */
+#define PM_SETRE(o,r)	STMT_START {					\
+                            const REGEXP *const whap = (r);		\
+                            assert(whap);				\
+			    PL_regex_pad[(o)->op_pmoffset] = (SV*)whap;	\
                         } STMT_END
-#define PM_GETRE_SAFE(o) (PL_regex_pad ? PM_GETRE(o) : (REGEXP*)0)
-#define PM_SETRE_SAFE(o,r) if (PL_regex_pad) PM_SETRE(o,r)
 #else
 #define PM_GETRE(o)     ((o)->op_pmregexp)
 #define PM_SETRE(o,r)   ((o)->op_pmregexp = (r))
-#define PM_GETRE_SAFE PM_GETRE
-#define PM_SETRE_SAFE PM_SETRE
 #endif
 
 
@@ -356,7 +359,8 @@ struct pmop {
 #define PMf_EVAL	0x0400		/* evaluating replacement as expr */
 
 /* The following flags have exact equivalents in regcomp.h with the prefix RXf_
- * which are stored in the regexp->extflags member.
+ * which are stored in the regexp->extflags member. If you change them here,
+ * you have to change them there, and vice versa.
  */
 #define PMf_NOTUSED	0x0800		/* not used. was: use locale for character types */
 #define PMf_MULTILINE	0x1000		/* assume multiple lines */
@@ -462,7 +466,9 @@ struct loop {
 #define cSVOPo_sv		cSVOPx_sv(o)
 #define kSVOP_sv		cSVOPx_sv(kid)
 
-#define Nullop Null(OP*)
+#ifndef PERL_CORE
+#  define Nullop ((OP*)NULL)
+#endif
 
 /* Lowest byte-and-a-bit of PL_opargs */
 #define OA_MARK 1

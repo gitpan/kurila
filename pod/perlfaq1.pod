@@ -1,6 +1,6 @@
 =head1 NAME
 
-perlfaq1 - General Questions About Perl ($Revision: 9681 $)
+perlfaq1 - General Questions About Perl ($Revision: 10427 $)
 
 =head1 DESCRIPTION
 
@@ -61,7 +61,7 @@ users the informal support will more than suffice.  See the answer to
 There is often a matter of opinion and taste, and there isn't any one
 answer that fits anyone.  In general, you want to use either the current
 stable release, or the stable release immediately prior to that one.
-Currently, those are perl5.8.x and perl5.6.x, respectively.
+Currently, those are perl5.10.x and perl5.8.x, respectively.
 
 Beyond that, you have to consider several things and decide which is best
 for you.
@@ -96,7 +96,7 @@ problems others have if you are risk averse.
 
 =item *
 
-The immediate, previous releases (i.e. perl5.6.x ) are usually maintained
+The immediate, previous releases (i.e. perl5.8.x ) are usually maintained
 for a while, although not at the same level as the current releases.
 
 =item *
@@ -107,15 +107,15 @@ as its whitewashed bones have fractured or eroded.
 
 =item *
 
-There is no Perl 6 for the next couple of years.  Stay tuned, but don't
-worry that you'll have to change major versions of Perl soon (i.e. before
-2008).
+There is no Perl 6 release scheduled, but it will be available when 
+it's ready.  Stay tuned, but don't worry that you'll have to change 
+major versions of Perl; no one is going to take Perl 5 away from you.
 
 =item *
 
 There are really two tracks of perl development: a maintenance version
 and an experimental version.  The maintenance versions are stable, and
-have an even number as the minor release (i.e. perl5.8.x, where 8 is the
+have an even number as the minor release (i.e. perl5.10.x, where 10 is the
 minor release).  The experimental versions may include features that
 don't make it into the stable versions, and have an odd number as the
 minor release (i.e. perl5.9.x, where 9 is the minor release).
@@ -127,7 +127,7 @@ minor release (i.e. perl5.9.x, where 9 is the minor release).
 
 (contributed by brian d foy)
 
-In short, Pelr 4 is the past, Perl 5 is the present, and Perl 6 is the
+In short, Perl 4 is the past, Perl 5 is the present, and Perl 6 is the
 future.
 
 The number after perl (i.e. the 5 after Perl 5) is the major release
@@ -136,7 +136,7 @@ major version has significant differences that earlier versions cannot
 support.
 
 The current major release of Perl is Perl 5, and was released in 1994.
-It can run scripts from the previous major release, perl4 (March 1991),
+It can run scripts from the previous major release, Perl 4 (March 1991),
 but has significant differences. It introduced the concept of references,
 complex data structures, and modules.  The Perl 5 interpreter was a
 complete re-write of the previous perl sources.
@@ -157,7 +157,7 @@ See L<perlhist> for a history of Perl revisions.
 Ponie stands for "Perl On the New Internal Engine", started by Arthur
 Bergman from Fotango in 2003, and subsequently run as a project of The
 Perl Foundation. It was abandoned in 2006
-(http://www.nntp.perl.org/group/perl.ponie.dev/487).
+( http://www.nntp.perl.org/group/perl.ponie.dev/487 ).
 
 Instead of using the current Perl internals, Ponie aimed to create a
 new one that would provide a translation path from Perl 5 to Perl 6
@@ -283,13 +283,23 @@ will sleep easier, too--Wall Street programs not withstanding. :-)
 =head2 What's the difference between "perl" and "Perl"?
 
 One bit.  Oh, you weren't talking ASCII? :-) Larry now uses "Perl" to
-signify the language proper and "perl" the implementation of it,
-i.e. the current interpreter.  Hence Tom's quip that "Nothing but perl
-can parse Perl."  You may or may not choose to follow this usage.  For
-example, parallelism means "awk and perl" and "Python and Perl" look
-OK, while "awk and Perl" and "Python and perl" do not.  But never
-write "PERL", because perl is not an acronym, apocryphal
-folklore and post-facto expansions notwithstanding.
+signify the language proper and "perl" the implementation of it, i.e.
+the current interpreter.  Hence Tom's quip that "Nothing but perl can
+parse Perl."  
+
+Before the first edition of I<Programming perl>, people commonly
+referred to the language as "perl", and its name appeared that way in
+the title because it referred to the interpreter. In the book, Randal
+Schwartz capitalised the language's name to make it stand out better
+when typeset. This convention was adopted by the community, and the
+second edition became I<Programming Perl>, using the capitalized
+version of the name to refer to the language.
+
+You may or may not choose to follow this usage.  For example,
+parallelism means "awk and perl" and "Python and Perl" look good, while
+"awk and Perl" and "Python and perl" do not.  But never write "PERL",
+because perl is not an acronym, apocryphal folklore and post-facto
+expansions notwithstanding.
 
 =head2 Is it a Perl program or a Perl script?
 
@@ -390,9 +400,9 @@ You might find these links useful:
 
 =head1 REVISION
 
-Revision: $Revision: 9681 $
+Revision: $Revision: 10427 $
 
-Date: $Date: 2007-06-26 01:36:56 +0200 (Tue, 26 Jun 2007) $
+Date: $Date: 2007-12-14 00:39:01 +0100 (Fri, 14 Dec 2007) $
 
 See L<perlfaq> for source control details and availability.
 

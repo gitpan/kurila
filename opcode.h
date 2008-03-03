@@ -117,10 +117,6 @@ EXTCONST char* const PL_op_name[] = {
 	"i_ne",
 	"ncmp",
 	"i_ncmp",
-	"slt",
-	"sgt",
-	"sle",
-	"sge",
 	"seq",
 	"sne",
 	"scmp",
@@ -225,7 +221,6 @@ EXTCONST char* const PL_op_name[] = {
 	"dump",
 	"goto",
 	"exit",
-	"setstate",
 	"method_named",
 	"entergiven",
 	"leavegiven",
@@ -252,8 +247,6 @@ EXTCONST char* const PL_op_name[] = {
 	"sysseek",
 	"sysread",
 	"syswrite",
-	"send",
-	"recv",
 	"eof",
 	"tell",
 	"seek",
@@ -261,6 +254,8 @@ EXTCONST char* const PL_op_name[] = {
 	"fcntl",
 	"ioctl",
 	"flock",
+	"send",
+	"recv",
 	"socket",
 	"sockpair",
 	"bind",
@@ -349,6 +344,7 @@ EXTCONST char* const PL_op_name[] = {
 	"semctl",
 	"require",
 	"dofile",
+	"hintseval",
 	"entereval",
 	"leaveeval",
 	"entertry",
@@ -481,10 +477,6 @@ EXTCONST char* const PL_op_desc[] = {
 	"integer ne (!=)",
 	"numeric comparison (<+>)",
 	"integer comparison (<+>)",
-	"string lt",
-	"string gt",
-	"string le",
-	"string ge",
 	"string eq",
 	"string ne",
 	"string comparison (cmp)",
@@ -589,7 +581,6 @@ EXTCONST char* const PL_op_desc[] = {
 	"dump",
 	"goto",
 	"exit",
-	"set statement info",
 	"method with known name",
 	"given()",
 	"leave given block",
@@ -616,8 +607,6 @@ EXTCONST char* const PL_op_desc[] = {
 	"sysseek",
 	"sysread",
 	"syswrite",
-	"send",
-	"recv",
 	"eof",
 	"tell",
 	"seek",
@@ -625,6 +614,8 @@ EXTCONST char* const PL_op_desc[] = {
 	"fcntl",
 	"ioctl",
 	"flock",
+	"send",
+	"recv",
 	"socket",
 	"socketpair",
 	"bind",
@@ -713,6 +704,7 @@ EXTCONST char* const PL_op_desc[] = {
 	"semctl",
 	"require",
 	"do \"file\"",
+	"eval hints",
 	"eval \"string\"",
 	"eval \"string\" exit",
 	"eval {block}",
@@ -857,10 +849,6 @@ EXT Perl_ppaddr_t PL_ppaddr[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_pp_i_ne),
 	MEMBER_TO_FPTR(Perl_pp_ncmp),
 	MEMBER_TO_FPTR(Perl_pp_i_ncmp),
-	MEMBER_TO_FPTR(Perl_pp_sle),	/* Perl_pp_slt */
-	MEMBER_TO_FPTR(Perl_pp_sle),	/* Perl_pp_sgt */
-	MEMBER_TO_FPTR(Perl_pp_sle),
-	MEMBER_TO_FPTR(Perl_pp_sle),	/* Perl_pp_sge */
 	MEMBER_TO_FPTR(Perl_pp_seq),
 	MEMBER_TO_FPTR(Perl_pp_sne),
 	MEMBER_TO_FPTR(Perl_pp_scmp),
@@ -965,7 +953,6 @@ EXT Perl_ppaddr_t PL_ppaddr[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_pp_goto),	/* Perl_pp_dump */
 	MEMBER_TO_FPTR(Perl_pp_goto),
 	MEMBER_TO_FPTR(Perl_pp_exit),
-	MEMBER_TO_FPTR(Perl_pp_setstate),
 	MEMBER_TO_FPTR(Perl_pp_method_named),
 	MEMBER_TO_FPTR(Perl_pp_entergiven),
 	MEMBER_TO_FPTR(Perl_pp_leavegiven),
@@ -992,8 +979,6 @@ EXT Perl_ppaddr_t PL_ppaddr[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_pp_sysseek),
 	MEMBER_TO_FPTR(Perl_pp_sysread),
 	MEMBER_TO_FPTR(Perl_pp_send),	/* Perl_pp_syswrite */
-	MEMBER_TO_FPTR(Perl_pp_send),
-	MEMBER_TO_FPTR(Perl_pp_sysread),	/* Perl_pp_recv */
 	MEMBER_TO_FPTR(Perl_pp_eof),
 	MEMBER_TO_FPTR(Perl_pp_tell),
 	MEMBER_TO_FPTR(Perl_pp_sysseek),	/* Perl_pp_seek */
@@ -1001,6 +986,8 @@ EXT Perl_ppaddr_t PL_ppaddr[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_pp_ioctl),	/* Perl_pp_fcntl */
 	MEMBER_TO_FPTR(Perl_pp_ioctl),
 	MEMBER_TO_FPTR(Perl_pp_flock),
+	MEMBER_TO_FPTR(Perl_pp_send),
+	MEMBER_TO_FPTR(Perl_pp_sysread),	/* Perl_pp_recv */
 	MEMBER_TO_FPTR(Perl_pp_socket),
 	MEMBER_TO_FPTR(Perl_pp_sockpair),
 	MEMBER_TO_FPTR(Perl_pp_bind),
@@ -1089,6 +1076,7 @@ EXT Perl_ppaddr_t PL_ppaddr[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_pp_semctl),
 	MEMBER_TO_FPTR(Perl_pp_require),
 	MEMBER_TO_FPTR(Perl_pp_require),	/* Perl_pp_dofile */
+	MEMBER_TO_FPTR(Perl_pp_hintseval),
 	MEMBER_TO_FPTR(Perl_pp_entereval),
 	MEMBER_TO_FPTR(Perl_pp_leaveeval),
 	MEMBER_TO_FPTR(Perl_pp_entertry),
@@ -1230,10 +1218,6 @@ EXT Perl_check_t PL_check[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* i_ne */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* ncmp */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* i_ncmp */
-	MEMBER_TO_FPTR(Perl_ck_null),	/* slt */
-	MEMBER_TO_FPTR(Perl_ck_null),	/* sgt */
-	MEMBER_TO_FPTR(Perl_ck_null),	/* sle */
-	MEMBER_TO_FPTR(Perl_ck_null),	/* sge */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* seq */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* sne */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* scmp */
@@ -1257,7 +1241,7 @@ EXT Perl_check_t PL_check[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* hex */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* oct */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* abs */
-	MEMBER_TO_FPTR(Perl_ck_lengthconst),	/* length */
+	MEMBER_TO_FPTR(Perl_ck_fun),	/* length */
 	MEMBER_TO_FPTR(Perl_ck_substr),	/* substr */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* vec */
 	MEMBER_TO_FPTR(Perl_ck_index),	/* index */
@@ -1338,7 +1322,6 @@ EXT Perl_check_t PL_check[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* dump */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* goto */
 	MEMBER_TO_FPTR(Perl_ck_exit),	/* exit */
-	MEMBER_TO_FPTR(Perl_ck_null),	/* setstate */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* method_named */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* entergiven */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* leavegiven */
@@ -1365,8 +1348,6 @@ EXT Perl_check_t PL_check[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* sysseek */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* sysread */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* syswrite */
-	MEMBER_TO_FPTR(Perl_ck_fun),	/* send */
-	MEMBER_TO_FPTR(Perl_ck_fun),	/* recv */
 	MEMBER_TO_FPTR(Perl_ck_eof),	/* eof */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* tell */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* seek */
@@ -1374,6 +1355,8 @@ EXT Perl_check_t PL_check[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* fcntl */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* ioctl */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* flock */
+	MEMBER_TO_FPTR(Perl_ck_fun),	/* send */
+	MEMBER_TO_FPTR(Perl_ck_fun),	/* recv */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* socket */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* sockpair */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* bind */
@@ -1462,6 +1445,7 @@ EXT Perl_check_t PL_check[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* semctl */
 	MEMBER_TO_FPTR(Perl_ck_require),	/* require */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* dofile */
+	MEMBER_TO_FPTR(Perl_ck_svconst),	/* hintseval */
 	MEMBER_TO_FPTR(Perl_ck_eval),	/* entereval */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* leaveeval */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* entertry */
@@ -1597,10 +1581,6 @@ EXTCONST U32 PL_opargs[] = {
 	0x00022416,	/* i_ne */
 	0x0002243e,	/* ncmp */
 	0x0002241e,	/* i_ncmp */
-	0x00022416,	/* slt */
-	0x00022416,	/* sgt */
-	0x00022416,	/* sle */
-	0x00022416,	/* sge */
 	0x00022416,	/* seq */
 	0x00022416,	/* sne */
 	0x0002241e,	/* scmp */
@@ -1624,7 +1604,7 @@ EXTCONST U32 PL_opargs[] = {
 	0x0001378e,	/* hex */
 	0x0001378e,	/* oct */
 	0x0001378e,	/* abs */
-	0x0001379c,	/* length */
+	0x0001379e,	/* length */
 	0x1322280c,	/* substr */
 	0x0022281c,	/* vec */
 	0x0122291c,	/* index */
@@ -1705,7 +1685,6 @@ EXTCONST U32 PL_opargs[] = {
 	0x00001a44,	/* dump */
 	0x00001a44,	/* goto */
 	0x00013644,	/* exit */
-	0x00001404,	/* setstate */
 	0x00000c40,	/* method_named */
 	0x00000640,	/* entergiven */
 	0x00000200,	/* leavegiven */
@@ -1732,8 +1711,6 @@ EXTCONST U32 PL_opargs[] = {
 	0x0022c804,	/* sysseek */
 	0x122ec81d,	/* sysread */
 	0x1322c81d,	/* syswrite */
-	0x1222c81d,	/* send */
-	0x022ec81d,	/* recv */
 	0x0001d614,	/* eof */
 	0x0001d60c,	/* tell */
 	0x0022c804,	/* seek */
@@ -1741,6 +1718,8 @@ EXTCONST U32 PL_opargs[] = {
 	0x0022c80c,	/* fcntl */
 	0x0022c80c,	/* ioctl */
 	0x0002c91c,	/* flock */
+	0x1222c81d,	/* send */
+	0x022ec81d,	/* recv */
 	0x0222c814,	/* socket */
 	0x222cc814,	/* sockpair */
 	0x0002c814,	/* bind */
@@ -1829,6 +1808,7 @@ EXTCONST U32 PL_opargs[] = {
 	0x0222281d,	/* semctl */
 	0x000136c0,	/* require */
 	0x00002240,	/* dofile */
+	0x00000c04,	/* hintseval */
 	0x00003640,	/* entereval */
 	0x00002200,	/* leaveeval */
 	0x00000600,	/* entertry */

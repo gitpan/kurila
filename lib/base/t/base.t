@@ -49,17 +49,17 @@ is( $Eval2::VERSION, 1.02 );
 
 
 eval q{use base 'reallyReAlLyNotexists'};
-like( $@, qr/^Base class package "reallyReAlLyNotexists" is empty\./,
+like( $@->{description}, qr/^Base class package "reallyReAlLyNotexists" is empty\./,
                                           'base with empty package');
 
 eval q{use base 'reallyReAlLyNotexists'};
-like( $@, qr/^Base class package "reallyReAlLyNotexists" is empty\./,
+like( $@->{description}, qr/^Base class package "reallyReAlLyNotexists" is empty\./,
                                           '  still empty on 2nd load');
 {
     my $warning;
-    local $SIG{__WARN__} = sub { $warning = shift };
+    local ${^WARN_HOOK} = sub { $warning = shift };
     eval q{package HomoGenous; use base 'HomoGenous';};
-    like($warning, qr/^Class 'HomoGenous' tried to inherit from itself/,
+    like($warning->{description}, qr/^Class 'HomoGenous' tried to inherit from itself/,
                                           '  self-inheriting');
 }
 

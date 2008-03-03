@@ -188,10 +188,14 @@ our %Offsets = (
     'untie'		=> 86,
     'utf8'		=> 88,
     'void'		=> 90,
+
+    # Warnings Categories added in Perl 5.011
+
+    'imprecision'	=> 92,
   );
 
 our %Bits = (
-    'all'		=> "\x[555555555555555555555505]", # [0..45]
+    'all'		=> "\x[555555555555555555555515]", # [0..46]
     'ambiguous'		=> "\x[000000000000000400000000]", # [29]
     'bareword'		=> "\x[000000000000001000000000]", # [30]
     'closed'		=> "\x[001000000000000000000000]", # [6]
@@ -202,6 +206,7 @@ our %Bits = (
     'exec'		=> "\x[004000000000000000000000]", # [7]
     'exiting'		=> "\x[400000000000000000000000]", # [3]
     'glob'		=> "\x[000100000000000000000000]", # [4]
+    'imprecision'	=> "\x[000000000000000000000010]", # [46]
     'inplace'		=> "\x[000000000040000000000000]", # [23]
     'internal'		=> "\x[000000000000010000000000]", # [24]
     'io'		=> "\x[005455000000000000000000]", # [5..11]
@@ -240,7 +245,7 @@ our %Bits = (
   );
 
 our %DeadBits = (
-    'all'		=> "\x[aaaaaaaaaaaaaaaaaaaaaa0a]", # [0..45]
+    'all'		=> "\x[aaaaaaaaaaaaaaaaaaaaaa2a]", # [0..46]
     'ambiguous'		=> "\x[000000000000000800000000]", # [29]
     'bareword'		=> "\x[000000000000002000000000]", # [30]
     'closed'		=> "\x[002000000000000000000000]", # [6]
@@ -251,6 +256,7 @@ our %DeadBits = (
     'exec'		=> "\x[008000000000000000000000]", # [7]
     'exiting'		=> "\x[800000000000000000000000]", # [3]
     'glob'		=> "\x[000200000000000000000000]", # [4]
+    'imprecision'	=> "\x[000000000000000000000020]", # [46]
     'inplace'		=> "\x[000000000080000000000000]", # [23]
     'internal'		=> "\x[000000000000020000000000]", # [24]
     'io'		=> "\x[00a8aa000000000000000000]", # [5..11]
@@ -289,18 +295,10 @@ our %DeadBits = (
   );
 
 our $NONE     = "\0\0\0\0\0\0\0\0\0\0\0\0";
-our $LAST_BIT = 92 ;
+our $LAST_BIT = 94 ;
 our $BYTES    = 12 ;
 
 our $All = "" ; vec($All, $Offsets{'all'}, 2) = 3 ;
-
-sub Croaker
-{
-    require Carp::Heavy; # this initializes %CarpInternal
-    local $Carp::CarpInternal{'warnings'};
-    delete $Carp::CarpInternal{'warnings'};
-    Carp::croak(@_);
-}
 
 sub bits
 {
@@ -328,7 +326,7 @@ sub bits
 	    $mask ^&^= ^~^($DeadBits{$word}^|^$All) if $no_fatal ;
 	}
 	else
-          { Croaker("Unknown warnings category '$word'")}
+          { die("Unknown warnings category '$word'")}
     }
 
     return $mask ;
@@ -366,7 +364,7 @@ sub import
 	    $mask ^&^= ^~^($DeadBits{$word}^|^$All) if $no_fatal ;
 	}
 	else
-          { Croaker("Unknown warnings category '$word'")}
+          { die("Unknown warnings category '$word'")}
     }
 
     ${^WARNING_BITS} = $mask ;
@@ -394,7 +392,7 @@ sub unimport
 	    $mask ^&^= ^~^($catmask ^|^ $DeadBits{$word} ^|^ $All);
 	}
 	else
-          { Croaker("Unknown warnings category '$word'")}
+          { die("Unknown warnings category '$word'")}
     }
 
     ${^WARNING_BITS} = $mask ;
@@ -412,19 +410,19 @@ sub __chk
         # check the category supplied.
         $category = shift ;
         if (my $type = ref $category) {
-            Croaker("not an object")
+            die("not an object")
                 if exists $builtin_type{$type};
 	    $category = $type;
             $isobj = 1 ;
         }
         $offset = $Offsets{$category};
-        Croaker("Unknown warnings category '$category'")
+        die("Unknown warnings category '$category'")
 	    unless defined $offset;
     }
     else {
         $category = (caller(1))[0] ;
         $offset = $Offsets{$category};
-        Croaker("package '$category' not registered for warnings")
+        die("package '$category' not registered for warnings")
 	    unless defined $offset ;
     }
 
@@ -439,21 +437,16 @@ sub __chk
 	$i -= 2 ;
     }
     else {
-        $i = _error_loc(); # see where Carp will allocate the error
+        $i = 2;
     }
 
     my $callers_bitmask = (caller($i))[9] ;
     return ($callers_bitmask, $offset, $i) ;
 }
 
-sub _error_loc {
-    require Carp::Heavy;
-    goto &Carp::short_error_loc; # don't introduce another stack frame
-}                                                             
-
 sub enabled
 {
-    Croaker("Usage: warnings::enabled([category])")
+    die("Usage: warnings::enabled([category])")
 	unless @_ == 1 || @_ == 0 ;
 
     my ($callers_bitmask, $offset, $i) = __chk(@_) ;
@@ -466,21 +459,20 @@ sub enabled
 
 sub warn
 {
-    Croaker("Usage: warnings::warn([category,] 'message')")
+    die("Usage: warnings::warn([category,] 'message')")
 	unless @_ == 2 || @_ == 1 ;
 
     my $message = pop ;
     my ($callers_bitmask, $offset, $i) = __chk(@_) ;
-    require Carp;
-    Carp::croak($message)
+    die($message)
 	if vec($callers_bitmask, $offset+1, 1) ||
 	   vec($callers_bitmask, $Offsets{'all'}+1, 1) ;
-    Carp::carp($message) ;
+    CORE::warn($message) ;
 }
 
 sub warnif
 {
-    Croaker("Usage: warnings::warnif([category,] 'message')")
+    die("Usage: warnings::warnif([category,] 'message')")
 	unless @_ == 2 || @_ == 1 ;
 
     my $message = pop ;
@@ -491,12 +483,11 @@ sub warnif
             	(vec($callers_bitmask, $offset, 1) ||
             	vec($callers_bitmask, $Offsets{'all'}, 1)) ;
 
-    require Carp;
-    Carp::croak($message)
+    die($message)
 	if vec($callers_bitmask, $offset+1, 1) ||
 	   vec($callers_bitmask, $Offsets{'all'}+1, 1) ;
 
-    Carp::carp($message) ;
+    CORE::warn($message) ;
 }
 
 1;

@@ -22,7 +22,7 @@ BEGIN {
 use warnings;
 use strict;
 use feature ":5.10";
-use Test::More tests => 55;
+use Test::More tests => 58;
 
 use B::Deparse;
 my $deparse = B::Deparse->new();
@@ -53,8 +53,8 @@ while ( ~< *DATA) {
 
     my $coderef = eval "sub \{$input\}";
 
-    if ($@) {
-	diag("$num deparsed: $@");
+    if ($@ and $@->{description}) {
+	diag("$num deparsed: {$@->message}");
 	ok(0, $testname);
     }
     else {
@@ -75,8 +75,9 @@ is("\{\n    (-1) ** \$a;\n\}", $deparse->coderef2text(sub{(-1) ** $a }));
 
 use constant cr => ['hello'];
 my $string = "sub " . $deparse->coderef2text(\&cr);
-my $val = (eval $string)->();
-ok( ref($val) eq 'ARRAY' && $val->[0] eq 'hello');
+my $val = (eval $string)->() or diag $string;
+is(ref($val), 'ARRAY');
+is($val->[0], 'hello');
 
 my $Is_VMS = $^O eq 'VMS';
 my $Is_MacOS = $^O eq 'MacOS';
@@ -161,12 +162,7 @@ $test /= 2 if ++$test;
 -((1, 2) x 2);
 ####
 # 6
-{
-    my $test = sub : lvalue {
-	my $x;
-    }
-    ;
-}
+1;
 ####
 # 7
 {
@@ -364,4 +360,17 @@ $a = sub {
 # 49 match
 {
     $a =~ m/foo/;
+}
+####
+# 51 Anonymous arrays and hashes, and references to them
+my $a = {};
+my $b = \{};
+my $c = [];
+my $d = \[];
+####
+# 52 implicit smartmatch in given/when
+given ('foo') {
+    when ('bar') { continue; }
+    when ($_ ~~ 'quux') { continue; }
+    default { 0; }
 }

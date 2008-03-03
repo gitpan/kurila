@@ -16,10 +16,10 @@ $bar = 4;
 {
     package ABC;
     $blurfl = 5;
-    $main'a = $'b;
+    $main::a = $::b;
 }
 
-$ABC'dyick = 6;
+$ABC::dyick = 6;
 
 $xyz = 2;
 
@@ -27,13 +27,9 @@ $main = join(':', sort(keys %main::));
 $xyz = join(':', sort(keys %xyz::));
 $ABC = join(':', sort(keys %ABC::));
 
-if ('a' lt 'A') {
-    print $xyz eq 'bar:main:new:xyz:ABC' ? "ok 1\n" : "not ok 1 '$xyz'\n";
-} else {
-    print $xyz eq 'ABC:bar:main:new:xyz' ? "ok 1\n" : "not ok 1 '$xyz'\n";
-}    
+print $xyz eq 'ABC:bar:main:new:xyz' ? "ok 1\n" : "not ok 1 '$xyz'\n";
 print $ABC eq 'blurfl:dyick' ? "ok 2\n" : "not ok 2 '$ABC'\n";
-print $main'blurfl == 123 ? "ok 3\n" : "not ok 3\n";
+print $main::blurfl == 123 ? "ok 3\n" : "not ok 3\n";
 
 package ABC;
 
@@ -62,7 +58,7 @@ eval { $a = *xyz::new{PACKAGE}; };
 print $a eq "__ANON__" ? "ok 9\n" : "not ok 9 # '$a'\n";
 
 eval { $Q->param; };
-print $@ =~ m/^Can't use anonymous symbol table for method lookup/ ?
+print $@->{description} =~ m/^Can't use anonymous symbol table for method lookup/ ?
   "ok 10\n" : "not ok 10 # '$@'\n";
 
 print "$Q" =~ m/^__ANON__=/ ? "ok 11\n" : "not ok 11 # '$Q'\n";

@@ -1,12 +1,10 @@
 package ExtUtils::MM_Any;
 
 use strict;
-use vars qw($VERSION @ISA);
-$VERSION = '0.15';
+our $VERSION = '6.43_01';
 
-use Carp;
 use File::Spec;
-BEGIN { @ISA = qw(File::Spec); }
+BEGIN { our @ISA = qw(File::Spec); }
 
 # We need $Verbose
 use ExtUtils::MakeMaker qw($Verbose);
@@ -145,8 +143,8 @@ sub split_command {
     # newline.
     chomp $cmd;
 
-    # set aside 20% for macro expansion.
-    my $len_left = int($self->max_exec_len * 0.80);
+    # set aside 30% for macro expansion.
+    my $len_left = int($self->max_exec_len * 0.70);
     $len_left -= length $self->_expand_macros($cmd);
 
     do {
@@ -234,6 +232,24 @@ sub wraplist {
     my $self = shift;
     return join " \\\n\t", @_;
 }
+
+
+=head3 maketext_filter
+
+    my $filter_make_text = $mm->maketext_filter($make_text);
+
+The text of the Makefile is run through this method before writing to
+disk.  It allows systems a chance to make portability fixes to the
+Makefile.
+
+By default it does nothing.
+
+This method is protected and not intended to be called outside of
+MakeMaker.
+
+=cut
+
+sub maketext_filter { return $_[1] }
 
 
 =head3 cd  I<Abstract>
@@ -648,7 +664,7 @@ confused or something gets snuck in before the real 'all' target.
 
 sub makemakerdflt_target {
     return <<'MAKE_FRAG';
-makemakerdflt: all
+makemakerdflt : all
 	$(NOECHO) $(NOOP)
 MAKE_FRAG
 
@@ -711,7 +727,7 @@ sub metafile_target {
     my $self = shift;
 
     return <<'MAKE_FRAG' if $self->{NO_META};
-metafile:
+metafile :
 	$(NOECHO) $(NOOP)
 MAKE_FRAG
 
@@ -721,12 +737,17 @@ MAKE_FRAG
         $prereq_pm .= sprintf "\n    %-30s %s", "$mod:", $ver;
     }
 
+    my $author_value = defined $self->{AUTHOR}
+        ? "\n    - $self->{AUTHOR}"
+        : undef;
+
     # Use a list to preserve order.
     my @meta_to_mm = (
         name         => $self->{DISTNAME},
         version      => $self->{VERSION},
         abstract     => $self->{ABSTRACT},
         license      => $self->{LICENSE},
+        author       => $author_value,
         generated_by => 
                 "ExtUtils::MakeMaker version $ExtUtils::MakeMaker::VERSION",
         distribution_type => $self->{PM} ? 'module' : 'script',
@@ -745,13 +766,8 @@ MAKE_FRAG
     $meta .= <<"YAML";
 requires:     $prereq_pm
 meta-spec:
-    url:     http://module-build.sourceforge.net/META-spec-v1.2.html
-    version: 1.2
-YAML
-
-    $meta .= <<"YAML" if defined $self->{AUTHOR};
-author:
-    - $self->{AUTHOR}
+    url:     http://module-build.sourceforge.net/META-spec-v1.3.html
+    version: 1.3
 YAML
 
     $meta .= $self->{EXTRA_META} if $self->{EXTRA_META};
@@ -992,7 +1008,7 @@ sub init_ABSTRACT {
 
     if ($self->{ABSTRACT_FROM}){
         $self->{ABSTRACT} = $self->parse_abstract($self->{ABSTRACT_FROM}) or
-            carp "WARNING: Setting ABSTRACT via file ".
+            warn "WARNING: Setting ABSTRACT via file ".
                  "'$self->{ABSTRACT_FROM}' failed\n";
     }
 }

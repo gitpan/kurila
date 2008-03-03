@@ -3,19 +3,8 @@ package Test::More;
 
 use strict;
 
-
-# Can't use Carp because it might cause use_ok() to accidentally succeed
-# even though the module being used forgot to use Carp.  Yes, this
-# actually happened.
-sub _carp {
-    my($file, $line) = (caller(1))[1,2];
-    warn @_, " at $file line $line\n";
-}
-
-
-
 use vars qw($VERSION @ISA @EXPORT %EXPORT_TAGS $TODO);
-$VERSION = '0.72';
+$VERSION = '0.74';
 $VERSION = eval $VERSION;    # make the alpha version come out as a number
 
 use Test::Builder::Module;
@@ -333,8 +322,6 @@ sub isnt ($$;$) {
 
     $tb->isnt_eq(@_);
 }
-
-*isn't = \&isnt;
 
 
 =item B<like>
@@ -658,32 +645,37 @@ sub use_ok ($;@) {
 
     my($pack,$filename,$line) = caller;
 
-    local($@,$!,$SIG{__DIE__});   # isolate eval
+    # Work around a glitch in $@ and eval
+    my $eval_error;
+    {
+        local($@,$!);   # isolate eval
 
-    if( @imports == 1 and $imports[0] =~ m/^v\d+(?:\.\d+)?$/ ) {
-        # probably a version check.  Perl needs to see the bare number
-        # for it to work with non-Exporter based modules.
-        eval <<USE;
+        if( @imports == 1 and $imports[0] =~ m/^v\d+(?:\.\d+)?$/ ) {
+            # probably a version check.  Perl needs to see the bare number
+            # for it to work with non-Exporter based modules.
+            eval <<USE;
 package $pack;
 use $module $imports[0];
 USE
-    }
-    else {
-        eval <<USE;
+        }
+        else {
+            eval <<USE;
 package $pack;
 use $module \@imports;
 USE
+        }
+        $eval_error = $@;
     }
 
-    my $ok = $tb->ok( !$@, "use $module;" );
+    my $ok = $tb->ok( !$eval_error, "use $module;" );
 
     unless( $ok ) {
-        chomp $@;
+        chomp $eval_error;
         $@ =~ s{^BEGIN failed--compilation aborted at .*$}
                 {BEGIN failed--compilation aborted at $filename line $line.}m;
         $tb->diag(<<DIAGNOSTIC);
     Tried to use '$module'.
-    Error:  $@
+    Error:  {$eval_error->message}
 DIAGNOSTIC
 
     }
@@ -710,8 +702,7 @@ sub require_ok ($) {
     # Module names must be barewords, files not.
     $module = qq['$module'] unless _is_module_name($module);
 
-    local($!, $@, $SIG{__DIE__}); # isolate eval
-    local $SIG{__DIE__};
+    local($!, $@); # isolate eval
     eval <<REQUIRE;
 package $pack;
 require $module;
@@ -723,7 +714,7 @@ REQUIRE
         chomp $@;
         $tb->diag(<<DIAGNOSTIC);
     Tried to require '$module'.
-    Error:  $@
+    Error:  {$@->message}
 DIAGNOSTIC
 
     }
@@ -796,7 +787,7 @@ of a reference to it
 WARNING
         chop $msg;   # clip off newline so carp() will put in line/file
 
-        _carp sprintf $msg, scalar @_;
+        warn sprintf $msg, scalar @_;
 
 	return $tb->ok(0);
     }
@@ -999,13 +990,13 @@ sub skip {
 
     unless( defined $how_many ) {
         # $how_many can only be avoided when no_plan is in use.
-        _carp "skip() needs to know \$how_many tests are in the block"
+        warn "skip() needs to know \$how_many tests are in the block"
           unless $tb->has_plan eq 'no_plan';
         $how_many = 1;
     }
 
     if( defined $how_many and $how_many =~ m/\D/ ) {
-        _carp "skip() was passed a non-numeric number of tests.  Did you get the arguments backwards?";
+        warn "skip() was passed a non-numeric number of tests.  Did you get the arguments backwards?";
         $how_many = 1;
     }
 
@@ -1085,7 +1076,7 @@ sub todo_skip {
 
     unless( defined $how_many ) {
         # $how_many can only be avoided when no_plan is in use.
-        _carp "todo_skip() needs to know \$how_many tests are in the block"
+        warn "todo_skip() needs to know \$how_many tests are in the block"
           unless $tb->has_plan eq 'no_plan';
         $how_many = 1;
     }

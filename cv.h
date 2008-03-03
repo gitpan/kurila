@@ -8,87 +8,37 @@
  *
  */
 
-struct xpvcv {
-    union {
-	NV	xnv_nv;		/* numeric value, if any */
-	HV *	xgv_stash;
-	struct {
-	    U32	xlow;
-	    U32	xhigh;
-	}	xpad_cop_seq;	/* used by pad.c for cop_sequence */
-	struct {
-	    U32 xbm_previous;	/* how many characters in string before rare? */
-	    U8	xbm_flags;
-	    U8	xbm_rare;	/* rarest character in string */
-	}	xbm_s;		/* fields from PVBM */
-    }		xnv_u;
-    STRLEN	xpv_cur;	/* length of xp_pv as a C string */
-    STRLEN	xpv_len;	/* allocated size */
-    union {
-	IV	xivu_iv;
-	UV	xivu_uv;
-	void *	xivu_p1;
-	I32	xivu_i32;	/* depth, >= 2 indicates recursive call */
-	HEK *	xivu_namehek;
-    }		xiv_u;
-    union {
-	MAGIC*	xmg_magic;	/* linked list of magicalness */
-	HV*	xmg_ourstash;	/* Stash for our (when SvPAD_OUR is true) */
-    } xmg_u;
-    HV*		xmg_stash;	/* class package */
+typedef U16 cv_flags_t;
 
-    HV *	xcv_stash;
-    union {
-	OP *	xcv_start;
-	ANY	xcv_xsubany;
-    }		xcv_start_u;
-    union {
-	OP *	xcv_root;
-	void	(*xcv_xsub) (pTHX_ CV*);
-    }		xcv_root_u;
-    GV *	xcv_gv;
-    char *	xcv_file;
-    PADLIST *	xcv_padlist;
-    CV *	xcv_outside;
-    U32		xcv_outside_seq; /* the COP sequence (at the point of our
-				  * compilation) in the lexically enclosing
-				  * sub */
-    cv_flags_t	xcv_flags;
+#define _XPVCV_COMMON								\
+    HV *	xcv_stash;							\
+    union {									\
+	OP *	xcv_start;							\
+	ANY	xcv_xsubany;							\
+    }		xcv_start_u;					    		\
+    union {									\
+	OP *	xcv_root;							\
+	void	(*xcv_xsub) (pTHX_ CV*);					\
+    }		xcv_root_u;							\
+    GV *	xcv_gv;								\
+    char *	xcv_file;							\
+    AV *	xcv_padlist;							\
+    CV *	xcv_outside;							\
+    U32		xcv_outside_seq; /* the COP sequence (at the point of our	\
+				  * compilation) in the lexically enclosing	\
+				  * sub */					\
+    cv_flags_t	xcv_flags
+
+struct xpvcv {
+    _XPV_HEAD;
+    _XPVMG_HEAD;
+    _XPVCV_COMMON;
 };
 
 typedef struct {
-    STRLEN	xpv_cur;	/* length of xp_pv as a C string */
-    STRLEN	xpv_len;	/* allocated size */
-    union {
-	IV	xivu_iv;
-	UV	xivu_uv;
-	void *	xivu_p1;
-	I32	xivu_i32;	/* depth, >= 2 indicates recursive call */
-	HEK *	xivu_namehek;
-    }		xiv_u;
-    union {
-	MAGIC*	xmg_magic;	/* linked list of magicalness */
-	HV*	xmg_ourstash;	/* Stash for our (when SvPAD_OUR is true) */
-    } xmg_u;
-    HV*		xmg_stash;	/* class package */
-
-    HV *	xcv_stash;
-    union {
-	OP *	xcv_start;
-	ANY	xcv_xsubany;
-    }		xcv_start_u;
-    union {
-	OP *	xcv_root;
-	void	(*xcv_xsub) (pTHX_ CV*);
-    }		xcv_root_u;
-    GV *	xcv_gv;
-    char *	xcv_file;
-    PADLIST *	xcv_padlist;
-    CV *	xcv_outside;
-    U32		xcv_outside_seq; /* the COP sequence (at the point of our
-				  * compilation) in the lexically enclosing
-				  * sub */
-    cv_flags_t	xcv_flags;
+    _XPV_ALLOCATED_HEAD;
+    _XPVMG_HEAD;
+    _XPVCV_COMMON;
 } xpvcv_allocated;
 
 /*
@@ -96,6 +46,8 @@ typedef struct {
 
 =for apidoc AmU||Nullcv
 Null CV pointer.
+
+(deprecated - use C<(CV *)NULL> instead)
 
 =head1 CV Manipulation Functions
 
@@ -105,7 +57,9 @@ Returns the stash of the CV.
 =cut
 */
 
-#define Nullcv Null(CV*)
+#ifndef PERL_CORE
+#  define Nullcv Null(CV*)
+#endif
 
 #define CvSTASH(sv)	((XPVCV*)SvANY(sv))->xcv_stash
 #define CvSTART(sv)	((XPVCV*)SvANY(sv))->xcv_start_u.xcv_start
@@ -135,7 +89,6 @@ Returns the stash of the CV.
 
 #define CVf_METHOD	0x0001	/* CV is explicitly marked as a method */
 #define CVf_LOCKED	0x0002	/* CV locks itself or first arg on entry */
-#define CVf_LVALUE	0x0004  /* CV return value can be used as lvalue */
 
 #define CVf_WEAKOUTSIDE	0x0010  /* CvOUTSIDE isn't ref counted */
 #define CVf_CLONE	0x0020	/* anon CV uses external lexicals */
@@ -149,7 +102,7 @@ Returns the stash of the CV.
 #define CVf_ISXSUB	0x0800	/* CV is an XSUB, not pure perl.  */
 
 /* This symbol for optimised communication between toke.c and op.c: */
-#define CVf_BUILTIN_ATTRS	(CVf_METHOD|CVf_LOCKED|CVf_LVALUE)
+#define CVf_BUILTIN_ATTRS	(CVf_METHOD|CVf_LOCKED)
 
 #define CvCLONE(cv)		(CvFLAGS(cv) & CVf_CLONE)
 #define CvCLONE_on(cv)		(CvFLAGS(cv) |= CVf_CLONE)
@@ -179,16 +132,12 @@ Returns the stash of the CV.
 #define CvLOCKED_on(cv)		(CvFLAGS(cv) |= CVf_LOCKED)
 #define CvLOCKED_off(cv)	(CvFLAGS(cv) &= ~CVf_LOCKED)
 
-#define CvLVALUE(cv)		(CvFLAGS(cv) & CVf_LVALUE)
-#define CvLVALUE_on(cv)		(CvFLAGS(cv) |= CVf_LVALUE)
-#define CvLVALUE_off(cv)	(CvFLAGS(cv) &= ~CVf_LVALUE)
-
 #define CvEVAL(cv)		(CvUNIQUE(cv) && !SvFAKE(cv))
 #define CvEVAL_on(cv)		(CvUNIQUE_on(cv),SvFAKE_off(cv))
 #define CvEVAL_off(cv)		CvUNIQUE_off(cv)
 
 /* BEGIN|CHECK|INIT|UNITCHECK|END */
-#define CvSPECIAL(cv)		(CvUNIQUE(cv) && SvFAKE(cv))
+static __inline__ U32 CvSPECIAL(CV *cv) { return CvUNIQUE(cv) && SvFAKE(cv); }
 #define CvSPECIAL_on(cv)	(CvUNIQUE_on(cv),SvFAKE_on(cv))
 #define CvSPECIAL_off(cv)	(CvUNIQUE_off(cv),SvFAKE_off(cv))
 

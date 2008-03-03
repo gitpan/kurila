@@ -54,7 +54,6 @@ use warnings 'syntax' ;
 require "abc" ;
 EXPECT
 ok1
-ok2
 ########
 
 --FILE-- abc
@@ -69,7 +68,6 @@ require "abc" ;
 EXPECT
 ok1
 ok2
-ok3
 ########
 
 --FILE-- abc.pm
@@ -184,7 +182,6 @@ ok1
 ok2
 ok3
 ok4
-ok5
 ########
 
 --FILE-- abc.pm
@@ -338,14 +335,19 @@ use warnings ;
 eval { 
     warnings::warn() 
   } ;
-print $@ ;
+print $@->message;
 eval { 
   warnings::warn("fred", "joe") 
   } ;
-print $@ ;
+print $@->message;
 EXPECT
-Usage: warnings::warn([category,] 'message') at - line 5
-Unknown warnings category 'fred' at - line 9
+Usage: warnings::warn([category,] 'message') at .../warnings.pm line xxx.
+    warnings::warn called at - line 5.
+    (eval) called at - line 4.
+Unknown warnings category 'fred' at .../warnings.pm line xxx.
+    warnings::__chk called at .../warnings.pm line xxx.
+    warnings::warn called at - line 9.
+    (eval) called at - line 8.
 ########
 
 # check warnings::warnif
@@ -353,14 +355,19 @@ use warnings ;
 eval { 
   warnings::warnif() 
 } ;
-print $@ ;
+print $@->message;
 eval { 
   warnings::warnif("fred", "joe") 
 } ;
-print $@ ;
+print $@->message;
 EXPECT
-Usage: warnings::warnif([category,] 'message') at - line 5
-Unknown warnings category 'fred' at - line 9
+Usage: warnings::warnif([category,] 'message') at .../warnings.pm line xxx.
+    warnings::warnif called at - line 5.
+    (eval) called at - line 4.
+Unknown warnings category 'fred' at .../warnings.pm line xxx.
+    warnings::__chk called at .../warnings.pm line xxx.
+    warnings::warnif called at - line 9.
+    (eval) called at - line 8.
 ########
 
 --FILE-- abc.pm
@@ -373,7 +380,9 @@ use warnings "io" ;
 use abc;
 abc::check() ;
 EXPECT
-hello at - line 3
+hello at .../warnings.pm line xxx.
+    warnings::warn called at abc.pm line 3.
+    abc::check called at - line 3.
 ########
 
 --FILE-- abc.pm
@@ -386,7 +395,9 @@ use warnings "io" ;
 use abc;
 abc::check() ;
 EXPECT
-hello at - line 3
+hello at .../warnings.pm line xxx.
+    warnings::warn called at abc.pm line 3.
+    abc::check called at - line 3.
 ########
 
 --FILE-- abc.pm
@@ -402,7 +413,10 @@ eval {
   } ;
 print "[[$@]]\n";
 EXPECT
-hello at - line 4
+hello at .../warnings.pm line xxx.
+    warnings::warn called at abc.pm line 3.
+    abc::check called at - line 4.
+    (eval) called at - line 3.
 [[]]
 ########
 
@@ -417,9 +431,12 @@ use abc;
 eval { 
   abc::check() ; 
 } ;
-print "[[$@]]\n";
+print "[[{$@->message}]]\n";
 EXPECT
-[[hello at - line 4
+[[hello at .../warnings.pm line xxx.
+    warnings::warn called at abc.pm line 3.
+    abc::check called at - line 4.
+    (eval) called at - line 3.
 ]]
 ########
 -W
@@ -463,7 +480,10 @@ use warnings 'syntax' ;
 use abc ;
 abc::check() ;
 EXPECT
-package 'abc' not registered for warnings at abc.pm line 4
+package 'abc' not registered for warnings at .../warnings.pm line xxx.
+    warnings::__chk called at .../warnings.pm line xxx.
+    warnings::enabled called at abc.pm line 4.
+    abc::check called at - line 3.
 ########
 
 --FILE-- abc.pm
@@ -478,7 +498,10 @@ use warnings 'syntax' ;
 use abc ;
 abc::check() ;
 EXPECT
-package 'abc' not registered for warnings at abc.pm line 4
+package 'abc' not registered for warnings at .../warnings.pm line xxx.
+    warnings::__chk called at .../warnings.pm line xxx.
+    warnings::warn called at abc.pm line 4.
+    abc::check called at - line 3.
 ########
 
 --FILE-- abc.pm
@@ -493,7 +516,10 @@ use warnings 'syntax' ;
 use abc ;
 abc::check() ;
 EXPECT
-package 'abc' not registered for warnings at abc.pm line 4
+package 'abc' not registered for warnings at .../warnings.pm line xxx.
+    warnings::__chk called at .../warnings.pm line xxx.
+    warnings::warnif called at abc.pm line 4.
+    abc::check called at - line 3.
 ########
 
 --FILE-- abc.pm
@@ -652,7 +678,9 @@ use abc;
 use warnings "abc" ;
 abc::check() ;
 EXPECT
-hello at - line 3
+hello at .../warnings.pm line xxx.
+    warnings::warn called at abc.pm line 4.
+    abc::check called at - line 3.
 ########
 
 --FILE-- abc.pm
@@ -664,7 +692,9 @@ sub check { warnings::warn("hello") }
 use abc;
 abc::check() ;
 EXPECT
-hello at - line 2
+hello at .../warnings.pm line xxx.
+    warnings::warn called at abc.pm line 3.
+    abc::check called at - line 2.
 ########
 
 --FILE-- abc.pm
@@ -680,7 +710,10 @@ eval {
   } ;
 print "[[$@]]\n";
 EXPECT
-hello at - line 4
+hello at .../warnings.pm line xxx.
+    warnings::warn called at abc.pm line 3.
+    abc::check called at - line 4.
+    (eval) called at - line 3.
 [[]]
 ########
 
@@ -695,9 +728,12 @@ use warnings qw( FATAL abc ) ;
 eval { 
   abc::check() ; 
   } ;
-print "[[$@]]\n";
+print "[[{$@->message}]]\n";
 EXPECT
-[[hello at - line 4
+[[hello at .../warnings.pm line xxx.
+    warnings::warn called at abc.pm line 3.
+    abc::check called at - line 4.
+    (eval) called at - line 3.
 ]]
 ########
 -W
@@ -1001,13 +1037,13 @@ use abc ;
 use warnings 'abc';
 abc::in1() ;
 EXPECT
-ok1
 ok2
 ok3
-ok4
-my message 1 at - line 3
-my message 2 at - line 3
-my message 3 at - line 3
+my message 1 at .../warnings.pm line xxx.
+    warnings::warn called at abc.pm line 10.
+    abc::check called at abc.pm line 16.
+    abc::in2 called at abc.pm line 17.
+    abc::in1 called at - line 3.
 ########
 
 --FILE-- def.pm
@@ -1040,13 +1076,14 @@ use abc ;
 no warnings;
 abc::in1() ;
 EXPECT
-ok1
 ok2
 ok3
-ok4
-my message 1 at abc.pm line 5
-my message 2 at abc.pm line 5
-my message 3 at abc.pm line 5
+my message 1 at .../warnings.pm line xxx.
+    warnings::warn called at def.pm line 9.
+    def::check called at def.pm line 15.
+    def::in2 called at def.pm line 16.
+    def::in1 called at abc.pm line 5.
+    abc::in1 called at - line 3.
 ########
 
 --FILE-- def.pm
@@ -1087,10 +1124,12 @@ abc::in1() ;
 EXPECT
 ok2
 ok3
-ok4
 ok5
-my message 1 at - line 4
-my message 3 at - line 4
+my message 1 at .../warnings.pm line xxx.
+    warnings::warn called at def.pm line 14.
+    def::check called at def.pm line 21.
+    def::in2 called at def.pm line 22.
+    def::in1 called at - line 4.
 ########
 
 --FILE-- def.pm
@@ -1163,22 +1202,38 @@ EXPECT
 ok1
 ok2
 ok3
-ok4
 ok5
 ok6
-my message 1 at - line 5
-my message 2 at - line 5
-my message 4 at - line 5
-my message 8 at - line 5
+my message 1 at .../warnings.pm line xxx.
+    warnings::warn called at def.pm line 21.
+    def::check called at def.pm line 35.
+    def::in2 called at def.pm line 41.
+    def::in1 called at - line 5.
+my message 2 at .../warnings.pm line xxx.
+    warnings::warn called at def.pm line 22.
+    def::check called at def.pm line 35.
+    def::in2 called at def.pm line 41.
+    def::in1 called at - line 5.
+my message 8 at .../warnings.pm line xxx.
+    warnings::warnif called at def.pm line 29.
+    def::check called at def.pm line 35.
+    def::in2 called at def.pm line 41.
+    def::in1 called at - line 5.
 **
 ok1
 ok2
 ok3
-ok4
 ok5
-my message 1 at - line 8
-my message 2 at - line 8
-my message 4 at - line 8
+my message 1 at .../warnings.pm line xxx.
+    warnings::warn called at def.pm line 21.
+    def::check called at def.pm line 35.
+    def::in2 called at def.pm line 41.
+    def::in1 called at - line 8.
+my message 2 at .../warnings.pm line xxx.
+    warnings::warn called at def.pm line 22.
+    def::check called at def.pm line 35.
+    def::in2 called at def.pm line 41.
+    def::in1 called at - line 8.
 ########
 
 --FILE--
@@ -1225,5 +1280,5 @@ print "ok1\n" if $@ =~ m/$warn_msg/;
 # does it indicate the right line?
 print "ok2\n" if $@ =~ m/line $warn_line/; 
 EXPECT
-ok1
-ok2
+
+########

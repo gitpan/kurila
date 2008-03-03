@@ -1,5 +1,5 @@
 name: kurila
-version: 1.7_0
+version: 1.8_0
 abstract: a geneticly modified perl
 author: ~
 license: perl
@@ -34,7 +34,6 @@ no_index:
     - ext/Unicode/Normalize
     - ext/Win32
     - ext/Win32API/File
-    - ext/Win32CORE
     - lib/Archive/Extract
     - lib/Archive/Tar
     - lib/Attribute/Handlers
@@ -88,6 +87,7 @@ no_index:
     - lib/Pod/Simple
     - lib/Term/ANSIColor
     - lib/Term/UI
+    - lib/Test/Builder
     - lib/Test/Harness
     - lib/Test/Simple
     - lib/Test/t
@@ -107,7 +107,7 @@ no_index:
     - ext/DynaLoader/t/XSLoader.t
     - ext/DynaLoader/XSLoader_pm.PL
     - ext/Filter/t/call.t
-    - ext/Filter/Util/Call
+    - ext/Opcode/Safe.pm
     - ext/threads/threads.pm
     - ext/threads/threads.xs
     - lib/Archive/Extract.pm

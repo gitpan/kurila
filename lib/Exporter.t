@@ -166,12 +166,12 @@ package Yet::More::Testing;
 @ISA = qw(Exporter);
 $VERSION = 0;
 eval { Yet::More::Testing->require_version(10); 1 };
-::ok($@ !~ m/\(undef\)/,       'require_version(10) and $VERSION = 0');
+::ok($@->{description} !~ m/\(undef\)/,       'require_version(10) and $VERSION = 0');
 
 
 my $warnings;
 BEGIN {
-    local $SIG{__WARN__} = sub { $warnings = join '', @_ };
+    local ${^WARN_HOOK} = sub { $warnings = join '', @_ };
     package Testing::Unused::Vars;
     @ISA = qw(Exporter);
     @EXPORT = qw(this $TODO that);

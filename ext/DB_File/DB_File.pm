@@ -164,13 +164,14 @@ our ($db_version, $use_XSLoader, $splice_end_array, $Error);
 use Carp;
 
 
-$VERSION = "1.815" ;
+$VERSION = "1.816_2" ;
+$VERSION = eval $VERSION; # needed for dev releases 
 
 {
-    local $SIG{__WARN__} = sub {$splice_end_array = "@_";};
+    local ${^WARN_HOOK} = sub {$splice_end_array = $_[0]->{description};};
     my @a =(1); splice(@a, 3);
     $splice_end_array = 
-        ($splice_end_array =~ m/^splice\(\) offset past end of array at /);
+        ($splice_end_array =~ m/^splice\(\) offset past end of array/);
 }      
 
 #typedef enum { DB_BTREE, DB_HASH, DB_RECNO } DBTYPE;
@@ -182,7 +183,7 @@ require Tie::Hash;
 require Exporter;
 BEGIN {
     $use_XSLoader = 1 ;
-    { local $SIG{__DIE__} ; eval { require XSLoader } ; }
+    { eval { require XSLoader } ; }
 
     if ($@) {
         $use_XSLoader = 0 ;

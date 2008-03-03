@@ -7,7 +7,7 @@
 #	MS Platform SDK 64-bit compiler and tools **experimental**
 #
 # This is set up to build a perl.exe that runs off a shared library
-# (perl59.dll).  Also makes individual DLLs for the XS extensions.
+# (perl511.dll).  Also makes individual DLLs for the XS extensions.
 #
 
 ##
@@ -34,7 +34,7 @@ INST_TOP	*= $(INST_DRV)\perl
 # versioned installation can be obtained by setting INST_TOP above to a
 # path that includes an arbitrary version string.
 #
-#INST_VER	*= \5.10.0
+#INST_VER	*= \5.11.0
 
 #
 # Comment this out if you DON'T want your perl installation to have
@@ -188,7 +188,7 @@ CRYPT_SRC	*= fcrypt.c
 # set this to additionally provide a statically linked perl-static.exe.
 # Note that dynamic loading will not work with this perl, so you must
 # include required modules statically using the STATIC_EXT or ALL_STATIC
-# variables below. A static library perl59s.lib will also be created.
+# variables below. A static library perl511s.lib will also be created.
 # Ordinary perl.exe is not affected by this option.
 #
 #BUILD_STATIC	*= define
@@ -522,7 +522,7 @@ LIBOUT_FLAG	=
 
 # NOTE: we assume that GCC uses MSVCRT.DLL
 # See comments about PERL_MSVCRT_READFIX in the "cl" compiler section below.
-BUILDOPT	+= -fno-strict-aliasing -DPERL_MSVCRT_READFIX
+BUILDOPT	+= -fno-strict-aliasing -mms-bitfields -DPERL_MSVCRT_READFIX
 
 .ELSE
 
@@ -782,8 +782,8 @@ CFGH_TMPL	= config_H.bc
 
 CFGSH_TMPL	= config.gc
 CFGH_TMPL	= config_H.gc
-PERLIMPLIB	= ..\libperl59$(a)
-PERLSTATICLIB	= ..\libperl59s$(a)
+PERLIMPLIB	= ..\libperl511$(a)
+PERLSTATICLIB	= ..\libperl511s$(a)
 
 .ELSE
 
@@ -799,9 +799,9 @@ CFGH_TMPL	= config_H.vc
 
 # makedef.pl must be updated if this changes, and this should normally
 # only change when there is an incompatible revision of the public API.
-PERLIMPLIB	*= ..\perl59$(a)
-PERLSTATICLIB	*= ..\perl59s$(a)
-PERLDLL		= ..\perl59.dll
+PERLIMPLIB	*= ..\perl511$(a)
+PERLSTATICLIB	*= ..\perl511s$(a)
+PERLDLL		= ..\perl511.dll
 
 XCOPY		= xcopy /f /r /i /d /y
 RCOPY		= xcopy /f /r /i /e /d /y
@@ -1028,9 +1028,6 @@ all : CHECKDMAKE .\config.h $(GLOBEXE) $(MINIPERL) $(MK2)		\
 	$(RIGHTMAKE) $(MINIMOD) $(CONFIGPM) $(UNIDATAFILES) MakePPPort	\
 	$(PERLEXE) $(X2P) Extensions $(PERLSTATIC)
 
-..\regnodes.h : ..\regcomp.sym ..\regcomp.pl ..\regexp.h
-	cd .. && miniperl regcomp.pl && cd win32
-
 ..\regcharclass.h : ..\Porting\regcharclass.pl
 	cd .. && miniperl Porting\regcharclass.pl && cd win32
 
@@ -1131,18 +1128,20 @@ config.w32 : $(CFGSH_TMPL)
 	$(MINIPERL) -I..\lib config_sh.PL --cfgsh-option-file \
 	    $(mktmp $(CFG_VARS)) config.w32 > ..\config.sh
 
-# this target is for when changes to the main config.sh happen
-# edit config.{b,v,g}c and make this target once for each supported
-# compiler (e.g. `dmake CCTYPE=BORLAND regen_config_h`)
+# this target is for when changes to the main config.sh happen.
+# edit config.gc, then make perl using GCC in a minimal configuration (i.e.
+# with MULTI, ITHREADS, IMP_SYS, LARGE_FILES, PERLIO and CRYPT off), then make
+# this target to regenerate config_H.gc.
+# unfortunately, some further manual editing is also then required to restore all
+# the special _MSC_VER handling that is otherwise lost.
+# repeat for config.bc and config_H.bc (using BORLAND), except that there is no
+# _MSC_VER stuff in that case.
 regen_config_h:
-	perl config_sh.PL --cfgsh-option-file $(mktmp $(CFG_VARS)) \
+	$(MINIPERL) -I..\lib config_sh.PL --cfgsh-option-file $(mktmp $(CFG_VARS)) \
 	    $(CFGSH_TMPL) > ..\config.sh
-	-cd .. && del /f perl.exe
-	-cd .. && del /f perl*.dll
-	cd .. && perl configpm
+	cd .. && miniperl configpm
 	-del /f $(CFGH_TMPL)
-	-mkdir $(COREDIR)
-	-perl config_h.PL "INST_VER=$(INST_VER)"
+	-$(MINIPERL) -I..\lib config_h.PL "INST_VER=$(INST_VER)"
 	rename config.h $(CFGH_TMPL)
 
 $(CONFIGPM) : $(MINIPERL) ..\config.sh config_h.PL ..\minimod.pl
@@ -1457,7 +1456,7 @@ utils: $(PERLEXE) $(X2P)
 	copy ..\README.vms      ..\pod\perlvms.pod
 	copy ..\README.vos      ..\pod\perlvos.pod
 	copy ..\README.win32    ..\pod\perlwin32.pod
-	copy ..\pod\perl5100delta.pod ..\pod\perldelta.pod
+	copy ..\pod\perl5110delta.pod ..\pod\perldelta.pod
 	cd ..\pod && $(MAKE) -f ..\win32\pod.mak converters
 	cd ..\lib && $(PERLEXE) lib_pm.PL
 	$(PERLEXE) $(PL2BAT) $(UTILS)

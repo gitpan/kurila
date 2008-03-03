@@ -18,11 +18,11 @@ static char *svclassnames[] = {
     "B::BIND",
     "B::IV",
     "B::NV",
-    "B::RV",
     "B::PV",
     "B::PVIV",
     "B::PVNV",
     "B::PVMG",
+    "B::REGEXP",
     "B::GV",
     "B::PVLV",
     "B::AV",
@@ -414,7 +414,6 @@ walkoptree(pTHX_ SV *opsv, const char *method)
 {
     dSP;
     OP *o, *kid;
-    dMY_CXT;
 
     if (!SvROK(opsv))
 	croak("opsv is not a reference");
@@ -522,7 +521,6 @@ static SV *
 make_warnings_object(pTHX_ SV *arg, STRLEN *warnings)
 {
     const char *type = 0;
-    dMY_CXT;
     IV iv = sizeof(specialsv_list)/sizeof(SV*);
 
     /* Counting down is deliberate. Before the split between make_sv_object
@@ -1402,7 +1400,7 @@ PMOP_precomp(o)
 	ST(0) = sv_newmortal();
 	rx = PM_GETRE(o);
 	if (rx)
-	    sv_setpvn(ST(0), rx->precomp, rx->prelen);
+	    sv_setpvn(ST(0), RX_PRECOMP(rx), RX_PRELEN(rx));
 
 #if PERL_VERSION >= 9
 
@@ -1414,7 +1412,7 @@ PMOP_reflags(o)
 	ST(0) = sv_newmortal();
 	rx = PM_GETRE(o);
 	if (rx)
-	    sv_setuv(ST(0), rx->extflags);
+	    sv_setuv(ST(0), RX_EXTFLAGS(rx));
 
 #endif
 
@@ -1609,7 +1607,6 @@ B_walkoptree(opsv, method)
 int
 B_walkoptree_debug(...)
     CODE:
-	dMY_CXT;
 	RETVAL = walkoptree_debug;
 	if (items > 0 && SvTRUE(ST(1)))
 	    walkoptree_debug = 1;
@@ -1664,7 +1661,7 @@ B_PAD_allocmy(char* name)
         PL_comppad =           *(AV**) av_fetch(CvPADLIST(PL_compcv), 1, 0);
         PL_curpad            = AvARRAY(PL_comppad);
         
-        RETVAL = Perl_pad_add_name(name, NULL, FALSE, FALSE);
+        RETVAL = Perl_pad_add_name(aTHX_ name, NULL, FALSE, FALSE);
 
         PL_comppad = old_comppad;
         PL_curpad  = old_curpad;

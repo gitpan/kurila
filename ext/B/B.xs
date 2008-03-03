@@ -24,11 +24,11 @@ static const char* const svclassnames[] = {
     "B::BIND",
     "B::IV",
     "B::NV",
-    "B::RV",
     "B::PV",
     "B::PVIV",
     "B::PVNV",
     "B::PVMG",
+    "B::REGEXP",
     "B::GV",
     "B::PVLV",
     "B::AV",
@@ -217,6 +217,7 @@ typedef SV	*B__IV;
 typedef SV	*B__PV;
 typedef SV	*B__NV;
 typedef SV	*B__PVMG;
+typedef SV	*B__REGEXP;
 typedef SV	*B__PVLV;
 typedef SV	*B__BM;
 typedef SV	*B__RV;
@@ -246,9 +247,6 @@ BOOT:
     specialsv_list[4] = (SV *) pWARN_ALL;
     specialsv_list[5] = (SV *) pWARN_NONE;
     specialsv_list[6] = (SV *) pWARN_STD;
-#if PERL_VERSION <= 8
-#  define OPpPAD_STATE 0
-#endif
 #include "defsubs.h"
 }
 
@@ -256,11 +254,7 @@ BOOT:
 #define B_init_av()	PL_initav
 #define B_inc_gv()	PL_incgv
 #define B_check_av()	PL_checkav_save
-#if PERL_VERSION > 8
-#  define B_unitcheck_av()	PL_unitcheckav_save
-#else
-#  define B_unitcheck_av()	NULL
-#endif
+#define B_unitcheck_av()	PL_unitcheckav_save
 #define B_begin_av()	PL_beginav_save
 #define B_end_av()	PL_endav
 #define B_amagic_generation()	PL_amagic_generation
@@ -283,12 +277,8 @@ B_init_av()
 B::AV
 B_check_av()
 
-#if PERL_VERSION >= 9
-
 B::AV
 B_unitcheck_av()
-
-#endif
 
 B::AV
 B_begin_av()
@@ -449,20 +439,6 @@ cchar(sv)
     OUTPUT:
 	RETVAL
 
-void
-threadsv_names()
-    PPCODE:
-#if PERL_VERSION <= 8
-# ifdef USE_5005THREADS
-	int i;
-	const STRLEN len = strlen(PL_threadsv_names);
-
-	EXTEND(sp, len);
-	for (i = 0; i < len; i++)
-	    PUSHs(sv_2mortal(newSVpvn(&PL_threadsv_names[i], 1)));
-# endif
-#endif
-
 MODULE = B	PACKAGE = B::SV
 
 U32
@@ -547,6 +523,20 @@ packiv(sv)
 	    ST(0) = sv_2mortal(newSVpvn((char *)&w, 4));
 	}
 
+
+B::SV
+RV(sv)
+        B::IV   sv
+    CODE:
+        if( SvROK(sv) ) {
+            RETVAL = SvRV(sv);
+        }
+        else {
+            croak( "argument is not SvROK" );
+        }
+    OUTPUT:
+        RETVAL
+
 MODULE = B	PACKAGE = B::NV		PREFIX = Sv
 
 NV
@@ -572,12 +562,6 @@ PARENT_PAD_INDEX(sv)
 U32
 PARENT_FAKELEX_FLAGS(sv)
 	B::NV	sv
-
-MODULE = B	PACKAGE = B::RV		PREFIX = Sv
-
-B::SV
-SvRV(sv)
-	B::RV	sv
 
 MODULE = B	PACKAGE = B::PV		PREFIX = Sv
 
@@ -656,6 +640,25 @@ B::HV
 SvSTASH(sv)
 	B::PVMG	sv
 
+MODULE = B	PACKAGE = B::REGEXP
+
+IV
+REGEX(sv)
+	B::REGEXP	sv
+    CODE:
+	/* FIXME - can we code this method more efficiently?  */
+	RETVAL = PTR2IV(sv);
+    OUTPUT:
+        RETVAL
+
+SV*
+precomp(sv)
+	B::REGEXP	sv
+    CODE:
+	RETVAL = newSVpvn( RX_PRECOMP(sv), RX_PRELEN(sv) );
+    OUTPUT:
+        RETVAL
+
 #define MgMOREMAGIC(mg) mg->mg_moremagic
 #define MgPRIVATE(mg) mg->mg_private
 #define MgTYPE(mg) mg->mg_type
@@ -716,7 +719,7 @@ precomp(mg)
             REGEXP* rx = (REGEXP*)mg->mg_obj;
             RETVAL = Nullsv;
             if( rx )
-                RETVAL = newSVpvn( rx->precomp, rx->prelen );
+                RETVAL = newSVpvn( RX_PRECOMP(rx), RX_PRELEN(rx) );
         }
         else {
             croak( "precomp is only meaningful on r-magic" );
@@ -907,17 +910,6 @@ SSize_t
 AvMAX(av)
 	B::AV	av
 
-#if PERL_VERSION < 9
-			   
-
-#define AvOFF(av) ((XPVAV*)SvANY(av))->xof_off
-
-IV
-AvOFF(av)
-	B::AV	av
-
-#endif
-
 void
 AvARRAY(av)
 	B::AV	av
@@ -938,16 +930,6 @@ AvARRAYelt(av, idx)
 	    XPUSHs(make_sv_object(aTHX_ sv_newmortal(), (AvARRAY(av)[idx])));
 	else
 	    XPUSHs(make_sv_object(aTHX_ sv_newmortal(), NULL));
-
-#if PERL_VERSION < 9
-				   
-MODULE = B	PACKAGE = B::AV
-
-U8
-AvFLAGS(av)
-	B::AV	av
-
-#endif
 
 MODULE = B	PACKAGE = B::CV		PREFIX = Cv
 
@@ -1044,7 +1026,7 @@ HvARRAY(hv)
 	    (void)hv_iterinit(hv);
 	    EXTEND(sp, HvKEYS(hv) * 2);
 	    while ((sv = hv_iternextsv(hv, &key, &len))) {
-		PUSHs(newSVpvn(key, len));
+		mPUSHp(key, len);
 		PUSHs(make_sv_object(aTHX_ sv_newmortal(), sv));
 	    }
 	}

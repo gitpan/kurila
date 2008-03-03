@@ -14,7 +14,7 @@ BEGIN {
 }
 
 use strict;
-use Test::More 'no_plan';
+use Test::More tests => 13;
 
 use TieOut;
 use MakeMaker::Test::Utils;
@@ -38,8 +38,8 @@ ok( chdir 'Big-Dummy', "chdir'd to Big-Dummy" ) ||
 {
     ok( my $stdout = tie *STDOUT, 'TieOut' );
     my $warnings = '';
-    local $SIG{__WARN__} = sub {
-        $warnings .= join '', @_;
+    local ${^WARN_HOOK} = sub {
+        $warnings .= $_[0]->{description};
     };
 
     WriteMakefile(
@@ -98,11 +98,34 @@ ok( chdir 'Big-Dummy', "chdir'd to Big-Dummy" ) ||
     };
     
     is $warnings, '';
-    is $@, <<'END', "PREREQ_FATAL";
+    is $@->{description}, <<'END', "PREREQ_FATAL";
 MakeMaker FATAL: prerequisites not found.
     I::Do::Not::Exist not installed
     Nor::Do::I not installed
     strict 99999
+
+Please install these modules first and rerun 'perl Makefile.PL'.
+END
+
+
+    $warnings = '';
+    eval {
+        WriteMakefile(
+            NAME            => 'Big::Dummy',
+            PREREQ_PM       => {
+                "I::Do::Not::Exist" => 0,
+            },
+            CONFIGURE => sub {
+                require I::Do::Not::Exist;
+            },
+            PREREQ_FATAL    => 1,
+        );
+    };
+    
+    is $warnings, '';
+    is $@->{description}, <<'END', "PREREQ_FATAL happens before CONFIGURE";
+MakeMaker FATAL: prerequisites not found.
+    I::Do::Not::Exist not installed
 
 Please install these modules first and rerun 'perl Makefile.PL'.
 END

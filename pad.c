@@ -102,6 +102,8 @@ to be generated in evals, such as
 
     { my $x = 1; sub f { eval '$x'} } f();
 
+For state vars, SVf_PADSTALE is overloaded to mean 'not yet initialised'
+
 =cut
 */
 
@@ -126,6 +128,9 @@ to be generated in evals, such as
 #ifdef PERL_MAD
 void pad_peg(const char* s) {
     static int pegcnt;
+
+    PERL_ARGS_ASSERT_PAD_PEG;
+
     pegcnt++;
 }
 #endif
@@ -248,6 +253,8 @@ Perl_pad_undef(pTHX_ CV* cv)
     I32 ix;
     const PADLIST * const padlist = CvPADLIST(cv);
 
+    PERL_ARGS_ASSERT_PAD_UNDEF;
+
     pad_peg("pad_undef");
     if (!padlist)
 	return;
@@ -346,6 +353,8 @@ Perl_pad_add_name(pTHX_ const char *name, HV* ourstash, bool fake, bool state)
     const PADOFFSET offset = pad_alloc(OP_PADSV, SVs_PADMY);
     SV* const namesv
 	= newSV_type((ourstash) ? SVt_PVMG : SVt_PVNV);
+
+    PERL_ARGS_ASSERT_PAD_ADD_NAME;
 
     ASSERT_CURPAD_ACTIVE("pad_add_name");
 
@@ -477,6 +486,9 @@ Perl_pad_add_anon(pTHX_ SV* sv, OPCODE op_type)
     dVAR;
     PADOFFSET ix;
     SV* const name = newSV_type(SVt_PVNV);
+
+    PERL_ARGS_ASSERT_PAD_ADD_ANON;
+
     pad_peg("add_anon");
     sv_setpvn(name, "&", 1);
     /* Are these two actually ever read? */
@@ -520,6 +532,8 @@ Perl_pad_check_dup(pTHX_ const char *name, bool is_our, const HV *ourstash)
     dVAR;
     SV		**svp;
     PADOFFSET	top, off;
+
+    PERL_ARGS_ASSERT_PAD_CHECK_DUP;
 
     ASSERT_CURPAD_ACTIVE("pad_check_dup");
     if (AvFILLp(PL_comppad_name) < 0 || !ckWARN(WARN_MISC))
@@ -593,6 +607,8 @@ Perl_pad_findmy(pTHX_ const char *name)
     I32 offset;
     const AV *nameav;
     SV **name_svp;
+
+    PERL_ARGS_ASSERT_PAD_FINDMY;
 
     pad_peg("pad_findmy");
     offset = pad_findlex(name, PL_compcv, PL_cop_seqmax, 1,
@@ -674,6 +690,8 @@ S_pad_findlex(pTHX_ const char *name, const CV* cv, U32 seq, int warn,
     SV *new_capture;
     SV **new_capturep;
     const AV * const padlist = CvPADLIST(cv);
+
+    PERL_ARGS_ASSERT_PAD_FINDLEX;
 
     *out_flags = 0;
 
@@ -760,6 +778,7 @@ S_pad_findlex(pTHX_ const char *name, const CV* cv, U32 seq, int warn,
 		else {
 		    int newwarn = warn;
 		    if (!CvCOMPILED(cv) && (*out_flags & PAD_FAKELEX_MULTI)
+			 && !SvPAD_STATE(name_svp[offset])
 			 && warn && ckWARN(WARN_CLOSURE)) {
 			newwarn = 0;
 			Perl_warner(aTHX_ packWARN(WARN_CLOSURE),
@@ -788,7 +807,9 @@ S_pad_findlex(pTHX_ const char *name, const CV* cv, U32 seq, int warn,
 			"Pad findlex cv=0x%"UVxf" found lex=0x%"UVxf"\n",
 			PTR2UV(cv), PTR2UV(*out_capture)));
 
-		    if (SvPADSTALE(*out_capture)) {
+		    if (SvPADSTALE(*out_capture)
+			&& !SvPAD_STATE(name_svp[offset]))
+		    {
 			if (ckWARN(WARN_CLOSURE))
 			    Perl_warner(aTHX_ packWARN(WARN_CLOSURE),
 				"Variable \"%s\" is not available", name);
@@ -843,7 +864,7 @@ S_pad_findlex(pTHX_ const char *name, const CV* cv, U32 seq, int warn,
 	    SvPVX_const(*out_name_sv),
 	    SvOURSTASH(*out_name_sv),
 	    1,  /* fake */
-	    0   /* not a state variable */
+	    SvPAD_STATE(*out_name_sv) ? 1 : 0 /* state variable ? */
 	);
 
 	new_namesv = AvARRAY(PL_comppad_name)[new_offset];
@@ -916,6 +937,9 @@ void
 Perl_pad_setsv(pTHX_ PADOFFSET po, SV* sv)
 {
     dVAR;
+
+    PERL_ARGS_ASSERT_PAD_SETSV;
+
     ASSERT_CURPAD_ACTIVE("pad_setsv");
 
     DEBUG_X(PerlIO_printf(Perl_debug_log,
@@ -1305,6 +1329,8 @@ Perl_do_dump_pad(pTHX_ I32 level, PerlIO *file, PADLIST *padlist, int full)
     SV **ppad;
     I32 ix;
 
+    PERL_ARGS_ASSERT_DO_DUMP_PAD;
+
     if (!padlist) {
 	return;
     }
@@ -1374,6 +1400,8 @@ S_cv_dump(pTHX_ const CV *cv, const char *title)
     const CV * const outside = CvOUTSIDE(cv);
     AV* const padlist = CvPADLIST(cv);
 
+    PERL_ARGS_ASSERT_CV_DUMP;
+
     PerlIO_printf(Perl_debug_log,
 		  "  %s: CV=0x%"UVxf" (%s), OUTSIDE=0x%"UVxf" (%s)\n",
 		  title,
@@ -1425,6 +1453,8 @@ Perl_cv_clone(pTHX_ CV *proto)
     SV** outpad;
     CV* outside;
     long depth;
+
+    PERL_ARGS_ASSERT_CV_CLONE;
 
     assert(!CvUNIQUE(proto));
 
@@ -1483,10 +1513,17 @@ Perl_cv_clone(pTHX_ CV *proto)
 	    if (SvFAKE(namesv)) {   /* lexical from outside? */
 		sv = outpad[PARENT_PAD_INDEX(namesv)];
 		assert(sv);
-		/* 'my $x if $y' can leave $x stale even in an active sub */
-		if (!SvPADSTALE(sv)) {
-		    SvREFCNT_inc_simple_void_NN(sv);
+		/* formats may have an inactive parent,
+		   while my $x if $false can leave an active var marked as
+		   stale. And state vars are always available */
+		if (SvPADSTALE(sv) && !SvPAD_STATE(namesv)) {
+		    if (ckWARN(WARN_CLOSURE))
+			Perl_warner(aTHX_ packWARN(WARN_CLOSURE),
+			    "Variable \"%s\" is not available", SvPVX_const(namesv));
+		    sv = NULL;
 		}
+		else 
+		    SvREFCNT_inc_simple_void_NN(sv);
 	    }
 	    if (!sv) {
                 const char sigil = SvPVX_const(namesv)[0];
@@ -1562,6 +1599,8 @@ Perl_pad_fixup_inner_anons(pTHX_ PADLIST *padlist, CV *old_cv, CV *new_cv)
     AV * const comppad = (AV*)AvARRAY(padlist)[1];
     SV ** const namepad = AvARRAY(comppad_name);
     SV ** const curpad = AvARRAY(comppad);
+
+    PERL_ARGS_ASSERT_PAD_FIXUP_INNER_ANONS;
     PERL_UNUSED_ARG(old_cv);
 
     for (ix = AvFILLp(comppad_name); ix > 0; ix--) {
@@ -1592,6 +1631,9 @@ void
 Perl_pad_push(pTHX_ PADLIST *padlist, int depth)
 {
     dVAR;
+
+    PERL_ARGS_ASSERT_PAD_PUSH;
+
     if (depth > AvFILLp(padlist)) {
 	SV** const svp = AvARRAY(padlist);
 	AV* const newpad = newAV();

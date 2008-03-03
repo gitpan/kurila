@@ -132,6 +132,7 @@ typedef struct jmpenv JMPENV;
 #define CATCH_SET(v)		(PL_top_env->je_mustcatch = (v))
 
 
+#include "mydtrace.h"
 
 struct cop {
     BASEOP
@@ -257,26 +258,28 @@ struct cop {
 
 /* subroutine context */
 struct block_sub {
+    OP *	retop;	/* op to execute on exit from sub */
+    /* Above here is the same for sub and eval.  */
     CV *	cv;
-    GV *	gv;
-    GV *	dfoutgv;
     AV *	savearray;
     AV *	argarray;
     I32		olddepth;
-    U8		hasargs;
-    U8		lval;		/* XXX merge lval and hasargs? */
     PAD		*oldcomppad;
-    OP *	retop;	/* op to execute on exit from sub */
 };
+
 
 /* base for the next two macros. Don't use directly.
  * Note that the refcnt of the cv is incremented twice;  The CX one is
  * decremented by LEAVESUB, the other by LEAVE. */
 
 #define PUSHSUB_BASE(cx)						\
+	ENTRY_PROBE(GvENAME(CvGV(cv)),		       			\
+		CopFILE((COP*)CvSTART(cv)),				\
+		CopLINE((COP*)CvSTART(cv)));				\
+									\
 	cx->blk_sub.cv = cv;						\
 	cx->blk_sub.olddepth = CvDEPTH(cv);				\
-	cx->blk_sub.hasargs = hasargs;					\
+	cx->cx_type |= (hasargs) ? CXp_HASARGS : 0;			\
 	cx->blk_sub.retop = NULL;					\
 	if (!CvDEPTH(cv)) {						\
 	    SvREFCNT_inc_simple_void_NN(cv);				\
@@ -287,13 +290,13 @@ struct block_sub {
 
 #define PUSHSUB(cx)							\
 	PUSHSUB_BASE(cx)						\
-	cx->blk_sub.lval = PL_op->op_private &                          \
+	cx->blk_u16 = PL_op->op_private &				\
 	                      (OPpLVAL_INTRO|OPpENTERSUB_INARGS);
 
 /* variant for use by OP_DBSTATE, where op_private holds hint bits */
 #define PUSHSUB_DB(cx)							\
 	PUSHSUB_BASE(cx)						\
-	cx->blk_sub.lval = 0;
+	cx->blk_u16 = 0;
 
 
 #define POP_SAVEARRAY()						\
@@ -313,7 +316,11 @@ struct block_sub {
 
 #define POPSUB(cx,sv)							\
     STMT_START {							\
-	if (cx->blk_sub.hasargs) {					\
+	RETURN_PROBE(GvENAME(CvGV((CV*)cx->blk_sub.cv)),		\
+		CopFILE((COP*)CvSTART((CV*)cx->blk_sub.cv)),		\
+		CopLINE((COP*)CvSTART((CV*)cx->blk_sub.cv)));		\
+									\
+	if (CxHASARGS(cx)) {						\
 	    POP_SAVEARRAY();						\
 	    /* abandon @_ if it got reified */				\
 	    if (AvREAL(cx->blk_sub.argarray)) {				\
@@ -341,20 +348,27 @@ struct block_sub {
 
 /* eval context */
 struct block_eval {
-    U8		old_in_eval;
-    U16		old_op_type;
+    OP *	retop;	/* op to execute on exit from eval */
+    /* Above here is the same for sub, format and eval.  */
     SV *	old_namesv;
     OP *	old_eval_root;
     SV *	cur_text;
     CV *	cv;
-    OP *	retop;	/* op to execute on exit from eval */
     JMPENV *	cur_top_env; /* value of PL_top_env when eval CX created */
 };
 
-#define PUSHEVAL(cx,n,fgv)						\
+/* If we ever need more than 512 op types, change the shift from 7.
+   blku_gimme is actually also only 2 bits, so could be merged with something.
+*/
+
+#define CxOLD_IN_EVAL(cx)	(((cx)->blk_u16) & 0x7F)
+#define CxOLD_OP_TYPE(cx)	(((cx)->blk_u16) >> 7)
+
+#define PUSHEVAL(cx,n)							\
     STMT_START {							\
-	cx->blk_eval.old_in_eval = PL_in_eval;				\
-	cx->blk_eval.old_op_type = PL_op->op_type;			\
+	assert(!(PL_in_eval & ~0x7F));					\
+	assert(!(PL_op->op_type & ~0x1FF));				\
+	cx->blk_u16 = (PL_in_eval & 0x7F) | ((U16)PL_op->op_type << 7);	\
 	cx->blk_eval.old_namesv = (n ? newSVpv(n,0) : NULL);		\
 	cx->blk_eval.old_eval_root = PL_eval_root;			\
 	cx->blk_eval.cur_text = PL_parser ? PL_parser->linestr : NULL;	\
@@ -365,8 +379,8 @@ struct block_eval {
 
 #define POPEVAL(cx)							\
     STMT_START {							\
-	PL_in_eval = cx->blk_eval.old_in_eval;				\
-	optype = cx->blk_eval.old_op_type;				\
+	PL_in_eval = CxOLD_IN_EVAL(cx);					\
+	optype = CxOLD_OP_TYPE(cx);					\
 	PL_eval_root = cx->blk_eval.old_eval_root;			\
 	if (cx->blk_eval.old_namesv)					\
 	    sv_2mortal(cx->blk_eval.old_namesv);			\
@@ -374,64 +388,54 @@ struct block_eval {
 
 /* loop context */
 struct block_loop {
-    char *	label;
     I32		resetsp;
     LOOP *	my_op;	/* My op, that contains redo, next and last ops.  */
     /* (except for non_ithreads we need to modify next_op in pp_ctl.c, hence
 	why next_op is conditionally defined below.)  */
 #ifdef USE_ITHREADS
-    void *	iterdata;
-    PAD		*oldcomppad;
+    PAD		*oldcomppad; /* Also used for the GV, if targoffset is 0 */
+    /* This is also accesible via cx->blk_loop.my_op->op_targ */
+    PADOFFSET	targoffset;
 #else
     OP *	next_op;
     SV **	itervar;
 #endif
-    SV *	itersave;
-    /* (from inspection of source code) for a .. range of strings this is the
-       current string.  */
-    SV *	iterlval;
-    /* (from inspection of source code) for a foreach loop this is the array
-       being iterated over. For a .. range of numbers it's the current value.
-       A check is often made on the SvTYPE of iterary to determine whether
-       we are iterating over an array or a range. (numbers or strings)  */
-    AV *	iterary;
-    IV		iterix;
-    /* (from inspection of source code) for a .. range of numbers this is the
-       maximum value.  */
-    IV		itermax;
+    union {
+	struct { /* valid if type is LOOP_FOR or LOOP_PLAIN (but {NULL,0})*/
+	    AV * ary; /* use the stack if this is NULL */
+	    IV ix;
+	} ary;
+	struct { /* valid if type is LOOP_LAZYIV */
+	    IV cur;
+	    IV end;
+	} lazyiv;
+	struct { /* valid if type if LOOP_LAZYSV */
+	    SV * cur;
+	    SV * end; /* maxiumum value (or minimum in reverse) */
+	} lazysv;
+    } state_u;
 };
-/* It might be possible to squeeze this structure further. As best I can tell
-   itermax and iterlval are never used at the same time, so it might be possible
-   to make them into a union. However, I'm not confident that there are enough
-   flag bits/NULLable pointers in this structure alone to encode which is
-   active. There is, however, U8 of space free in struct block, which could be
-   used. Right now it may not be worth squeezing this structure further, as it's
-   the largest part of struct block, and currently struct block is 64 bytes on
-   an ILP32 system, which will give good cache alignment.
-*/
 
 #ifdef USE_ITHREADS
 #  define CxITERVAR(c)							\
-	((c)->blk_loop.iterdata						\
-	 ? (CxPADLOOP(cx) 						\
-	    ? &CX_CURPAD_SV( (c)->blk_loop, 				\
-		    INT2PTR(PADOFFSET, (c)->blk_loop.iterdata))		\
-	    : &GvSV((GV*)(c)->blk_loop.iterdata))			\
+	((c)->blk_loop.oldcomppad					\
+	 ? (CxPADLOOP(c) 						\
+	    ? &CX_CURPAD_SV( (c)->blk_loop, (c)->blk_loop.targoffset )	\
+	    : &GvSV((GV*)(c)->blk_loop.oldcomppad))			\
 	 : (SV**)NULL)
-#  define CX_ITERDATA_SET(cx,idata)					\
-	CX_CURPAD_SAVE(cx->blk_loop);					\
-	if ((cx->blk_loop.iterdata = (idata)))				\
-	    cx->blk_loop.itersave = SvREFCNT_inc(*CxITERVAR(cx));	\
+#  define CX_ITERDATA_SET(cx,idata,o)					\
+	if ((cx->blk_loop.targoffset = (o)))				\
+	    CX_CURPAD_SAVE(cx->blk_loop);				\
 	else								\
-	    cx->blk_loop.itersave = NULL;
+	    cx->blk_loop.oldcomppad = (idata);
 #else
 #  define CxITERVAR(c)		((c)->blk_loop.itervar)
-#  define CX_ITERDATA_SET(cx,ivar)					\
-	if ((cx->blk_loop.itervar = (SV**)(ivar)))			\
-	    cx->blk_loop.itersave = SvREFCNT_inc(*CxITERVAR(cx));	\
-	else								\
-	    cx->blk_loop.itersave = NULL;
+#  define CX_ITERDATA_SET(cx,ivar,o)					\
+	cx->blk_loop.itervar = (SV**)(ivar);
 #endif
+#define CxLABEL(c)	(0 + (c)->blk_oldcop->cop_label)
+#define CxHASARGS(c)	(((c)->cx_type & CXp_HASARGS) == CXp_HASARGS)
+#define CxLVAL(c)	(0 + (c)->blk_u16)
 
 #ifdef USE_ITHREADS
 #  define PUSHLOOP_OP_NEXT		/* No need to do anything.  */
@@ -441,30 +445,29 @@ struct block_loop {
 #  define CX_LOOP_NEXTOP_GET(cx)	((cx)->blk_loop.next_op + 0)
 #endif
 
-#define PUSHLOOP(cx, dat, s)						\
-	cx->blk_loop.label = PL_curcop->cop_label;			\
+#define PUSHLOOP_PLAIN(cx, s)						\
 	cx->blk_loop.resetsp = s - PL_stack_base;			\
 	cx->blk_loop.my_op = cLOOP;					\
 	PUSHLOOP_OP_NEXT;						\
-	cx->blk_loop.iterlval = NULL;					\
-	cx->blk_loop.iterary = NULL;					\
-	cx->blk_loop.iterix = -1;					\
-	CX_ITERDATA_SET(cx,dat);
+	cx->blk_loop.state_u.ary.ary = NULL;				\
+	cx->blk_loop.state_u.ary.ix = 0;				\
+	CX_ITERDATA_SET(cx, NULL, 0);
+
+#define PUSHLOOP_FOR(cx, dat, s, offset)				\
+	cx->blk_loop.resetsp = s - PL_stack_base;			\
+	cx->blk_loop.my_op = cLOOP;					\
+	PUSHLOOP_OP_NEXT;						\
+	cx->blk_loop.state_u.ary.ary = NULL;				\
+	cx->blk_loop.state_u.ary.ix = 0;				\
+	CX_ITERDATA_SET(cx, dat, offset);
 
 #define POPLOOP(cx)							\
-	SvREFCNT_dec(cx->blk_loop.iterlval);				\
-	if (CxITERVAR(cx)) {						\
-            if (SvPADMY(cx->blk_loop.itersave)) {			\
-		SV ** const s_v_p = CxITERVAR(cx);			\
-		sv_2mortal(*s_v_p);					\
-		*s_v_p = cx->blk_loop.itersave;				\
-	    }								\
-	    else {							\
-		SvREFCNT_dec(cx->blk_loop.itersave);			\
-	    }								\
+	if (CxTYPE(cx) == CXt_LOOP_LAZYSV) {				\
+	    SvREFCNT_dec(cx->blk_loop.state_u.lazysv.cur);		\
+	    SvREFCNT_dec(cx->blk_loop.state_u.lazysv.end);		\
 	}								\
-	if (cx->blk_loop.iterary && cx->blk_loop.iterary != PL_curstack)\
-	    SvREFCNT_dec(cx->blk_loop.iterary);
+	if (CxTYPE(cx) == CXt_LOOP_FOR)					\
+	    SvREFCNT_dec(cx->blk_loop.state_u.ary.ary);
 
 /* given/when context */
 struct block_givwhen {
@@ -478,9 +481,9 @@ struct block_givwhen {
 
 /* context common to subroutines, evals and loops */
 struct block {
-    U16		blku_type;	/* what kind of context this is */
+    U8		blku_type;	/* what kind of context this is */
     U8		blku_gimme;	/* is this block running in list context? */
-    U8		blku_spare;	/* Padding to match with struct subst */
+    U16		blku_u16;	/* used by block_sub and block_eval (so far) */
     I32		blku_oldsp;	/* stack pointer to copy stuff down to */
     COP *	blku_oldcop;	/* old curcop pointer */
     I32		blku_oldmarksp;	/* mark stack index */
@@ -500,6 +503,7 @@ struct block {
 #define blk_oldscopesp	cx_u.cx_blk.blku_oldscopesp
 #define blk_oldpm	cx_u.cx_blk.blku_oldpm
 #define blk_gimme	cx_u.cx_blk.blku_gimme
+#define blk_u16		cx_u.cx_blk.blku_u16
 #define blk_sub		cx_u.cx_blk.blk_u.blku_sub
 #define blk_eval	cx_u.cx_blk.blk_u.blku_eval
 #define blk_loop	cx_u.cx_blk.blk_u.blku_loop
@@ -539,12 +543,11 @@ struct block {
 
 /* substitution context */
 struct subst {
-    U16		sbu_type;	/* what kind of context this is */
-    U8		sbu_once;	/* Actually both booleans, but U8 to matches */
-    U8		sbu_rxtainted;	/* struct block */
+    U8		sbu_type;	/* what kind of context this is */
+    U8		sbu_rflags;
+    U16		sbu_rxtainted;	/* matches struct block */
     I32		sbu_iters;
     I32		sbu_maxiters;
-    I32		sbu_rflags;
     I32		sbu_oldsave;
     char *	sbu_orig;
     SV *	sbu_dstr;
@@ -575,7 +578,6 @@ struct subst {
 	cx->sb_maxiters		= maxiters,				\
 	cx->sb_rflags		= r_flags,				\
 	cx->sb_oldsave		= oldsave,				\
-	cx->sb_once		= once,					\
 	cx->sb_rxtainted	= rxtainted,				\
 	cx->sb_orig		= orig,					\
 	cx->sb_dstr		= dstr,					\
@@ -585,9 +587,11 @@ struct subst {
 	cx->sb_strend		= strend,				\
 	cx->sb_rxres		= NULL,					\
 	cx->sb_rx		= rx,					\
-	cx->cx_type		= CXt_SUBST;				\
+	cx->cx_type		= CXt_SUBST | (once ? CXp_ONCE : 0);	\
 	rxres_save(&cx->sb_rxres, rx);					\
 	(void)ReREFCNT_inc(rx)
+
+#define CxONCE(cx)		((cx)->cx_type & CXp_ONCE)
 
 #define POPSUBST(cx) cx = &cxstack[cxstack_ix--];			\
 	rxres_free(&cx->sb_rxres);					\
@@ -601,46 +605,61 @@ struct context {
 };
 #define cx_type cx_u.cx_subst.sbu_type
 
-#define CXTYPEMASK	0xff
+/* If you re-order these, there is also an array of uppercase names in perl.h
+   and a static array of context names in pp_ctl.c  */
+#define CXTYPEMASK	0xf
 #define CXt_NULL	0
-#define CXt_SUB		1
-#define CXt_EVAL	2
-#define CXt_LOOP	3
-#define CXt_SUBST	4
-#define CXt_BLOCK	5
-#define CXt_GIVEN	6
-#define CXt_WHEN	7
+#define CXt_WHEN	1
+#define CXt_BLOCK	2
+/* When micro-optimising :-) keep GIVEN next to the LOOPs, as these 5 share a
+   jump table in pp_ctl.c
+   The first 4 don't have a 'case' in at least one switch statement in pp_ctl.c
+*/
+#define CXt_GIVEN	3
+/* This is first so that CXt_LOOP_FOR|CXt_LOOP_LAZYIV is CXt_LOOP_LAZYIV */
+#define CXt_LOOP_FOR	4
+#define CXt_LOOP_PLAIN	5
+#define CXt_LOOP_LAZYSV	6
+#define CXt_LOOP_LAZYIV	7
+#define CXt_SUB		8
+#define CXt_EVAL        9
+#define CXt_SUBST      10
+/* SUBST doesn't feature in all switch statements.  */
 
-/* private flags for CXt_SUB and CXt_NULL */
-#define CXp_MULTICALL	0x00000400	/* part of a multicall (so don't
-					   tear down context on exit). */ 
+/* private flags for CXt_SUB and CXt_NULL
+   However, this is checked in many places which do not check the type, so
+   this bit needs to be kept clear for most everything else. For reasons I
+   haven't investigated, it can coexist with CXp_FOR_DEF */
+#define CXp_MULTICALL	0x10	/* part of a multicall (so don't
+				   tear down context on exit). */ 
+
+/* private flags for CXt_SUB */
+#define CXp_HASARGS	0x20
 
 /* private flags for CXt_EVAL */
-#define CXp_REAL	0x00000100	/* truly eval'', not a lookalike */
-#define CXp_TRYBLOCK	0x00000200	/* eval{}, not eval'' or similar */
+#define CXp_REAL	0x20	/* truly eval'', not a lookalike */
+#define CXp_TRYBLOCK	0x40	/* eval{}, not eval'' or similar */
 
 /* private flags for CXt_LOOP */
-#define CXp_FOREACH	0x00000200	/* a foreach loop */
-#define CXp_FOR_DEF	0x00000400	/* foreach using $_ */
+#define CXp_FOR_DEF	0x10	/* foreach using $_ */
 #ifdef USE_ITHREADS
-#  define CXp_PADVAR	0x00000100	/* itervar lives on pad, iterdata
-					   has pad offset; if not set,
-					   iterdata holds GV* */
-#  define CxPADLOOP(c)	(((c)->cx_type & (CXt_LOOP|CXp_PADVAR))		\
-			 == (CXt_LOOP|CXp_PADVAR))
+#  define CxPADLOOP(c)	((c)->blk_loop.targoffset)
 #endif
 
+/* private flags for CXt_SUBST */
+#define CXp_ONCE	0x10	/* What was sbu_once in struct subst */
+
 #define CxTYPE(c)	((c)->cx_type & CXTYPEMASK)
+#define CxTYPE_is_LOOP(c)	(((c)->cx_type & 0xC) == 0x4)
 #define CxMULTICALL(c)	(((c)->cx_type & CXp_MULTICALL)			\
 			 == CXp_MULTICALL)
-#define CxREALEVAL(c)	(((c)->cx_type & (CXt_EVAL|CXp_REAL))		\
+#define CxREALEVAL(c)	(((c)->cx_type & (CXTYPEMASK|CXp_REAL))		\
 			 == (CXt_EVAL|CXp_REAL))
-#define CxTRYBLOCK(c)	(((c)->cx_type & (CXt_EVAL|CXp_TRYBLOCK))	\
+#define CxTRYBLOCK(c)	(((c)->cx_type & (CXTYPEMASK|CXp_TRYBLOCK))	\
 			 == (CXt_EVAL|CXp_TRYBLOCK))
-#define CxFOREACH(c)	(((c)->cx_type & (CXt_LOOP|CXp_FOREACH))	\
-                         == (CXt_LOOP|CXp_FOREACH))
-#define CxFOREACHDEF(c)	(((c)->cx_type & (CXt_LOOP|CXp_FOREACH|CXp_FOR_DEF))\
-			 == (CXt_LOOP|CXp_FOREACH|CXp_FOR_DEF))
+#define CxFOREACH(c)	(CxTYPE_is_LOOP(c) && CxTYPE(c) != CXt_LOOP_PLAIN)
+#define CxFOREACHDEF(c)	((CxTYPE_is_LOOP(c) && CxTYPE(c) != CXt_LOOP_PLAIN) \
+			 && ((c)->cx_type & CXp_FOR_DEF))
 
 #define CXINC (cxstack_ix < cxstack_max ? ++cxstack_ix : (cxstack_ix = cxinc()))
 
@@ -677,19 +696,20 @@ L<perlcall>.
 =cut
 */
 
-#define G_SCALAR	0
-#define G_ARRAY		1
-#define G_VOID		128	/* skip this bit when adding flags below */
+#define G_SCALAR	2
+#define G_ARRAY		3
+#define G_VOID		1
+#define G_WANT		3
 
 /* extra flags for Perl_call_* routines */
-#define G_DISCARD	2	/* Call FREETMPS.
+#define G_DISCARD	4	/* Call FREETMPS.
 				   Don't change this without consulting the
 				   hash actions codes defined in hv.h */
-#define G_EVAL		4	/* Assume eval {} around subroutine call. */
-#define G_NOARGS	8	/* Don't construct a @_ array. */
-#define G_KEEPERR      16	/* Append errors to $@, don't overwrite it */
-#define G_NODEBUG      32	/* Disable debugging at toplevel.  */
-#define G_METHOD       64       /* Calling method. */
+#define G_EVAL		8	/* Assume eval {} around subroutine call. */
+#define G_NOARGS       16	/* Don't construct a @_ array. */
+#define G_KEEPERR      32	/* Append errors to $@, don't overwrite it */
+#define G_NODEBUG      64	/* Disable debugging at toplevel.  */
+#define G_METHOD      128       /* Calling method. */
 #define G_FAKINGEVAL  256	/* Faking an eval context for call_sv or
 				   fold_constants. */
 

@@ -9,14 +9,13 @@
 
 package Data::Dumper;
 
-$VERSION = '2.121_14'
+$VERSION = '2.121_16';
+
 #$| = 1;
 
 ;
 require Exporter;
 require overload;
-
-use Carp;
 
 BEGIN {
     @ISA = qw(Exporter);
@@ -62,7 +61,7 @@ $Deparse    = 0         unless defined $Deparse;
 sub new {
   my($c, $v, $n) = @_;
 
-  croak "Usage:  PACKAGE->new(ARRAYREF, [ARRAYREF])" 
+  die "Usage:  PACKAGE->new(ARRAYREF, [ARRAYREF])" 
     unless (defined($v) && (ref($v) eq 'ARRAY'));
   $n = [] unless (defined($n) && (ref($v) eq 'ARRAY'));
 
@@ -133,7 +132,7 @@ sub Seen {
 	$s->{seen}{$id} = [$k, $v];
       }
       else {
-	carp "Only refs supported, ignoring non-ref item \$$k";
+	warn "Only refs supported, ignoring non-ref item \$$k";
       }
     }
     return $s;
@@ -313,11 +312,11 @@ sub _dump {
 			    $val ];
       }
     }
-
-    if ($realpack and $realpack eq 'Regexp') {
-	$out = "$val";
-	$out =~ s,/,\\/,g;
-	return "qr/$out/";
+    my $no_bless = 0; 
+    my $is_regex = 0;
+    if ( $realpack and re::is_regexp($val) ) {
+        $is_regex = 1;
+        $no_bless = $realpack eq 'Regexp';
     }
 
     # If purity is not set and maxdepth is set, then check depth: 
@@ -332,7 +331,7 @@ sub _dump {
     }
 
     # we have a blessed ref
-    if ($realpack) {
+    if ($realpack and !$no_bless) {
       $out = $s->{'bless'} . '( ';
       $blesspad = $s->{apad};
       $s->{apad} .= '       ' if ($s->{indent} +>= 2);
@@ -341,7 +340,28 @@ sub _dump {
     $s->{level}++;
     $ipad = $s->{xpad} x $s->{level};
 
-    if ($realtype eq 'SCALAR' || $realtype eq 'REF') {
+    if ($is_regex) {
+        my $pat;
+        # This really sucks, re:regexp_pattern is in ext/re/re.xs and not in 
+        # universal.c, and even worse we cant just require that re to be loaded
+        # we *have* to use() it. 
+        # We should probably move it to universal.c for 5.10.1 and fix this.
+        # Currently we only use re::regexp_pattern when the re is blessed into another
+        # package. This has the disadvantage of meaning that a DD dump won't round trip
+        # as the pattern will be repeatedly wrapped with the same modifiers.
+        # This is an aesthetic issue so we will leave it for now, but we could use
+        # regexp_pattern() in list context to get the modifiers separately.
+        # But since this means loading the full debugging engine in process we wont
+        # bother unless its necessary for accuracy.
+        if (($realpack ne 'Regexp') && defined(*re::regexp_pattern{CODE})) {
+            $pat = re::regexp_pattern($val);
+        } else {
+            $pat = "$val";
+        }
+        $pat =~ s,/,\\/,g;
+        $out .= "qr/$pat/";
+    }
+    elsif ($realtype eq 'SCALAR' || $realtype eq 'REF') {
       if ($realpack) {
 	$out .= 'do{\(my $o = ' . $s->_dump($$val, "\$\{$name\}") . ')}';
       }
@@ -387,7 +407,7 @@ sub _dump {
 	if (ref($s->{sortkeys}) eq 'CODE') {
 	  $keys = $s->{sortkeys}($val);
 	  unless (ref($keys) eq 'ARRAY') {
-	    carp "Sortkeys subroutine did not return ARRAYREF";
+	    warn "Sortkeys subroutine did not return ARRAYREF";
 	    $keys = [];
 	  }
 	}
@@ -424,14 +444,14 @@ sub _dump {
 	$out   .=  $sub;
       } else {
         $out .= 'sub { "DUMMY" }';
-        carp "Encountered CODE ref, using dummy placeholder" if $s->{purity};
+        warn "Encountered CODE ref, using dummy placeholder" if $s->{purity};
       }
     }
     else {
-      croak "Can\'t handle $realtype type.";
+      die "Can\'t handle $realtype type.";
     }
     
-    if ($realpack) { # we have a blessed ref
+    if ($realpack and !$no_bless) { # we have a blessed ref
       $out .= ', ' . _quote($realpack) . ' )';
       $out .= '->' . $s->{toaster} . '()'  if $s->{toaster} ne '';
       $s->{apad} = $blesspad;

@@ -77,7 +77,7 @@ sub safeUntie
 {
     my $hashref = shift ;
     my $no_inner = 1;
-    local $SIG{__WARN__} = sub {-- $no_inner } ;
+    local ${^WARN_HOOK} = sub {-- $no_inner } ;
     untie %$hashref;
     return $no_inner;
 }
@@ -124,9 +124,9 @@ ok(12, $dbh->{lorder} == 1234 );
 
 # Check that an invalid entry is caught both for store & fetch
 eval '$dbh->{fred} = 1234' ;
-ok(13, $@ =~ m/^DB_File::HASHINFO::STORE - Unknown element 'fred' at/ );
+ok(13, $@->{description} =~ m/^DB_File::HASHINFO::STORE - Unknown element 'fred'/ );
 eval 'my $q = $dbh->{fred}' ;
-ok(14, $@ =~ m/^DB_File::HASHINFO::FETCH - Unknown element 'fred' at/ );
+ok(14, $@->{description} =~ m/^DB_File::HASHINFO::FETCH - Unknown element 'fred'/ );
 
 
 # Now check the interface to HASH
@@ -397,7 +397,7 @@ untie %h ;
     my $filename = "xyz" ;
     my @x ;
     eval { tie @x, 'DB_File', $filename, O_RDWR^|^O_CREAT, 0640, $DB_HASH ; } ;
-    ok(52, $@ =~ m/^DB_File can only tie an associative array to a DB_HASH database/) ;
+    ok(52, $@->{description} =~ m/^DB_File can only tie an associative array to a DB_HASH database/) ;
     unlink $filename ;
 }
 
@@ -707,7 +707,7 @@ EOM
    $db->filter_store_key (sub { $_ = $h{$_} }) ;
 
    eval '$h{1} = 1234' ;
-   ok(116, $@ =~ m/^recursion detected in filter_store_key at/ );
+   ok(116, $@->{description} =~ m/^recursion detected in filter_store_key/ );
    
    undef $db ;
    untie %h;
@@ -774,7 +774,7 @@ EOM
     unlink $Dfile;
     my %h ;
     my $a = "";
-    local $SIG{__WARN__} = sub {$a = $_[0]} ;
+    local ${^WARN_HOOK} = sub {$a = $_[0]} ;
     
     tie %h, 'DB_File', $Dfile or die "Can't open file: $!\n" ;
     $h{ABC} = undef;
@@ -793,7 +793,7 @@ EOM
     unlink $Dfile;
     my %h ;
     my $a = "";
-    local $SIG{__WARN__} = sub {$a = $_[0]} ;
+    local ${^WARN_HOOK} = sub {$a = $_[0]} ;
     
     tie %h, 'DB_File', $Dfile or die "Can't open file: $!\n" ;
     %h = (); ;
@@ -849,7 +849,7 @@ EOM
     my $dbh = DB_File::HASHINFO->new() ;
 
     eval { $dbh->{hash} = 2 };
-    ok(126, $@ =~ m/^Key 'hash' not associated with a code reference at/);
+    ok(126, $@->{description} =~ m/^Key 'hash' not associated with a code reference at/);
 
 }
 
@@ -963,7 +963,7 @@ EOM
    $h{"fred"} = "joe" ;
    ok(137, $h{"fred"} eq "joe");
 
-   eval { grep { $h{$_} } (1, 2, 3) };
+   eval { my @r= grep { $h{$_} } (1, 2, 3) };
    ok (138, ! $@);
 
 
@@ -979,7 +979,7 @@ EOM
 
    ok(140, $db->FIRSTKEY() eq "fred") ;
    
-   eval { grep { $h{$_} } (1, 2, 3) };
+   eval { my @r= grep { $h{$_} } (1, 2, 3) };
    ok (141, ! $@);
 
    undef $db ;
@@ -1051,7 +1051,7 @@ EOM
     ok(152, $db = tie(%h, 'DB_File', $Dfile, O_RDWR^|^O_CREAT, 0640, $DB_HASH ) );
 
     my $warned = '';
-    local $SIG{__WARN__} = sub {$warned = $_[0]} ;
+    local ${^WARN_HOOK} = sub {$warned = $_[0]} ;
 
     # db-put with substr of key
     my %remember = () ;

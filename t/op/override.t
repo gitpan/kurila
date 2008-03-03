@@ -46,7 +46,7 @@ is( $r, join($dirsep, "Foo", "Bar.pm") );
     local(*CORE::GLOBAL::require);
     $r = '';
     eval "require NoNeXiSt;";
-    ok( ! ( $r or $@ !~ m/^Can't locate NoNeXiSt/i ) );
+    ok( ! ( $r or $@->{description} !~ m/^Can't locate NoNeXiSt/i ) );
 }
 
 #
@@ -92,8 +92,8 @@ BEGIN { *Rgs::readpipe = sub ($) { ++$r . " $_[0]" }; }
 # Verify that the parsing of overriden keywords isn't messed up
 # by the indirect object notation
 {
-    local $SIG{__WARN__} = sub {
-	::like( $_[0], qr/^ok overriden at/ );
+    local ${^WARN_HOOK} = sub {
+	::like( $_[0]->message, qr/^ok overriden at/ );
     };
     BEGIN { *OverridenWarn::warn = sub { CORE::warn "@_ overriden"; }; }
     package OverridenWarn;

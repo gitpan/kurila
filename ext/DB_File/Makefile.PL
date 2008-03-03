@@ -22,12 +22,10 @@ WriteMakefile(
 	XSPROTOARG	=> '-noprototypes',
 	DEFINE		=> $OS2 || "",
 	INC		=> ($^O eq "MacOS" ? "-i ::::db:include" : ""),
-    ((ExtUtils::MakeMaker->VERSION() gt '6.30')
-            ?  ('LICENSE'  => 'perl')
-            : ()
-    ),
-              ABSTRACT_FROM => 'DB_File.pm',
-              AUTHOR       => 'Paul Marquess <pmqs@cpan.org>',
+        XS_VERSION      => eval MM->parse_version('DB_File.pm'),
+        LICENSE  => 'perl',
+        ABSTRACT_FROM => 'DB_File.pm',
+        AUTHOR       => 'Paul Marquess <pmqs@cpan.org>',
 
 	'depend'	=> {'version$(OBJ_EXT)' => 'version.c'},
 	'clean'		=> {FILES => 'constants.h constants.xs'},

@@ -340,10 +340,12 @@ Example:
 The interpretation of the file permission operators C<-r>, C<-R>,
 C<-w>, C<-W>, C<-x>, and C<-X> is by default based solely on the mode
 of the file and the uids and gids of the user.  There may be other
-reasons you can't actually read, write, or execute the file.  Such
-reasons may be for example network filesystem access controls, ACLs
-(access control lists), read-only filesystems, and unrecognized
-executable formats.
+reasons you can't actually read, write, or execute the file: for
+example network filesystem access controls, ACLs (access control lists),
+read-only filesystems, and unrecognized executable formats.  Note
+that the use of these six specific operators to verify if some operation
+is possible is usually a mistake, because it may be open to race
+conditions.
 
 Also note that, for the superuser on the local filesystems, the C<-r>,
 C<-R>, C<-w>, and C<-W> tests always return 1, and C<-x> and C<-X> return 1
@@ -358,8 +360,11 @@ will test whether the permission can (not) be granted using the
 access() family of system calls.  Also note that the C<-x> and C<-X> may
 under this pragma return true even if there are no execute permission
 bits set (nor any extra execute permission ACLs).  This strangeness is
-due to the underlying system calls' definitions.  Read the
-documentation for the C<filetest> pragma for more information.
+due to the underlying system calls' definitions. Note also that, due to
+the implementation of C<use filetest 'access'>, the C<_> special
+filehandle won't cache the results of the file tests when this pragma is
+in effect.  Read the documentation for the C<filetest> pragma for more
+information.
 
 Note that C<-s/a/b/> does not do a negated substitution.  Saying
 C<-exp($foo)> still works as expected, however--only single letters
@@ -1368,7 +1373,7 @@ Entries are returned in an apparently random order.  The actual random
 order is subject to change in future versions of perl, but it is
 guaranteed to be in the same order as either the C<keys> or C<values>
 function would produce on the same (unmodified) hash.  Since Perl
-5.8.1 the ordering is different even between different runs of Perl
+5.8.2 the ordering can be different even between different runs of Perl
 for security reasons (see L<perlsec/"Algorithmic Complexity Attacks">).
 
 When the hash is entirely read, a null array is returned in list context
@@ -1864,11 +1869,11 @@ Here's a mailbox appender for BSD systems.
 	flock(MBOX,LOCK_UN);
     }
 
-    open(MBOX, ">>", "/usr/spool/mail/$ENV{'USER'}")
+    open(my $mbox, ">>", "/usr/spool/mail/$ENV{'USER'}")
 	    or die "Can't open mailbox: $!";
 
     lock();
-    print MBOX $msg,"\n\n";
+    print $mbox $msg,"\n\n";
     unlock();
 
 On systems that support a real flock(), locks are inherited across fork()
@@ -2600,9 +2605,10 @@ X<length> X<size>
 =item length
 
 Returns the length in I<characters> of the value of EXPR.  If EXPR is
-omitted, returns length of C<$_>.  Note that this cannot be used on
-an entire array or hash to find out how many elements these have.
-For that, use C<scalar @array> and C<scalar keys %hash> respectively.
+omitted, returns length of C<$_>.  If EXPR is undefined, returns C<undef>.
+Note that this cannot be used on an entire array or hash to find out how
+many elements these have. For that, use C<scalar @array> and C<scalar keys
+%hash> respectively.
 
 Note the I<characters>: if the EXPR is in Unicode, you will get the
 number of characters, not the number of bytes.  To get the length
@@ -2682,7 +2688,8 @@ Wednesday.  C<$yday> is the day of the year, in the range C<0..364>
 C<$isdst> is true if the specified time occurs during Daylight Saving
 Time, false otherwise.
 
-If EXPR is omitted, C<localtime()> uses the current time (C<localtime(time)>).
+If EXPR is omitted, C<localtime()> uses the current time (as returned
+by time(3)).
 
 In scalar context, C<localtime()> returns the ctime(3) value:
 
@@ -2990,6 +2997,14 @@ X<open> X<pipe> X<file, open> X<fopen>
 Opens the file whose filename is given by EXPR, and associates it with
 FILEHANDLE.
 
+Simple examples to open a file for reading:
+
+    open(my $fh, '<', "input.txt") or die $!;
+
+and for writing:
+
+    open(my $fh, '>', "output.txt") or die $!;
+
 (The following is a comprehensive reference to open(): for a gentler
 introduction you may consider L<perlopentut>.)
 
@@ -3045,7 +3060,7 @@ The MODE argument may be used to specify IO "layers"
 that affect how the input and output are processed (see L<open> and
 L<PerlIO> for more details). For example
 
-  open(FH, "<:encoding(UTF-8)", "file")
+  open(my $fh, "<:encoding(UTF-8)", "file")
 
 will open the UTF-8 encoded file containing Unicode characters,
 see L<perluniintro>. Note that if layers are specified in the
@@ -3075,7 +3090,7 @@ working with an unopened filehandle is actually what you want to do.
 As a special case the 3-arg form with a read/write mode and the third
 argument being C<undef>:
 
-    open(TMP, "+>", undef) or die ...
+    open(my $tmp, "+>", undef) or die ...
 
 opens a filehandle to an anonymous temporary file.  Also using "+<"
 works for symmetry, but you really should consider writing something
@@ -3103,7 +3118,7 @@ Examples:
     open(LOG, '>>', '/usr/spool/news/twitlog');	# (log is reserved)
     # if the open fails, output is discarded
 
-    open(DBASE, '+<', 'dbase.mine')		# open for update
+    open(my $dbase, '+<', 'dbase.mine')		# open for update
 	or die "Can't open 'dbase.mine' for update: $!";
 
     open(ARTICLE, '-|', "caesar <$article")     # decrypt article
@@ -3270,7 +3285,7 @@ them, and automatically close whenever and however you leave that scope:
     #...
     sub read_myfile_munged {
 	my $ALL = shift;
-	my $handle = new IO::File;
+	my $handle = IO::File->new;
 	open($handle, "<", "myfile") or die "myfile: $!";
 	$first = ~< $handle
 	    or return ();     # Automatically closed here.
@@ -3291,6 +3306,8 @@ dirhandle, usually the real dirhandle name.  If DIRHANDLE is an undefined
 scalar variable (or array or hash element), the variable is assigned a
 reference to a new anonymous dirhandle.
 DIRHANDLEs have their own namespace separate from FILEHANDLEs.
+
+See example at C<readdir>.
 
 =item ord EXPR
 X<ord> X<encoding>
@@ -3918,12 +3935,6 @@ If the package name is null, the C<main> package as assumed.  That is,
 C<$::sail> is equivalent to C<$main::sail> (as well as to C<$main'sail>,
 still seen in older code).
 
-If NAMESPACE is omitted, then there is no current package, and all
-identifiers must be fully qualified or lexicals.  However, you are
-strongly advised not to make use of this feature. Its use can cause
-unexpected behaviour, even crashing some versions of Perl. It is
-deprecated, and will be removed from a future release.
-
 See L<perlmod/"Packages"> for more information about packages, modules,
 and classes.  See L<perlsub> for other scoping issues.
 
@@ -4143,9 +4154,9 @@ If you're planning to filetest the return values out of a C<readdir>, you'd
 better prepend the directory in question.  Otherwise, because we didn't
 C<chdir> there, it would have been testing the wrong file.
 
-    opendir(DIR, $some_dir) || die "can't opendir $some_dir: $!";
-    @dots = grep { /^\./ && -f "$some_dir/$_" } readdir(DIR);
-    closedir DIR;
+    opendir(my $dh, $some_dir) || die "can't opendir $some_dir: $!";
+    @dots = grep { /^\./ && -f "$some_dir/$_" } readdir($dh);
+    closedir $dh;
 
 =item readline EXPR
 
@@ -4226,10 +4237,10 @@ See L<perlipc/"UDP: Message Passing"> for examples.
 Note the I<characters>: depending on the status of the socket, either
 (8-bit) bytes or characters are received.  By default all sockets
 operate on bytes, but for example if the socket has been changed using
-binmode() to operate with the C<:utf8> I/O layer (see the C<open>
-pragma, L<open>), the I/O will operate on UTF-8 encoded Unicode
-characters, not bytes.  Similarly for the C<:encoding> pragma:
-in that case pretty much any characters can be read.
+binmode() to operate with the C<:encoding(utf8)> I/O layer (see the
+C<open> pragma, L<open>), the I/O will operate on UTF-8 encoded Unicode
+characters, not bytes.  Similarly for the C<:encoding> pragma: in that
+case pretty much any characters can be read.
 
 =item redo LABEL
 X<redo>
@@ -4608,7 +4619,7 @@ of the file) from the Fcntl module.  Returns C<1> upon success, C<0>
 otherwise.
 
 Note the I<in bytes>: even if the filehandle has been set to
-operate on characters (for example by using the C<:utf8> open
+operate on characters (for example by using the C<:encoding(utf8)> open
 layer), tell() will return byte offsets, not character offsets
 (because implementing that would render seek() and tell() rather slow).
 
@@ -4798,10 +4809,10 @@ L<perlipc/"UDP: Message Passing"> for examples.
 Note the I<characters>: depending on the status of the socket, either
 (8-bit) bytes or characters are sent.  By default all sockets operate
 on bytes, but for example if the socket has been changed using
-binmode() to operate with the C<:utf8> I/O layer (see L</open>, or the
-C<open> pragma, L<open>), the I/O will operate on UTF-8 encoded
-Unicode characters, not bytes.  Similarly for the C<:encoding> pragma:
-in that case pretty much any characters can be sent.
+binmode() to operate with the C<:encoding(utf8)> I/O layer (see
+L</open>, or the C<open> pragma, L<open>), the I/O will operate on UTF-8
+encoded Unicode characters, not bytes.  Similarly for the C<:encoding>
+pragma: in that case pretty much any characters can be sent.
 
 =item setpgrp PID,PGRP
 X<setpgrp> X<group>
@@ -5401,8 +5412,8 @@ to take the arguments out of order, e.g.:
 
 one or more of:
 
-   space   prefix positive number with a space
-   +       prefix positive number with a plus sign
+   space   prefix non-negative number with a space
+   +       prefix non-negative number with a plus sign
    -       left-justify within the field
    0       use zeros, not spaces, to right-justify
    #       ensure the leading "0" for any octal,
@@ -5615,7 +5626,7 @@ So:
 would use C<$a> for the width, C<$b> for the precision and C<$c>
 as the value to format, while:
 
-  print '<%*1$.*s>', $a, $b;
+  printf '<%*1$.*s>', $a, $b;
 
 would use C<$a> for the width and the precision, and C<$b> as the
 value to format.
@@ -6152,9 +6163,9 @@ POSITION, and C<2> to set it to EOF plus POSITION (typically
 negative).
 
 Note the I<in bytes>: even if the filehandle has been set to operate
-on characters (for example by using the C<:utf8> I/O layer), tell()
-will return byte offsets, not character offsets (because implementing
-that would render sysseek() very slow).
+on characters (for example by using the C<:encoding(utf8)> I/O layer),
+tell() will return byte offsets, not character offsets (because
+implementing that would render sysseek() very slow).
 
 sysseek() bypasses normal buffered IO, so mixing this with reads (other
 than C<sysread>, for example C<< <> >> or read()) C<print>, C<write>,
@@ -6279,9 +6290,9 @@ the actual filehandle.  If FILEHANDLE is omitted, assumes the file
 last read.
 
 Note the I<in bytes>: even if the filehandle has been set to
-operate on characters (for example by using the C<:utf8> open
-layer), tell() will return byte offsets, not character offsets
-(because that would render seek() and tell() rather slow).
+operate on characters (for example by using the C<:encoding(utf8)> open
+layer), tell() will return byte offsets, not character offsets (because
+that would render seek() and tell() rather slow).
 
 The return value of tell() for the standard streams like the STDIN
 depends on the operating system: it may return -1 or something else.

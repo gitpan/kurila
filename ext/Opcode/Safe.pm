@@ -2,7 +2,7 @@ package Safe;
 
 use strict;
 
-$Safe::VERSION = "2.12";
+$Safe::VERSION = "2.15";
 
 # *** Don't declare any lexicals above this point ***
 #
@@ -25,7 +25,9 @@ sub lexless_anon_sub {
 }
 
 use Carp;
-use Carp::Heavy;
+BEGIN { eval q{
+    use Carp::Heavy;
+} }
 
 use Opcode 1.01, qw(
     opset opset_to_ops opmask_add
@@ -44,6 +46,20 @@ my $default_share = [qw[
     *_
     &PerlIO::get_layers
     &Regexp::DESTROY
+    &UNIVERSAL::isa
+    &UNIVERSAL::can
+    &UNIVERSAL::VERSION
+    &utf8::is_utf8
+    &utf8::valid
+    &utf8::encode
+    &utf8::decode
+    &utf8::upgrade
+    &utf8::downgrade
+    &utf8::native_to_unicode
+    &utf8::unicode_to_native
+    $version::VERSION
+    $version::CLASS
+    @version::ISA
     &re::is_regexp
     &re::regname
     &re::regnames
@@ -57,18 +73,7 @@ my $default_share = [qw[
     &Tie::Hash::NamedCapture::NEXTKEY
     &Tie::Hash::NamedCapture::SCALAR
     &Tie::Hash::NamedCapture::flags
-    &UNIVERSAL::isa
-    &UNIVERSAL::can
     &UNIVERSAL::DOES
-    &UNIVERSAL::VERSION
-    &utf8::is_utf8
-    &utf8::valid
-    &utf8::encode
-    &utf8::decode
-    &utf8::upgrade
-    &utf8::downgrade
-    &utf8::native_to_unicode
-    &utf8::unicode_to_native
     &version::()
     &version::new
     &version::(""
@@ -77,7 +82,7 @@ my $default_share = [qw[
     &version::numify
     &version::normal
     &version::(cmp
-    &version::(<=>
+    &version::(<+>
     &version::vcmp
     &version::(bool
     &version::boolean
@@ -85,6 +90,11 @@ my $default_share = [qw[
     &version::noop
     &version::is_alpha
     &version::qv
+    &re::regexp_pattern
+    &error::create
+    &error::message
+    &error::write_to_stderr
+    &Symbol::fetch_glob
 ]];
 
 sub new {
@@ -610,11 +620,11 @@ but more subtle effect.
 
 =head2 AUTHOR
 
-Originally designed and implemented by Malcolm Beattie,
-mbeattie@sable.ox.ac.uk.
+Originally designed and implemented by Malcolm Beattie.
 
-Reworked to use the Opcode module and other changes added by Tim Bunce
-E<lt>F<Tim.Bunce@ig.co.uk>E<gt>.
+Reworked to use the Opcode module and other changes added by Tim Bunce.
+
+Currently maintained by the Perl 5 Porters, <perl5-porters@perl.org>.
 
 =cut
 

@@ -1390,8 +1390,8 @@ sub safe_do {
     my $file = shift;
 
     # Just exactly what part of the word "CORE::" don't you understand?
-    local $SIG{__WARN__};
-    local $SIG{__DIE__};
+    local ${^WARN_HOOK};
+    local ${^DIE_HOOK};
 
     unless ( is_safe_file($file) ) {
         CORE::warn <<EO_GRIPE;
@@ -2302,8 +2302,8 @@ completely replacing it.
 
                     # Squelch signal handling; we want to keep control here
                     # if something goes loco during the alias eval.
-                    local $SIG{__DIE__};
-                    local $SIG{__WARN__};
+                    local ${^DIE_HOOK};
+                    local ${^WARN_HOOK};
 
                     # This is a command, so we eval it in the DEBUGGER's
                     # scope! Otherwise, we can't see the special debugger
@@ -2435,7 +2435,7 @@ Uses C<dumpvar.pl> to dump out the current values for selected variables.
                         # The die doesn't need to include the $@, because
                         # it will automatically get propagated for us.
                         if ($@) {
-                            die unless $@ =~ m/dumpvar print failed/;
+                            die unless $@->{description} =~ m/dumpvar print failed/;
                         }
                     } ## end if (defined &main::dumpvar)
                     else {
@@ -2604,7 +2604,7 @@ above the current one and then displays then using C<dumpvar.pl>.
                     # See if we've got the necessary support.
                     eval { require PadWalker; PadWalker->VERSION(0.08) }
                       or &warn(
-                        $@ =~ m/locate/
+                        $@->{description} =~ m/locate/
                         ? "PadWalker module not found - please install\n"
                         : $@
                       )
@@ -2868,8 +2868,8 @@ mess us up.
                     if ( $inpat ne "" ) {
 
                         # Turn of warn and die procesing for a bit.
-                        local $SIG{__DIE__};
-                        local $SIG{__WARN__};
+                        local ${^DIE_HOOK};
+                        local ${^WARN_HOOK};
 
                         # Create the pattern.
                         eval '$inpat =~ m' . "\a$inpat\a";
@@ -2943,8 +2943,8 @@ Same as for C</>, except the loop runs backwards.
                     if ( $inpat ne "" ) {
 
                         # Turn off die & warn handlers.
-                        local $SIG{__DIE__};
-                        local $SIG{__WARN__};
+                        local ${^DIE_HOOK};
+                        local ${^WARN_HOOK};
                         eval '$inpat =~ m' . "\a$inpat\a";
 
                         if ( $@ ne "" ) {
@@ -3201,8 +3201,8 @@ Manipulates C<%alias> to add or list command aliases.
                         $alias{$k} = "s\a$k\a$v\a";
 
                         # Turn off standard warn and die behavior.
-                        local $SIG{__DIE__};
-                        local $SIG{__WARN__};
+                        local ${^DIE_HOOK};
+                        local ${^WARN_HOOK};
 
                         # Is it valid Perl?
                         unless ( eval "sub \{ s\a$k\a$v\a \}; 1" ) {
@@ -4760,7 +4760,7 @@ sub cmd_i {
     my $line = shift;
     eval { require Class::ISA };
     if ($@) {
-        &warn( $@ =~ m/locate/
+        &warn( $@->{description} =~ m/locate/
             ? "Class::ISA module not found - please install\n"
             : $@ );
     }
@@ -6142,21 +6142,38 @@ a new window.
 # it creates, but since it appears frontmost and windows are enumerated
 # front to back, we can use "first window" === "window 1".
 #
-# There's no direct accessor for the tty device name, so we fiddle
-# with the window title options until it says what we want.
-#
 # Since "do script" is implemented by supplying the argument (plus a
 # return character) as terminal input, there's a potential race condition
 # where the debugger could beat the shell to reading the command.
 # To prevent this, we wait for the screen to clear before proceeding.
 #
-# Tested and found to be functional in Mac OS X 10.3.9 and 10.4.8.
+# 10.3 and 10.4:
+# There's no direct accessor for the tty device name, so we fiddle
+# with the window title options until it says what we want.
+#
+# 10.5:
+# There _is_ a direct accessor for the tty device name, _and_ there's
+# a new possible component of the window title (the name of the settings
+# set).  A separate version is needed.
 
-sub macosx_get_fork_TTY
-{
-    my($pipe,$tty);
+my @script_versions=
 
-    return unless open($pipe,'-|','/usr/bin/osascript','-e',<<'__SCRIPT__');
+    ([237, <<'__LEOPARD__'],
+tell application "Terminal"
+    do script "clear;exec sleep 100000"
+    tell first tab of first window
+        copy tty to thetty
+        set custom title to "forked perl debugger"
+        set title displays custom title to true
+        repeat while (length of first paragraph of (get contents)) > 0
+            delay 0.1
+        end repeat
+    end tell
+end tell
+thetty
+__LEOPARD__
+
+     [100, <<'__JAGUAR_TIGER__'],
 tell application "Terminal"
     do script "clear;exec sleep 100000"
     tell first window
@@ -6166,16 +6183,31 @@ tell application "Terminal"
         set title displays device name to true
         set title displays custom title to true
         set custom title to ""
-        copy name to thetitle
+        copy "/dev/" & name to thetty
         set custom title to "forked perl debugger"
         repeat while (length of first paragraph of (get contents)) > 0
             delay 0.1
         end repeat
     end tell
 end tell
-"/dev/" & thetitle
-__SCRIPT__
+thetty
+__JAGUAR_TIGER__
 
+);
+
+sub macosx_get_fork_TTY
+{
+    my($version,$script,$pipe,$tty);
+
+    return unless $version=$ENV{TERM_PROGRAM_VERSION};
+    foreach my $entry (@script_versions) {
+	if ($version +>= $entry->[0]) {
+	    $script=$entry->[1];
+	    last;
+	}
+    }
+    return unless defined($script);
+    return unless open($pipe,'-|','/usr/bin/osascript','-e',$script);
     $tty=readline($pipe);
     close($pipe);
     return unless defined($tty) && $tty =~ m(^/dev/);
@@ -7562,7 +7594,7 @@ sub diesignal {
     if ( defined &Carp::longmess ) {
 
         # Don't recursively enter the warn handler, since we're carping.
-        local $SIG{__WARN__} = '';
+        local ${^WARN_HOOK} = '';
 
         # Skip two levels before reporting traceback: we're skipping
         # mydie and confess.
@@ -7599,8 +7631,8 @@ sub dbwarn {
 
     # Turn off warn and die handling to prevent recursive entries to this
     # routine.
-    local $SIG{__WARN__} = '';
-    local $SIG{__DIE__}  = '';
+    local ${^WARN_HOOK} = '';
+    local ${^DIE_HOOK}  = '';
 
     # Load Carp if we can. If $^S is false (current thing being compiled isn't
     # done yet), we may not be able to do a require.
@@ -7649,13 +7681,13 @@ displaying the exception via its C<dbwarn()> routine.
 sub dbdie {
     local $frame         = 0;
     local $doret         = -2;
-    local $SIG{__DIE__}  = '';
-    local $SIG{__WARN__} = '';
+    local ${^DIE_HOOK}  = '';
+    local ${^WARN_HOOK} = '';
     my $i      = 0;
     my $ineval = 0;
     my $sub;
     if ( $dieLevel +> 2 ) {
-        local $SIG{__WARN__} = \&dbwarn;
+        local ${^WARN_HOOK} = \&dbwarn;
         &warn(@_);    # Yell no matter what
         return;
     }
@@ -7701,13 +7733,13 @@ being debugged in place.
 
 sub warnLevel {
     if (@_) {
-        $prevwarn = $SIG{__WARN__} unless $warnLevel;
+        $prevwarn = ${^WARN_HOOK} unless $warnLevel;
         $warnLevel = shift;
         if ($warnLevel) {
-            $SIG{__WARN__} = \&DB::dbwarn;
+            ${^WARN_HOOK} = \&DB::dbwarn;
         }
         elsif ($prevwarn) {
-            $SIG{__WARN__} = $prevwarn;
+            ${^WARN_HOOK} = $prevwarn;
         }
     } ## end if (@_)
     $warnLevel;
@@ -7724,12 +7756,12 @@ zero lets you use your own C<die()> handler.
 sub dieLevel {
     local $\ = '';
     if (@_) {
-        $prevdie = $SIG{__DIE__} unless $dieLevel;
+        $prevdie = ${^DIE_HOOK} unless $dieLevel;
         $dieLevel = shift;
         if ($dieLevel) {
 
             # Always set it to dbdie() for non-zero values.
-            $SIG{__DIE__} = \&DB::dbdie;    # if $dieLevel < 2;
+            ${^DIE_HOOK} = \&DB::dbdie;    # if $dieLevel < 2;
 
             # No longer exists, so don't try  to use it.
             #$SIG{__DIE__} = \&DB::diehard if $dieLevel >= 2;
@@ -7747,7 +7779,7 @@ sub dieLevel {
 
         # Put the old one back if there was one.
         elsif ($prevdie) {
-            $SIG{__DIE__} = $prevdie;
+            ${^DIE_HOOK} = $prevdie;
             print $OUT "Default die handler restored.\n";
         }
     } ## end if (@_)

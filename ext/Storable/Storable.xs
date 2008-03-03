@@ -50,14 +50,6 @@
 #endif
 #endif
 
-#ifndef SvRV_set
-#define SvRV_set(sv, val) \
-    STMT_START { \
-        assert(SvTYPE(sv) >=  SVt_RV); \
-        (((XRV*)SvANY(sv))->xrv_rv = (val)); \
-    } STMT_END
-#endif
-
 #ifndef PERL_UNUSED_DECL
 #  ifdef HASATTRIBUTE
 #    if (defined(__GNUC__) && defined(__cplusplus)) || defined(__INTEL_COMPILER)
@@ -1578,7 +1570,7 @@ static SV *pkg_fetchmeth(
         pTHX_
 	HV *cache,
 	HV *pkg,
-	char *method)
+	const char *method)
 {
 	GV *gv;
 	SV *sv;
@@ -1618,7 +1610,7 @@ static void pkg_hide(
         pTHX_
 	HV *cache,
 	HV *pkg,
-	char *method)
+	const char *method)
 {
 	const char *hvname = HvNAME_get(pkg);
 	(void) hv_store(cache,
@@ -1634,7 +1626,7 @@ static void pkg_uncache(
         pTHX_
 	HV *cache,
 	HV *pkg,
-	char *method)
+	const char *method)
 {
 	const char *hvname = HvNAME_get(pkg);
 	(void) hv_delete(cache, hvname, strlen(hvname), G_DISCARD);
@@ -1652,7 +1644,7 @@ static SV *pkg_can(
         pTHX_
 	HV *cache,
 	HV *pkg,
-	char *method)
+	const char *method)
 {
 	SV **svh;
 	SV *sv;
@@ -3254,7 +3246,9 @@ static int sv_type(pTHX_ SV *sv)
 {
 	switch (SvTYPE(sv)) {
 	case SVt_NULL:
+#if PERL_VERSION <= 10
 	case SVt_IV:
+#endif
 	case SVt_NV:
 		/*
 		 * No need to check for ROK, that can't be set here since there
@@ -3262,7 +3256,11 @@ static int sv_type(pTHX_ SV *sv)
 		 */
 		return svis_SCALAR;
 	case SVt_PV:
+#if PERL_VERSION <= 10
 	case SVt_RV:
+#else
+	case SVt_IV:
+#endif
 	case SVt_PVIV:
 	case SVt_PVNV:
 		/*
@@ -4264,7 +4262,7 @@ static SV *retrieve_hook(pTHX_ stcxt_t *cxt, const char *cname)
 	 * into the existing design.  -- RAM, 17/02/2001
 	 */
 
-	sv_magic(sv, rv, mtype, Nullch, 0);
+	sv_magic(sv, rv, mtype, (char *)NULL, 0);
 	SvREFCNT_dec(rv);			/* Undo refcnt inc from sv_magic() */
 
 	return sv;
@@ -4317,9 +4315,9 @@ static SV *retrieve_ref(pTHX_ stcxt_t *cxt, const char *cname)
 
 	if (cname) {
 		/* No need to do anything, as rv will already be PVMG.  */
-		assert (SvTYPE(rv) >= SVt_RV);
+		assert (SvTYPE(rv) == SVt_IV || SvTYPE(rv) >= SVt_PV);
 	} else {
-		sv_upgrade(rv, SVt_RV);
+		sv_upgrade(rv, SVt_IV);
 	}
 
 	SvRV_set(rv, sv);				/* $rv = \$sv */
@@ -4381,7 +4379,7 @@ static SV *retrieve_overloaded(pTHX_ stcxt_t *cxt, const char *cname)
 	 * WARNING: breaks RV encapsulation.
 	 */
 
-	sv_upgrade(rv, SVt_RV);
+	sv_upgrade(rv, SVt_IV);
 	SvRV_set(rv, sv);				/* $rv = \$sv */
 	SvROK_on(rv);
 
@@ -4461,7 +4459,7 @@ static SV *retrieve_tied_array(pTHX_ stcxt_t *cxt, const char *cname)
 
 	sv_upgrade(tv, SVt_PVAV);
 	AvREAL_off((AV *)tv);
-	sv_magic(tv, sv, 'P', Nullch, 0);
+	sv_magic(tv, sv, 'P', (char *)NULL, 0);
 	SvREFCNT_dec(sv);			/* Undo refcnt inc from sv_magic() */
 
 	TRACEME(("ok (retrieve_tied_array at 0x%"UVxf")", PTR2UV(tv)));
@@ -4489,7 +4487,7 @@ static SV *retrieve_tied_hash(pTHX_ stcxt_t *cxt, const char *cname)
 		return (SV *) 0;		/* Failed */
 
 	sv_upgrade(tv, SVt_PVHV);
-	sv_magic(tv, sv, 'P', Nullch, 0);
+	sv_magic(tv, sv, 'P', (char *)NULL, 0);
 	SvREFCNT_dec(sv);			/* Undo refcnt inc from sv_magic() */
 
 	TRACEME(("ok (retrieve_tied_hash at 0x%"UVxf")", PTR2UV(tv)));
@@ -4521,7 +4519,7 @@ static SV *retrieve_tied_scalar(pTHX_ stcxt_t *cxt, const char *cname)
 	}
 
 	sv_upgrade(tv, SVt_PVMG);
-	sv_magic(tv, obj, 'q', Nullch, 0);
+	sv_magic(tv, obj, 'q', (char *)NULL, 0);
 
 	if (obj) {
 		/* Undo refcnt inc from sv_magic() */
@@ -4588,7 +4586,7 @@ static SV *retrieve_tied_idx(pTHX_ stcxt_t *cxt, const char *cname)
 	RLEN(idx);					/* Retrieve <idx> */
 
 	sv_upgrade(tv, SVt_PVMG);
-	sv_magic(tv, sv, 'p', Nullch, idx);
+	sv_magic(tv, sv, 'p', (char *)NULL, idx);
 	SvREFCNT_dec(sv);			/* Undo refcnt inc from sv_magic() */
 
 	return tv;

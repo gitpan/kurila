@@ -62,7 +62,7 @@ push @EXPORT_FAIL, qw(weaken isweak dualvar isvstring set_prototype);
 sub UNIVERSAL::a_sub_not_likely_to_be_here { ref($_[0]) }
 
 sub blessed ($) {
-  local($@, $SIG{__DIE__}, $SIG{__WARN__});
+  local($@, ${^WARN_HOOK});
   length(ref($_[0]))
     ? eval { $_[0]->a_sub_not_likely_to_be_here }
     : undef
@@ -83,7 +83,7 @@ sub refaddr($) {
 }
 
 sub reftype ($) {
-  local($@, $SIG{__DIE__}, $SIG{__WARN__});
+  local($@, ${^WARN_HOOK});
   my $r = shift;
   my $t;
 
@@ -113,7 +113,7 @@ sub reftype ($) {
 }
 
 sub tainted {
-  local($@, $SIG{__DIE__}, $SIG{__WARN__});
+  local($@, ${^WARN_HOOK});
   local $^W = 0;
   eval { kill 0 * $_[0] };
   $@ =~ /^Insecure/;
@@ -122,7 +122,7 @@ sub tainted {
 sub readonly {
   return 0 if tied($_[0]) || (ref(\($_[0])) ne "SCALAR");
 
-  local($@, $SIG{__DIE__}, $SIG{__WARN__});
+  local($@, ${^WARN_HOOK});
   my $tmp = $_[0];
 
   !eval { $_[0] = $tmp; 1 };
@@ -331,12 +331,5 @@ Except weaken and isweak which are
 Copyright (c) 1999 Tuomas J. Lukka <lukka@iki.fi>. All rights reserved.
 This program is free software; you can redistribute it and/or modify it
 under the same terms as perl itself.
-
-=head1 BLATANT PLUG
-
-The weaken and isweak subroutines in this module and the patch to the core Perl
-were written in connection  with the APress book `Tuomas J. Lukka's Definitive
-Guide to Object-Oriented Programming in Perl', to avoid explaining why certain
-things would have to be done in cumbersome ways.
 
 =cut

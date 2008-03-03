@@ -41,7 +41,7 @@ typedef struct
 #define MYMethod(x) #x,&s->x
 
 CV *
-PerlIOVia_fetchmethod(pTHX_ PerlIOVia * s, char *method, CV ** save)
+PerlIOVia_fetchmethod(pTHX_ PerlIOVia * s, const char *method, CV ** save)
 {
     GV *gv = gv_fetchmeth(s->stash, method, strlen(method), 0);
 #if 0
@@ -64,7 +64,7 @@ PerlIOVia_fetchmethod(pTHX_ PerlIOVia * s, char *method, CV ** save)
  */
 
 SV *
-PerlIOVia_method(pTHX_ PerlIO * f, char *method, CV ** save, int flags,
+PerlIOVia_method(pTHX_ PerlIO * f, const char *method, CV ** save, int flags,
 		 ...)
 {
     PerlIOVia *s = PerlIOSelf(f, PerlIOVia);
@@ -489,7 +489,7 @@ PerlIOVia_get_base(pTHX_ PerlIO * f)
 	    return (STDCHAR *) SvPVX(s->var);
 	}
     }
-    return (STDCHAR *) Nullch;
+    return (STDCHAR *) NULL;
 }
 
 STDCHAR *
@@ -502,7 +502,7 @@ PerlIOVia_get_ptr(pTHX_ PerlIO * f)
 	    return p;
 	}
     }
-    return (STDCHAR *) Nullch;
+    return (STDCHAR *) NULL;
 }
 
 SSize_t

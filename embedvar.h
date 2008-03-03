@@ -42,7 +42,6 @@
 
 #define PL_Argv			(vTHX->IArgv)
 #define PL_Cmd			(vTHX->ICmd)
-#define PL_DBassertion		(vTHX->IDBassertion)
 #define PL_DBcv			(vTHX->IDBcv)
 #define PL_DBgv			(vTHX->IDBgv)
 #define PL_DBline		(vTHX->IDBline)
@@ -129,6 +128,7 @@
 #define PL_endav		(vTHX->Iendav)
 #define PL_envgv		(vTHX->Ienvgv)
 #define PL_errgv		(vTHX->Ierrgv)
+#define PL_errorcreatehook	(vTHX->Ierrorcreatehook)
 #define PL_errors		(vTHX->Ierrors)
 #define PL_euid			(vTHX->Ieuid)
 #define PL_eval_root		(vTHX->Ieval_root)
@@ -347,7 +347,6 @@
 
 #define PL_IArgv		PL_Argv
 #define PL_ICmd			PL_Cmd
-#define PL_IDBassertion		PL_DBassertion
 #define PL_IDBcv		PL_DBcv
 #define PL_IDBgv		PL_DBgv
 #define PL_IDBline		PL_DBline
@@ -434,6 +433,7 @@
 #define PL_Iendav		PL_endav
 #define PL_Ienvgv		PL_envgv
 #define PL_Ierrgv		PL_errgv
+#define PL_Ierrorcreatehook	PL_errorcreatehook
 #define PL_Ierrors		PL_errors
 #define PL_Ieuid		PL_euid
 #define PL_Ieval_root		PL_eval_root

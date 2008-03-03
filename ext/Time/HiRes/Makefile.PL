@@ -18,8 +18,11 @@ my $SYSCALL_H;
 
 use vars qw($self); # Used in 'sourcing' the hints.
 
+# TBD: Can we just use $Config(exe_ext) here instead of this complex
+#      expression?
 my $ld_exeext = ($^O eq 'cygwin' ||
-                 $^O eq 'os2' && $Config{ldflags} =~ m/-Zexe\b/) ? '.exe' : '';
+                 $^O eq 'os2' && $Config{ldflags} =~ m/-Zexe\b/) ? '.exe' :
+                (($^O eq 'vos') ? $Config{exe_ext} : '');
 
 unless($ENV{PERL_CORE}) {
     $ENV{PERL_CORE} = 1 if grep { $_ eq 'PERL_CORE=1' } @ARGV;
@@ -844,12 +847,16 @@ EOM
        if ((exists $ENV{LC_ALL}   && $ENV{LC_ALL}   =~ m/utf-?8/i) ||
            (exists $ENV{LC_CTYPE} && $ENV{LC_CTYPE} =~ m/utf-?8/i) ||
            (exists $ENV{LANG}     && $ENV{LANG}     =~ m/utf-?8/i)) {
-            print  <<EOM;
+            print <<EOM;
+
 NOTE: if you get an error like this (the Makefile line number may vary):
 Makefile:91: *** missing separator
 then set the environment variable LC_ALL to "C" and retry
 from scratch (re-run perl "Makefile.PL").
-(And consider upgrading your Perl.)
+(And consider upgrading your Perl to, say, at least Perl 5.8.8.)
+(You got this message because you seem to have
+ an UTF-8 locale active in your shell environment, this used
+ to cause broken Makefiles to be created from Makefile.PLs)
 EOM
         }
     }

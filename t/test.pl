@@ -26,6 +26,17 @@ my $noplan;
 $TODO = 0;
 $NO_ENDING = 0;
 
+# Use this instead of print to avoid interference while testing globals.
+sub _print {
+    local($\, $", $,) = (undef, ' ', '');
+    print STDOUT @_;
+}
+
+sub _print_stderr {
+    local($\, $", $,) = (undef, ' ', '');
+    print STDERR @_;
+}
+
 sub plan {
     my $n;
     if (@_ == 1) {
@@ -38,7 +49,7 @@ sub plan {
 	my %plan = @_;
 	$n = $plan{tests};
     }
-    print STDOUT "1..$n\n" unless $noplan;
+    _print "1..$n\n" unless $noplan;
     $planned = $n;
 }
 
@@ -46,10 +57,10 @@ END {
     my $ran = $test - 1;
     if (!$NO_ENDING) {
 	if (defined $planned && $planned != $ran) {
-	    print STDERR
+	    _print_stderr
 		"# Looks like you planned $planned tests but ran $ran.\n";
 	} elsif ($noplan) {
-	    print "1..$ran\n";
+	    _print "1..$ran\n";
 	}
     }
 }
@@ -60,9 +71,8 @@ sub _diag {
     return unless @_;
     my @mess = map { m/^#/ ? "$_\n" : "# $_\n" }
                map { split m/\n/ } @_;
-    my $fh = $TODO ? *STDOUT : *STDERR;
-    print $fh @mess;
-
+    my $func = $TODO ? \&_print : \&_print_stderr;
+    $func->(@mess);
 }
 
 sub diag {
@@ -71,9 +81,9 @@ sub diag {
 
 sub skip_all {
     if (@_) {
-	print STDOUT "1..0 # Skipped: @_\n";
+	_print "1..0 # Skipped: @_\n";
     } else {
-	print STDOUT "1..0\n";
+	_print "1..0\n";
     }
     exit(0);
 }
@@ -92,7 +102,7 @@ sub _ok {
     }
 
     $out .= " # TODO $TODO" if $TODO;
-    print STDOUT "$out\n";
+    _print "$out\n";
 
     unless ($pass) {
 	_diag "# Failed $where\n";
@@ -119,12 +129,7 @@ sub ok ($@) {
 
 sub _q {
     my $x = shift;
-    return "GLOB('" . Symbol::glob_name($x) . ")" if ref \$x eq "GLOB";
-    return 'undef' unless defined $x;
-    my $q = $x;
-    $q =~ s/\\/\\\\/g;
-    $q =~ s/'/\\'/g;
-    return "'$q'";
+    return dump::view($x);
 }
 
 sub _qq {
@@ -171,12 +176,9 @@ sub is ($$@) {
         # undef only matches undef
         $pass = !defined $got && !defined $expected;
     }
-    elsif (ref \$got eq "GLOB") {
-        "GLOB('" . Symbol::glob_name($got) . ')';
-        $got = "GLOB('" . Symbol::glob_name($got) . ')';
-        $pass = 0;
-    } else {
-        $pass = $got eq $expected;
+    else {
+        local $@;
+        $pass = eval { $got eq $expected };
     }
 
     unless ($pass) {
@@ -313,7 +315,7 @@ sub skip {
     my $why = shift;
     my $n    = @_ ? shift : 1;
     for (1..$n) {
-        print STDOUT "ok $test # skip: $why\n";
+        _print "ok $test # skip: $why\n";
         $test = $test + 1;
     }
     local $^W = 0;
@@ -325,7 +327,7 @@ sub todo_skip {
     my $n   = @_ ? shift : 1;
 
     for (1..$n) {
-        print STDOUT "not ok $test # TODO & SKIP: $why\n";
+        _print "not ok $test # TODO & SKIP: $why\n";
         $test = $test + 1;
     }
     local $^W = 0;
@@ -352,12 +354,12 @@ sub eq_hash {
     $key = "" . $key;
     if (exists $orig->{$key}) {
       if ($orig->{$key} ne $value) {
-        print STDOUT "# key ", _qq($key), " was ", _qq($orig->{$key}),
+        _print "# key ", _qq($key), " was ", _qq($orig->{$key}),
                      " now ", _qq($value), "\n";
         $fail = 1;
       }
     } else {
-      print STDOUT "# key ", _qq($key), " is ", _qq($value),
+      _print "# key ", _qq($key), " is ", _qq($value),
                    ", not in original.\n";
       $fail = 1;
     }
@@ -366,7 +368,7 @@ sub eq_hash {
     # Force a hash recompute if this perl's internals can cache the hash key.
     $_ = "" . $_;
     next if (exists $suspect->{$_});
-    print STDOUT "# key ", _qq($_), " was ", _qq($orig->{$_}), " now missing.\n";
+    _print "# key ", _qq($_), " was ", _qq($orig->{$_}), " now missing.\n";
     $fail = 1;
   }
   !$fail;
@@ -404,6 +406,7 @@ my $is_mswin    = $^O eq 'MSWin32';
 my $is_netware  = $^O eq 'NetWare';
 my $is_macos    = $^O eq 'MacOS';
 my $is_vms      = $^O eq 'VMS';
+my $is_cygwin   = $^O eq 'cygwin';
 
 sub _quote_args {
     my ($runperl, $args) = @_;
@@ -482,7 +485,7 @@ sub _create_runperl { # Create the string to qx in runperl().
 	    if ($args{verbose}) {
 		my $stdindisplay = $stdin;
 		$stdindisplay =~ s/\n/\n\#/g;
-		print STDERR "# $stdindisplay\n";
+		_print_stderr "# $stdindisplay\n";
 	    }
 	    `$stdin`;
 	    $runperl .= q{ < teststdin };
@@ -500,7 +503,7 @@ sub _create_runperl { # Create the string to qx in runperl().
     if ($args{verbose}) {
 	my $runperldisplay = $runperl;
 	$runperldisplay =~ s/\n/\n\#/g;
-	print STDERR "# $runperldisplay\n";
+	_print_stderr "# $runperldisplay\n";
     }
     return $runperl;
 }
@@ -538,6 +541,7 @@ sub runperl {
 	    join $sep, grep { $_ ne "" and $_ ne "." and -d $_ and
 		($is_mswin or $is_vms or !(stat && (stat '_')[2]^&^0022)) }
 		    split quotemeta ($sep), $1;
+	$ENV{PATH} .= "$sep/bin" if $is_cygwin;  # Must have /bin under Cygwin
 
 	$runperl =~ m/(.*)/s;
 	$runperl = $1;
@@ -553,7 +557,7 @@ sub runperl {
 *run_perl = \&runperl; # Nice alias.
 
 sub DIE {
-    print STDERR "# @_\n";
+    _print_stderr "# @_\n";
     exit 1;
 }
 
@@ -610,7 +614,7 @@ sub which_perl {
 sub unlink_all {
     foreach my $file (@_) {
         1 while unlink $file;
-        print STDERR "# Couldn't unlink '$file': $!\n" if -f $file;
+        _print_stderr "# Couldn't unlink '$file': $!\n" if -f $file;
     }
 }
 
@@ -695,6 +699,7 @@ sub _fresh_perl {
 sub fresh_perl_is {
     my($prog, $expected, $runperl_args, $name) = @_;
     local $Level = 2;
+    $expected =~ s/\n+$//; # is also removed from program output
     _fresh_perl($prog,
 		sub { @_ ? $_[0] eq $expected : $expected },
 		$runperl_args, $name);
@@ -755,7 +760,7 @@ sub isa_ok ($$;$) {
         local($@, $!);  # eval sometimes resets $!
         my $rslt = eval { $object->isa($class) };
         if( $@ ) {
-            if( $@ =~ m/^Can't call method "isa" on unblessed reference/ ) {
+            if( $@->{description} =~ m/^Can't call method "isa" on unblessed reference/ ) {
                 if( !UNIVERSAL::isa($object, $class) ) {
                     my $ref = ref $object;
                     $diag = "$obj_name isn't a '$class' it's a '$ref'";
@@ -776,6 +781,39 @@ WHOA
     }
 
     _ok( !$diag, _where(), $name );
+}
+
+sub dies_not(&;$) {
+    my ($e, $qr, $name) = @_;
+    local $Level = 2;
+    if (eval { $e->(); 1; }) {
+        return ok(1, $name);
+    }
+    diag $@->message;
+    return ok(0, $name);
+}
+
+sub dies_like(&$;$) {
+    my ($e, $qr, $name) = @_;
+    if (eval { $e->(); 1; }) {
+        local $Level = 2;
+        diag "didn't die";
+        return ok(0, $name);
+    }
+    my $err = $@->{description};
+    return like_yn(0, $err, $qr );
+}
+
+sub eval_dies_like($$;$) {
+    my ($e, $qr, $name) = @_;
+    eval "$e";
+    my $err = $@;
+    if (not $err) {
+        local $Level = 2;
+        diag "didn't die";
+        return ok(0, $name);
+    }
+    return like_yn(0, $err->{description}, $qr );
 }
 
 1;

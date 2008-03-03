@@ -78,7 +78,7 @@ void* dlopen(const char *filename, int flags) {
         h = new PerlSymbianLibHandle;
         if (h) {
             h->error   = KErrNone;
-            h->symbols = Nullhv;
+            h->symbols = (HV *)NULL;
         } else
             error = KErrNoMemory;
     }
@@ -205,7 +205,7 @@ void
 dl_install_xsub(perl_name, symref, filename="$Package")
     char *		perl_name
     void *		symref 
-    char *		filename
+    const char *	filename
     CODE:
     ST(0) = sv_2mortal(newRV((SV*)newXS_flags(perl_name,
 					      (void(*)(pTHX_ CV *))symref,

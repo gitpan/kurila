@@ -60,7 +60,7 @@
 
 bool
 Perl_do_openn(pTHX_ GV *gv, register const char *oname, I32 len, int as_raw,
-	      int rawmode, int rawperm, PerlIO *supplied_fp, SV **svp,
+	      int rawmode, int rawperm, PerlIO *supplied_fp, SV * const *svp,
 	      I32 num_svs)
 {
     dVAR;
@@ -78,6 +78,8 @@ Perl_do_openn(pTHX_ GV *gv, register const char *oname, I32 len, int as_raw,
     char *type  = NULL;
     char mode[PERL_MODE_MAX];	/* file mode ("r\0", "rb\0", "ab\0" etc.) */
     SV *namesv;
+
+    PERL_ARGS_ASSERT_DO_OPENN;
 
     Zero(mode,sizeof(mode),char);
     PL_forkprocess = 1;		/* assume true if no fork */
@@ -176,7 +178,7 @@ Perl_do_openn(pTHX_ GV *gv, register const char *oname, I32 len, int as_raw,
 
         IoTYPE(io) = PerlIO_intmode2str(rawmode, &mode[ix], &writing);
 
-	namesv = sv_2mortal(newSVpvn(oname,len));
+	namesv = newSVpvn_flags(oname, len, SVs_TEMP);
 	num_svs = 1;
 	svp = &namesv;
 	type = NULL;
@@ -184,7 +186,6 @@ Perl_do_openn(pTHX_ GV *gv, register const char *oname, I32 len, int as_raw,
     }
     else {
 	/* Regular (non-sys) open */
-	char *name;
 	STRLEN olen = len;
 	char *tend;
 	int dodup = 0;
@@ -212,7 +213,6 @@ Perl_do_openn(pTHX_ GV *gv, register const char *oname, I32 len, int as_raw,
 	    /* '-' opens STDIN */
 	    if (num_svs)
 		Perl_croak(aTHX_ "open() '-' is only allowed with 3rd argument.");
-	    name = type;
 	    mode[0] = 'r';
 	    if (in_raw)
 		mode[1] = 'b';
@@ -276,10 +276,10 @@ Perl_do_openn(pTHX_ GV *gv, register const char *oname, I32 len, int as_raw,
 		goto say_false;
 	    }
 #endif /* USE_STDIO */
-	    name = SvOK(*svp) ? savesvpv (*svp) : savepvn ("", 0);
-	    SAVEFREEPV(name);
-
 	    if (*type == IoTYPE_PIPE) {
+		char *name = SvOK(*svp) ? savesvpv (*svp) : savepvn ("", 0);
+		SAVEFREEPV(name);
+
 		if (type[1] != IoTYPE_STD) {
 		  unknown_open_mode:
 		    Perl_croak(aTHX_ "Unknown open() mode '%.*s'", (int)olen, oname);
@@ -352,14 +352,9 @@ Perl_do_openn(pTHX_ GV *gv, register const char *oname, I32 len, int as_raw,
 			if (num_svs > 1) {
 			    Perl_croak(aTHX_ "More than one argument to '%c&' open",IoTYPE(io));
 			}
-			while (isSPACE(*type))
-			    type++;
 			if (SvIOK(*svp) || (SvPOK(*svp) && looks_like_number(*svp))) {
 			    fd = SvUV(*svp);
 			    num_svs = 0;
-			}
-			else if (isDIGIT(*type)) {
-			    fd = atoi(type);
 			}
 			else {
 			    const IO* thatio;
@@ -455,6 +450,9 @@ Perl_do_openn(pTHX_ GV *gv, register const char *oname, I32 len, int as_raw,
 	    } /* IoTYPE_RDONLY */
 	    else if ((/* '-|...' or '...|' */
 			 type[0] == IoTYPE_STD && type[1] == IoTYPE_PIPE)) {
+		char *name = SvOK(*svp) ? savesvpv (*svp) : savepvn ("", 0);
+		SAVEFREEPV(name);
+
 		type += 2;   /* skip over '-|' */
 		if (*name == '\0') {
 		    /* command is missing 19990114 */
@@ -476,6 +474,8 @@ Perl_do_openn(pTHX_ GV *gv, register const char *oname, I32 len, int as_raw,
 		    fp = PerlProc_popen_list(mode,num_svs,svp);
 		}
 		else {
+		    char *name = SvOK(*svp) ? savesvpv (*svp) : savepvn ("", 0);
+		    SAVEFREEPV(name);
 		    fp = PerlProc_popen(name,mode);
 		}
 		IoTYPE(io) = IoTYPE_PIPE;
@@ -677,6 +677,8 @@ Perl_nextargv(pTHX_ register GV *gv)
     Gid_t filegid;
     IO * const io = GvIOp(gv);
 
+    PERL_ARGS_ASSERT_NEXTARGV;
+
     if (!PL_argvoutgv)
 	PL_argvoutgv = gv_fetchpvs("ARGVOUT", GV_ADD|GV_NOTQUAL, SVt_PVIO);
     if (io && (IoFLAGS(io) & IOf_ARGV) && (IoFLAGS(io) & IOf_START)) {
@@ -706,7 +708,7 @@ Perl_nextargv(pTHX_ register GV *gv)
 	SAVEFREESV(sv);
 	sv_setsv(GvSVn(gv),sv);
 	SvSETMAGIC(GvSV(gv));
-	PL_oldname = SvPVx(GvSV(gv), oldlen);
+	PL_oldname = SvPVx(GvSV(gv), &oldlen);
 	if ( ! PL_inplace) {
 	    if (oldlen == 1 && *PL_oldname == '-') {
 		if (do_openn(gv,"-", 1, FALSE, O_RDONLY,0,NULL,NULL,0)) {
@@ -932,6 +934,8 @@ Perl_io_close(pTHX_ IO *io, bool not_implicit)
     dVAR;
     bool retval = FALSE;
 
+    PERL_ARGS_ASSERT_IO_CLOSE;
+
     if (IoIFP(io)) {
 	if (IoTYPE(io) == IoTYPE_PIPE) {
 	    const int status = PerlProc_pclose(IoIFP(io));
@@ -970,6 +974,8 @@ Perl_do_eof(pTHX_ GV *gv)
 {
     dVAR;
     register IO * const io = GvIO(gv);
+
+    PERL_ARGS_ASSERT_DO_EOF;
 
     if (!io)
 	return TRUE;
@@ -1015,6 +1021,8 @@ Perl_do_tell(pTHX_ GV *gv)
     register IO *io = NULL;
     register PerlIO *fp;
 
+    PERL_ARGS_ASSERT_DO_TELL;
+
     if (gv && (io = GvIO(gv)) && (fp = IoIFP(io))) {
 #ifdef ULTRIX_STDIO_BOTCH
 	if (PerlIO_eof(fp))
@@ -1054,6 +1062,8 @@ Perl_do_sysseek(pTHX_ GV *gv, Off_t pos, int whence)
     dVAR;
     register IO *io = NULL;
     register PerlIO *fp;
+
+    PERL_ARGS_ASSERT_DO_SYSSEEK;
 
     if (gv && (io = GvIO(gv)) && (fp = IoIFP(io)))
 	return PerlLIO_lseek(PerlIO_fileno(fp), pos, whence);
@@ -1176,6 +1186,9 @@ bool
 Perl_do_print(pTHX_ register SV *sv, PerlIO *fp)
 {
     dVAR;
+
+    PERL_ARGS_ASSERT_DO_PRINT;
+
     /* assuming fp is checked earlier */
     if (!sv)
 	return TRUE;
@@ -1281,6 +1294,7 @@ Perl_my_lstat(pTHX)
     static const char no_prev_lstat[] = "The stat preceding -l _ wasn't an lstat";
     dSP;
     SV *sv;
+    const char *file;
     if (PL_op->op_flags & OPf_REF) {
 	EXTEND(SP,1);
 	if (cGVOP_gv == PL_defgv) {
@@ -1307,10 +1321,10 @@ Perl_my_lstat(pTHX)
 		GvENAME((GV*) SvRV(sv)));
 	return (PL_laststatval = -1);
     }
-    /* XXX Do really need to be calling SvPV() all these times? */
-    sv_setpv(PL_statname,SvPV_nolen_const(sv));
-    PL_laststatval = PerlLIO_lstat(SvPV_nolen_const(sv),&PL_statcache);
-    if (PL_laststatval < 0 && ckWARN(WARN_NEWLINE) && strchr(SvPV_nolen_const(sv), '\n'))
+    file = SvPV_nolen_const(sv);
+    sv_setpv(PL_statname,file);
+    PL_laststatval = PerlLIO_lstat(file,&PL_statcache);
+    if (PL_laststatval < 0 && ckWARN(WARN_NEWLINE) && strchr(file, '\n'))
 	Perl_warner(aTHX_ packWARN(WARN_NEWLINE), PL_warn_nl, "lstat");
     return PL_laststatval;
 }
@@ -1319,6 +1333,7 @@ static void
 S_exec_failed(pTHX_ const char *cmd, int fd, int do_report)
 {
     const int e = errno;
+    PERL_ARGS_ASSERT_EXEC_FAILED;
     if (ckWARN(WARN_EXEC))
 	Perl_warner(aTHX_ packWARN(WARN_EXEC), "Can't exec \"%s\": %s",
 		    cmd, Strerror(e));
@@ -1329,22 +1344,23 @@ S_exec_failed(pTHX_ const char *cmd, int fd, int do_report)
 }
 
 bool
-Perl_do_aexec5(pTHX_ SV *really, register SV **mark, register SV **sp,
+Perl_do_aexec5(pTHX_ SV *really, register SV * const *mark, register SV * const *sp,
 	       int fd, int do_report)
 {
     dVAR;
+    PERL_ARGS_ASSERT_DO_AEXEC5;
 #if defined(MACOS_TRADITIONAL) || defined(__SYMBIAN32__) || defined(__LIBCATAMOUNT__)
     Perl_croak(aTHX_ "exec? I'm not *that* kind of operating system");
 #else
     if (sp > mark) {
-	char **a;
+	const char **a;
 	const char *tmps = NULL;
-	Newx(PL_Argv, sp - mark + 1, char*);
+	Newx(PL_Argv, sp - mark + 1, const char*);
 	a = PL_Argv;
 
 	while (++mark <= sp) {
 	    if (*mark)
-		*a++ = (char*)SvPV_nolen_const(*mark);
+		*a++ = SvPV_nolen_const(*mark);
 	    else
 		*a++ = "";
 	}
@@ -1383,13 +1399,15 @@ bool
 Perl_do_exec3(pTHX_ const char *incmd, int fd, int do_report)
 {
     dVAR;
-    register char **a;
+    register const char **a;
     register char *s;
     char *buf;
     char *cmd;
-
     /* Make a copy so we can change it */
     const Size_t cmdlen = strlen(incmd) + 1;
+
+    PERL_ARGS_ASSERT_DO_EXEC3;
+
     Newx(buf, cmdlen, char);
     cmd = buf;
     memcpy(cmd, incmd, cmdlen);
@@ -1479,7 +1497,7 @@ Perl_do_exec3(pTHX_ const char *incmd, int fd, int do_report)
 	}
     }
 
-    Newx(PL_Argv, (s - cmd) / 2 + 2, char*);
+    Newx(PL_Argv, (s - cmd) / 2 + 2, const char*);
     PL_Cmd = savepvn(cmd, s-cmd);
     a = PL_Argv;
     for (s = PL_Cmd; *s;) {
@@ -1495,7 +1513,7 @@ Perl_do_exec3(pTHX_ const char *incmd, int fd, int do_report)
     *a = NULL;
     if (PL_Argv[0]) {
 	PERL_FPU_PRE_EXEC
-	PerlProc_execvp(PL_Argv[0],PL_Argv);
+	PerlProc_execvp(PL_Argv[0],EXEC_ARGV_CAST(PL_Argv));
 	PERL_FPU_POST_EXEC
 	if (errno == ENOEXEC) {		/* for system V NIH syndrome */
 	    do_execfree();
@@ -1519,6 +1537,8 @@ Perl_apply(pTHX_ I32 type, register SV **mark, register SV **sp)
     const char *const what = PL_op_name[type];
     const char *s;
     SV ** const oldmark = mark;
+
+    PERL_ARGS_ASSERT_APPLY;
 
     /* Doing this ahead of the switch statement preserves the old behaviour,
        where attempting to use kill as a taint test test would fail on
@@ -1591,8 +1611,8 @@ Perl_apply(pTHX_ I32 type, register SV **mark, register SV **sp)
 	APPLY_TAINT_PROPER();
 	if (sp - mark > 2) {
             register I32 val2;
-	    val = SvIVx(*++mark);
-	    val2 = SvIVx(*++mark);
+	    val = SvIV(*++mark);
+	    val2 = SvIV(*++mark);
 	    APPLY_TAINT_PROPER();
 	    tot = sp - mark;
 	    while (++mark <= sp) {
@@ -1822,6 +1842,9 @@ Perl_cando(pTHX_ Mode_t mode, bool effective, register const Stat_t *statbufp)
  */
 {
     dVAR;
+
+    PERL_ARGS_ASSERT_CANDO;
+
 #ifdef DOSISH
     /* [Comments and code from Len Reed]
      * MS-DOS "user" is similar to UNIX's "superuser," but can't write
@@ -1911,10 +1934,11 @@ I32
 Perl_do_ipcget(pTHX_ I32 optype, SV **mark, SV **sp)
 {
     dVAR;
-    const key_t key = (key_t)SvNVx(*++mark);
-    const I32 n = (optype == OP_MSGGET) ? 0 : SvIVx(*++mark);
-    const I32 flags = SvIVx(*++mark);
+    const key_t key = (key_t)SvNV(*++mark);
+    const I32 n = (optype == OP_MSGGET) ? 0 : SvIV(*++mark);
+    const I32 flags = SvIV(*++mark);
 
+    PERL_ARGS_ASSERT_DO_IPCGET;
     PERL_UNUSED_ARG(sp);
 
     SETERRNO(0,0);
@@ -1946,15 +1970,16 @@ Perl_do_ipcctl(pTHX_ I32 optype, SV **mark, SV **sp)
     dVAR;
     char *a;
     I32 ret = -1;
-    const I32 id  = SvIVx(*++mark);
+    const I32 id  = SvIV(*++mark);
 #ifdef Semctl
-    const I32 n   = (optype == OP_SEMCTL) ? SvIVx(*++mark) : 0;
+    const I32 n   = (optype == OP_SEMCTL) ? SvIV(*++mark) : 0;
 #endif
-    const I32 cmd = SvIVx(*++mark);
+    const I32 cmd = SvIV(*++mark);
     SV * const astr = *++mark;
     STRLEN infosize = 0;
     I32 getinfo = (cmd == IPC_STAT);
 
+    PERL_ARGS_ASSERT_DO_IPCCTL;
     PERL_UNUSED_ARG(sp);
 
     switch (optype)
@@ -2071,12 +2096,13 @@ Perl_do_msgsnd(pTHX_ SV **mark, SV **sp)
     dVAR;
 #ifdef HAS_MSG
     STRLEN len;
-    const I32 id = SvIVx(*++mark);
+    const I32 id = SvIV(*++mark);
     SV * const mstr = *++mark;
-    const I32 flags = SvIVx(*++mark);
+    const I32 flags = SvIV(*++mark);
     const char * const mbuf = SvPV_const(mstr, len);
     const I32 msize = len - sizeof(long);
 
+    PERL_ARGS_ASSERT_DO_MSGSND;
     PERL_UNUSED_ARG(sp);
 
     if (msize < 0)
@@ -2084,6 +2110,8 @@ Perl_do_msgsnd(pTHX_ SV **mark, SV **sp)
     SETERRNO(0,0);
     return msgsnd(id, (struct msgbuf *)mbuf, msize, flags);
 #else
+    PERL_UNUSED_ARG(sp);
+    PERL_UNUSED_ARG(mark);
     Perl_croak(aTHX_ "msgsnd not implemented");
 #endif
 }
@@ -2096,16 +2124,18 @@ Perl_do_msgrcv(pTHX_ SV **mark, SV **sp)
     char *mbuf;
     long mtype;
     I32 msize, flags, ret;
-    const I32 id = SvIVx(*++mark);
+    const I32 id = SvIV(*++mark);
     SV * const mstr = *++mark;
+
+    PERL_ARGS_ASSERT_DO_MSGRCV;
     PERL_UNUSED_ARG(sp);
 
     /* suppress warning when reading into undef var --jhi */
     if (! SvOK(mstr))
 	sv_setpvn(mstr, "", 0);
-    msize = SvIVx(*++mark);
-    mtype = (long)SvIVx(*++mark);
-    flags = SvIVx(*++mark);
+    msize = SvIV(*++mark);
+    mtype = (long)SvIV(*++mark);
+    flags = SvIV(*++mark);
     SvPV_force_nolen(mstr);
     mbuf = SvGROW(mstr, sizeof(long)+msize+1);
 
@@ -2121,6 +2151,8 @@ Perl_do_msgrcv(pTHX_ SV **mark, SV **sp)
     }
     return ret;
 #else
+    PERL_UNUSED_ARG(sp);
+    PERL_UNUSED_ARG(mark);
     Perl_croak(aTHX_ "msgrcv not implemented");
 #endif
 }
@@ -2131,9 +2163,11 @@ Perl_do_semop(pTHX_ SV **mark, SV **sp)
 #ifdef HAS_SEM
     dVAR;
     STRLEN opsize;
-    const I32 id = SvIVx(*++mark);
+    const I32 id = SvIV(*++mark);
     SV * const opstr = *++mark;
     const char * const opbuf = SvPV_const(opstr, opsize);
+
+    PERL_ARGS_ASSERT_DO_SEMOP;
     PERL_UNUSED_ARG(sp);
 
     if (opsize < 3 * SHORTSIZE
@@ -2184,10 +2218,12 @@ Perl_do_shmio(pTHX_ I32 optype, SV **mark, SV **sp)
     dVAR;
     char *shm;
     struct shmid_ds shmds;
-    const I32 id = SvIVx(*++mark);
+    const I32 id = SvIV(*++mark);
     SV * const mstr = *++mark;
-    const I32 mpos = SvIVx(*++mark);
-    const I32 msize = SvIVx(*++mark);
+    const I32 mpos = SvIV(*++mark);
+    const I32 msize = SvIV(*++mark);
+
+    PERL_ARGS_ASSERT_DO_SHMIO;
     PERL_UNUSED_ARG(sp);
 
     SETERRNO(0,0);
@@ -2254,6 +2290,9 @@ Perl_start_glob (pTHX_ SV *tmpglob, IO *io)
     dVAR;
     SV * const tmpcmd = newSV(0);
     PerlIO *fp;
+
+    PERL_ARGS_ASSERT_START_GLOB;
+
     ENTER;
     SAVEFREESV(tmpcmd);
 #ifdef VMS /* expand the wildcards right here, rather than opening a pipe, */

@@ -41,9 +41,9 @@ is ($@, "");
 
 {
     my $c = 0;
-    local $SIG{__WARN__} = sub { $c++   };
-    local $SIG{__DIE__}  = sub { $c+= 2 };
+    local ${^WARN_HOOK} = sub { $c++   };
     eval q{
+        local ${^DIE_HOOK} = sub { $c+= 2 };
 	is($c, 0, "premature warn/die: $c");
 	my $x = "a"+5;
 	is($c, 1, "missing warn hook");
@@ -51,6 +51,6 @@ is ($@, "");
 	$c = 0;
 	$x = 1/0;
     };
-    like ($@, qr/division/, "eval caught division");
+    like ($@->{description}, qr/division/, "eval caught division");
     is($c, 2, "missing die hook");
 }

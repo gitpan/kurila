@@ -35,11 +35,11 @@ ok( chdir 'Problem-Module', "chdir'd to Problem-Module" ) ||
     my $stdout = tie *STDOUT, 'TieOut' or die;
 
     my $warning = '';
-    local $SIG{__WARN__} = sub { $warning = join '', @_ };
+    local ${^WARN_HOOK} = sub { $warning = $_[0]->{description} };
     eval { $MM->eval_in_subdirs; };
 
     is( $stdout->read, qq{\@INC has .\n}, 'cwd in @INC' );
-    like( $@, 
+    like( $@->{description}, 
           qr{^ERROR from evaluation of .*subdir.*Makefile.PL: YYYAaaaakkk},
           'Makefile.PL death in subdir warns' );
 

@@ -31,7 +31,7 @@ BEGIN {
     my $thr = threads->create(sub {});
     eval { $thr->kill('HUP') };
     $thr->join();
-    if ($@ && $@ =~ /safe signals/) {
+    if ($@ && $@->{description} =~ m/safe signals/) {
         print("1..0 # Skip: Not using safe signals\n");
         exit(0);
     }
@@ -47,9 +47,10 @@ BEGIN {
 my $q = Thread::Queue->new();
 my $TEST = 1;
 
-sub ok
+sub ok($$)
 {
-    $q->enqueue(@_);
+    my ($xok, $xname) = @_;
+    $q->enqueue($xok, $xname);
 
     while ($q->pending()) {
         my $ok   = $q->dequeue();
@@ -73,7 +74,7 @@ ok(1, 'Loaded');
 
 # Set up to capture warning when thread terminates
 my @errs :shared;
-$SIG{__WARN__} = sub { push(@errs, @_); };
+${^DIE_HOOK} = sub { push(@errs, $_[0]->{description}); };
 
 sub thr_func {
     my $q = shift;
@@ -93,7 +94,7 @@ sub thr_func {
 }
 
 # Create thread
-my $thr = threads->create('thr_func', $q);
+my $thr = threads->create(\&thr_func, $q);
 ok($thr && $thr->tid() == 2, 'Created thread');
 threads->yield();
 sleep(1);
@@ -107,7 +108,7 @@ my $rc = $thr->join();
 ok(! $rc, 'No thread return value');
 
 # Check for thread termination message
-ok(@errs && $errs[0] =~ /Thread killed/, 'Thread termination warning');
+ok(@errs && $errs[0] =~ m/Thread killed/, 'Thread termination warning');
 
 
 ### Thread suspend/resume ###
@@ -149,7 +150,7 @@ my $sema = Thread::Semaphore->new();
 ok($sema, 'Semaphore created');
 
 # Create a thread and send it the semaphore
-$thr = threads->create('thr_func2', $q, $sema);
+$thr = threads->create(\&thr_func2, $q, $sema);
 ok($thr && $thr->tid() == 3, 'Created thread');
 threads->yield();
 sleep(1);

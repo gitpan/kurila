@@ -120,8 +120,6 @@ END_EXTERN_C
 #define PL_Argv			(*Perl_IArgv_ptr(aTHX))
 #undef  PL_Cmd
 #define PL_Cmd			(*Perl_ICmd_ptr(aTHX))
-#undef  PL_DBassertion
-#define PL_DBassertion		(*Perl_IDBassertion_ptr(aTHX))
 #undef  PL_DBcv
 #define PL_DBcv			(*Perl_IDBcv_ptr(aTHX))
 #undef  PL_DBgv
@@ -294,6 +292,8 @@ END_EXTERN_C
 #define PL_envgv		(*Perl_Ienvgv_ptr(aTHX))
 #undef  PL_errgv
 #define PL_errgv		(*Perl_Ierrgv_ptr(aTHX))
+#undef  PL_errorcreatehook
+#define PL_errorcreatehook	(*Perl_Ierrorcreatehook_ptr(aTHX))
 #undef  PL_errors
 #define PL_errors		(*Perl_Ierrors_ptr(aTHX))
 #undef  PL_euid

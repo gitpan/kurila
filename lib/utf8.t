@@ -91,7 +91,7 @@ plan tests => 36;
     local $TODO = "use utf8; passed to eval";
     use utf8;
     my $w = 0;
-    local $SIG{__WARN__} = sub { print "#($_[0])\n"; $w++ };
+    local ${^WARN_HOOK} = sub { print "#($_[0])\n"; $w++ };
     my $x = eval q/"\\/ . "\x{100}" . q/"/;
    
     ok($w == 0 && $x eq "\x{100}");
@@ -202,7 +202,7 @@ SKIP: {
 {
     use utf8;
     eval {utf8::encode("£")};
-    like($@, qr//, "utf8::encode is a NO-OP");
+    is($@, '', "utf8::encode is a NO-OP");
 }
 
 {

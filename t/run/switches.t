@@ -11,7 +11,7 @@ BEGIN {
 
 BEGIN { require "./test.pl"; }
 
-plan(tests => 61);
+plan(tests => 62);
 
 use Config;
 
@@ -262,13 +262,13 @@ SWTESTPM
 
 # Tests for switches which do not exist
 
-foreach my $switch (split m//, "ABbGgHJjKkLNOoQqRrYyZz123456789_")
+foreach my $switch (split m//, "ABbGgHJjKkLNOoPQqRrYyZz123456789_")
 {
     local $TODO = '';   # these ones should work on VMS
 
     like( runperl( switches => ["-$switch"], stderr => 1,
 		   prog => 'die "oops"' ),
-	  qr/\QUnrecognized switch: -$switch  (-h will show valid options)./,
+	  qr/\QUnrecognized switch: -$switch  (-h will show valid options)/,
           "-$switch correctly unknown" );
 
 }

@@ -2251,6 +2251,15 @@ L<perlfunc/listen>.
 (F) There is currently a limit on the length of string which lookbehind can
 handle. This restriction may be eased in a future release. 
 
+=item Lost precision when %s %f by 1
+
+(W) The value you attempted to increment or decrement by one is too large
+for the underlying floating point representation to store accurately,
+hence the target of C<++> or C<--> is unchanged. Perl issues this warning
+because it has already switched from integers to floating point when values
+are too large for integers, and now even floating point is insufficient.
+You may wish to switch to using L<Math::BigInt> explicitly.
+
 =item lstat() on filehandle %s
 
 (W io) You tried to do an lstat on a filehandle.  What did you mean
@@ -3286,11 +3295,6 @@ fine from VMS' perspective, it's probably not what you intended.
 =item 'P' must have an explicit size in unpack
 
 (F) The unpack format P must have an explicit size, not "*".
-
-=item B<-P> not allowed for setuid/setgid script
-
-(F) The script would have to be opened by the C preprocessor by name,
-which provides a race condition that breaks security.
 
 =item POSIX class [:%s:] unknown in regex; marked by <-- HERE in m/%s/
 
@@ -4912,18 +4916,6 @@ the version number.
 
 (W misc) The version string contains invalid characters at the end, which
 are being ignored.
-
-=item v-string in use/require is non-portable
-
-(W portable) The use of v-strings is non-portable to older, pre-5.6, Perls.
-If you want your scripts to be backward portable, use the floating
-point version number: for example, instead of C<use 5.6.1> say
-C<use 5.006_001>. This of course won't make older Perls suddenly start
-understanding newer features, but at least they will show a sensible
-error message indicating the required minimum version.
-
-This warning is suppressed if the C<use 5.x.y> is preceded by a
-C<use 5.006> (see C<use VERSION> in L<perlfunc/use>).
 
 =item Warning: something's wrong
 

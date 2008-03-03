@@ -394,7 +394,7 @@ B<-D14> is equivalent to B<-Dtls>):
         8  t  Trace execution
        16  o  Method and overloading resolution
        32  c  String/numeric conversions
-       64  P  Print profiling info, preprocessor command for -P, source file input state
+       64  P  Print profiling info, source file input state
       128  m  Memory allocation
       256  f  Format processing
       512  r  Regular expression parsing and execution
@@ -454,10 +454,10 @@ X<-f>
 Disable executing F<$Config{sitelib}/sitecustomize.pl> at startup.
 
 Perl can be built so that it by default will try to execute
-F<$Config{sitelib}/sitecustomize.pl> at startup.  This is a hook that
-allows the sysadmin to customize how perl behaves.  It can for
-instance be used to add entries to the @INC array to make perl find
-modules in non-standard locations.
+F<$Config{sitelib}/sitecustomize.pl> at startup (in a BEGIN block).
+This is a hook that allows the sysadmin to customize how perl behaves.
+It can for instance be used to add entries to the @INC array to make perl
+find modules in non-standard locations.
 
 =item B<-F>I<pattern>
 X<-F>
@@ -691,11 +691,6 @@ overrides a B<-n> switch.
 
 C<BEGIN> and C<END> blocks may be used to capture control before or after
 the implicit loop, just as in B<awk>.
-
-=item B<-P>
-X<-P>
-
-Has been removed in kurila.
 
 =item B<-s>
 X<-s>
@@ -1059,9 +1054,9 @@ X<:utf8>
 
 A pseudolayer that turns on a flag on the layer below to tell perl
 that output should be in utf8 and that input should be regarded as
-already in utf8 form.  May be useful in PERLIO environment
-variable to make UTF-8 the default. (To turn off that behaviour
-use C<:bytes> layer.)
+already in valid utf8 form. It does not check for validity and as such
+should be handled with caution for input. Generally C<:encoding(utf8)> is
+the best option when reading UTF-8 encoded data.
 
 =item :win32
 X<:win32>

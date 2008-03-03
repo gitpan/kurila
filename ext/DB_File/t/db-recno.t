@@ -93,7 +93,7 @@ sub safeUntie
 {
     my $hashref = shift ;
     my $no_inner = 1;
-    local $SIG{__WARN__} = sub {-- $no_inner } ;
+    local ${^WARN_HOOK} = sub {-- $no_inner } ;
     untie @$hashref;
     return $no_inner;
 }
@@ -141,7 +141,6 @@ sub normalise
 BEGIN 
 { 
     { 
-        local $SIG{__DIE__} ; 
         eval { require Data::Dumper ; Data::Dumper->import() } ; 
     }
  
@@ -195,9 +194,9 @@ ok(14, $dbh->{bfname} == 1234 );
 
 # Check that an invalid entry is caught both for store & fetch
 eval '$dbh->{fred} = 1234' ;
-ok(15, $@ =~ m/^DB_File::RECNOINFO::STORE - Unknown element 'fred' at/ );
+ok(15, $@->{description} =~ m/^DB_File::RECNOINFO::STORE - Unknown element 'fred' at/ );
 eval 'my $q = $dbh->{fred}' ;
-ok(16, $@ =~ m/^DB_File::RECNOINFO::FETCH - Unknown element 'fred' at/ );
+ok(16, $@->{description} =~ m/^DB_File::RECNOINFO::FETCH - Unknown element 'fred' at/ );
 
 # Now check the interface to RECNOINFO
 
@@ -317,7 +316,7 @@ ok(56, $h[0] eq "abcd" );
 
 # now try to read before the start of the array
 eval '$h[ - (1 + ($FA ? @h : $X->length))] = 1234' ;
-ok(57, $@ =~ '^Modification of non-creatable array value attempted' );
+ok(57, $@->{description} =~ '^Modification of non-creatable array value attempted' );
 
 # IMPORTANT - $X must be undefined before the untie otherwise the
 #             underlying DB close routine will not get called.
@@ -405,7 +404,7 @@ unlink $Dfile;
     my $filename = "xyz" ;
     my %x ;
     eval { tie %x, 'DB_File', $filename, O_RDWR^|^O_CREAT, 0640, $DB_RECNO ; } ;
-    ok(71, $@ =~ m/^DB_File can only tie an array to a DB_RECNO database/) ;
+    ok(71, $@->{description} =~ m/^DB_File can only tie an array to a DB_RECNO database/) ;
     unlink $filename ;
 }
 
@@ -758,7 +757,7 @@ EOM
    $db->filter_store_key (sub { $_ = $h[0] }) ;
 
    eval '$h[1] = 1234' ;
-   ok(146, $@ =~ m/^recursion detected in filter_store_key at/ );
+   ok(146, $@->{description} =~ m/^recursion detected in filter_store_key/ );
    
    undef $db ;
    ok(147, safeUntie \@h);
@@ -944,7 +943,7 @@ EOM
     unlink $Dfile;
     my @h ;
     my $a = "";
-    local $SIG{__WARN__} = sub {$a = $_[0]} ;
+    local ${^WARN_HOOK} = sub {$a = $_[0]} ;
     
     tie @h, 'DB_File', $Dfile, O_RDWR^|^O_CREAT, 0664, $DB_RECNO 
 	or die "Can't open file: $!\n" ;
@@ -961,7 +960,7 @@ EOM
     use strict ;
     use DB_File ;
     my $a = "";
-    local $SIG{__WARN__} = sub {$a = $_[0]} ;
+    local ${^WARN_HOOK} = sub {$a = $_[0]} ;
 
     unlink $Dfile;
     my @h ;
@@ -994,7 +993,7 @@ EOM
    $h[0] = "joe" ;
    ok(155, $h[0] eq "joe");
 
-   eval { grep { $h[$_] } (1, 2, 3) };
+   eval { my @r= grep { $h[$_] } (1, 2, 3) };
    ok (156, ! $@);
 
 
@@ -1008,7 +1007,7 @@ EOM
 
    ok(157, $h[1] eq "joe");
 
-   eval { grep { $h[$_] } (1, 2, 3) };
+   eval { my @r= grep { $h[$_] } (1, 2, 3) };
    ok (158, ! $@);
 
    undef $db ;
@@ -1081,7 +1080,7 @@ EOM
     ok(169, $db = tie(@h, 'DB_File', $Dfile, O_RDWR^|^O_CREAT, 0640, $DB_RECNO) );
 
     my $warned = '';
-    local $SIG{__WARN__} = sub {$warned = $_[0]} ;
+    local ${^WARN_HOOK} = sub {$warned = $_[0]} ;
 
     # db-put with substr of key
     my %remember = () ;
@@ -1199,7 +1198,7 @@ exit unless $FA ;
 
     my $a = '';
     my @a = (1);
-    local $SIG{__WARN__} = sub {$a = $_[0]} ;
+    local ${^WARN_HOOK} = sub {$a = $_[0]->{description}} ;
 
     unlink $Dfile;
     my @tied ;
@@ -1404,31 +1403,31 @@ sub test_splice {
     # 
     my ($s_r, $s_error, @s_warnings);
 
-    my $gather_warning = sub { push @s_warnings, $_[0] };
+    my $gather_warning = sub { push @s_warnings, $_[0]->{description} };
     if ($context eq 'list') {
 	my @r;
 	eval {
-	    local $SIG{__WARN__} = $gather_warning;
+	    local ${^WARN_HOOK} = $gather_warning;
 	    @r = splice @array, $offset, $length, @list;
 	};
-	$s_error = $@;
+	$s_error = $@ && $@->{description};
 	$s_r = \@r;
     }
     elsif ($context eq 'scalar') {
 	my $r;
 	eval {
-	    local $SIG{__WARN__} = $gather_warning;
+	    local ${^WARN_HOOK} = $gather_warning;
 	    $r = splice @array, $offset, $length, @list;
 	};
-	$s_error = $@;
+	$s_error = $@ && $@->{description};
 	$s_r = [ $r ];
     }
     elsif ($context eq 'void') {
 	eval {
-	    local $SIG{__WARN__} = $gather_warning;
+	    local ${^WARN_HOOK} = $gather_warning;
 	    splice @array, $offset, $length, @list;
 	};
-	$s_error = $@;
+	$s_error = $@ && $@->{description};
 	$s_r = [];
     }
     else {
@@ -1444,31 +1443,31 @@ sub test_splice {
 
     # Now do the same for DB_File's version of splice
     my ($ms_r, $ms_error, @ms_warnings);
-    $gather_warning = sub { push @ms_warnings, $_[0] };
+    $gather_warning = sub { push @ms_warnings, $_[0]->{description} };
     if ($context eq 'list') {
 	my @r;
 	eval {
-	    local $SIG{__WARN__} = $gather_warning;
+	    local ${^WARN_HOOK} = $gather_warning;
 	    @r = splice @h, $offset, $length, @list;
 	};
-	$ms_error = $@;
+	$ms_error = $@ && $@->{description};
 	$ms_r = \@r;
     }
     elsif ($context eq 'scalar') {
 	my $r;
 	eval {
-	    local $SIG{__WARN__} = $gather_warning;
+	    local ${^WARN_HOOK} = $gather_warning;
 	    $r = splice @h, $offset, $length, @list;
 	};
-	$ms_error = $@;
+	$ms_error = $@ && $@->{description};
 	$ms_r = [ $r ];
     }
     elsif ($context eq 'void') {
 	eval {
-	    local $SIG{__WARN__} = $gather_warning;
+	    local ${^WARN_HOOK} = $gather_warning;
 	    splice @h, $offset, $length, @list;
 	};
-	$ms_error = $@;
+	$ms_error = $@ && $@->{description};
 	$ms_r = [];
     }
     else {
@@ -1488,6 +1487,8 @@ sub test_splice {
       if list_diff(\@array, \@h);
 
     if ((scalar @s_warnings) != (scalar @ms_warnings)) {
+        print STDERR "s_warnings: ", @s_warnings, "ABC\n";
+        print STDERR "ms_warnings: ", @ms_warnings, "DEF\n";
 	return 'different number of warnings';
     }
 

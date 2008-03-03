@@ -853,7 +853,6 @@ $   ENDIF
 $ ENDIF  !(needman .EQS. "true")
 $!
 $!: see if sh knows # comments             !sfn
-$ sharpbang = "$ "
 $!: figure out how to guarantee sh startup !sfn
 $!: find out where common programs are     !sfn
 $!loclist="awk/cat/comm/cp/echo/expr/find/grep/ln/ls/mkdir/rm/sed/sort/touch/tr/uniq"
@@ -3184,9 +3183,8 @@ $! perllibs should be libs with all non-core libs (such as gdbm) removed.
 $!
 $ perllibs=libs
 $!
-$! Are we 64 bit?
 $!
-$ IF use64bitint .OR. use64bitint .EQS. "define"
+$ IF archname .NES. "VMS_VAX"
 $ THEN
 $   d_PRId64 = "define"
 $   d_PRIu64 = "define"
@@ -3202,7 +3200,11 @@ $   sPRIx64 = """Lx"""
 $   d_quad = "define"
 $   quadtype = "long long"
 $   uquadtype = "unsigned long long"
-$   quadkind  = "QUAD_IS_LONG_LONG"
+$   quadkind  = "3"
+$!
+$   d_frexpl = "define"
+$   d_modfl = "define"
+$   d_modflproto = "define"
 $ ELSE
 $   d_PRId64 = "undef"
 $   d_PRIXU64 = "undef"
@@ -3216,17 +3218,10 @@ $   sPRIo64 = ""
 $   sPRIu64 = ""
 $   sPRIx64 = ""
 $   d_quad = "undef"
-$   quadtype = "long"
-$   uquadtype = "unsigned long"
-$   quadkind  = "QUAD_IS_LONG"
-$ ENDIF
+$   quadtype = "undef"
+$   uquadtype = "undef"
+$   quadkind  = "undef"
 $!
-$ IF archname .NES. "VMS_VAX"
-$ THEN
-$   d_frexpl = "define"
-$   d_modfl = "define"
-$   d_modflproto = "define"
-$ ELSE
 $   d_frexpl = "undef"
 $   d_modfl = "undef"
 $   d_modflproto = "undef"
@@ -5940,6 +5935,8 @@ $ WC "d_nanosleep='" + d_nanosleep + "'"
 $ WC "d_nice='define'"
 $ WC "d_nl_langinfo='" + d_nl_langinfo + "'"
 $ WC "d_nv_preserves_uv='" + d_nv_preserves_uv + "'"
+$! Pending integrating the probe test
+$ WC "nv_overflows_integers_at='0'"
 $ WC "nv_preserves_uv_bits='" + nv_preserves_uv_bits + "'"
 $ WC "d_nv_zero_is_allbits_zero='define'"
 $ WC "d_off64_t='" + d_off64_t + "'"
@@ -6128,6 +6125,7 @@ $ WC "dlobj='" + dlobj + "'"
 $ WC "dlsrc='dl_vms.c'"
 $ WC "doublesize='" + doublesize + "'"
 $ WC "drand01='" + drand01 + "'"
+$ WC "dtrace='" + "'"
 $!
 $! The extensions symbol may be quite long
 $!
@@ -6169,6 +6167,7 @@ $ WC "i64type='" + i64type + "'"
 $ WC "i8size='" + i8size + "'"
 $ WC "i8type='" + i8type + "'"
 $ WC "i_arpainet='undef'"
+$ WC "i_assert='define'"
 $ WC "i_crypt='undef'"
 $ WC "i_db='undef'"
 $ WC "i_dbm='undef'"
@@ -6370,6 +6369,7 @@ $ WC "seedfunc='" + seedfunc + "'"
 $ WC "selectminbits='32'"
 $ WC "selecttype='" + selecttype + "'"
 $ WC "sh='MCR'"
+$ WC "sharpbang='#!'"
 $ WC "shmattype='" + " '"
 $ WC "shortsize='" + shortsize + "'"
 $ IF (f$length(sig_name) .GE. 244)
@@ -6441,6 +6441,7 @@ $ WC "usedebugging_perl='"+use_debugging_perl+"'"
 $ WC "usedefaulttypes='" + usedefaulttypes + "'"    ! VMS-specific
 $ WC "usecrosscompile='undef'"
 $ WC "usedl='" + usedl + "'"
+$ WC "usedtrace='undef'"
 $ WC "usefaststdio='" + usefaststdio + "'"
 $ WC "useieee='" + useieee + "'"                    ! VMS-specific
 $ WC "useithreads='" + useithreads + "'"

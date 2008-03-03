@@ -2,7 +2,7 @@
 
 BEGIN {
     $| = 1;
-    $SIG{__WARN__} = sub { die "Dying on warning: ", @_ };
+    ${^WARN_HOOK} = sub { die "Dying on warning: ", @_ };
 }
 
 use warnings;
@@ -35,6 +35,7 @@ sub skip {
 }
 
 print "1..57\n";
+
 
 my $Is_MSWin32  = $^O eq 'MSWin32';
 my $Is_NetWare  = $^O eq 'NetWare';
@@ -176,11 +177,11 @@ else {
 }
 
 eval { die "foo\n" };
-ok $@ eq "foo\n", $@;
+ok $@->{description} eq "foo\n", $@;
 
 ok $$ +> 0, $$;
 eval { $$++ };
-ok $@ =~ m/^Modification of a read-only value attempted/;
+ok $@->{description} =~ m/^Modification of a read-only value attempted/;
 
 our ($wd, $script);
 
@@ -349,7 +350,7 @@ else {
 {
     my $ok = 1;
     my $warn = '';
-    local $SIG{'__WARN__'} = sub { $ok = 0; $warn = join '', @_; };
+    local ${^WARN_HOOK} = sub { $ok = 0; $warn = join '', @_; };
     $! = undef;
     ok($ok, $warn, $Is_VMS ? "'\$!=undef' does throw a warning" : '');
 }

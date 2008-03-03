@@ -15,7 +15,7 @@ krunch.pm krunch.pmc whap.pm whap.pmc);
 
 my $Is_EBCDIC = (ord('A') == 193) ? 1 : 0;
 my $Is_UTF8   = (${^OPEN} || "") =~ m/:utf8/;
-my $total_tests = 37;
+my $total_tests = 38;
 if ($Is_EBCDIC || $Is_UTF8) { $total_tests -= 3; }
 print "1..$total_tests\n";
 
@@ -39,7 +39,7 @@ eval 'require 5.005';
 print "not " unless $@;
 print "ok ",$i++,"\n";
 
-print "not " unless v5.5.1 gt v5.5;
+print "not " unless (v5.5.1 cmp v5.5) +> 0;
 print "ok ",$i++,"\n";
 
 {
@@ -61,7 +61,7 @@ $i++;
 
 # run-time failure in require
 do_require "0;\n";
-print "# $@\nnot " unless $@ =~ m/did not return a true/;
+print "# $@\nnot " unless $@->message =~ m/did not return a true/;
 print "ok ",$i++,"\n";
 
 print "not " if exists $INC{'bleah.pm'};
@@ -86,7 +86,7 @@ for my $expected_compile (1,0) {
 do_require "1)\n";
 # bison says 'parse error' instead of 'syntax error',
 # various yaccs may or may not capitalize 'syntax'.
-print "# $@\nnot " unless $@ =~ m/(syntax|parse) error/mi;
+print "# $@\nnot " unless $@->message =~ m/(syntax|parse) error/mi;
 print "ok ",$i++,"\n";
 
 # previous failure cached in %INC
@@ -96,7 +96,7 @@ write_file($flag_file, 1);
 write_file('bleah.pm', "unlink '$flag_file'; 1");
 print "# $@\nnot " if eval { require 'bleah.pm' };
 print "ok ",$i++,"\n";
-print "# $@\nnot " unless $@ =~ m/Compilation failed/i;
+print "# $@\nnot " unless $@->message =~ m/Compilation failed/i;
 print "ok ",$i++,"\n";
 print "not " unless -e $flag_file;
 print "ok ",$i++,"\n";
@@ -141,7 +141,7 @@ $foo = eval  {require bleah}; delete $INC{"bleah.pm"}; ++$::i;
 my $r = "threads";
 eval { require $r };
 $i++;
-if($@ =~ m/Can't locate threads in \@INC/) {
+if($@->message =~ m/Can't locate threads in \@INC/) {
     print "ok $i\n";
 } else {
     print "not ok $i\n";
@@ -151,7 +151,7 @@ if($@ =~ m/Can't locate threads in \@INC/) {
 write_file('bleah.pm', qq(die "This is an expected error";\n));
 delete $INC{"bleah.pm"}; ++$::i;
 eval { CORE::require bleah; };
-if ($@ =~ m/^This is an expected error/) {
+if ($@->message =~ m/^This is an expected error/) {
     print "ok $i\n";
 } else {
     print "not ok $i\n";
@@ -205,11 +205,25 @@ EOT
     require krunch;
     eval {CORE::require whap; 1} and die;
 
-    if ($@ =~ m/^This is an expected error/) {
+    if ($@->message =~ m/^This is an expected error/) {
 	print "ok $pmc_dies\n";
     } else {
 	print "not ok $pmc_dies\n";
     }
+}
+
+#  [perl #49472] Attributes + Unkown Error
+
+{
+    do_require
+	'use strict;sub MODIFY_CODE_ATTRIBUTE{} sub f:Blah {$nosuchvar}';
+    my $err = $@ && $@->message;
+    $err .= "\n" unless $err =~ m/\n$/;
+    unless ($err =~ m/Global symbol "\$nosuchvar" requires /) {
+	$err =~ s/^/# /mg;
+	print "${err}not ";
+    }
+    print "ok ", ++$i, " [perl #49472]\n";
 }
 
 ##########################################
@@ -225,14 +239,6 @@ require utf8;
 my $utf8 = utf8::chr(0xFEFF);
 
 $i++; do_require(qq(${utf8}print "ok $i\n"; 1;\n));
-
-sub bytes_to_utf16 {
-    my $utf16 = pack("$_[0]*", unpack("C*", $_[1]));
-    return @_ == 3 && $_[2] ? pack("$_[0]", 0xFEFF) . $utf16 : $utf16;
-}
-
-$i++; do_require(bytes_to_utf16('n', qq(print "ok $i\\n"; 1;\n), 1)); # BE
-$i++; do_require(bytes_to_utf16('v', qq(print "ok $i\\n"; 1;\n), 1)); # LE
 
 END {
     foreach my $file (@fjles_to_delete) {

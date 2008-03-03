@@ -46,26 +46,26 @@ while ( ~< *DATA) {
 
     $evalData = eval $data;
     die if $@;
-    $data = ref $evalData ? $evalData : [$evalData];
-    push @tests, [$template, $data, $result, $comment];
+    $evalData = ref $evalData ? $evalData : [$evalData];
+    push @tests, [$template, $evalData, $result, $comment, $data];
 }
 
 print '1..', scalar @tests, "\n";
 
-$SIG{__WARN__} = sub {
-    if ($_[0] =~ m/^Invalid conversion/) {
+${^WARN_HOOK} = sub {
+    if ($_[0]->{description} =~ m/^Invalid conversion/) {
 	$w = ' INVALID';
-    } elsif ($_[0] =~ m/^Use of uninitialized value/) {
+    } elsif ($_[0]->{description}=~ m/^Use of uninitialized value/) {
 	$w = ' UNINIT';
     } else {
-	warn @_;
+	warn $_[0]->{description};
     }
 };
 
 for ($i = 1; @tests; $i++) {
-    ($template, $data, $result, $comment) = @{shift @tests};
+    ($template, $evalData, $result, $comment, $data) = @{shift @tests};
     $w = undef;
-    $x = sprintf(">$template<", @$data);
+    $x = sprintf(">$template<", @$evalData);
     substr($x, -1, 0, $w) if $w;
     # $x may have 3 exponent digits, not 2
     my $y = $x;

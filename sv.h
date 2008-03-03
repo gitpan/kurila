@@ -48,11 +48,12 @@ typedef enum {
 	SVt_BIND,	/* 1 */
 	SVt_IV,		/* 2 */
 	SVt_NV,		/* 3 */
-	SVt_RV,		/* 4 */
-	SVt_PV,		/* 5 */
-	SVt_PVIV,	/* 6 */
-	SVt_PVNV,	/* 7 */
-	SVt_PVMG,	/* 8 */
+	/* RV was here, before it was merged with IV.  */
+	SVt_PV,		/* 4 */
+	SVt_PVIV,	/* 5 */
+	SVt_PVNV,	/* 6 */
+	SVt_PVMG,	/* 7 */
+	SVt_REGEXP,	/* 8 */
 	/* PVBM was here, before BIND replaced it.  */
 	SVt_PVGV,	/* 9 */
 	SVt_PVLV,	/* 10 */
@@ -105,10 +106,10 @@ struct STRUCT_SV {		/* struct sv { */
     _SV_HEAD(void*);
     _SV_HEAD_UNION;
 #ifdef DEBUG_LEAKING_SCALARS
-    unsigned	sv_debug_optype:9;	/* the type of OP that allocated us */
-    unsigned	sv_debug_inpad:1;	/* was allocated in a pad for an OP */
-    unsigned	sv_debug_cloned:1;	/* was cloned for an ithread */
-    unsigned	sv_debug_line:16;	/* the line where we were allocated */
+    PERL_BITFIELD32 sv_debug_optype:9;	/* the type of OP that allocated us */
+    PERL_BITFIELD32 sv_debug_inpad:1;	/* was allocated in a pad for an OP */
+    PERL_BITFIELD32 sv_debug_cloned:1;	/* was cloned for an ithread */
+    PERL_BITFIELD32 sv_debug_line:16;	/* the line where we were allocated */
     char *	sv_debug_file;		/* the file where we were allocated */
 #endif
 };
@@ -135,6 +136,11 @@ struct hv {
 
 struct io {
     _SV_HEAD(XPVIO*);		/* pointer to xpvio body */
+    _SV_HEAD_UNION;
+};
+
+struct p5rx {
+    _SV_HEAD(struct regexp*);	/* pointer to regexp body */
     _SV_HEAD_UNION;
 };
 
@@ -204,7 +210,7 @@ perform the upgrade if necessary.  See C<svtype>.
 #define SvFLAGS(sv)	(sv)->sv_flags
 #define SvREFCNT(sv)	(sv)->sv_refcnt
 
-#if defined(__GNUC__) && !defined(__STRICT_ANSI__) && !defined(PERL_GCC_PEDANTIC)
+#if defined(__GNUC__) && !defined(PERL_GCC_BRACE_GROUPS_FORBIDDEN)
 #  define SvREFCNT_inc(sv)		\
     ({					\
 	SV * const _sv = (SV*)(sv);	\
@@ -247,7 +253,7 @@ perform the upgrade if necessary.  See C<svtype>.
 #define SvREFCNT_inc_void_NN(sv)	(void)(++SvREFCNT((SV*)(sv)))
 #define SvREFCNT_inc_simple_void_NN(sv)	(void)(++SvREFCNT((SV*)(sv)))
 
-#if defined(__GNUC__) && !defined(__STRICT_ANSI__) && !defined(PERL_GCC_PEDANTIC)
+#if defined(__GNUC__) && !defined(PERL_GCC_BRACE_GROUPS_FORBIDDEN)
 #  define SvREFCNT_dec(sv)		\
     ({					\
 	SV * const _sv = (SV*)(sv);	\
@@ -310,18 +316,18 @@ perform the upgrade if necessary.  See C<svtype>.
 				       3: For PVCV, whether CvUNIQUE(cv)
 					  refers to an eval or once only
 					  [CvEVAL(cv), CvSPECIAL(cv)]
-				       4: Whether the regexp pointer is in
-					  fact an offset [SvREPADTMP(sv)]
-				       5: On a pad name SV, that slot in the
+				       4: On a pad name SV, that slot in the
 					  frame AV is a REFCNT'ed reference
 					  to a lexical from "outside". */
-#define SVphv_REHASH	SVf_FAKE    /* 6: On a PVHV, hash values are being
+#define SVphv_REHASH	SVf_FAKE    /* 5: On a PVHV, hash values are being
 					  recalculated */
 #define SVf_OOK		0x02000000  /* has valid offset value. For a PVHV this
 				       means that a hv_aux struct is present
 				       after the main array */
 #define SVf_BREAK	0x04000000  /* refcnt is artificially low - used by
-				       SV's in final arena cleanup */
+				       SVs in final arena cleanup.
+				       Set in S_regtry on PL_reg_curpm, so that
+				       perl_destruct will skip it. */
 #define SVf_READONLY	0x08000000  /* may not be modified */
 
 
@@ -370,179 +376,89 @@ perform the upgrade if necessary.  See C<svtype>.
 /* RV upwards. However, SVf_ROK and SVp_IOK are exclusive  */
 #define SVprv_WEAKREF   0x80000000  /* Weak reference */
 
+#define _XPV_ALLOCATED_HEAD						\
+    STRLEN	xpv_cur;	/* length of svu_pv as a C string */    \
+    STRLEN	xpv_len 	/* allocated size */
+
+#define _XPV_HEAD	\
+    union _xnvu xnv_u;	\
+    _XPV_ALLOCATED_HEAD
+
+union _xnvu {
+    NV	    xnv_nv;		/* numeric value, if any */
+    HV *    xgv_stash;
+    struct {
+	U32 xlow;
+	U32 xhigh;
+    }	    xpad_cop_seq;	/* used by pad.c for cop_sequence */
+    struct {
+	U32 xbm_previous;	/* how many characters in string before rare? */
+	U8  xbm_flags;
+	U8  xbm_rare;		/* rarest character in string */
+    }	    xbm_s;		/* fields from PVBM */
+};
+
+union _xivu {
+    IV	    xivu_iv;		/* integer value */
+				/* xpvfm: pv offset */
+    UV	    xivu_uv;
+    void *  xivu_p1;
+    I32	    xivu_i32;
+    HEK *   xivu_namehek;	/* xpvlv, xpvgv: GvNAME */
+    HV *    xivu_hv;		/* regexp: paren_names */
+};
+
+union _xmgu {
+    MAGIC*  xmg_magic;		/* linked list of magicalness */
+    HV*	    xmg_ourstash;	/* Stash for our (when SvPAD_OUR is true) */
+};
 
 struct xpv {
-    union {
-	NV	xnv_nv;		/* numeric value, if any */
-	HV *	xgv_stash;
-	struct {
-	    U32	xlow;
-	    U32	xhigh;
-	}	xpad_cop_seq;	/* used by pad.c for cop_sequence */
-	struct {
-	    U32 xbm_previous;	/* how many characters in string before rare? */
-	    U8	xbm_flags;
-	    U8	xbm_rare;	/* rarest character in string */
-	}	xbm_s;		/* fields from PVBM */
-    }		xnv_u;
-    STRLEN	xpv_cur;	/* length of svu_pv as a C string */
-    STRLEN	xpv_len;	/* allocated size */
+    _XPV_HEAD;
 };
 
 typedef struct {
-    STRLEN	xpv_cur;	/* length of svu_pv as a C string */
-    STRLEN	xpv_len;	/* allocated size */
+    _XPV_ALLOCATED_HEAD;
 } xpv_allocated;
 
 struct xpviv {
-    union {
-	NV	xnv_nv;		/* numeric value, if any */
-	HV *	xgv_stash;
-	struct {
-	    U32	xlow;
-	    U32	xhigh;
-	}	xpad_cop_seq;	/* used by pad.c for cop_sequence */
-	struct {
-	    U32 xbm_previous;	/* how many characters in string before rare? */
-	    U8	xbm_flags;
-	    U8	xbm_rare;	/* rarest character in string */
-	}	xbm_s;		/* fields from PVBM */
-    }		xnv_u;
-    STRLEN	xpv_cur;	/* length of svu_pv as a C string */
-    STRLEN	xpv_len;	/* allocated size */
-    union {
-	IV	xivu_iv;	/* integer value or pv offset */
-	UV	xivu_uv;
-	void *	xivu_p1;
-	I32	xivu_i32;
-	HEK *	xivu_namehek;
-    }		xiv_u;
+    _XPV_HEAD;
+    union _xivu xiv_u;
 };
 
 typedef struct {
-    STRLEN	xpv_cur;	/* length of svu_pv as a C string */
-    STRLEN	xpv_len;	/* allocated size */
-    union {
-	IV	xivu_iv;	/* integer value or pv offset */
-	UV	xivu_uv;
-	void *	xivu_p1;
-	I32	xivu_i32;
-	HEK *	xivu_namehek;
-    }		xiv_u;
+    _XPV_ALLOCATED_HEAD;
+    union _xivu xiv_u;
 } xpviv_allocated;
 
 #define xiv_iv xiv_u.xivu_iv
 
 struct xpvuv {
-    union {
-	NV	xnv_nv;		/* numeric value, if any */
-	HV *	xgv_stash;
-	struct {
-	    U32	xlow;
-	    U32	xhigh;
-	}	xpad_cop_seq;	/* used by pad.c for cop_sequence */
-	struct {
-	    U32 xbm_previous;	/* how many characters in string before rare? */
-	    U8	xbm_flags;
-	    U8	xbm_rare;	/* rarest character in string */
-	}	xbm_s;		/* fields from PVBM */
-    }		xnv_u;
-    STRLEN	xpv_cur;	/* length of svu_pv as a C string */
-    STRLEN	xpv_len;	/* allocated size */
-    union {
-	IV	xuvu_iv;
-	UV	xuvu_uv;	/* unsigned value or pv offset */
-	void *	xuvu_p1;
-	HEK *	xivu_namehek;
-    }		xuv_u;
+    _XPV_HEAD;
+    union _xivu xuv_u;
 };
 
-#define xuv_uv xuv_u.xuvu_uv
+#define xuv_uv xuv_u.xivu_uv
 
 struct xpvnv {
-    union {
-	NV	xnv_nv;		/* numeric value, if any */
-	HV *	xgv_stash;
-	struct {
-	    U32	xlow;
-	    U32	xhigh;
-	}	xpad_cop_seq;	/* used by pad.c for cop_sequence */
-	struct {
-	    U32 xbm_previous;	/* how many characters in string before rare? */
-	    U8	xbm_flags;
-	    U8	xbm_rare;	/* rarest character in string */
-	}	xbm_s;		/* fields from PVBM */
-    }		xnv_u;
-    STRLEN	xpv_cur;	/* length of svu_pv as a C string */
-    STRLEN	xpv_len;	/* allocated size */
-    union {
-	IV	xivu_iv;	/* integer value or pv offset */
-	UV	xivu_uv;
-	void *	xivu_p1;
-	I32	xivu_i32;
-	HEK *	xivu_namehek;
-    }		xiv_u;
+    _XPV_HEAD;
+    union _xivu xiv_u;
 };
+
+#define _XPVMG_HEAD				    \
+    union _xivu xiv_u;				    \
+    union _xmgu	xmg_u;				    \
+    HV*		xmg_stash	/* class package */
 
 /* These structure must match the beginning of struct xpvhv in hv.h. */
 struct xpvmg {
-    union {
-	NV	xnv_nv;		/* numeric value, if any */
-	HV *	xgv_stash;
-	struct {
-	    U32	xlow;
-	    U32	xhigh;
-	}	xpad_cop_seq;	/* used by pad.c for cop_sequence */
-	struct {
-	    U32 xbm_previous;	/* how many characters in string before rare? */
-	    U8	xbm_flags;
-	    U8	xbm_rare;	/* rarest character in string */
-	}	xbm_s;		/* fields from PVBM */
-    }		xnv_u;
-    STRLEN	xpv_cur;	/* length of svu_pv as a C string */
-    STRLEN	xpv_len;	/* allocated size */
-    union {
-	IV	xivu_iv;	/* integer value or pv offset */
-	UV	xivu_uv;
-	void *	xivu_p1;
-	I32	xivu_i32;
-	HEK *	xivu_namehek;
-    }		xiv_u;
-    union {
-	MAGIC*	xmg_magic;	/* linked list of magicalness */
-	HV*	xmg_ourstash;	/* Stash for our (when SvPAD_OUR is true) */
-    } xmg_u;
-    HV*		xmg_stash;	/* class package */
+    _XPV_HEAD;
+    _XPVMG_HEAD;
 };
 
 struct xpvlv {
-    union {
-	NV	xnv_nv;		/* numeric value, if any */
-	HV *	xgv_stash;
-	struct {
-	    U32	xlow;
-	    U32	xhigh;
-	}	xpad_cop_seq;	/* used by pad.c for cop_sequence */
-	struct {
-	    U32 xbm_previous;	/* how many characters in string before rare? */
-	    U8	xbm_flags;
-	    U8	xbm_rare;	/* rarest character in string */
-	}	xbm_s;		/* fields from PVBM */
-    }		xnv_u;
-    STRLEN	xpv_cur;	/* length of svu_pv as a C string */
-    STRLEN	xpv_len;	/* allocated size */
-    union {
-	IV	xivu_iv;	/* integer value or pv offset */
-	UV	xivu_uv;
-	void *	xivu_p1;
-	I32	xivu_i32;
-	HEK *	xivu_namehek;	/* GvNAME */
-    }		xiv_u;
-    union {
-	MAGIC*	xmg_magic;	/* linked list of magicalness */
-	HV*	xmg_ourstash;	/* Stash for our (when SvPAD_OUR is true) */
-    } xmg_u;
-    HV*		xmg_stash;	/* class package */
+    _XPV_HEAD;
+    _XPVMG_HEAD;
 
     STRLEN	xlv_targoff;
     STRLEN	xlv_targlen;
@@ -554,86 +470,43 @@ struct xpvlv {
 /* This structure works in 3 ways - regular scalar, GV with GP, or fast
    Boyer-Moore.  */
 struct xpvgv {
-    union {
-	NV	xnv_nv;
-	HV *	xgv_stash;	/* The stash of this GV */
-	struct {
-	    U32	xlow;
-	    U32	xhigh;
-	}	xpad_cop_seq;	/* used by pad.c for cop_sequence */
-	struct {
-	    U32 xbm_previous;	/* how many characters in string before rare? */
-	    U8	xbm_flags;
-	    U8	xbm_rare;	/* rarest character in string */
-	}	xbm_s;		/* fields from PVBM */
-    }		xnv_u;
-    STRLEN	xpv_cur;	/* xgv_flags */
-    STRLEN	xpv_len;	/* 0 */
-    union {
-	IV	xivu_iv;
-	UV	xivu_uv;
-	void *	xivu_p1;
-	I32	xivu_i32;	/* is this constant pattern being useful? */
-	HEK *	xivu_namehek;	/* GvNAME */
-    }		xiv_u;
-    union {
-	MAGIC*	xmg_magic;	/* linked list of magicalness */
-	HV*	xmg_ourstash;	/* Stash for our (when SvPAD_OUR is true) */
-    } xmg_u;
-    HV*		xmg_stash;	/* class package */
-
+    _XPV_HEAD;
+    _XPVMG_HEAD;
 };
 
-typedef U16 cv_flags_t;
+#define _XPVIO_TAIL							\
+    PerlIO *	xio_ifp;	/* ifp and ofp are normally the same */	\
+    PerlIO *	xio_ofp;	/* but sockets need separate streams */	\
+    /* Cray addresses everything by word boundaries (64 bits) and	\
+     * code and data pointers cannot be mixed (which is exactly what	\
+     * Perl_filter_add() tries to do with the dirp), hence the		\
+     *  following union trick (as suggested by Gurusamy Sarathy).	\
+     * For further information see Geir Johansen's problem report	\
+     * titled [ID 20000612.002] Perl problem on Cray system		\
+     * The any pointer (known as IoANY()) will also be a good place	\
+     * to hang any IO disciplines to.					\
+     */									\
+    union {								\
+	DIR *	xiou_dirp;	/* for opendir, readdir, etc */		\
+	void *	xiou_any;	/* for alignment */			\
+    } xio_dirpu;							\
+    IV		xio_lines;	/* $. */				\
+    char	xio_type;						\
+    U8		xio_flags
+
 
 struct xpvio {
-    union {
-	NV	xnv_nv;		/* numeric value, if any */
-	HV *	xgv_stash;
-	struct {
-	    U32	xlow;
-	    U32	xhigh;
-	}	xpad_cop_seq;	/* used by pad.c for cop_sequence */
-	struct {
-	    U32 xbm_previous;	/* how many characters in string before rare? */
-	    U8	xbm_flags;
-	    U8	xbm_rare;	/* rarest character in string */
-	}	xbm_s;		/* fields from PVBM */
-    }		xnv_u;
-    STRLEN	xpv_cur;	/* length of svu_pv as a C string */
-    STRLEN	xpv_len;	/* allocated size */
-    union {
-	IV	xivu_iv;	/* integer value or pv offset */
-	UV	xivu_uv;
-	void *	xivu_p1;
-	I32	xivu_i32;
-	HEK *	xivu_namehek;
-    }		xiv_u;
-    union {
-	MAGIC*	xmg_magic;	/* linked list of magicalness */
-	HV*	xmg_ourstash;	/* Stash for our (when SvPAD_OUR is true) */
-    } xmg_u;
-    HV*		xmg_stash;	/* class package */
-
-    PerlIO *	xio_ifp;	/* ifp and ofp are normally the same */
-    PerlIO *	xio_ofp;	/* but sockets need separate streams */
-    /* Cray addresses everything by word boundaries (64 bits) and
-     * code and data pointers cannot be mixed (which is exactly what
-     * Perl_filter_add() tries to do with the dirp), hence the following
-     * union trick (as suggested by Gurusamy Sarathy).
-     * For further information see Geir Johansen's problem report titled
-       [ID 20000612.002] Perl problem on Cray system
-     * The any pointer (known as IoANY()) will also be a good place
-     * to hang any IO disciplines to.
-     */
-    union {
-	DIR *	xiou_dirp;	/* for opendir, readdir, etc */
-	void *	xiou_any;	/* for alignment */
-    } xio_dirpu;
-    IV		xio_lines;	/* $. */
-    char	xio_type;
-    U8		xio_flags;
+    _XPV_HEAD;
+    _XPVMG_HEAD;
+    _XPVIO_TAIL;
 };
+
+typedef struct {
+    _XPV_ALLOCATED_HEAD;
+    _XPVMG_HEAD;
+    _XPVIO_TAIL;
+} xpvio_allocated;
+
 #define xio_dirp	xio_dirpu.xiou_dirp
 #define xio_any		xio_dirpu.xiou_any
 
@@ -726,10 +599,12 @@ Tells an SV that it is a string and disables all other OK bits.
 Will also turn off the UTF-8 status.
 
 =for apidoc Am|U32|SvOOK|SV* sv
-Returns a U32 indicating whether the SvIVX is a valid offset value for
-the SvPVX.  This hack is used internally to speed up removal of characters
-from the beginning of a SvPV.  When SvOOK is true, then the start of the
-allocated string buffer is really (SvPVX - SvIVX).
+Returns a U32 indicating whether the pointer to the string buffer is offset.
+This hack is used internally to speed up removal of characters from the
+beginning of a SvPV.  When SvOOK is true, then the start of the
+allocated string buffer is actually C<SvOOK_offset()> bytes before SvPVX.
+This offset used to be stored in SvIVX, but is now stored within the spare
+part of the buffer.
 
 =for apidoc Am|U32|SvROK|SV* sv
 Tests if the SV is an RV.
@@ -833,7 +708,7 @@ Set the actual length of the string which is in the SV.  See C<SvIV_set>.
 
 #define SvOKp(sv)		(SvFLAGS(sv) & (SVp_IOK|SVp_NOK|SVp_POK))
 #define SvIOKp(sv)		(SvFLAGS(sv) & SVp_IOK)
-#define SvIOKp_on(sv)		(assert_not_glob(sv) SvRELEASE_IVX(sv), \
+#define SvIOKp_on(sv)		(assert_not_glob(sv) SvRELEASE_IVX_(sv)	\
 				    SvFLAGS(sv) |= SVp_IOK)
 #define SvNOKp(sv)		(SvFLAGS(sv) & SVp_NOK)
 #define SvNOKp_on(sv)		(assert_not_glob(sv) SvFLAGS(sv) |= SVp_NOK)
@@ -842,7 +717,7 @@ Set the actual length of the string which is in the SV.  See C<SvIV_set>.
 				 SvFLAGS(sv) |= SVp_POK)
 
 #define SvIOK(sv)		(SvFLAGS(sv) & SVf_IOK)
-#define SvIOK_on(sv)		(assert_not_glob(sv) SvRELEASE_IVX(sv), \
+#define SvIOK_on(sv)		(assert_not_glob(sv) SvRELEASE_IVX_(sv)	\
 				    SvFLAGS(sv) |= (SVf_IOK|SVp_IOK))
 #define SvIOK_off(sv)		(SvFLAGS(sv) &= ~(SVf_IOK|SVp_IOK|SVf_IVisUV))
 #define SvIOK_only(sv)		(SvOK_off(sv), \
@@ -1014,13 +889,8 @@ the scalar's value cannot change unless written to.
 #define SvTAIL_off(sv)		(SvFLAGS(sv) &= ~SVpbm_TAIL)
 
 
-#ifdef USE_ITHREADS
-/* The following uses the FAKE flag to show that a regex pointer is infact
-   its own offset in the regexpad for ithreads */
-#define SvREPADTMP(sv)		(SvFLAGS(sv) & SVf_FAKE)
-#define SvREPADTMP_on(sv)	(SvFLAGS(sv) |= SVf_FAKE)
-#define SvREPADTMP_off(sv)	(SvFLAGS(sv) &= ~SVf_FAKE)
-#endif
+#define SvPAD_TYPED(sv) \
+	((SvFLAGS(sv) & (SVpad_NAME|SVpad_TYPED)) == (SVpad_NAME|SVpad_TYPED))
 
 #define SvPAD_OUR(sv)	\
 	((SvFLAGS(sv) & (SVpad_NAME|SVpad_OUR)) == (SVpad_NAME|SVpad_OUR))
@@ -1127,12 +997,13 @@ the scalar's value cannot change unless written to.
 	    assert(SvTYPE(_svi) != SVt_PVAV);				\
 	    assert(SvTYPE(_svi) != SVt_PVHV);				\
 	    assert(SvTYPE(_svi) != SVt_PVCV);				\
+	    assert(SvTYPE(_svi) != SVt_PVIO);				\
 	    assert(!isGV_with_GP(_svi));				\
 	   &(((XPVNV*) SvANY(_svi))->xnv_u.xnv_nv);			\
 	 }))
 #    define SvRV(sv)							\
 	(*({ SV *const _svi = (SV *) (sv);				\
-	    assert(SvTYPE(_svi) >= SVt_RV);				\
+	    assert(SvTYPE(_svi) >= SVt_PV || SvTYPE(_svi) == SVt_IV);	\
 	    assert(SvTYPE(_svi) != SVt_PVAV);				\
 	    assert(SvTYPE(_svi) != SVt_PVHV);				\
 	    assert(SvTYPE(_svi) != SVt_PVCV);				\
@@ -1200,6 +1071,7 @@ the scalar's value cannot change unless written to.
 	STMT_START { assert(SvTYPE(sv) == SVt_NV || SvTYPE(sv) >= SVt_PVNV); \
 	    assert(SvTYPE(sv) != SVt_PVAV); assert(SvTYPE(sv) != SVt_PVHV); \
 	    assert(SvTYPE(sv) != SVt_PVCV); \
+		assert(SvTYPE(sv) != SVt_PVIO);		\
 		assert(!isGV_with_GP(sv));		\
 		(((XPVNV*)SvANY(sv))->xnv_u.xnv_nv = (val)); } STMT_END
 #define SvPV_set(sv, val) \
@@ -1216,7 +1088,7 @@ the scalar's value cannot change unless written to.
 		assert(!isGV_with_GP(sv));		\
 		(((XPVUV*)SvANY(sv))->xuv_uv = (val)); } STMT_END
 #define SvRV_set(sv, val) \
-        STMT_START { assert(SvTYPE(sv) >=  SVt_RV); \
+        STMT_START { assert(SvTYPE(sv) >=  SVt_PV || SvTYPE(sv) ==  SVt_IV); \
 		assert(SvTYPE(sv) != SVt_PVAV);		\
 		assert(SvTYPE(sv) != SVt_PVHV);		\
 		assert(SvTYPE(sv) != SVt_PVCV);		\
@@ -1260,14 +1132,31 @@ the scalar's value cannot change unless written to.
     STMT_START {							\
 		     assert(SvTYPE(sv) >= SVt_PV);			\
 		     if (SvLEN(sv)) {					\
+			 assert(!SvROK(sv));				\
 			 if(SvOOK(sv)) {				\
-			     SvPV_set(sv, SvPVX_mutable(sv) - SvIVX(sv)); \
+			     STRLEN zok; 				\
+			     SvOOK_offset(sv, zok);			\
+			     SvPV_set(sv, SvPVX_mutable(sv) - zok);	\
 			     SvFLAGS(sv) &= ~SVf_OOK;			\
 			 }						\
 			 Safefree(SvPVX(sv));				\
 		     }							\
 		 } STMT_END
 
+#ifdef PERL_CORE
+/* Code that crops up in three places to take a scalar and ready it to hold
+   a reference */
+#  define prepare_SV_for_RV(sv)						\
+    STMT_START {							\
+		    if (SvTYPE(sv) < SVt_PV && SvTYPE(sv) != SVt_IV)	\
+			sv_upgrade(sv, SVt_IV);				\
+		    else if (SvTYPE(sv) >= SVt_PV) {			\
+			SvPV_free(sv);					\
+			SvLEN_set(sv, 0);				\
+                        SvCUR_set(sv, 0);				\
+		    }							\
+		 } STMT_END
+#endif
 
 #define PERL_FBM_TABLE_OFFSET 1	/* Number of bytes between EOS and table */
 
@@ -1369,6 +1258,28 @@ Taints an SV if tainting is enabled.
 	}				\
     } STMT_END
 
+
+/* all these 'functions' are now just macros */
+
+#define sv_pv(sv) SvPV_nolen(sv)
+
+#define sv_pvn_force_nomg(sv, lp) sv_pvn_force_flags(sv, lp, 0)
+#define sv_catpvn_nomg(dsv, sstr, slen) sv_catpvn_flags(dsv, sstr, slen, 0)
+#define sv_setsv(dsv, ssv) \
+	sv_setsv_flags(dsv, ssv, SV_GMAGIC|SV_DO_COW_SVSETSV)
+#define sv_setsv_nomg(dsv, ssv) sv_setsv_flags(dsv, ssv, SV_DO_COW_SVSETSV)
+#define sv_catsv(dsv, ssv) sv_catsv_flags(dsv, ssv, SV_GMAGIC)
+#define sv_catsv_nomg(dsv, ssv) sv_catsv_flags(dsv, ssv, 0)
+#define sv_catsv_mg(dsv, ssv) sv_catsv_flags(dsv, ssv, SV_GMAGIC|SV_SMAGIC)
+#define sv_catpvn(dsv, sstr, slen) sv_catpvn_flags(dsv, sstr, slen, SV_GMAGIC)
+#define sv_catpvn_mg(sv, sstr, slen) \
+	sv_catpvn_flags(sv, sstr, slen, SV_GMAGIC|SV_SMAGIC);
+#define sv_2pv(sv, lp) sv_2pv_flags(sv, lp, SV_GMAGIC)
+#define sv_2pv_nolen(sv) sv_2pv(sv, 0)
+#define sv_2pv_nomg(sv, lp) sv_2pv_flags(sv, lp, 0)
+#define sv_pvn_force(sv, lp) sv_pvn_force_flags(sv, lp, SV_GMAGIC)
+#define sv_2iv(sv) sv_2iv_flags(sv, SV_GMAGIC)
+#define sv_2uv(sv) sv_2uv_flags(sv, SV_GMAGIC)
 /*
 =for apidoc Am|char*|SvPV_force|SV* sv|STRLEN len
 Like C<SvPV> but will force the SV into containing just a string
@@ -1400,37 +1311,19 @@ the SV if the SV does not contain a string.  The SV may cache the
 stringified form becoming C<SvPOK>.  Handles 'get' magic.
 
 =for apidoc Am|IV|SvIV|SV* sv
-Coerces the given SV to an integer and returns it. See C<SvIVx> for a
-version which guarantees to evaluate sv only once.
+Coerces the given SV to an integer and returns it.
 
 =for apidoc Am|IV|SvIV_nomg|SV* sv
 Like C<SvIV> but doesn't process magic.
 
-=for apidoc Am|IV|SvIVx|SV* sv
-Coerces the given SV to an integer and returns it. Guarantees to evaluate
-C<sv> only once. Only use this if C<sv> is an expression with side effects,
-otherwise use the more efficient C<SvIV>.
-
 =for apidoc Am|NV|SvNV|SV* sv
-Coerce the given SV to a double and return it. See C<SvNVx> for a version
-which guarantees to evaluate sv only once.
-
-=for apidoc Am|NV|SvNVx|SV* sv
-Coerces the given SV to a double and returns it. Guarantees to evaluate
-C<sv> only once. Only use this if C<sv> is an expression with side effects,
-otherwise use the more efficient C<SvNV>.
+Coerce the given SV to a double and return it.
 
 =for apidoc Am|UV|SvUV|SV* sv
-Coerces the given SV to an unsigned integer and returns it.  See C<SvUVx>
-for a version which guarantees to evaluate sv only once.
+Coerces the given SV to an unsigned integer and returns it.
 
 =for apidoc Am|UV|SvUV_nomg|SV* sv
 Like C<SvUV> but doesn't process magic.
-
-=for apidoc Am|UV|SvUVx|SV* sv
-Coerces the given SV to an unsigned integer and returns it. Guarantees to
-C<sv> only once. Only use this if C<sv> is an expression with side effects,
-otherwise use the more efficient C<SvUV>.
 
 =for apidoc Am|bool|SvTRUE|SV* sv
 Returns a boolean indicating whether Perl would evaluate the SV as true or
@@ -1456,14 +1349,6 @@ Like C<sv_catsv> but doesn't process magic.
 
 =cut
 */
-
-/* Let us hope that bitmaps for UV and IV are the same */
-#define SvIV(sv) (SvIOK(sv) ? SvIVX(sv) : sv_2iv(sv))
-#define SvUV(sv) (SvIOK(sv) ? SvUVX(sv) : sv_2uv(sv))
-#define SvNV(sv) (SvNOK(sv) ? SvNVX(sv) : sv_2nv(sv))
-
-#define SvIV_nomg(sv) (SvIOK(sv) ? SvIVX(sv) : sv_2iv_flags(sv, 0))
-#define SvUV_nomg(sv) (SvIOK(sv) ? SvUVX(sv) : sv_2uv_flags(sv, 0))
 
 /* ----*/
 
@@ -1526,63 +1411,6 @@ Like C<sv_catsv> but doesn't process magic.
 
 #define SvPVx_force(sv, lp) sv_pvn_force(sv, &lp)
 
-#if defined(__GNUC__) && !defined(PERL_GCC_BRACE_GROUPS_FORBIDDEN)
-
-#  define SvIVx(sv) ({SV *_sv = (SV*)(sv); SvIV(_sv); })
-#  define SvUVx(sv) ({SV *_sv = (SV*)(sv); SvUV(_sv); })
-#  define SvNVx(sv) ({SV *_sv = (SV*)(sv); SvNV(_sv); })
-#  define SvPVx(sv, lp) ({SV *_sv = (sv); SvPV(_sv, lp); })
-#  define SvPVx_const(sv, lp) ({SV *_sv = (sv); SvPV_const(_sv, lp); })
-#  define SvPVx_nolen(sv) ({SV *_sv = (sv); SvPV_nolen(_sv); })
-#  define SvPVx_nolen_const(sv) ({SV *_sv = (sv); SvPV_nolen_const(_sv); })
-#  define SvTRUE(sv) (						\
-    !sv								\
-    ? 0								\
-    :    SvPOK(sv)						\
-	?   (({XPV *nxpv = (XPV*)SvANY(sv);			\
-	     nxpv &&						\
-	     (nxpv->xpv_cur > 1 ||				\
-	      (nxpv->xpv_cur && *(sv)->sv_u.svu_pv != '0')); })	\
-	     ? 1						\
-	     : 0)						\
-	:							\
-	    SvIOK(sv)						\
-	    ? SvIVX(sv) != 0					\
-	    :   SvNOK(sv)					\
-		? SvNVX(sv) != 0.0				\
-		: sv_2bool(sv) )
-#  define SvTRUEx(sv) ({SV *_sv = (sv); SvTRUE(_sv); })
-
-#else /* __GNUC__ */
-
-/* These inlined macros use globals, which will require a thread
- * declaration in user code, so we avoid them under threads */
-
-#  define SvIVx(sv) ((PL_Sv = (sv)), SvIV(PL_Sv))
-#  define SvUVx(sv) ((PL_Sv = (sv)), SvUV(PL_Sv))
-#  define SvNVx(sv) ((PL_Sv = (sv)), SvNV(PL_Sv))
-#  define SvPVx(sv, lp) ((PL_Sv = (sv)), SvPV(PL_Sv, lp))
-#  define SvPVx_const(sv, lp) ((PL_Sv = (sv)), SvPV_const(PL_Sv, lp))
-#  define SvPVx_nolen(sv) ((PL_Sv = (sv)), SvPV_nolen(PL_Sv))
-#  define SvPVx_nolen_const(sv) ((PL_Sv = (sv)), SvPV_nolen_const(PL_Sv))
-#  define SvTRUE(sv) (						\
-    !sv								\
-    ? 0								\
-    :    SvPOK(sv)						\
-	?   ((PL_Xpv = (XPV*)SvANY(PL_Sv = (sv))) &&		\
-	     (PL_Xpv->xpv_cur > 1 ||				\
-	      (PL_Xpv->xpv_cur && *PL_Sv->sv_u.svu_pv != '0'))	\
-	     ? 1						\
-	     : 0)						\
-	:							\
-	    SvIOK(sv)						\
-	    ? SvIVX(sv) != 0					\
-	    :   SvNOK(sv)					\
-		? SvNVX(sv) != 0.0				\
-		: sv_2bool(sv) )
-#  define SvTRUEx(sv) ((PL_Sv = (sv)), SvTRUE(PL_Sv))
-#endif /* __GNU__ */
-
 #define SvIsCOW(sv)		((SvFLAGS(sv) & (SVf_FAKE | SVf_READONLY)) == \
 				    (SVf_FAKE | SVf_READONLY))
 #define SvIsCOW_shared_hash(sv)	(SvIsCOW(sv) && SvLEN(sv) == 0)
@@ -1595,7 +1423,6 @@ Like C<sv_catsv> but doesn't process magic.
 #define SV_IMMEDIATE_UNREF	1
 #define SV_GMAGIC		2
 #define SV_COW_DROP_PV		4
-#define SV_UTF8_NO_ENCODING	8
 #define SV_NOSTEAL		16
 #define SV_CONST_RETURN		32
 #define SV_MUTABLE_RETURN	64
@@ -1604,6 +1431,8 @@ Like C<sv_catsv> but doesn't process magic.
 #define SV_COW_SHARED_HASH_KEYS	512
 /* This one is only enabled for PERL_OLD_COPY_ON_WRITE */
 #define SV_COW_OTHER_PVS	1024
+/* Make sv_2pv_flags return NULL if something is undefined.  */
+#define SV_UNDEF_RETURNS_NULL	2048
 
 /* The core is safe for this COW optimisation. XS code on CPAN may not be.
    So only default to doing the COW setup if we're in the core.
@@ -1635,10 +1464,16 @@ Like C<sv_catsv> but doesn't process magic.
 
 #ifdef PERL_OLD_COPY_ON_WRITE
 #define SvRELEASE_IVX(sv)   \
-    ((SvIsCOW(sv) ? sv_force_normal_flags(sv, 0) : (void) 0), SvOOK_off(sv))
+    ((SvIsCOW(sv) ? sv_force_normal_flags(sv, 0) : (void) 0), 0)
 #  define SvIsCOW_normal(sv)	(SvIsCOW(sv) && SvLEN(sv))
+#  define SvRELEASE_IVX_(sv)	SvRELEASE_IVX(sv),
 #else
-#  define SvRELEASE_IVX(sv)   SvOOK_off(sv)
+#  define SvRELEASE_IVX(sv)   0
+/* This little game brought to you by the need to shut this warning up:
+mg.c: In function `Perl_magic_get':
+mg.c:1024: warning: left-hand operand of comma expression has no effect
+*/
+#  define SvRELEASE_IVX_(sv)  /**/
 #endif /* PERL_OLD_COPY_ON_WRITE */
 
 #define CAN_COW_MASK	(SVs_OBJECT|SVs_GMG|SVs_SMG|SVs_RMG|SVf_IOK|SVf_NOK| \
@@ -1649,28 +1484,6 @@ Like C<sv_catsv> but doesn't process magic.
 #define SV_CHECK_THINKFIRST(sv) if (SvTHINKFIRST(sv)) \
 				    sv_force_normal_flags(sv, 0)
 
-
-/* all these 'functions' are now just macros */
-
-#define sv_pv(sv) SvPV_nolen(sv)
-
-#define sv_pvn_force_nomg(sv, lp) sv_pvn_force_flags(sv, lp, 0)
-#define sv_catpvn_nomg(dsv, sstr, slen) sv_catpvn_flags(dsv, sstr, slen, 0)
-#define sv_setsv(dsv, ssv) \
-	sv_setsv_flags(dsv, ssv, SV_GMAGIC|SV_DO_COW_SVSETSV)
-#define sv_setsv_nomg(dsv, ssv) sv_setsv_flags(dsv, ssv, SV_DO_COW_SVSETSV)
-#define sv_catsv(dsv, ssv) sv_catsv_flags(dsv, ssv, SV_GMAGIC)
-#define sv_catsv_nomg(dsv, ssv) sv_catsv_flags(dsv, ssv, 0)
-#define sv_catsv_mg(dsv, ssv) sv_catsv_flags(dsv, ssv, SV_GMAGIC|SV_SMAGIC)
-#define sv_catpvn(dsv, sstr, slen) sv_catpvn_flags(dsv, sstr, slen, SV_GMAGIC)
-#define sv_catpvn_mg(sv, sstr, slen) \
-	sv_catpvn_flags(sv, sstr, slen, SV_GMAGIC|SV_SMAGIC);
-#define sv_2pv(sv, lp) sv_2pv_flags(sv, lp, SV_GMAGIC)
-#define sv_2pv_nolen(sv) sv_2pv(sv, 0)
-#define sv_2pv_nomg(sv, lp) sv_2pv_flags(sv, lp, 0)
-#define sv_pvn_force(sv, lp) sv_pvn_force_flags(sv, lp, SV_GMAGIC)
-#define sv_2iv(sv) sv_2iv_flags(sv, SV_GMAGIC)
-#define sv_2uv(sv) sv_2uv_flags(sv, SV_GMAGIC)
 
 /*
 =for apidoc Am|SV*|newRV_inc|SV* sv
@@ -1812,6 +1625,60 @@ struct clone_params {
   PerlInterpreter *proto_perl;
 };
 
+/*
+=for apidoc Am|void|SvOOK_offset|NN SV*sv|STRLEN len
+
+Reads into I<len> the offset from SvPVX back to the true start of the
+allocated buffer, which will be non-zero if C<sv_chop> has been used to
+efficiently remove characters from start of the buffer. Implemented as a
+macro, which takes the address of I<len>, which must be of type C<STRLEN>.
+Evaluates I<sv> more than once. Sets I<len> to 0 if C<SvOOK(sv)> is false.
+
+=cut
+*/
+
+#ifdef DEBUGGING
+/* Does the bot know something I don't?
+10:28 <@Nicholas> metabatman
+10:28 <+meta> Nicholas: crash
+*/
+#  define SvOOK_offset(sv, offset) STMT_START {				\
+	assert(sizeof(offset) == sizeof(STRLEN));			\
+	if (SvOOK(sv)) {						\
+	    const U8 *crash = (U8*)SvPVX_const(sv);			\
+	    offset = *--crash;						\
+ 	    if (!offset) {						\
+		crash -= sizeof(STRLEN);				\
+		Copy(crash, (U8 *)&offset, sizeof(STRLEN), U8);		\
+	    }								\
+	    {								\
+		/* Validate the preceding buffer's sentinels to		\
+		   verify that no-one is using it.  */			\
+		const U8 *const bonk = (U8 *) SvPVX_const(sv) - offset;	\
+		while (crash > bonk) {					\
+		    --crash;						\
+		    assert (*crash == (U8)PTR2UV(crash));		\
+		}							\
+	    }								\
+	} else {							\
+	    offset = 0;							\
+	}								\
+    } STMT_END
+#else
+    /* This is the same code, but avoids using any temporary variables:  */
+#  define SvOOK_offset(sv, offset) STMT_START {				\
+	assert(sizeof(offset) == sizeof(STRLEN));			\
+	if (SvOOK(sv)) {						\
+	    offset = ((U8*)SvPVX_const(sv))[-1];			\
+	    if (!offset) {						\
+		Copy(SvPVX_const(sv) - 1 - sizeof(STRLEN),		\
+		     (U8 *)&offset, sizeof(STRLEN), U8);		\
+	    }								\
+	} else {							\
+	    offset = 0;							\
+	}								\
+    } STMT_END
+#endif
 /*
  * Local variables:
  * c-indentation-style: bsd

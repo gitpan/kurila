@@ -24,7 +24,7 @@ use_ok( 'Tie::Scalar' );
 # these are "abstract virtual" parent methods
 for my $method qw( TIESCALAR FETCH STORE ) {
 	eval { Tie::Scalar->?$method() };
-	like( $@, qr/doesn't define a $method/, "croaks on inherited $method()" );
+	like( $@->{description}, qr/doesn't define a $method/, "croaks on inherited $method()" );
 }
 
 # the default value is undef
@@ -57,13 +57,13 @@ is( $flag, 1, 'and DESTROY() works' );
 # we want some noise, and some way to capture it
 use warnings;
 my $warn;
-local $SIG{__WARN__} = sub {
+local ${^WARN_HOOK} = sub {
 	$warn = $_[0];
 };
 
 # Tie::Scalar::TIEHANDLE should find and call TieTest::new and complain
 is( tie( my $foo, 'TieTest'), 'Fooled you.', 'delegated to new()' );
-like( $warn, qr/WARNING: calling TieTest->new/, 'caught warning fine' );
+like( $warn->{description}, qr/WARNING: calling TieTest->new/, 'caught warning fine' );
 
 package DestroyAction;
 

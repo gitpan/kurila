@@ -50,7 +50,7 @@ SKIP: {
 		if ($^O =~ m/os2|win32|macos|cygwin/i);
 	
 	my $warn;
-	local $SIG{__WARN__} = sub {
+	local ${^WARN_HOOK} = sub {
 		$warn = shift;
 	};
 
@@ -58,7 +58,7 @@ SKIP: {
 	$stat[2] = 077;
 	ok( !defined(Net::Netrc::_readrc()),
 		'_readrc() should not read world-writable file' );
-	ok( scalar($warn =~ m/^Bad permissions:/),
+	ok( scalar($warn->message =~ m/^Bad permissions:/),
 		'... and should warn about it' );
 
 	# the owner field should still not match
@@ -67,7 +67,7 @@ SKIP: {
         if ($<) { 
           ok( !defined(Net::Netrc::_readrc()), 
               '_readrc() should not read file owned by someone else' ); 
-          ok( scalar($warn =~ m/^Not owner:/),
+          ok( scalar($warn->message =~ m/^Not owner:/),
 		'... and should warn about it' ); 
         } else { 
           skip("testing as root",2);

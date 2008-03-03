@@ -24,10 +24,6 @@ sub import {
     Exporter::import($this,@list);
 }
 
-sub croak { require Carp;  goto &Carp::croak }
-# declare usage to assist AutoLoad
-sub usage;
-
 XSLoader::load 'POSIX', $VERSION;
 
 my %NON_CONSTS = (map {($_,1)}
@@ -35,7 +31,7 @@ my %NON_CONSTS = (map {($_,1)}
                      WIFEXITED WIFSIGNALED WIFSTOPPED WSTOPSIG WTERMSIG));
 
 for my $name (keys %NON_CONSTS) {
-    *{Symbol::fetch_glob($name)} = sub { &int_macro_int($name, $_[0]) };
+    *{Symbol::fetch_glob($name)} = sub { int_macro_int($name, $_[0]) };
 }
 
 package POSIX::SigRt;
@@ -55,24 +51,24 @@ package POSIX;
 
 sub usage {
     my ($mess) = @_;
-    croak "Usage: POSIX::$mess";
+    die "Usage: POSIX::$mess";
 }
 
 sub redef {
     my ($mess) = @_;
-    croak "Use method $mess instead";
+    die "Use method $mess instead";
 }
 
 sub unimpl {
     my ($mess) = @_;
     $mess =~ s/xxx//;
-    croak "Unimplemented: POSIX::$mess";
+    die "Unimplemented: POSIX::$mess";
 }
 
 sub assert {
     usage "assert(expr)" if @_ != 1;
     if (!$_[0]) {
-	croak "Assertion failed";
+	die "Assertion failed";
     }
 }
 

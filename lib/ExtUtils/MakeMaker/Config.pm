@@ -1,18 +1,17 @@
 package ExtUtils::MakeMaker::Config;
 
-$VERSION = '0.04';
-
 use strict;
+
+our $VERSION = '6.43_01';
+
 use Config ();
 
 # Give us an overridable config.
-use vars qw(%Config);
-%Config = %Config::Config;
+our %Config = %Config::Config;
 
 sub import {
     my $caller = caller;
 
-    no strict 'refs';
     *{Symbol::fetch_glob($caller.'::Config')} = \%Config;
 }
 

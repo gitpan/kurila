@@ -2,6 +2,7 @@
 
                 # we build the new one
 
+use kurila;
 use strict;
 
 BEGIN {
@@ -67,7 +68,7 @@ EOW
     $warning;
 } # do_not_edit
 
-open IN, "embed.fnc" or die $!;
+open IN, '<', "embed.fnc" or die $!;
 
 # walk table providing an array of components in each line to
 # subroutine, printing the result
@@ -84,7 +85,7 @@ sub walk_table (&@) {
     }
     else {
 	safer_unlink $filename if $filename ne '/dev/null';
-	open F, ">$filename" or die "Can't open $filename: $!";
+	open F, ">", "$filename" or die "Can't open $filename: $!";
 	binmode F;
 	$F = \*F;
     }
@@ -156,13 +157,15 @@ sub write_protos {
 	$ret .= "$arg\n";
     }
     else {
-	my ($flags,$retval,$func,@args) = @_;
+	my ($flags,$retval,$plain_func,@args) = @_;
 	my @nonnull;
 	my $has_context = ( $flags !~ m/n/ );
 	my $never_returns = ( $flags =~ m/r/ );
 	my $commented_out = ( $flags =~ m/m/ );
 	my $is_malloc = ( $flags =~ m/a/ );
 	my $can_ignore = ( $flags !~ m/R/ ) && !$is_malloc;
+	my @names_of_nn;
+	my $func;
 
 	my $splint_flags = "";
 	if ( $SPLINT && !$commented_out ) {
@@ -174,12 +177,14 @@ sub write_protos {
 
 	if ($flags =~ m/s/) {
 	    $retval = "STATIC $splint_flags$retval";
-	    $func = "S_$func";
+	    $func = "S_$plain_func";
 	}
 	else {
 	    $retval = "PERL_CALLCONV $splint_flags$retval";
 	    if ($flags =~ m/[bp]/) {
-		$func = "Perl_$func";
+		$func = "Perl_$plain_func";
+	    } else {
+		$func = $plain_func;
 	    }
 	}
 	$ret .= "$retval\t$func(";
@@ -205,11 +210,15 @@ sub write_protos {
 		my $temp_arg = $arg;
 		$temp_arg =~ s/\*//g;
 		$temp_arg =~ s/\s*\bstruct\b\s*/ /g;
-		if ( ($temp_arg ne "...") && ($temp_arg !~ m/\w+\s+\w+/) ) {
-		    warn "$func: $arg doesn't have a name\n";
+		if ( ($temp_arg ne "...")
+		     && ($temp_arg !~ m/\w+\s+(\w+)(?:\[\d+\])?\s*$/) ) {
+		    warn "$func: $arg ($n) doesn't have a name\n";
 		}
 		if ( $SPLINT && $nullok && !$commented_out ) {
 		    $arg = '/*@null@*/ ' . $arg;
+		}
+		if (defined $1 && $nn) {
+		    push @names_of_nn, $1;
 		}
 	    }
 	    $ret .= join ", ", @args;
@@ -251,6 +260,10 @@ sub write_protos {
 	}
 	$ret .= ";";
 	$ret = "/* $ret */" if $commented_out;
+	if (@names_of_nn) {
+	    $ret .= "\n#define PERL_ARGS_ASSERT_\U$plain_func\E\t\\\n\t"
+		. join '; ', map "assert($_)", @names_of_nn;
+	}
 	$ret .= @attrs ? "\n\n" : "\n";
     }
     $ret;
@@ -306,7 +319,7 @@ my @extvars = qw(sv_undef sv_yes sv_no na dowarn
 sub readsyms (\%$) {
     my ($syms, $file) = @_;
     local (*FILE, $_);
-    open(FILE, "< $file")
+    open(FILE, "<", "$file")
 	or die "embed.pl: Can't open $file: $!\n";
     while ( ~< *FILE) {
 	s/[ \t]*#.*//;		# Delete comments.
@@ -326,7 +339,7 @@ readsyms my %ppsym, 'pp.sym';
 sub readvars(\%$$@) {
     my ($syms, $file,$pre,$keep_pre) = @_;
     local (*FILE, $_);
-    open(FILE, "< $file")
+    open(FILE, "<", "$file")
 	or die "embed.pl: Can't open $file: $!\n";
     while ( ~< *FILE) {
 	s/[ \t]*#.*//;		# Delete comments.
@@ -377,7 +390,7 @@ sub multoff ($$) {
 }
 
 safer_unlink 'embed.h';
-open(EM, '> embed.h') or die "Can't create embed.h: $!\n";
+open(EM, '>', 'embed.h') or die "Can't create embed.h: $!\n";
 binmode EM;
 
 print EM do_not_edit ("embed.h"), <<'END';
@@ -632,7 +645,7 @@ END
 close(EM) or die "Error closing EM: $!";
 
 safer_unlink 'embedvar.h';
-open(EM, '> embedvar.h')
+open(EM, '>', 'embedvar.h')
     or die "Can't create embedvar.h: $!\n";
 binmode EM;
 
@@ -730,9 +743,9 @@ close(EM) or die "Error closing EM: $!";
 
 safer_unlink 'perlapi.h';
 safer_unlink 'perlapi.c';
-open(CAPI, '> perlapi.c') or die "Can't create perlapi.c: $!\n";
+open(CAPI, '>', 'perlapi.c') or die "Can't create perlapi.c: $!\n";
 binmode CAPI;
-open(CAPIH, '> perlapi.h') or die "Can't create perlapi.h: $!\n";
+open(CAPIH, '>', 'perlapi.h') or die "Can't create perlapi.h: $!\n";
 binmode CAPIH;
 
 print CAPIH do_not_edit ("perlapi.h"), <<'EOT';

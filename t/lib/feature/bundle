@@ -1,0 +1,20 @@
+Check feature bundles.
+
+__END__
+# 5.9 not supported
+use feature ":5.9";
+EXPECT
+OPTIONS regex
+^Feature bundle "5.9" is not supported by Perl \S+ at [^^]*
+########
+# 5.9.4 not supported
+use feature ":5.9.4";
+EXPECT
+OPTIONS regex
+^Feature bundle "5.9.4" is not supported by Perl \S+ at .*
+########
+# 5.8.8 not supported
+use feature ":5.8.8";
+EXPECT
+OPTIONS regex
+^Feature bundle "5.8.8" is not supported by Perl \S+ at .*

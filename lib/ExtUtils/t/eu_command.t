@@ -147,7 +147,7 @@ BEGIN {
     SKIP: {
         if ($^O eq 'amigaos' || $^O eq 'os2' || $^O eq 'MSWin32' ||
             $^O eq 'NetWare' || $^O eq 'dos' || $^O eq 'cygwin'  ||
-            $^O eq 'MacOS'
+            $^O eq 'MacOS' || $^O eq 'vos'
            ) {
             skip( "different file permission semantics on $^O", 5);
         }
@@ -207,7 +207,7 @@ BEGIN {
     @ARGV = ( $Testfile ) x 3;
     eval { cp() };
 
-    like( $@, qr/Too many arguments/, 'cp croaks on error' );
+    like( $@->{description}, qr/Too many arguments/, 'cp croaks on error' );
 
     # move a file to a subdirectory
     @ARGV = ( $Testfile, 'ecmddir' );
@@ -222,7 +222,7 @@ BEGIN {
     @ARGV = ( $Testfile ) x 3;
 
     eval { mv() };
-    like( $@, qr/Too many arguments/, 'mv croaks on error' );
+    like( $@->{description}, qr/Too many arguments/, 'mv croaks on error' );
 
     # Test expand_wildcards()
     {

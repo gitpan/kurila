@@ -17,7 +17,6 @@ package Maintainers;
 	'arandal'       => 'Allison Randal <allison@perl.org>',
 	'audreyt'	=> 'Audrey Tang <cpan@audreyt.org>',
 	'avar'		=> 'Ævar Arnfjörð Bjarmason <avar@cpan.org>',
-	'bbb'		=> 'Rob Brown <bbb@cpan.org>',
 	'craig'		=> 'Craig Berry <craigberry@mac.com>',
 	'dankogai'	=> 'Dan Kogai <dankogai@cpan.org>',
 	'dconway'	=> 'Damian Conway <dconway@cpan.org>',
@@ -70,6 +69,7 @@ package Maintainers;
 	'sburke'	=> 'Sean Burke <sburke@cpan.org>',
 	'mschwern'	=> 'Michael Schwern <mschwern@cpan.org>',
 	'smccam'	=> 'Stephen McCamant <smccam@cpan.org>',
+	'smpeters'	=> 'Steve Peters <steve@fisharerojo.org>',
 	'smueller'	=> 'Steffen Mueller <smueller@cpan.org>',
 	'tels'		=> 'Tels <nospam-abuse@bloodgate.com>',
 	'tomhughes'	=> 'Tom Hughes <tomhughes@cpan.org>',
@@ -101,7 +101,7 @@ package Maintainers;
 	'AutoLoader' =>
 		{
 		'MAINTAINER'	=> 'smueller',
-		'FILES'		=> q[lib/AutoLoader.pm lib/AutoLoader.t],
+		'FILES'		=> q[lib/AutoLoader.pm lib/AutoSplit.pm lib/AutoLoader],
 		'CPAN'		=> 1,
 	},
 
@@ -610,7 +610,7 @@ package Maintainers;
 
 	'Net::Ping' =>
 		{
-		'MAINTAINER'	=> 'bbb',
+		'MAINTAINER'	=> 'smpeters',
 		'FILES'		=> q[lib/Net/Ping.pm lib/Net/Ping],
 		'CPAN'		=> 1,
 		},
@@ -760,7 +760,7 @@ package Maintainers;
 	'Safe' =>
 		{
 		'MAINTAINER'	=> 'rgarcia',
-		'FILES'		=> q[ext/Safe],
+		'FILES'		=> q[ext/Safe ext/Opcode/Safe.pm],
 		'CPAN'		=> 1,
 		},
 
@@ -835,25 +835,16 @@ package Maintainers;
 		'CPAN'		=> 1,
 		},
 
-	'Test::Builder' =>
-		{
-		'MAINTAINER'	=> 'mschwern',
-		'FILES'		=> q[lib/Test/Builder.pm],
-		'CPAN'		=> 1,
-		},
-
 	'Test::Harness' =>
 		{
-		'MAINTAINER'	=> 'petdance',
-		'FILES'		=> q[lib/Test/Harness.pm lib/Test/Harness
-				     t/lib/sample-tests],
-		'CPAN'		=> 1,
-		},
-
-	'Test::More' =>
-		{
-		'MAINTAINER'	=> 'mschwern',
-		'FILES'		=> q[lib/Test/More.pm],
+		'MAINTAINER'	=> 'andya',
+		'FILES'		=> q[lib/App/Prove.pm lib/App/Prove/State.pm
+				     lib/Test/Harness.pm lib/Test/Harness
+				     lib/TAP
+				     t/lib/data t/lib/sample-tests 
+				     t/lib/source_tests t/lib/Dev/Null.pm
+				     t/lib/App/Prove/Plugin/Dummy.pm
+				     t/lib/IO/c55Capture.pm t/lib/NoFork.pm],
 		'CPAN'		=> 1,
 		},
 
@@ -861,6 +852,8 @@ package Maintainers;
 		{
 		'MAINTAINER'	=> 'mschwern',
 		'FILES'		=> q[lib/Test/Simple.pm lib/Test/Simple
+				     lib/Test/Builder.pm lib/Test/Builder
+				     lib/Test/More.pm
 				     t/lib/Test/Simple],
 		'CPAN'		=> 1,
 		},
@@ -869,6 +862,20 @@ package Maintainers;
 		{
 		'MAINTAINER'	=> 'jstowe',
 		'FILES'		=> q[lib/Term/Cap.{pm,t}],
+		'CPAN'		=> 1,
+		},
+
+	'Thread::Queue' =>
+		{
+		'MAINTAINER'	=> 'jdhedden',
+		'FILES'		=> q[lib/Thread/Queue.pm lib/Thread/Queue],
+		'CPAN'		=> 1,
+		},
+
+	'Thread::Semaphore' =>
+		{
+		'MAINTAINER'	=> 'jdhedden',
+		'FILES'		=> q[lib/Thread/Semaphore.pm lib/Thread/Semaphore],
 		'CPAN'		=> 1,
 		},
 
@@ -962,8 +969,8 @@ package Maintainers;
 	'win32' =>
 		{
 		'MAINTAINER'	=> 'jand',
-		'FILES'		=> q[win32 README.win32 t/win32 ext/Win32CORE],
-		'CPAN'		=> 1,
+		'FILES'		=> q[win32 t/win32 README.win32 ext/Win32CORE],
+		'CPAN'		=> 0,
 		},
 
 	'Win32' =>

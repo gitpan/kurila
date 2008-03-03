@@ -329,12 +329,11 @@ untie @ary;
 }
                            
 
-                           
 {
     tie my @dummy, "NegFetchsize";
     eval { "@dummy"; };
-    print "# $@" if $@;
-    print "not " unless $@ =~ m/^FETCHSIZE returned a negative value/;
+    print "# $@->{description}\n" if $@;
+    print "not " unless $@->{description} =~ m/^FETCHSIZE returned a negative value/;
     print "ok ", $test++, " - croak on negative FETCHSIZE\n";
 }
 

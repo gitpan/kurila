@@ -48,7 +48,7 @@ sub read_manifest {
 
 sub catch_warning {
     my $warn = '';
-    local $SIG{__WARN__} = sub { $warn .= $_[0] };
+    local ${^WARN_HOOK} = sub { $warn .= $_[0]->{description} };
     return join('', $_[0]->() ), $warn;
 }
 
@@ -173,7 +173,7 @@ $files = maniread();
 eval { (undef, $warn) = catch_warning( sub {
  		manicopy( $files, 'copy', 'cp' ) })
 };
-like( $@, qr/^Can't read none: /, 'croaked about none' );
+like( $@->{description}, qr/^Can't read none: /, 'croaked about none' );
 
 # a newline comes through, so get rid of it
 chomp($warn);
@@ -278,7 +278,7 @@ SKIP: {
     eval {
         maniadd({ 'grrrwoof' => 'yippie' });
     };
-    like( $@, qr/^\Qmaniadd() could not open MANIFEST:\E/,  
+    like( $@->{description}, qr/^\Qmaniadd() could not open MANIFEST:\E/,  
                  "maniadd() dies if it can't open the MANIFEST" );
 
     chmod( 0600, 'MANIFEST' );

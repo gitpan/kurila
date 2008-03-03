@@ -10,7 +10,6 @@ B<perl>	S<[ B<-sTtuUWX> ]>
 	S<[ B<-pna> ] [ B<-F>I<pattern> ] [ B<-l>[I<octal>] ] [ B<-0>[I<octal/hexadecimal>] ]>
 	S<[ B<-I>I<dir> ] [ B<-m>[B<->]I<module> ] [ B<-M>[B<->]I<'module...'> ] [ B<-f> ]>
 	S<[ B<-C [I<number/list>] >]>
-	S<[ B<-P> ]>
 	S<[ B<-S> ]>
 	S<[ B<-x>[I<dir>] ]>
 	S<[ B<-i>[I<extension>] ]>
@@ -146,6 +145,7 @@ For ease of access, the Perl manual has been split up into several sections.
     perldoc		Look up Perl documentation in Pod format
 
     perlhist		Perl history records
+    kurila18delta       What is new for Perl Kurila 1.8
     kurila17delta       What is new for Perl Kurila 1.7
     kurila16delta       What is new for Perl Kurila 1.6
     kurila15delta       What is new for Perl Kurila 1.5
@@ -154,6 +154,7 @@ For ease of access, the Perl manual has been split up into several sections.
     kurila02delta       What is new for Perl Kurila 0.2
     kurila01delta       What is new for Perl Kurila 0.1
     perldelta		Perl changes since previous version
+    perl5100delta	Perl changes in version 5.10.0
     perl595delta	Perl changes in version 5.9.5
     perl594delta	Perl changes in version 5.9.4
     perl593delta	Perl changes in version 5.9.3

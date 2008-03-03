@@ -17,10 +17,10 @@ use B qw(class main_root main_start main_cv svref_2object opnumber perlstring
 	 OPpEXISTS_SUB OPpSORT_NUMERIC OPpSORT_INTEGER
 	 OPpSORT_REVERSE OPpSORT_INPLACE OPpSORT_DESCEND OPpITER_REVERSED
 	 SVf_IOK SVf_NOK SVf_ROK SVf_POK SVpad_OUR SVf_FAKE SVs_RMG SVs_SMG
-         CVf_METHOD CVf_LOCKED CVf_LVALUE
+         CVf_METHOD CVf_LOCKED
 	 PMf_KEEP PMf_GLOBAL PMf_CONTINUE PMf_EVAL
 	 PMf_MULTILINE PMf_SINGLELINE PMf_FOLD PMf_EXTENDED RXf_SKIPWHITE);
-$VERSION = 0.83;
+$VERSION = 0.86;
 use strict;
 use warnings ();
 
@@ -614,7 +614,7 @@ sub compile {
 	    $self->todo($block, 0);
 	}
 	$self->stash_subs();
-	local($SIG{"__DIE__"}) =
+	local(${^DIE_HOOK}) =
 	  sub {
 	      if ($self->{'curcop'}) {
 		  my $cop = $self->{'curcop'};
@@ -810,9 +810,8 @@ Carp::confess("SPECIAL in deparse_sub") if $cv->isa("B::SPECIAL");
     if ($cv->FLAGS ^&^ SVf_POK) {
 	$proto = "(". $cv->PV . ") ";
     }
-    if ($cv->CvFLAGS ^&^ (CVf_METHOD^|^CVf_LOCKED^|^CVf_LVALUE)) {
+    if ($cv->CvFLAGS ^&^ (CVf_METHOD^|^CVf_LOCKED)) {
         $proto .= ": ";
-        $proto .= "lvalue " if $cv->CvFLAGS ^&^ CVf_LVALUE;
         $proto .= "locked " if $cv->CvFLAGS ^&^ CVf_LOCKED;
         $proto .= "method " if $cv->CvFLAGS ^&^ CVf_METHOD;
     }
@@ -1407,8 +1406,7 @@ sub declare_hints {
 my %ignored_hints = (
     'open<' => 1,
     'open>' => 1,
-    'v_string' => 1,
-    );
+);
 
 sub declare_hinthash {
     my ($from, $to, $indent) = @_;
@@ -1786,9 +1784,7 @@ sub pp_refgen {
     my $kid = $op->first;
     if ($kid->name eq "null") {
 	$kid = $kid->first;
-	if ($kid->name eq "anonlist" || $kid->name eq "anonhash") {
-	    return $self->anon_hash_or_list($op, $cx);
-	} elsif (!null($kid->sibling) and
+	if (!null($kid->sibling) and
 		 $kid->sibling->name eq "anoncode") {
             return $self->e_anoncode({ code => $self->padval($kid->sibling->targ) });
 	} elsif ($kid->name eq "pushmark") {
@@ -2068,7 +2064,7 @@ sub pp_aassign { binop(@_, "=", 7, SWAP_CHILDREN ^|^ LIST_CONTEXT) }
 sub pp_smartmatch {
     my ($self, $op, $cx) = @_;
     if ($op->flags ^&^ OPf_SPECIAL) {
-	return $self->deparse($op->first, $cx);
+	return $self->deparse($op->last, $cx);
     }
     else {
 	binop(@_, "~~", 14);

@@ -13,7 +13,7 @@ use Getopt::Long qw(GetOptionsFromString :config no_ignore_case);
 my $want_version="2.3501";
 die("Getopt::Long version $want_version required--this is only version ".
     $Getopt::Long::VERSION)
-  unless $Getopt::Long::VERSION ge $want_version;
+  unless $Getopt::Long::VERSION +>= $want_version;
 
 print "1..14\n";
 
@@ -35,7 +35,7 @@ $args = "-Foo -baR blech --foo bar";
 undef $opt_baR;
 undef $opt_bar;
 { my $msg = "";
-  local $SIG{__WARN__} = sub { $msg .= "@_" };
+  local ${^WARN_HOOK} = sub { $msg .= $_[0]->{description} };
   my $ret = GetOptionsFromString($args, "foo", "Foo=s");
   print ($ret ? "not " : "ok 9\n");
   print ($msg =~ m/^GetOptionsFromString: Excess data / ? "" : "$msg\nnot ", "ok 10\n");

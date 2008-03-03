@@ -328,6 +328,7 @@ Perl_newSVuv
 Perl_newSVnv
 Perl_newSVpv
 Perl_newSVpvn
+Perl_newSVpvn_flags
 Perl_newSVhek
 Perl_newSVpvn_share
 Perl_newSVpvf
@@ -387,9 +388,9 @@ Perl_ref
 Perl_regdump
 Perl_pregexec
 Perl_pregfree
+Perl_pregfree2
 Perl_reg_temp_copy
 Perl_regfree_internal
-Perl_reg_stringify
 Perl_regdupe_internal
 Perl_pregcomp
 Perl_re_compile
@@ -452,7 +453,7 @@ Perl_save_scalar
 Perl_save_pptr
 Perl_save_vptr
 Perl_save_re_context
-Perl_save_padsv
+Perl_save_padsv_and_mortalize
 Perl_save_sptr
 Perl_save_svref
 Perl_scan_bin
@@ -659,7 +660,7 @@ Perl_ss_dup
 Perl_any_dup
 Perl_he_dup
 Perl_hek_dup
-Perl_re_dup
+Perl_re_dup_guts
 Perl_fp_dup
 Perl_dirp_dup
 Perl_gp_dup

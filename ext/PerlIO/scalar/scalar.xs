@@ -31,8 +31,9 @@ PerlIOScalar_pushed(pTHX_ PerlIO * f, const char *mode, SV * arg,
 		return -1;
 	    }
 	    s->var = SvREFCNT_inc(SvRV(arg));
-	    if (!SvPOK(s->var) && SvTYPE(SvRV(arg)) > SVt_NULL)
-		(void)SvPV_nolen(s->var);
+	    SvGETMAGIC(s->var);
+	    if (!SvPOK(s->var) && SvOK(s->var))
+		(void)SvPV_nomg_const_nolen(s->var);
 	}
 	else {
 	    s->var =
@@ -184,7 +185,7 @@ PerlIOScalar_get_base(pTHX_ PerlIO * f)
     if (PerlIOBase(f)->flags & PERLIO_F_CANREAD) {
 	return (STDCHAR *) SvPV_nolen(s->var);
     }
-    return (STDCHAR *) Nullch;
+    return (STDCHAR *) NULL;
 }
 
 STDCHAR *
@@ -194,7 +195,7 @@ PerlIOScalar_get_ptr(pTHX_ PerlIO * f)
 	PerlIOScalar *s = PerlIOSelf(f, PerlIOScalar);
 	return PerlIOScalar_get_base(aTHX_ f) + s->posn;
     }
-    return (STDCHAR *) Nullch;
+    return (STDCHAR *) NULL;
 }
 
 SSize_t

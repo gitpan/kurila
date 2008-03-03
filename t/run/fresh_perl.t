@@ -180,20 +180,20 @@ TIEARRAY FAKEARRAY fred
 TIEARRAY FAKEARRAY fred
 DESTROY 
 ########
-BEGIN { die "phooey\n" }
+BEGIN { die "phooey" }
 EXPECT
-phooey
-BEGIN failed--compilation aborted at - line 1.
+phooey at - line 1.
+BEGIN failed--compilation aborted
 ########
 BEGIN { 1/$zero }
 EXPECT
 Illegal division by zero at - line 1.
-BEGIN failed--compilation aborted at - line 1.
+BEGIN failed--compilation aborted
 ########
 BEGIN { undef = 0 }
 EXPECT
 Modification of a read-only value attempted at - line 1.
-BEGIN failed--compilation aborted at - line 1.
+BEGIN failed--compilation aborted
 ########
 {
     package foo;
@@ -269,7 +269,7 @@ print "ok\n" if (1E2<<1 == 200 and 3E4<<3 == 240000);
 EXPECT
 ok
 ########
-print "ok\n" if ("\0" lt "\x[FF]");
+print "ok\n" if ("\0" cmp "\x[FF]") +< 0;
 EXPECT
 ok
 ########
@@ -336,6 +336,8 @@ foo;
 EXPECT
 In foo1
 Subroutine foo redefined at (eval 1) line 1.
+    (eval) called at - line 4.
+    main::foo called at - line 7.
 Exiting foo1
 In foo2
 ########
@@ -426,16 +428,17 @@ destroyed
 ########
 BEGIN {
   $| = 1;
-  $SIG{__WARN__} = sub {
-    eval { print $_[0] };
-    die "bar\n";
+  ${^WARN_HOOK} = sub {
+    eval { print $_[0]->{description} };
+    die "bar";
   };
   warn "foo\n";
 }
 EXPECT
 foo
-bar
-BEGIN failed--compilation aborted at - line 8.
+bar at - line 5.
+    main::__ANON__ called at - line 7.
+BEGIN failed--compilation aborted
 ########
 re();
 sub re {
@@ -488,6 +491,7 @@ eval "C";
 M(C);
 EXPECT
 Modification of a read-only value attempted at - line 2.
+    main::M called at - line 4.
 ########
 print qw(ab a\b a\\b);
 EXPECT
@@ -521,7 +525,7 @@ ok
 # reversed again as a result of [perl #17763]
 die qr(x)
 EXPECT
-(?-uxism:x)
+recursive die
 ########
 # David Dyck
 # coredump in 5.7.1
@@ -549,24 +553,6 @@ use utf8;
 "abcd\x{1234}" =~ m/(a)(b[c])(d+)?/i and print "ok\n";
 EXPECT
 ok
-########
-my $foo = Bar->new();
-my @dst;
-END {
-    ($_ = "@dst") =~ s/\(0x.+?\)/(0x...)/;
-    print $_, "\n";
-}
-package Bar;
-sub new {
-    my $self = bless [], 'Bar';
-    eval '$self';
-    return $self;
-}
-sub DESTROY { 
-    push @dst, "$_[0]";
-}
-EXPECT
-Bar=ARRAY(0x...)
 ######## (?{...}) compilation bounces on PL_rs
 -0
 {
@@ -704,7 +690,7 @@ BEGIN {
 }
 # Test case cut down by jhi
 use Carp;
-$SIG{__WARN__} = sub { $@ = shift };
+${^WARN_HOOK} = sub { $@ = shift };
 use Encode;
 use utf8;
 my $t = "\x[E9]";

@@ -1,6 +1,6 @@
 package feature;
 
-our $VERSION = '1.11';
+our $VERSION = '1.13';
 
 # (feature name) => (internal name, used in %^H)
 my %feature = (
@@ -8,14 +8,15 @@ my %feature = (
     state  => "feature_state",
 );
 
+# NB. the latest bundle must be loaded by the -E switch (see toke.c)
+
 my %feature_bundle = (
-    "5.10.0" => [qw(switch state)],
+    "5.10" => [qw(switch state)],
+    "5.11" => [qw(switch state)],
 );
 
-# latest version here
-$feature_bundle{"5.10"} = $feature_bundle{"5.10.0"};
-
-$feature_bundle{"5.9.5"} = $feature_bundle{"5.10.0"};
+# special case
+$feature_bundle{"5.9.5"} = $feature_bundle{"5.10"};
 
 # TODO:
 # - think about versioned features (use feature switch => 2)
@@ -91,11 +92,11 @@ See L<perlsub/"Persistent Private Variables"> for details.
 It's possible to load a whole slew of features in one go, using
 a I<feature bundle>. The name of a feature bundle is prefixed with
 a colon, to distinguish it from an actual feature. At present, the
-only feature bundles are C<use feature ":5.10"> and C<use feature ":5.10.0">,
-which both are equivalent to C<use feature qw(switch say state)>.
+only feature bundle is C<use feature ":5.10"> which is equivalent
+to C<use feature qw(switch say state)>.
 
-In the forthcoming 5.10.X perl releases, C<use feature ":5.10"> will be
-equivalent to the latest C<use feature ":5.10.X">.
+Specifying sub-versions such as the C<0> in C<5.10.0> in feature bundles has
+no effect: feature bundles are guaranteed to be the same for all sub-versions.
 
 =head1 IMPLICIT LOADING
 
@@ -118,9 +119,10 @@ the C<use VERSION> construct, and when the version is higher than or equal to
 
 will do an implicit
 
-    use feature ':5.10.0';
+    use feature ':5.10';
 
-and so on.
+and so on. Note how the trailing sub-version is automatically stripped from the
+version.
 
 But to avoid portability warnings (see L<perlfunc/use>), you may prefer:
 
@@ -135,14 +137,17 @@ with the same effect.
 sub import {
     my $class = shift;
     if (@_ == 0) {
-	croak("No features specified");
+	die("No features specified");
     }
     while (@_) {
 	my $name = shift(@_);
 	if (substr($name, 0, 1) eq ":") {
 	    my $v = substr($name, 1);
 	    if (!exists $feature_bundle{$v}) {
-		unknown_feature_bundle($v);
+		$v =~ s/^([0-9]+)\.([0-9]+).[0-9]+$/$1.$2/;
+		if (!exists $feature_bundle{$v}) {
+		    unknown_feature_bundle(substr($name, 1));
+		}
 	    }
 	    unshift @_, @{$feature_bundle{$v}};
 	    next;
@@ -168,7 +173,10 @@ sub unimport {
 	if (substr($name, 0, 1) eq ":") {
 	    my $v = substr($name, 1);
 	    if (!exists $feature_bundle{$v}) {
-		unknown_feature_bundle($v);
+		$v =~ s/^([0-9]+)\.([0-9]+).[0-9]+$/$1.$2/;
+		if (!exists $feature_bundle{$v}) {
+		    unknown_feature_bundle(substr($name, 1));
+		}
 	    }
 	    unshift @_, @{$feature_bundle{$v}};
 	    next;
@@ -184,19 +192,14 @@ sub unimport {
 
 sub unknown_feature {
     my $feature = shift;
-    croak(sprintf('Feature "%s" is not supported by Perl %vd',
-	    $feature, $^V));
+    die(sprintf('Feature "%s" is not supported by Perl %s',
+                $feature, $^V));
 }
 
 sub unknown_feature_bundle {
     my $feature = shift;
-    croak(sprintf('Feature bundle "%s" is not supported by Perl %vd',
+    die(sprintf('Feature bundle "%s" is not supported by Perl %s',
 	    $feature, $^V));
-}
-
-sub croak {
-    require Carp;
-    Carp::croak(@_);
 }
 
 1;

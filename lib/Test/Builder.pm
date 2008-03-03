@@ -7,7 +7,7 @@ $^C ||= 0;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.72';
+$VERSION = '0.74_1';
 $VERSION = eval $VERSION;    # make the alpha version come out as a number
 
 # Make Test::Builder thread-safe for ithreads.
@@ -700,7 +700,7 @@ sub cmp_ok {
 
     my $test;
     {
-        local($@,$!,$SIG{__DIE__});  # isolate eval
+        local($@,$!);  # isolate eval
 
         my $code = $self->_caller_context;
 
@@ -924,7 +924,8 @@ sub maybe_regex {
     my($re, $opts);
 
     # Check for qr/foo/
-    if( ref $regex eq 'Regexp' ) {
+    if (re::is_regexp($regex))
+    {
         $usable_regex = $regex;
     }
     # Check for '/foo/' or 'm,foo,'
@@ -953,7 +954,7 @@ sub _regex_ok {
         my $test;
         my $code = $self->_caller_context;
 
-        local($@, $!, $SIG{__DIE__}); # isolate eval
+        local($@, $!); # isolate eval
 
         # Yes, it has to look like this or 5.4.5 won't see the #line directive.
         # Don't ask me, man, I just work here.
@@ -1003,10 +1004,9 @@ sub _try {
     
     local $!;               # eval can mess up $!
     local $@;               # don't set $@ in the test
-    local $SIG{__DIE__};    # don't trip an outside DIE handler.
     my $return = eval { $code->() };
     
-    return wantarray ? ($return, $@) : $return;
+    return wantarray ? ($return, $@ && $@->{description}) : $return;
 }
 
 =end private
@@ -1658,7 +1658,7 @@ doesn't actually exit, that's your job.
 =cut
 
 sub _my_exit {
-    $? = $_[0];
+    $? ||= $_[0];
 
     return 1;
 }
@@ -1669,18 +1669,6 @@ sub _my_exit {
 =end _private
 
 =cut
-
-$SIG{__DIE__} = sub {
-    # We don't want to muck with death in an eval, but $^S isn't
-    # totally reliable.  5.005_03 and 5.6.1 both do the wrong thing
-    # with it.  Instead, we use caller.  This also means it runs under
-    # 5.004!
-    my $in_eval = 0;
-    for( my $stack = 1;  my $sub = (CORE::caller($stack))[3];  $stack++ ) {
-        $in_eval = 1 if $sub =~ m/^\(eval\)/;
-    }
-    $Test->{Test_Died} = 1 unless $in_eval;
-};
 
 sub _ending {
     my $self = shift;

@@ -57,7 +57,7 @@ SKIP: {
     }
     else {
        eval { chdir($dh); };
-       like($@, qr/^The dirfd function is unimplemented at/, "dirfd is unimplemented");
+       like($@->{description}, qr/^The dirfd function is unimplemented at/, "dirfd is unimplemented");
        chdir ".." or die $!;
     }
 
@@ -72,7 +72,7 @@ SKIP: {
     }
     else {
        eval { chdir(*DH); };
-       like($@, qr/^The dirfd function is unimplemented at/, "dirfd is unimplemented");
+       like($@->{description}, qr/^The dirfd function is unimplemented at/, "dirfd is unimplemented");
        chdir ".." or die $!;
     }
     ok(-d "op", "verify that we are back");
@@ -90,7 +90,7 @@ SKIP: {
     }
     else {
 	eval { chdir(*H); };
-	like($@, qr/^The dirfd function is unimplemented at/,
+	like($@->{description}, qr/^The dirfd function is unimplemented at/,
 	     "dirfd is unimplemented");
 	SKIP: {
 	    skip("dirfd is unimplemented");
@@ -106,7 +106,7 @@ SKIP: {
     skip("has fchdir", 1) if $has_fchdir;
     opendir(my $dh, "op");
     eval { chdir($dh); };
-    like($@, qr/^The fchdir function is unimplemented at/, "fchdir is unimplemented");
+    like($@->{description}, qr/^The fchdir function is unimplemented at/, "fchdir is unimplemented");
 }
 
 # The environment variables chdir() pays attention to.
@@ -128,7 +128,7 @@ sub check_env {
         is( abs_path, $Cwd,       '  and back again' );
 
         my $warning = '';
-        local $SIG{__WARN__} = sub { $warning .= join '', @_ };
+        local ${^WARN_HOOK} = sub { $warning .= $_[0]->{description} . "\n" };
 
 
         # Check the deprecated chdir(undef) feature.
@@ -136,8 +136,8 @@ sub check_env {
         ok( chdir(undef),           "chdir(undef) w/ only \$ENV\{$key\} set" );
         is( abs_path, $ENV{$key},   '  abs_path() agrees' );
         is( $warning,  <<WARNING,   '  got uninit & deprecation warning' );
-Use of uninitialized value in chdir at $0 line 64.
-Use of chdir('') or chdir(undef) as chdir() is deprecated at $0 line 64.
+Use of uninitialized value in chdir
+Use of chdir('') or chdir(undef) as chdir() is deprecated
 WARNING
 
         chdir($Cwd);
@@ -148,7 +148,7 @@ WARNING
         ok( chdir(''),              "chdir('') w/ only \$ENV\{$key\} set" );
         is( abs_path, $ENV{$key},   '  abs_path() agrees' );
         is( $warning,  <<WARNING,   '  got deprecation warning' );
-Use of chdir('') or chdir(undef) as chdir() is deprecated at $0 line 76.
+Use of chdir('') or chdir(undef) as chdir() is deprecated
 WARNING
 
         chdir($Cwd);

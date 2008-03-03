@@ -18,6 +18,7 @@ BEGIN {
 our %Config;
 eval 'use Config';          #  Defaults assumed if this fails
 
+run_tests() unless caller;
 
 # use utf8;
 # use charnames ':full';
@@ -48,15 +49,18 @@ our ($test, $x, %XXX, @XXX, $foo, @x, $null, @words);
 # Force scalar context on the patern match
 sub ok ($;$) {
     my($ok, $name) = @_;
+    my $todo = $TODO ? " # TODO $TODO" : '';
 
     printf "%sok %d - %s\n", ($ok ? "" : "not "), $test,
-        ($name||$Message)."\tLine ".((caller)[2]);
+        ($name||$Message)."$todo\tLine ".((caller)[2]);
 
     printf "# Failed test at line %d\n", (caller)[2] unless $ok;
 
     $test++;
     return $ok;
 }
+
+sub run_tests {
 
 $x = "abc\ndef\n";
 
@@ -296,12 +300,12 @@ print "ok 68\n";
 
 undef $@;
 eval "'aaa' =~ m/a\{1,$reg_infty\}/";
-print "not " if $@ !~ m%^\QQuantifier in {,} bigger than%;
+print "not " if $@->{description} !~ m%^\QQuantifier in {,} bigger than%;
 print "ok 69\n";
 
 eval "'aaa' =~ m/a\{1,$reg_infty_p\}/";
 print "not "
-	if $@ !~ m%^\QQuantifier in {,} bigger than%;
+	if $@->{description} !~ m%^\QQuantifier in {,} bigger than%;
 print "ok 70\n";
 undef $@;
 
@@ -309,7 +313,7 @@ undef $@;
 
 our $context = 'x' x 256;
 eval qq("${context}y" =~ m/(?<=$context)y/);
-print "not " if $@ !~ m%^\QLookbehind longer than 255 not%;
+print "not " if $@->{description} !~ m%^\QLookbehind longer than 255 not%;
 print "ok 71\n";
 
 # removed test
@@ -433,7 +437,7 @@ $test++;
 my $code = '{$blah = 45}';
 my $blah = 12;
 eval { m/(?$code)/ };
-print "not " unless $@ and $@ =~ m/not allowed at runtime/ and $blah == 12;
+print "not " unless $@ and $@->{description} =~ m/not allowed at runtime/ and $blah == 12;
 print "ok $test\n";
 $test++;
 
@@ -443,7 +447,7 @@ for $code ('{$blah = 45}','=xx') {
   if ($code eq '=xx') {
     print "#'$@','$res','$blah'\nnot " unless not $@ and $res;
   } else {
-    print "#'$@','$res','$blah'\nnot " unless $@ and $@ =~ m/not allowed at runtime/ and $blah == 12;
+    print "#'$@','$res','$blah'\nnot " unless $@ and $@->{description} =~ m/not allowed at runtime/ and $blah == 12;
   }
   print "ok $test\n";
   $test++;
@@ -540,15 +544,17 @@ $b = 7;
 m/$a$a/;
 ok($b eq '9');
 
-$c="$a";
-m/$a$a/;
-ok($b eq '11');
+{
+    $c="$a";
+    m/$a$a/;
+    iseq($b, '11');
+}
 
 our $lex_a;
 {
   use re "eval";
   m/$a$c$a/;
-  ok($b eq '14');
+  iseq($b, '14');
 
   local $lex_a = 2;
   my $lex_a = 43;
@@ -567,11 +573,10 @@ our $lex_a;
 
 
   no re "eval";
-  my $match = eval { m/$a$c$a/ };
-  print "not "
-    unless $b eq '14' and $@ =~ m/Eval-group not allowed/ and not $match;
-  print "ok $test\n";
-  $test++;
+  $match = eval { m/$a$c$a/ };
+  # FIXME - split this one. That would require removing a lot of hard coded
+  # test numbers.
+  ok($b eq '14' and $@->{description} =~ m/Eval-group not allowed/ and not $match);
 }
 
 {
@@ -602,13 +607,13 @@ ok($c == 3, "# TODO lexical scope?");
 
 sub must_warn_pat {
     my $warn_pat = shift;
-    return sub { print "not  # warning: $_[0]" unless $_[0] =~ m/$warn_pat/ }
+    return sub { print "not  # warning: $_[0]->{description}" unless $_[0]->{description} =~ m/$warn_pat/ }
 }
 
 sub must_warn {
     my ($warn_pat, $code) = @_;
     local %SIG;
-    eval 'BEGIN { use warnings; $SIG{__WARN__} = $warn_pat };' . $code;
+    eval 'BEGIN { use warnings; ${^WARN_HOOK} = $warn_pat };' . $code;
     print "ok $test\n";
     $test++;
 }
@@ -727,24 +732,24 @@ $test++;
 
 eval { $+[0] = 13; };
 print "not "
-   if $@ !~ m/^Modification of a read-only value attempted/;
+   if $@->{description} !~ m/^Modification of a read-only value attempted/;
 print "ok $test\n";
 $test++;
 
 eval { $-[0] = 13; };
 print "not "
-   if $@ !~ m/^Modification of a read-only value attempted/;
+   if $@->{description} !~ m/^Modification of a read-only value attempted/;
 print "ok $test\n";
 $test++;
 
 eval { @+ = (7, 6, 5); };
 print "not "
-   if $@ !~ m/^Modification of a read-only value attempted/;
+   if $@->{description} !~ m/^Modification of a read-only value attempted/;
 print "ok $test\n";
 $test++;
 
 eval { @- = qw(foo bar); };
-ok( $@ =~ m/^Modification of a read-only value attempted/ );
+ok( $@->{description} =~ m/^Modification of a read-only value attempted/ );
 
 m/.(a)(ba*)?/;
 print "#$#-..$#+\nnot " if $#+ != 2 or $#- != 1;
@@ -777,9 +782,10 @@ print "not " if $str =~ m/^...\G/;
 print "ok $test\n";
 $test++;
 
-print "not " unless $str =~ m/.\G./ and $& eq 'bc';
-print "ok $test\n";
-$test++;
+{
+    local $TODO = $::running_as_thread;
+    ok($str =~ m/.\G./ and $& eq 'bc');
+}
 
 print "not " unless $str =~ m/\G../ and $& eq 'cd';
 print "ok $test\n";
@@ -863,24 +869,30 @@ $foo='aabbccddeeffgg';
 
 pos($foo)=1;
 
-$foo=~m/.\G(..)/g;
-iseq($1,'ab');
+$foo =~ m/.\G(..)/g;
+{
+    local $TODO = $::running_as_thread;
+    iseq($1,'ab');
+}
 
 pos($foo) += 1;
-$foo=~m/.\G(..)/g;
-print "not " unless($1 eq 'cc');
-print "ok $test\n";
-$test++;
+$foo =~ m/.\G(..)/g;
+{
+    local $TODO = $::running_as_thread;
+    iseq($1, 'cc');
+}
 
 pos($foo) += 1;
-$foo=~m/.\G(..)/g;
-print "not " unless($1 eq 'de');
-print "ok $test\n";
-$test++;
+$foo =~ m/.\G(..)/g;
+{
+    local $TODO = $::running_as_thread;
+    iseq($1, 'de');
+}
 
-print "not " unless $foo =~ m/\Gef/g;
-print "ok $test\n";
-$test++;
+{
+    local $TODO = $::running_as_thread;
+    ok($foo =~ m/\Gef/g);
+}
 
 undef pos $foo;
 
@@ -1046,7 +1058,8 @@ ok("\n\n" =~ m/\n* $ \n/x);
 
 ok("\n\n" =~ m/\n+ $ \n/x);
 
-ok([] =~ m/^ARRAY/, "ARRAYREF");
+eval { [] =~ m/^ARRAY/ };
+ok($@ && $@->{description} =~ qr/Tried to stringify a reference/, " # TODO ");
 
 eval << 'EOE';
 \{
@@ -1070,7 +1083,7 @@ $test++;
 
 our $w = 0;
 {
-    local $SIG{__WARN__} = sub { $w = 1 };
+    local ${^WARN_HOOK} = sub { $w = 1 };
     local $^W = 1;
 	$w = 1 if ("1\n" x 102) =~ m/^\s*\n/m;
 }
@@ -1119,7 +1132,7 @@ $test++;
     my $y = qr/^.$/u;
     ok("$y" eq "(?u-xism:^.\$)", "unicode-modifier stringified.");
     eval q|no utf8; $x =~ m/\x{65e5}/|;
-    ok( $@ , "\\x\{...\} gives error in non-unicode regex");
+    ok( $@->{description} , "\\x\{...\} gives error in non-unicode regex");
 }
 
 use utf8;
@@ -1255,22 +1268,17 @@ SKIP: {
 	    print "ok $test\n"; $test++;
 	}
 	print "# IsASCII\n";
-	if (ord("A") == 193) {
-	    print "ok $test # Skip: in EBCDIC\n"; $test++;
-	    print "ok $test # Skip: in EBCDIC\n"; $test++;
-	} else {
-	    if ($code le '00007f') {
-		print "not " unless $char =~ m/\p{IsASCII}/;
-		print "ok $test\n"; $test++;
-		print "not " if     $char =~ m/\P{IsASCII}/;
-		print "ok $test\n"; $test++;
-	    } else {
-		print "not " if     $char =~ m/\p{IsASCII}/;
-		print "ok $test\n"; $test++;
-		print "not " unless $char =~ m/\P{IsASCII}/;
-		print "ok $test\n"; $test++;
-	    }
-	}
+        if (($code cmp '00007f') +<= 0) {
+            print "not " unless $char =~ m/\p{IsASCII}/;
+            print "ok $test\n"; $test++;
+            print "not " if     $char =~ m/\P{IsASCII}/;
+            print "ok $test\n"; $test++;
+        } else {
+            print "not " if     $char =~ m/\p{IsASCII}/;
+            print "ok $test\n"; $test++;
+            print "not " unless $char =~ m/\P{IsASCII}/;
+            print "ok $test\n"; $test++;
+        }
 	print "# IsCntrl\n";
 	if ($class =~ m/^C/) {
 	    print "not " unless $char =~ m/\p{IsCntrl}/;
@@ -1569,7 +1577,7 @@ EOT
     # from japhy
     my $w;
     use warnings;    
-    local $SIG{__WARN__} = sub { $w .= shift };
+    local ${^WARN_HOOK} = sub { $w .= shift->{description} . "\n" };
 
     $w = "";
     eval 'qr/(?c)/';
@@ -2800,12 +2808,15 @@ ok("A" =~ m/\p{AsciiHexAndDash}/, "'A' is AsciiHexAndDash");
     ok($a !~ m/^\C{4}y/,     q{don't match \C{4}y});
 }
 
-$_ = 'aaaaaaaaaa';
-chop $_; $\="\n";
-ok(m/[^\s]+/, "m/[^\s]/ utf8");
-ok(m/[^\d]+/, "m/[^\d]/ utf8");
-ok(($a = $_, $_ =~ s/[^\s]+/./g), "s/[^\s]/ utf8");
-ok(($a = $_, $a =~ s/[^\d]+/./g), "s/[^\s]/ utf8");
+{
+    local $\;
+    $_ = 'aaaaaaaaaa';
+    chop $_; $\="\n";
+    ok(m/[^\s]+/, "m/[^\s]/ utf8");
+    ok(m/[^\d]+/, "m/[^\d]/ utf8");
+    ok(($a = $_, $_ =~ s/[^\s]+/./g), "s/[^\s]/ utf8");
+    ok(($a = $_, $a =~ s/[^\d]+/./g), "s/[^\s]/ utf8");
+}
 
 ok("\x{100}" =~ m/\x{100}/, "[perl #15397]");
 ok("\x{100}" =~ m/(\x{100})/, "[perl #15397]");
@@ -2860,13 +2871,13 @@ ok("bbbbac" =~ m/$pattern/ && $1 eq 'a', "[perl #3547]");
     foreach (1,2,3,4) {
 	    $p++ if m/(??{ $p })/
     }
-    ok ($p == 5, "[perl #20683] (??\{ \}) returns stale values");
+    iseq ($p, 5, '[perl #20683] (??{ }) returns stale values');
     { package P; $a=1; sub TIESCALAR { bless[] } sub FETCH { $a++ } }
     tie $p, 'P';
     foreach (1,2,3,4) {
 	    m/(??{ $p })/
     }
-    ok ( $p == 5, "(??\{ \}) returns stale values");
+    iseq ( $p, 5, '(??{ }) returns stale values');
 }
 
 {
@@ -3155,27 +3166,6 @@ if (!$ENV{PERL_SKIP_PSYCHO_TEST}){
 	or print "# $@\n";
 }
 
-{
-    package lv;
-    $var = "abc";
-    sub variable : lvalue { $var }
-
-    package main;
-    my $o = bless [], "lv";
-    my $f = "";
-    eval { for (1..2) { $f .= $1 if $o->variable =~ m/(.)/g } };
-    ok($f eq "ab", "pos retained between calls # TODO") or print "# $@\n";
-}
-
-{
-    $var = "abc";
-    sub variable : lvalue { $var }
-
-    my $f = "";
-    eval { for (1..2) { $f .= $1 if variable() =~ m/(.)/g } };
-    ok($f eq "ab", "pos retained between calls # TODO") or print "# $@\n";
-}
-
 # [perl #37836] Simple Regex causes SEGV when run on specific data
 if ($ordA == 193) {
     print "ok $test # Skip: in EBCDIC\n"; $test++;
@@ -3284,7 +3274,7 @@ if ($ordA == 193) {
     {
         my $code;
         my $w="";
-        local $SIG{__WARN__} = sub { $w.=shift };
+        local ${^WARN_HOOK} = sub { $w.=shift->message };
         eval($code=<<'EOFTEST') or die "$@\n$code\n";
         {
             use warnings;
@@ -3403,15 +3393,17 @@ SKIP:{
 
 sub iseq($$;$) { 
     my ( $got, $expect, $name)=@_;
+    my $todo = $TODO ? " # TODO $TODO" : '';
     
     $_=defined($_) ? "'$_'" : "undef"
         for $got, $expect;
         
     my $ok=  $got eq $expect;
         
-    printf "%sok %d - %s\n", ($ok ? "" : "not "), $test,
+    printf "%sok %d - %s$todo\n", ($ok ? "" : "not "), $test,
         ($name||$Message)."\tLine ".((caller)[2]);
 
+    no warnings 'utf8';
     printf "# Failed test at line %d\n".
            "# expected: %s\n". 
            "#   result: %s\n", 
@@ -3453,6 +3445,45 @@ sub iseq($$;$) {
     iseq("@v","bar baz foo", "Got expected values");
     eval'
         print for $+{this_key_doesnt_exist};
+    ';
+    ok(!$@,'lvalue $+{...} should not throw an exception');
+}
+{
+    #
+    # Almost the same as the block above, except that the capture is nested.
+    #
+    my $s = 'foo bar baz';
+    my (@k,@v,@fetch,$res);
+    my $count = 0;
+    my @names = qw($+{A} $+{B} $+{C} $+{D});
+    if ($s =~ m/(?<D>(?<A>foo)\s+(?<B>bar)?\s+(?<C>baz))/) {
+	while (my ($k,$v) = each(%+)) {
+	    $count++;
+	}
+	@k = sort keys(%+);
+	@v = sort values(%+);
+	$res = 1;
+	push @fetch,
+	    [ "$+{A}", "$2" ],
+	    [ "$+{B}", "$3" ],
+	    [ "$+{C}", "$4" ],
+	    [ "$+{D}", $1 ],
+	;
+    }
+    foreach (0..3) {
+	if ($fetch[$_]) {
+	    iseq($fetch[$_][0],$fetch[$_][1],$names[$_]);
+	} else {
+	    ok(0, $names[$_]);
+	}
+    }
+    iseq($res,1,"$s~=m/(?<D>(?<A>foo)\s+(?<B>bar)?\s+(?<C>baz))/");
+    iseq($count,4,"Got 4 keys in %+ via each -- bug 50496");
+    iseq(0+@k, 4, 'Got 4 keys in %+ via keys -- bug 50496');
+    iseq("@k","A B C D", "Got expected keys -- bug 50496");
+    iseq("@v","bar baz foo foo bar baz", "Got expected values -- bug = 50496");
+    eval'
+	print for $+{this_key_doesnt_exist};
     ';
     ok(!$@,'lvalue $+{...} should not throw an exception');
 }
@@ -3817,12 +3848,13 @@ for my $c ("z", "\0", "!", chr(254), chr(256)) {
     iseq($^R,'Nothing');
 }
 {
-    local $Message="RT#22395";
+    local $Message="RT 22395";
+    local $TODO = "Should be L+1 not L*(L+3)/2 (L=$l)";
     our $count;
     for my $l (10,100,1000) {
 	$count=0;
 	('a' x $l) =~ m/(.*)(?{$count++})[bc]/;
-	iseq( $count, $l + 1, "# TODO Should be L+1 not L*(L+3)/2 (L=$l)");
+	iseq( $count, $l + 1);
     }
 }
 {
@@ -4031,7 +4063,7 @@ sub kt
     use warnings;
     local $Message = "ASCII pattern that really is utf8";
     my @w;
-    local $SIG{__WARN__}=sub{push @w,"@_"};
+    local ${^WARN_HOOK}=sub{push @w,"@_"};
     my $c=qq(\x{DF}); 
     ok($c=~m/${c}|\x{100}/);
     ok(@w==0);
@@ -4092,6 +4124,7 @@ sub kt
     }
 }
 {
+    use bytes;
     local $Message = "BBC(Bleadperl Breaks CPAN) Today: String::Multibyte";
     my $re  = qr/(?:[\x[00]-\x[FF]]{4})/;
     my $hyp = "\0\0\0-";
@@ -4189,6 +4222,45 @@ sub kt
     iseq(length($str),"0","Trie scope error, string should be empty");
 }
 
+{
+    my $a = 3; "" =~ m/(??{ $a })/;
+    my $b = $a;
+    iseq($b, $a, "copy of scalar used for postponed subexpression");
+}
+{
+     local $Message = "\$REGMARK in replacement -- Bug #49190";
+     my $_ = "A";
+     s/(*:B)A/$REGMARK/;
+     iseq $_, "B";
+     $_ = "CCCCBAA";
+     s/(*:X)A+|(*:Y)B+|(*:Z)C+/$REGMARK/g;
+     iseq $_, "ZYX";
+}
+{
+    our @ctl_n=();
+    our @plus=();
+    our $nested_tags;
+    $nested_tags = qr{
+        <
+           (\w+)
+           (?{
+                   push @ctl_n,$^N;
+                   push @plus,$+;
+           })
+        >
+        (??{$nested_tags})*
+        </\s* \w+ \s*>
+    }x;
+
+    my $match= '<bla><blubb></blubb></bla>' =~ m/^$nested_tags$/;
+    ok($match,'nested construct matches');
+    iseq("@ctl_n","bla blubb",'$^N inside of (?{}) works as expected');
+    iseq("@plus","bla blubb",'$+ inside of (?{}) works as expected');
+}
+
+
+
+
 # Test counter is at bottom of file. Put new tests above here.
 #-------------------------------------------------------------------
 # Keep the following tests last -- they may crash perl
@@ -4219,7 +4291,7 @@ ok((q(a)x 100) =~ m/^(??{'(.)'x 100})/,
     or print "# Unexpected outcome: should pass or crash perl\n";
 
 eval 'm/\k/';
-ok($@=~m/\QSequence \k... not terminated in regex;\E/);
+ok($@->{description}=~m/\QSequence \k... not terminated in regex;\E/);
 
 {
     use bytes;
@@ -4246,8 +4318,13 @@ ok($@=~m/\QSequence \k... not terminated in regex;\E/);
 
 # Put new tests above the dotted line about a page above this comment
 iseq(0+$::test,$::TestCount,"Got the right number of tests!");
+
+} # end of sub pat_tests
+
 # Don't forget to update this!
 BEGIN {
-    $::TestCount = 1782;
+    $::TestCount = 1796;
     print "1..$::TestCount\n";
 }
+
+"Truth";

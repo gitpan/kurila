@@ -5,7 +5,7 @@ use strict;
 
 our($VERSION, @ISA, @EXPORT_OK);
 
-$VERSION = "1.11";
+$VERSION = "1.13";
 
 use Carp;
 use Exporter ();
@@ -319,7 +319,7 @@ invert_opset function.
     not complement
 
     lt i_lt gt i_gt le i_le ge i_ge eq i_eq ne i_ne ncmp i_ncmp
-    slt sgt sle sge seq sne scmp
+    seq sne scmp
 
     substr vec stringify study pos length index rindex ord chr
 
@@ -331,7 +331,7 @@ invert_opset function.
 
     cond_expr flip flop andassign orassign dorassign and or dor xor
 
-    warn die lineseq nextstate scope enter leave setstate
+    warn die lineseq nextstate scope enter leave
 
     rv2cv anoncode prototype
 
@@ -536,7 +536,7 @@ This tag holds opcodes related to loading modules and getting information
 about calling environment and args.
 
     require dofile 
-    caller
+    caller compsub
 
 =item :still_to_be_decided
 
@@ -550,6 +550,8 @@ about calling environment and args.
     sort -- assorted problems including core dumps
     tied -- can be used to access object implementing a tie
     pack unpack -- can be used to create/use memory pointers
+
+    hintseval -- constant op holding eval hints
 
     entereval -- can be used to hide code from initial compile
 

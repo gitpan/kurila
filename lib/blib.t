@@ -44,13 +44,13 @@ BEGIN {
 use Test::More tests => 7;
 
 eval 'use blib;';
-ok( $@ =~ m/Cannot find blib/, 'Fails if blib directory not found' );
+ok( $@->{description} =~ m/Cannot find blib/, 'Fails if blib directory not found' );
 
 _mkdirs( @blib_dirs );
 
 {
     my $warnings = '';
-    local $SIG{__WARN__} = sub { $warnings = join '', @_ };
+    local ${^WARN_HOOK} = sub { $warnings = join '', @_ };
     use_ok('blib');
     is( $warnings, '',  'use blib is nice and quiet' );
 }

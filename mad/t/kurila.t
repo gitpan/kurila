@@ -15,7 +15,8 @@ use Fatal qw|open close|;
 
 use Convert;
 
-my $from = 1.5;
+my $from = 'kurila-1.7';
+my $to = 'kurila-1.71';
 
 sub p5convert {
     my ($input, $expected) = @_;
@@ -23,7 +24,9 @@ sub p5convert {
     local $Test::Builder::Level = $Test::Builder::Level + 1;
 
     local $TODO = $TODO || ($input =~ m/^[#]\s*TODO/);
-    my $output = Convert::convert($input, "/usr/bin/env perl ../mad/p5kurila.pl",
+    my $output = Convert::convert($input,
+                                  "/usr/bin/env perl ../mad/p5kurila.pl --from $from",
+                                  from => $from, to => $to,
                                   dumpcommand => "$ENV{madpath}/perl");
     is($output, $expected) or $TODO or die;
 }
@@ -31,8 +34,12 @@ sub p5convert {
 #t_parenthesis();
 #t_change_deref();
 #t_anon_hash();
-t_string_block();
+t_error_str();
 die;
+t_open_args3();
+t_qstring();
+t_subst_eval();
+t_string_block();
 t_force_m();
 t_pointy_op();
 t_lvalue_subs();
@@ -684,7 +691,122 @@ END
 
 }
 
+sub t_subst_eval {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+s/x/1/e;
+----
+s/x/{1}/;
+====
+s/x//eg;
+----
+s/x/{}/g;
+====
+s/(x)/uc($1)/eg;
+----
+s/(x)/{uc($1)}/g;
+====
+sub foo {}
+s/(x)/foo($1)/eg;
+----
+sub foo {}
+s/(x)/{foo($1)}/g;
+====
+END
+}
+
+sub t_open_args3 {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+open($fh,$filename);
+----
+open($fh, "<",$filename);
+====
+open $fh, ">$filename";
+----
+open $fh, ">", "$filename";
+====
+open $fh, ">> $filename";
+----
+open $fh, ">>", "$filename";
+====
+open $fh, ">filename";
+----
+open $fh, ">", "filename";
+====
+open FH, 'filename';
+----
+open FH, "<", 'filename';
+====
+open FH, 'echo "bar" |';
+----
+open FH, "-|", 'echo "bar"';
+====
+open FH, "$filename";
+----
+open FH, "<", "$filename";
+====
+open FH, ">&STDERR";
+----
+open FH, ">&", "STDERR";
+====
+my $TEST;
+open IN, $TEST or warn "$0: cannot read $TEST: $!" ;
+----
+my $TEST;
+open IN, "<", $TEST or warn "$0: cannot read $TEST: $!" ;
+====
+open(POD, "<$$.pod") or die "$$.pod: $!";
+----
+open(POD, "<", "$$.pod") or die "$$.pod: $!";
+====
+open $fh, "-";
+open $fh, ">-";
+----
+open $fh, "-";
+open $fh, ">-";
+====
+END
+}
+
+sub t_error_str {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+$@ =~ m/foo/;
+----
+$@->{description} =~ m/foo/;
+====
+is($@, '');
+like($@, qr/foo/);
+----
+is($@, '');
+like($@->{description}, qr/foo/);
+====
+$SIG{__DIE__} = 1;
+----
+${^DIE_HOOK} = 1;
+====
+like($@->{description}, qr/foo/);
+----
+like($@->{description}, qr/foo/);
+====
+$SIG{'__WARN__'} = 1;
+----
+${^WARN_HOOK} = 1;
+END
+}
+
+sub t_qstring {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+'foo\'bar'
+----
+q|foo'bar|
+====
+'foo\\bar'
+----
+'foo\bar'
+END
+}
+
 sub t_string_block {
+    my $x = "abc";
     p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
 "foo { ";
 'foo { ';
@@ -704,5 +826,32 @@ FOO
 ----
 "\$ \{"
 ====
+<<"FOO";
+$x {
+FOO
+----
+<<"FOO";
+$x \{
+FOO
+====
+qq{ {} };
+----
+qq{ \{\} };
+====
+"\x{FF}";
+"\\x{FF}";
+"foo\{FF}";
+----
+"\x{FF}";
+"\\x\{FF\}";
+"foo\{FF\}";
+====
+s//ab{c/g;
+s''de{f'g;
+s/${a}{4}//g;
+----
+s//ab\{c/g;
+s''de{f'g;
+s/${a}{4}//g;
 END
 }

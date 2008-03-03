@@ -321,7 +321,7 @@ PerlIO_fdupopen(pTHX_ PerlIO *f, CLONE_PARAMS *param, int flags)
 
 PerlIO *
 PerlIO_openn(pTHX_ const char *layers, const char *mode, int fd,
-	     int imode, int perm, PerlIO *old, int narg, SV **args)
+	     int imode, int perm, PerlIO *old, int narg, SV *const*args)
 {
     if (narg) {
 	if (narg > 1) {
@@ -759,6 +759,11 @@ PerlIO_get_layers(pTHX_ PerlIO *f)
 	PerlIOl *l = PerlIOBase(f);
 
 	while (l) {
+	    /* There is some collusion in the implementation of
+	       XS_PerlIO_get_layers - it knows that name and flags are
+	       generated as fresh SVs here, and takes advantage of that to
+	       "copy" them by taking a reference. If it changes here, it needs
+	       to change there too.  */
 	    SV * const name = l->tab && l->tab->name ?
 	    newSVpv(l->tab->name, 0) : &PL_sv_undef;
 	    SV * const arg = l->tab && l->tab->Getarg ?
@@ -1477,7 +1482,7 @@ PerlIO_layer_from_ref(pTHX_ SV *sv)
 
 PerlIO_list_t *
 PerlIO_resolve_layers(pTHX_ const char *layers,
-		      const char *mode, int narg, SV **args)
+		      const char *mode, int narg, SV *const*args)
 {
     dVAR;
     PerlIO_list_t *def = PerlIO_default_layers(aTHX);
@@ -1531,7 +1536,7 @@ PerlIO_resolve_layers(pTHX_ const char *layers,
 
 PerlIO *
 PerlIO_openn(pTHX_ const char *layers, const char *mode, int fd,
-	     int imode, int perm, PerlIO *f, int narg, SV **args)
+	     int imode, int perm, PerlIO *f, int narg, SV * const *args)
 {
     dVAR;
     if (!f && narg == 1 && *args == &PL_sv_undef) {
@@ -1622,18 +1627,24 @@ PerlIO_openn(pTHX_ const char *layers, const char *mode, int fd,
 SSize_t
 Perl_PerlIO_read(pTHX_ PerlIO *f, void *vbuf, Size_t count)
 {
+     PERL_ARGS_ASSERT_PERLIO_READ;
+
      Perl_PerlIO_or_Base(f, Read, read, -1, (aTHX_ f, vbuf, count));
 }
 
 SSize_t
 Perl_PerlIO_unread(pTHX_ PerlIO *f, const void *vbuf, Size_t count)
 {
+     PERL_ARGS_ASSERT_PERLIO_UNREAD;
+
      Perl_PerlIO_or_Base(f, Unread, unread, -1, (aTHX_ f, vbuf, count));
 }
 
 SSize_t
 Perl_PerlIO_write(pTHX_ PerlIO *f, const void *vbuf, Size_t count)
 {
+     PERL_ARGS_ASSERT_PERLIO_WRITE;
+
      Perl_PerlIO_or_fail(f, Write, -1, (aTHX_ f, vbuf, count));
 }
 
@@ -1939,7 +1950,7 @@ PERLIO_FUNCS_DECL(PerlIO_byte) = {
 PerlIO *
 PerlIORaw_open(pTHX_ PerlIO_funcs *self, PerlIO_list_t *layers,
 	       IV n, const char *mode, int fd, int imode, int perm,
-	       PerlIO *old, int narg, SV **args)
+	       PerlIO *old, int narg, SV *const*args)
 {
     PerlIO_funcs * const tab = PerlIO_default_btm();
     PERL_UNUSED_ARG(self);
@@ -2413,7 +2424,7 @@ PerlIO_cleanup(pTHX)
     }
 }
 
-void PerlIO_teardown() /* Call only from PERL_SYS_TERM(). */
+void PerlIO_teardown(void) /* Call only from PERL_SYS_TERM(). */
 {
     dVAR;
 #if 0
@@ -2593,7 +2604,7 @@ PerlIOUnix_seek(pTHX_ PerlIO *f, Off_t offset, int whence)
 PerlIO *
 PerlIOUnix_open(pTHX_ PerlIO_funcs *self, PerlIO_list_t *layers,
 		IV n, const char *mode, int fd, int imode,
-		int perm, PerlIO *f, int narg, SV **args)
+		int perm, PerlIO *f, int narg, SV *const*args)
 {
     if (PerlIOValid(f)) {
 	if (PerlIOBase(f)->flags & PERLIO_F_OPEN)
@@ -2903,7 +2914,7 @@ PerlIO_importFILE(FILE *stdio, const char *mode)
 PerlIO *
 PerlIOStdio_open(pTHX_ PerlIO_funcs *self, PerlIO_list_t *layers,
 		 IV n, const char *mode, int fd, int imode,
-		 int perm, PerlIO *f, int narg, SV **args)
+		 int perm, PerlIO *f, int narg, SV *const*args)
 {
     char tmode[8];
     if (PerlIOValid(f)) {
@@ -3395,9 +3406,7 @@ PerlIOStdio_set_ptrcnt(pTHX_ PerlIO *f, STDCHAR * ptr, SSize_t cnt)
 #ifdef STDIO_PTR_LVALUE
 	PerlSIO_set_ptr(stdio, ptr); /* LHS STDCHAR* cast non-portable */
 #ifdef STDIO_PTR_LVAL_SETS_CNT
-	if (PerlSIO_get_cnt(stdio) != (cnt)) {
-	    assert(PerlSIO_get_cnt(stdio) == (cnt));
-	}
+	assert(PerlSIO_get_cnt(stdio) == (cnt));
 #endif
 #if (!defined(STDIO_PTR_LVAL_NOCHANGE_CNT))
 	/*
@@ -3657,7 +3666,7 @@ PerlIOBuf_pushed(pTHX_ PerlIO *f, const char *mode, SV *arg, PerlIO_funcs *tab)
 PerlIO *
 PerlIOBuf_open(pTHX_ PerlIO_funcs *self, PerlIO_list_t *layers,
 	       IV n, const char *mode, int fd, int imode, int perm,
-	       PerlIO *f, int narg, SV **args)
+	       PerlIO *f, int narg, SV *const*args)
 {
     if (PerlIOValid(f)) {
 	PerlIO *next = PerlIONext(f);
@@ -4094,13 +4103,14 @@ void
 PerlIOBuf_set_ptrcnt(pTHX_ PerlIO *f, STDCHAR * ptr, SSize_t cnt)
 {
     PerlIOBuf * const b = PerlIOSelf(f, PerlIOBuf);
+#ifndef DEBUGGING
+    PERL_UNUSED_ARG(cnt);
+#endif
     if (!b->buf)
 	PerlIO_get_base(f);
     b->ptr = ptr;
-    if (PerlIO_get_cnt(f) != cnt || b->ptr < b->buf) {
-	assert(PerlIO_get_cnt(f) == cnt);
-	assert(b->ptr >= b->buf);
-    }
+    assert(PerlIO_get_cnt(f) == cnt);
+    assert(b->ptr >= b->buf);
     PerlIOBase(f)->flags |= PERLIO_F_RDBUF;
 }
 

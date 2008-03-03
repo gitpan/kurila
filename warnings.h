@@ -26,6 +26,9 @@
 
 /* if PL_warnhook is set to this value, then warnings die */
 #define PERL_WARNHOOK_FATAL	(&PL_sv_placeholder)
+/* if PL_diehook is set to this value, then a fatal warning is printed */
+#define PERL_DIEHOOK_FATAL	(&PL_sv_placeholder)
+#define PERL_DIEHOOK_IGNORE	(&PL_sv_undef)
 
 /* Warnings Categories added in Perl 5.008 */
 
@@ -75,6 +78,10 @@
 #define WARN_UNTIE		43
 #define WARN_UTF8		44
 #define WARN_VOID		45
+
+/* Warnings Categories added in Perl 5.011 */
+
+#define WARN_IMPRECISION	46
 
 #define WARNsize		12
 #define WARN_ALLstring		"\125\125\125\125\125\125\125\125\125\125\125\125"

@@ -257,13 +257,13 @@ use constant TRUE   => sub { 1 };
     eval { check( $tmpl, { foo => 1 } ) };      
 
     ok( $@,             "Call dies with fatal toggled" );
-    like( $@,           qr/invalid type/,
+    like( $@->{description},           qr/invalid type/,
                             "   error stored ok" );
 }
 
 ### store => \$foo tests
 {   ### quell warnings
-    local $SIG{__WARN__} = sub {};
+    local ${^WARN_HOOK} = sub {};
     
     my $tmpl = { foo => { store => '' } };
     check( $tmpl, {} );

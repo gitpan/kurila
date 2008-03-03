@@ -38,7 +38,7 @@ my @default = map { "IO/$_.pm" } qw( Handle Seekable File Pipe Socket Dir );
 delete @INC{ @default };
 
 my $warn = '' ;
-local $SIG{__WARN__} = sub { $warn = "@_" } ;
+local ${^WARN_HOOK} = sub { $warn = $_[0]->{description} } ;
 
 {
     no warnings ;
@@ -57,7 +57,7 @@ local $SIG{__WARN__} = sub { $warn = "@_" } ;
 {
     local $^W = 1;
     IO->import();
-    like( $warn, qr/^Parameterless "use IO" deprecated at/, 
+    like( $warn, qr/^Parameterless "use IO" deprecated/, 
               "... import default, should warn");
     $warn = '' ;
 }
@@ -65,7 +65,7 @@ local $SIG{__WARN__} = sub { $warn = "@_" } ;
 {
     use warnings 'deprecated' ;
     IO->import(); 
-    like( $warn, qr/^Parameterless "use IO" deprecated at/, 
+    like( $warn, qr/^Parameterless "use IO" deprecated/, 
               "... import default, should warn");
     $warn = '' ;
 }
@@ -73,7 +73,7 @@ local $SIG{__WARN__} = sub { $warn = "@_" } ;
 {
     use warnings ;
     IO->import();
-    like( $warn, qr/^Parameterless "use IO" deprecated at/, 
+    like( $warn, qr/^Parameterless "use IO" deprecated/,
               "... import default, should warn");
     $warn = '' ;
 }
@@ -84,7 +84,7 @@ foreach my $default (@default)
 }
 
 eval { IO->import( 'nothere' ) };
-like( $@, qr/Can.t locate IO.nothere\.pm/, '... croaking on any error' );
+like( $@->{description}, qr/Can.t locate IO.nothere\.pm/, '... croaking on any error' );
 
 my $fakedir = File::Spec->catdir( 'lib', 'IO' );
 my $fakemod = File::Spec->catfile( $fakedir, 'fakemod.pm' );

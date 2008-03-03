@@ -8,19 +8,21 @@ my $Is_VMS = $^O eq 'VMS';
 
 use Carp qw(carp cluck croak confess);
 
-plan tests => 37;
+plan tests => 35;
+
+our $TODO = "Figure out what to do with Carp";
 
 ok 1;
 
-{ local $SIG{__WARN__} = sub {
-    like $_[0], qr/ok (\d+)\n at.+\b(?i:carp\.t) line \d+$/, 'ok 2\n' };
+{ local ${^WARN_HOOK} = sub {
+    like $_[0]->message, qr/ok (\d+)\n at.+\b(?i:carp\.t) line \d+/, 'ok 2\n' };
 
   carp  "ok 2\n";
 
 }
 
-{ local $SIG{__WARN__} = sub {
-    like $_[0], qr/(\d+) at.+\b(?i:carp\.t) line \d+$/, 'carp 3' };
+{ local ${^WARN_HOOK} = sub {
+    like $_[0]->message, qr/(\d+) at.+\b(?i:carp\.t) line \d+$/, 'carp 3' };
 
   carp 3;
 
@@ -28,8 +30,8 @@ ok 1;
 
 sub sub_4 {
 
-local $SIG{__WARN__} = sub {
-    like $_[0], qr/^(\d+) at.+\b(?i:carp\.t) line \d+\n\tmain::sub_4\(\) called at.+\b(?i:carp\.t) line \d+$/, 'cluck 4' };
+local ${^WARN_HOOK} = sub {
+    like $_[0]->message, qr/^(\d+) at.+\b(?i:carp\.t) line \d+\n\tmain::sub_4\(\) called at.+\b(?i:carp\.t) line \d+$/, 'cluck 4' };
 
 cluck 4;
 
@@ -37,15 +39,15 @@ cluck 4;
 
 sub_4;
 
-{ local $SIG{__DIE__} = sub {
-    like $_[0], qr/^(\d+) at.+\b(?i:carp\.t) line \d+\n\teval \Q{...}\E called at.+\b(?i:carp\.t) line \d+$/, 'croak 5' };
+{ local ${^DIE_HOOK} = sub {
+    like $_[0]->message, qr/^(\d+) at.+\b(?i:carp\.t) line \d+\n\teval \Q{...}\E called at.+\b(?i:carp\.t) line \d+$/, 'croak 5' };
 
   eval { croak 5 };
 }
 
 sub sub_6 {
-    local $SIG{__DIE__} = sub {
-	like $_[0], qr/^(\d+) at.+\b(?i:carp\.t) line \d+\n\teval \Q{...}\E called at.+\b(?i:carp\.t) line \d+\n\tmain::sub_6\(\) called at.+\b(?i:carp\.t) line \d+$/, 'confess 6' };
+    local ${^DIE_HOOK} = sub {
+	like $_[0]->message, qr/^(\d+) at.+\b(?i:carp\.t) line \d+\n\teval \Q{...}\E called at.+\b(?i:carp\.t) line \d+\n\tmain::sub_6\(\) called at.+\b(?i:carp\.t) line \d+$/, 'confess 6' };
 
     eval { confess 6 };
 }
@@ -64,8 +66,8 @@ my $warning;
 eval {
     BEGIN {
 	$^W = 1;
-	local $SIG{__WARN__} =
-	    sub { if( defined $^S ){ warn $_[0] } else { $warning = $_[0] } }
+	local ${^WARN_HOOK} =
+	    sub { if( defined $^S ){ warn $_[0]->message } else { $warning = $_[0]->message } }
     }
     package Z;
     BEGIN { eval { Carp::croak() } }
@@ -167,8 +169,8 @@ sub w { cluck @_ }
 
     for my $re (@$aref) {
         local $Carp::Verbose = $i++;
-        local $SIG{__WARN__} = sub {
-            like $_[0], $re, 'Verbose';
+        local ${^WARN_HOOK} = sub {
+            like $_[0]->message, $re, 'Verbose';
 	};
         package Z;
         main::x('t');
@@ -180,7 +182,7 @@ sub w { cluck @_ }
     for(0,4) {
         my $txt = "Carp::cluck($test_num)";
         local $Carp::MaxEvalLen = $_;
-        local $SIG{__WARN__} = sub {
+        local ${^WARN_HOOK} = sub {
 	    "@_"=~m/'(.+?)(?:\n|')/s;
             is length($1), length($_?substr($txt,0,$_):substr($txt,0)), 'MaxEvalLen';
 	};
@@ -190,12 +192,15 @@ sub w { cluck @_ }
 
 # $Carp::MaxArgLen
 {
-    for(0,4) {
+    for(0,6) {
         my $arg = 'testtest';
         local $Carp::MaxArgLen = $_;
-        local $SIG{__WARN__} = sub {
-	    "@_"=~m/'(.+?)'/;
-	    is length($1), length($_?substr($arg,0,$_):substr($arg,0)), 'MaxArgLen';
+        local ${^WARN_HOOK} = sub {
+            if ($_) {
+                ok "@_"=~m/\Qmain::w('te...)\E/, "MaxArgLen $_";
+            } else {
+                ok "@_"=~m/\Qmain::w('testtest')\E/, "MaxArgLen $_";
+            }
 	};
 
         package Z;
@@ -212,7 +217,7 @@ sub w { cluck @_ }
 
     for(@$aref) {
         local $Carp::MaxArgNums = $i++;
-        local $SIG{__WARN__} = sub {
+        local ${^WARN_HOOK} = sub {
 	    like "@_", $_, 'MaxArgNums';
 	};
 
@@ -230,7 +235,7 @@ sub w { cluck @_ }
 
     for (@$aref) {
         local $Carp::CarpLevel = $i++;
-        local $SIG{__WARN__} = sub {
+        local ${^WARN_HOOK} = sub {
 	    like "@_", $_, 'CarpLevel';
 	};
 
@@ -257,8 +262,8 @@ sub w { cluck @_ }
 # undef used to be incorrectly reported as the string "undef"
 sub cluck_undef {
 
-local $SIG{__WARN__} = sub {
-    like $_[0], qr/^Bang! at.+\b(?i:carp\.t) line \d+\n\tmain::cluck_undef\(0, 'undef', 2, undef, 4\) called at.+\b(?i:carp\.t) line \d+$/, "cluck doesn't quote undef" };
+local ${^WARN_HOOK} = sub {
+    like $_[0]->message, qr/^Bang! at.+\b(?i:carp\.t) line \d+\n\tmain::cluck_undef\(0, 'undef', 2, undef, 4\) called at.+\b(?i:carp\.t) line \d+$/, "cluck doesn't quote undef" };
 
 cluck "Bang!"
 
@@ -300,10 +305,10 @@ sub long {
 package D;
 sub short {
     eval{ Carp::croak("Error") };
-    return $@;
+    return $@->message;
 }
 
 sub long {
     eval{ Carp::confess("Error") };
-    return $@;
+    return $@->message;
 }

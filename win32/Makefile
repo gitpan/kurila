@@ -5,7 +5,7 @@
 #	MS Platform SDK 64-bit compiler and tools
 #
 # This is set up to build a perl.exe that runs off a shared library
-# (perl59.dll).  Also makes individual DLLs for the XS extensions.
+# (perl511.dll).  Also makes individual DLLs for the XS extensions.
 #
 
 ##
@@ -32,7 +32,7 @@ INST_TOP	= $(INST_DRV)\perl
 # versioned installation can be obtained by setting INST_TOP above to a
 # path that includes an arbitrary version string.
 #
-#INST_VER	= \5.10.0
+#INST_VER	= \5.11.0
 
 #
 # Comment this out if you DON'T want your perl installation to have
@@ -170,7 +170,7 @@ CRYPT_SRC	= fcrypt.c
 # set this to additionally provide a statically linked perl-static.exe.
 # Note that dynamic loading will not work with this perl, so you must
 # include required modules statically using the STATIC_EXT or ALL_STATIC
-# variables below. A static library perl59s.lib will also be created.
+# variables below. A static library perl511s.lib will also be created.
 # Ordinary perl.exe is not affected by this option.
 #
 #BUILD_STATIC	= define
@@ -546,9 +546,9 @@ $(o).dll:
 
 # makedef.pl must be updated if this changes, and this should normally
 # only change when there is an incompatible revision of the public API.
-PERLIMPLIB	= ..\perl59.lib
-PERLSTATICLIB	= ..\perl59s.lib
-PERLDLL		= ..\perl59.dll
+PERLIMPLIB	= ..\perl511.lib
+PERLSTATICLIB	= ..\perl511s.lib
+PERLDLL		= ..\perl511.dll
 
 MINIPERL	= ..\miniperl.exe
 MINIDIR		= .\mini
@@ -843,11 +843,6 @@ all : .\config.h $(GLOBEXE) $(MINIMOD) $(CONFIGPM) $(UNIDATAFILES) MakePPPort \
 	$(PERLEXE) $(X2P) Extensions $(PERLSTATIC)
 	@echo	Everything is up to date. '$(MAKE_BARE) test' to run test suite.
 
-..\regnodes.h : ..\regcomp.sym ..\regcomp.pl ..\regexp.h
-	cd ..
-	miniperl regcomp.pl
-	cd win32
-	
 ..\regcharclass.h : ..\Porting\regcharclass.pl
 	cd ..
 	miniperl Porting\regcharclass.pl
@@ -886,18 +881,22 @@ config.w32 : $(CFGSH_TMPL)
 ..\config.sh : config.w32 $(MINIPERL) config_sh.PL
 	$(MINIPERL) -I..\lib config_sh.PL $(CFG_VARS) config.w32 > ..\config.sh
 
-# this target is for when changes to the main config.sh happen
-# edit config.{b,v,g}c and make this target once for each supported
-# compiler (e.g. `nmake CCTYPE=BORLAND regen_config_h`)
+# this target is for when changes to the main config.sh happen.
+# edit config.vc, then make perl in a minimal configuration (i.e. with MULTI,
+# ITHREADS, IMP_SYS, LARGE_FILES, PERLIO and CRYPT off), then make this target
+# to regenerate config_H.vc.
+# repeat for config.vc64 and config_H.vc64 if you have a suitable build
+# environment, otherwise hand-edit them to maintain the same differences with
+# config.vc and config_H.vc as before.
+# unfortunately, some further manual editing is also then required to restore all
+# the special __GNUC__ handling that is otherwise lost.
 regen_config_h:
-	perl config_sh.PL $(CFG_VARS) $(CFGSH_TMPL) > ..\config.sh
+	$(MINIPERL) -I..\lib config_sh.PL $(CFG_VARS) $(CFGSH_TMPL) > ..\config.sh
 	cd ..
-	-del /f perl.exe perl*.dll
-	perl configpm
+	miniperl configpm
 	cd win32
 	-del /f $(CFGH_TMPL)
-	-mkdir $(COREDIR)
-	-perl config_h.PL "INST_VER=$(INST_VER)"
+	-$(MINIPERL) -I..\lib config_h.PL "INST_VER=$(INST_VER)"
 	rename config.h $(CFGH_TMPL)
 
 $(CONFIGPM) : $(MINIPERL) ..\config.sh config_h.PL ..\minimod.pl
@@ -1133,7 +1132,7 @@ utils: $(PERLEXE) $(X2P)
 	copy ..\README.vms      ..\pod\perlvms.pod
 	copy ..\README.vos      ..\pod\perlvos.pod
 	copy ..\README.win32    ..\pod\perlwin32.pod
-	copy ..\pod\perl5100delta.pod ..\pod\perldelta.pod
+	copy ..\pod\perl5110delta.pod ..\pod\perldelta.pod
 	$(MAKE) -f ..\win32\pod.mak converters
 	cd ..\lib
 	$(PERLEXE) lib_pm.PL

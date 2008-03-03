@@ -535,7 +535,6 @@ sub lvalue_subs {
     }
 }
 
-<<<<<<< HEAD:mad/p5kurila.pl
 sub force_m {
     my $xml = shift;
     for my $op ($xml->findnodes(qq|//op_match|), $xml->findnodes(qq|//op_pushre|)) {
@@ -577,7 +576,20 @@ sub qq_block_escape {
     for my $prop (qw|assign value|) {
         my $v = get_madprop($op, $prop);
         next unless $v;
-        $v =~ s/([}{])/\\$1/g;
+        # sort of parser of '\\' and '\x{...}'
+        my @v = split m/\\\\/, $v, -1;
+        my @v_x = map { [split m'(\\[xN]{[^}]+})', $_, -1] } @v;
+        for my $vx (@v_x) {
+            my $i = 0;
+            for (@$vx) {
+                next if $i++ % 2;
+                s/(\A|[^\\])([}])/$1\\$2/g;
+                s/(\A|[^\\])([}])/$1\\$2/g;
+                s/(\A|[^\\])([{])/$1\\$2/g;
+                s/(\A|[^\\])([{])/$1\\$2/g;
+            }
+        }
+        $v = join "\\\\", map { join '', @$_ } @v_x;
         set_madprop($op, $prop, $v);
     }
     for my $child ($op->children) {
@@ -586,12 +598,103 @@ sub qq_block_escape {
     }
 }
 
+sub open_3args {
+    my $xml = shift;
+    for my $op_open ($xml->findnodes(qq|//op_open|)) {
+        next unless $op_open->children == 2+2;
+        my $arg = $op_open->child(3);
+        my $argo = $arg->child(1);
+        if (($argo->att('was') || '') eq "rv2sv" or
+            $argo->tag eq "op_padsv" or
+            ($argo->tag eq "op_stringify" and 
+             $argo->children == 3 and
+             ($argo->child(-1)->att('was') || '') eq "rv2sv")) {
+            # horrible way to insert "<"
+            set_madprop($arg, "comma", ', &quot;&lt;&quot;,');
+            next;
+        }
+        my $c = $arg->child(1);
+        if ($c and ($c->att('was') || '') eq "stringify") {
+            $c = $c->child(2)->child(1);
+        }
+        if ($c and $c->tag eq "op_concat") {
+            $c = $c->child(1);
+        }
+        next unless $c and $c->tag eq "op_const";
+        my $prop = get_madprop($c, "value") ? "value" : "assign";
+        my $v = get_madprop($c, $prop);
+        next if $v eq "-" or $v eq "&gt;-";
+        my $mode = '&lt;';
+        if ($v =~ s/^ ( [+-]? (?: &lt; | &gt;(?:&gt;)? | \| ) (?:&amp;)? ) \s* //x) {
+            $mode = $1;
+            $mode eq "|" and $mode = "|-";
+        } elsif ($v =~ s/\s* ( [|] ) $//x) {
+            $mode = '-|';
+        }
+        set_madprop($arg, "comma", ", &quot;$mode&quot;,");
+        set_madprop($c, $prop => $v);
+    }
+}
+
+sub error_str {
+    my $xml = shift;
+
+    for my $op (map { $xml->findnodes($_) } qw|//op_rv2sv //op_null[@was="rv2sv"]|) {
+        next unless (get_madprop($op, "variable") || '') eq '$@';
+        next unless $op->parent->tag eq "op_match" or
+          $op->parent->findnodes(q|.//*[@gv="main::like"]|);
+
+        # horrible way to insert description
+        set_madprop($op, "variable", '$@->{description}');
+    }
+
+    # replae $SIG{__DIE__} with ${^DIE_HOOK}
+    for my $op_const ($xml->findnodes('//op_const')) {
+        for my $name (qw|DIE WARN|) {
+            next unless ($op_const->att('PV') || '') eq "__${name}__";
+            next unless $op_const->parent->tag eq "op_helem";
+            my $rv2hv = $op_const->parent->child(1);
+            next unless $rv2hv->tag eq "op_rv2hv";
+            next unless get_madprop($rv2hv, "variable") eq '$SIG';
+            set_madprop($rv2hv, "variable", '${^' . $name . '_HOOK}');
+            set_madprop($op_const->parent, "curly_open", '');
+            set_madprop($op_const->parent, "curly_close", '');
+            set_madprop($op_const, $_, '') for qw|value quote_open quote_close assign|;
+        }
+    }
+}
+
+sub qstring {
+    my $xml = shift;
+    for my $mad_quote ($xml->findnodes(qq|//madprops/mad_null_type_first[\@val="quote"]|)) {
+        my $op = $mad_quote->parent->parent;
+        next unless get_madprop($op, "quote_open") eq "'";
+        my $v = get_madprop($op, 'assign');
+        next unless $v =~ m/\\/;
+        $v =~ s/\\([\\\'])/$1/g;
+        set_madprop($op, 'assign' => $v);
+        if ($v =~ m/\'/) {
+            my ($delim) = grep { $v !~ m/\Q$_/ } qw{| " ! : / \ + =};
+            set_madprop($op, "quote_open" => "q$delim");
+            set_madprop($op, "quote_close" => "$delim");
+        }
+    }
+}
+
 sub qq_block {
     # escape '{' and '}' inside a double quoted string
     my $xml = shift;
     for my $mad_quote ($xml->findnodes(qq|//madprops/mad_null_type_first[\@val="quote"]|)) {
         my $op = $mad_quote->parent->parent;
-        next unless get_madprop($op, "quote_open") =~ m/^(&#34;|&lt;&lt;[^'])/;
+        next unless get_madprop($op, "quote_open") =~ m/^(&#34;|&lt;&lt;[^']|qq)/;
+        qq_block_escape($op);
+    }
+
+    # '{' and '}' inside s/../../g;
+    for my $op_subst ($xml->findnodes(qq|//op_subst/|)) {
+        my $op = $op_subst->child(-1);
+        next unless $op and $op->tag ne "op_regcomp";
+        next unless get_madprop($op_subst, "subst_open") ne "'";
         qq_block_escape($op);
     }
 }
@@ -605,8 +708,10 @@ sub pointy_anon_hash {
     }
 }
 
-my $from = 0; # floating point number with starting version of kurila.
-GetOptions("from=f" => \$from);
+my $from; # floating point number with starting version of kurila.
+GetOptions("from=s" => \$from);
+$from =~ m/(\w+)[-]([\d.]+)$/ or die "invalid from: '$from'";
+$from = { branch => $1, 'v' => $2};
 
 my $filename = shift @ARGV;
 
@@ -617,7 +722,7 @@ my $twig= XML::Twig->new( # keep_spaces => 1,
 
 $twig->parsefile( "-" );
 
-if ($from < 1.4 - 0.05) {
+if ($from->{v} < 1.4 - 0.05) {
     # replacing.
     for my $op ($twig->findnodes(q|//op_entersub|)) {
         entersub_handler($twig, $op);
@@ -635,7 +740,7 @@ if ($from < 1.4 - 0.05) {
     remove_typed_declaration($twig);
 }
 
-if ($from < 1.5 - 0.05) {
+if ($from->{v} < 1.5 - 0.05) {
     rename_bit_operators($twig);
     remove_useversion($twig);
     change_deref_method($twig);
@@ -647,7 +752,7 @@ if ($from < 1.5 - 0.05) {
 }
 #t_parenthesis($twig);
 
-if ($from < 1.6 - 0.05) {
+if ($from->{v} < 1.6 - 0.05) {
     remove_vstring( $twig );
     use_pkg_version($twig);
     lvalue_subs( $twig );
@@ -655,8 +760,14 @@ if ($from < 1.6 - 0.05) {
 
 #rename_pointy_ops( $twig );
 #pointy_anon_hash( $twig );
-force_m( $twig );
-qq_block( $twig );
+if ($from->{v} < 1.7 - 0.05) {
+     force_m( $twig );
+     qq_block( $twig );
+     qstring( $twig );
+     open_3args($twig);
+}
+
+error_str($twig);
 
 # print
 $twig->print( pretty_print => 'indented' );

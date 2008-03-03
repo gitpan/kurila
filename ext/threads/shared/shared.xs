@@ -675,7 +675,7 @@ S_get_RV(pTHX_ SV *sv, SV *ssv) {
         if (SvROK(sv)) {
             SvREFCNT_dec(SvRV(sv));
         } else {
-            assert(SvTYPE(sv) >= SVt_RV);
+            assert(SvTYPE(sv) >= SVt_IV);
             sv_setsv_nomg(sv, &PL_sv_undef);
             SvROK_on(sv);
         }
@@ -735,7 +735,7 @@ sharedsv_scalar_store(pTHX_ SV *sv, SV *ssv)
         SV *sobj = Perl_sharedsv_find(aTHX_ obj);
         if (sobj) {
             SHARED_CONTEXT;
-            (void)SvUPGRADE(ssv, SVt_RV);
+            (void)SvUPGRADE(ssv, SVt_IV);
             sv_setsv_nomg(ssv, &PL_sv_undef);
 
             SvRV_set(ssv, SvREFCNT_inc(sobj));
@@ -1033,9 +1033,15 @@ sharedsv_array_mg_free(pTHX_ SV *sv, MAGIC *mg)
  * This is called when perl is about to access an element of
  * the array -
  */
+#if PERL_VERSION >= 11
+int
+sharedsv_array_mg_copy(pTHX_ SV *sv, MAGIC* mg,
+                       SV *nsv, const char *name, I32 namlen)
+#else
 int
 sharedsv_array_mg_copy(pTHX_ SV *sv, MAGIC* mg,
                        SV *nsv, const char *name, int namlen)
+#endif
 {
     MAGIC *nmg = sv_magicext(nsv,mg->mg_obj,
                             toLOWER(mg->mg_type),&sharedsv_elem_vtbl,
@@ -1108,6 +1114,24 @@ Perl_sharedsv_locksv(pTHX_ SV *sv)
 }
 
 
+/* Can a shared object be destroyed?
+ * True if not a shared,
+ * or if detroying last proxy on a shared object
+ */
+#ifdef PL_destroyhook
+bool
+Perl_shared_object_destroy(pTHX_ SV *sv)
+{
+    SV *ssv;
+
+    if (SvROK(sv))
+        sv = SvRV(sv);
+    ssv = Perl_sharedsv_find(aTHX_ sv);
+    return (!ssv || (SvREFCNT(ssv) <= 1));
+}
+#endif
+
+
 /* Saves a space for keeping SVs wider than an interpreter. */
 
 void
@@ -1121,6 +1145,9 @@ Perl_sharedsv_init(pTHX)
     recursive_lock_init(aTHX_ &PL_sharedsv_lock);
     PL_lockhook = &Perl_sharedsv_locksv;
     PL_sharehook = &Perl_sharedsv_share;
+#ifdef PL_destroyhook
+    PL_destroyhook = &Perl_shared_object_destroy;
+#endif
 }
 
 #endif /* USE_ITHREADS */

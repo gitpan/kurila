@@ -23,7 +23,6 @@ Perl_ck_fun
 Perl_ck_glob
 Perl_ck_grep
 Perl_ck_index
-Perl_ck_lengthconst
 Perl_ck_lfun
 Perl_ck_listiob
 Perl_ck_match
@@ -128,10 +127,6 @@ Perl_pp_ne
 Perl_pp_i_ne
 Perl_pp_ncmp
 Perl_pp_i_ncmp
-Perl_pp_slt
-Perl_pp_sgt
-Perl_pp_sle
-Perl_pp_sge
 Perl_pp_seq
 Perl_pp_sne
 Perl_pp_scmp
@@ -236,7 +231,6 @@ Perl_pp_redo
 Perl_pp_dump
 Perl_pp_goto
 Perl_pp_exit
-Perl_pp_setstate
 Perl_pp_method_named
 Perl_pp_entergiven
 Perl_pp_leavegiven
@@ -263,8 +257,6 @@ Perl_pp_sysopen
 Perl_pp_sysseek
 Perl_pp_sysread
 Perl_pp_syswrite
-Perl_pp_send
-Perl_pp_recv
 Perl_pp_eof
 Perl_pp_tell
 Perl_pp_seek
@@ -272,6 +264,8 @@ Perl_pp_truncate
 Perl_pp_fcntl
 Perl_pp_ioctl
 Perl_pp_flock
+Perl_pp_send
+Perl_pp_recv
 Perl_pp_socket
 Perl_pp_sockpair
 Perl_pp_bind
@@ -360,6 +354,7 @@ Perl_pp_semget
 Perl_pp_semctl
 Perl_pp_require
 Perl_pp_dofile
+Perl_pp_hintseval
 Perl_pp_entereval
 Perl_pp_leaveeval
 Perl_pp_entertry

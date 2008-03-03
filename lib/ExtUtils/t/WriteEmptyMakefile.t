@@ -15,7 +15,7 @@ BEGIN {
 chdir 't';
 
 use strict;
-use Test::More 'no_plan';
+use Test::More tests => 5;
 
 use ExtUtils::MakeMaker qw(WriteEmptyMakefile);
 use TieOut;
@@ -23,7 +23,7 @@ use TieOut;
 can_ok __PACKAGE__, 'WriteEmptyMakefile';
 
 eval { WriteEmptyMakefile("something"); };
-like $@, qr/Need an even number of args/;
+like $@->{description}, qr/Need an even number of args/;
 
 
 {

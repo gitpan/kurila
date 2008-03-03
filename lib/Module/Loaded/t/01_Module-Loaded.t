@@ -27,7 +27,7 @@ my $Strict  = 'strict';
     my $rv = eval "require $Mod; 1";
     ok( !$rv,                   "$Mod require failed" );
     ok( $@,                     "   require died" );
-    like( $@, qr/locate/,       "       with expected error" );
+    like( $@->{description}, qr/locate/,       "       with expected error" );
 }
 
 ### check for an already loaded module
@@ -37,7 +37,7 @@ my $Strict  = 'strict';
                                 "   $Strict unloaded" );
 
     ### redefining subs, quell warnings
-    {   local $SIG{__WARN__} = sub {};
+    {   local ${^WARN_HOOK} = sub {};
         my $rv = eval "require $Strict; 1";
         ok( $rv,                "$Strict loaded again" );
     }

@@ -283,7 +283,7 @@ ReadLine support %s
             ) {
                 delete $INC{"Term/ReadLine.pm"};
                 my $redef = 0;
-                local($SIG{__WARN__}) = CPAN::Shell::paintdots_onreload(\$redef);
+                local(${^WARN_HOOK}) = CPAN::Shell::paintdots_onreload(\$redef);
                 require Term::ReadLine;
                 $CPAN::Frontend->myprint("\n$redef subroutines in ".
                                          "Term::ReadLine redefined\n");
@@ -1078,7 +1078,6 @@ this variable in either a CPAN/MyConfig.pm or a CPAN/Config.pm in your
 #       Larry
 
     # global backstop to cleanup if we should really die
-    $SIG{__DIE__} = \&cleanup;
     $self->debug("Signal handler set.") if $CPAN::DEBUG;
 }
 
@@ -1326,7 +1325,6 @@ sub new {
 #-> sub CPAN::cleanup ;
 sub cleanup {
   # warn "cleanup called with arg[@_] End[$CPAN::End] Signal[$Signal]";
-  local $SIG{__DIE__} = '';
   my($message) = @_;
   my $i = 0;
   my $ineval = 0;
@@ -2122,7 +2120,7 @@ sub reload {
             $p =~ s/\.pm$//;
             $p =~ s|/|::|g;
             $CPAN::Frontend->myprint("($p");
-            local($SIG{__WARN__}) = paintdots_onreload(\$redef);
+            local(${^WARN_HOOK}) = paintdots_onreload(\$redef);
             $self->_reload_this($f) or $failed++;
             my $v = eval "$p\::->VERSION";
             $CPAN::Frontend->myprint("v$v)");
@@ -2815,7 +2813,7 @@ sub expand_by_method {
                 for my $method (@$methods) {
                     my $match = eval {$obj->?$method() =~ m/$regex/i};
                     if ($@) {
-                        my($err) = $@ =~ m/^(.+) at .+? line \d+\.$/;
+                        my($err) = $@->{description} =~ m/^(.+) at .+? line \d+\.$/;
                         $err ||= $@; # if we were too restrictive above
                         $CPAN::Frontend->mydie("$err\n");
                     } elsif ($match) {

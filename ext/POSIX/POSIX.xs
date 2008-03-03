@@ -386,7 +386,7 @@ unsigned long strtoul (const char *, char **, int);
 #endif
 
 static int
-not_here(char *s)
+not_here(const char *s)
 {
     croak("POSIX::%s not implemented on this architecture", s);
     return -1;
@@ -582,7 +582,7 @@ MODULE = SigSet		PACKAGE = POSIX::SigSet		PREFIX = sig
 
 POSIX::SigSet
 new(packname = "POSIX::SigSet", ...)
-    char *		packname
+    const char *	packname
     CODE:
 	{
 	    int i;
@@ -627,7 +627,7 @@ MODULE = Termios	PACKAGE = POSIX::Termios	PREFIX = cf
 
 POSIX::Termios
 new(packname = "POSIX::Termios", ...)
-    char *		packname
+    const char *	packname
     CODE:
 	{
 #ifdef I_TERMIOS
@@ -1662,7 +1662,7 @@ strtol(str, base = 0)
 
 void
 strtoul(str, base = 0)
-	char *		str
+	const char *	str
 	int		base
     PREINIT:
 	unsigned long num;

@@ -549,9 +549,9 @@ use Test::Harness::Straps;
 my @_INC = map { qq{"-I$_"} } @INC;
 $Test::Harness::Switches = "@_INC -Mstrict";
 
-$SIG{__WARN__} = sub { 
-    warn @_ unless $_[0] =~ m/^Enormous test number/ ||
-                   $_[0] =~ m/^Can't detailize/
+${^WARN_HOOK} = sub { 
+    print STDERR $_[0]->message unless $_[0]->message =~ m/^Enormous test number/ ||
+                   $_[0]->message =~ m/^Can't detailize/
 };
 
 for my $test ( sort keys %samples ) {

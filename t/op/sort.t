@@ -4,7 +4,7 @@ BEGIN {
     require './test.pl';
 }
 use warnings;
-plan( tests => 143 );
+plan( tests => 142 );
 
 our (@a, @b);
 
@@ -20,11 +20,11 @@ our (@a, @b);
     map scalar(sort(+())), ('')x68;
 }
 
-sub Backwards { $a lt $b ? 1 : $a gt $b ? -1 : 0 }
-sub Backwards_stacked($$) { my($a,$b) = @_; $a lt $b ? 1 : $a gt $b ? -1 : 0 }
-sub Backwards_other { $a lt $b ? 1 : $a gt $b ? -1 : 0 }
+sub Backwards { ($a cmp $b) +< 0 ? 1 : ($a cmp $b) +> 0 ? -1 : 0 }
+sub Backwards_stacked($$) { my($x,$y) = @_; ($x cmp $y) +< 0 ? 1 : ($x cmp $y) +> 0 ? -1 : 0 }
+sub Backwards_other { ($a cmp $b) +< 0 ? 1 : ($a cmp $b) +> 0 ? -1 : 0 }
 
-my $upperfirst = 'A' lt 'a';
+my $upperfirst = ('A' cmp 'a') +< 0;
 
 # Beware: in future this may become hairier because of possible
 # collation complications: qw(A a B b) can be sorted at least as
@@ -147,13 +147,8 @@ ok(($@ eq "" && "@b" eq "1 4 5 9"),'redefinition should not take effect during t
 		 $a <+> $b;
 	       };
 }
-eval { @b = sort twoface 4,1 };
-cmp_ok(substr($@,0,4), 'eq', 'good', 'twoface eval');
-
-eval <<'CODE';
-    my @result = sort main'Backwards 'one', 'two';
-CODE
-cmp_ok($@,'eq','',q(old skool package));
+dies_like( sub { @b = sort twoface 4,1 },
+           qr/^good/, 'twoface eval');
 
 eval <<'CODE';
     # "sort 'one', 'two'" should not try to parse "'one" as a sort sub
@@ -678,36 +673,34 @@ ok "@output", "0 C B A", 'reversed sort with trailing argument';
 @output = reverse (0, sort(qw(C A B)));
 ok "@output", "C B A 0", 'reversed sort with leading argument';
 
-eval { @output = sort {goto sub {}} 1,2; };
-our $fail_msg = q(Can't goto subroutine outside a subroutine);
-main::cmp_ok(substr($@,0,length($fail_msg)),'eq',$fail_msg,'goto subr outside subr');
-
-
+#dies_like( sub { @output = sort {goto sub {}} 1,2; },
+main::dies_like( sub { @output = sort {goto sub {}} 1,2; },
+                 qr(^Can't goto subroutine outside a subroutine),
+                 'goto subr outside subr');
 
 sub goto_sub {goto sub{}}
-eval { @output = sort goto_sub 1,2; };
-$fail_msg = q(Can't goto subroutine from a sort sub);
-main::cmp_ok(substr($@,0,length($fail_msg)),'eq',$fail_msg,'goto subr from a sort sub');
+main::dies_like( sub { @output = sort goto_sub 1,2; },
+                 qr(^Can't goto subroutine from a sort sub),
+                 'goto subr from a sort sub');
 
 
-
-eval { @output = sort {goto label} 1,2; };
-$fail_msg = q(Can't "goto" out of a pseudo block);
-main::cmp_ok(substr($@,0,length($fail_msg)),'eq',$fail_msg,'goto out of a pseudo block 1');
+main::dies_like( sub { @output = sort {goto label} 1,2; },
+           qr(^Can't "goto" out of a pseudo block),
+           'goto out of a pseudo block 1');
 
 
 
 sub goto_label {goto label}
 label: eval { @output = sort goto_label 1,2; };
 $fail_msg = q(Can't "goto" out of a pseudo block);
-main::cmp_ok(substr($@,0,length($fail_msg)),'eq',$fail_msg,'goto out of a pseudo block 2');
+main::cmp_ok(substr($@->{description},0,length($fail_msg)),'eq',$fail_msg,'goto out of a pseudo block 2');
 
 
 
 sub self_immolate {undef &self_immolate; $a<+>$b}
-eval { @output = sort self_immolate 1,2,3 };
-$fail_msg = q(Can't undef active subroutine);
-main::cmp_ok(substr($@,0,length($fail_msg)),'eq',$fail_msg,'undef active subr');
+main::dies_like( sub { @output = sort self_immolate 1,2,3 },
+                 qr(^Can't undef active subroutine),
+                 'undef active subr');
 
 
 
@@ -769,11 +762,8 @@ sub min {
 
 # Bug 7567 - an array shouldn't be modifiable while it's being
 # sorted in-place.
-eval { @a=(1..8); @a = sort { @a = (0) } @a; };
-
-$fail_msg = q(Modification of a read-only value attempted);
-main::cmp_ok(substr($@,0,length($fail_msg)),'eq',$fail_msg,'bug 7567');
-
+eval { @a=(1..8); @a = sort { @a = (0) } @a; },
+main::like($@->{description}, qr(^Modification of a read-only value attempted), 'bug 7567');
 
 
 # Sorting shouldn't increase the refcount of a sub
@@ -787,7 +777,7 @@ $fail_msg = q(Modification of a read-only value attempted);
 my @readonly = (1..10);
 Internals::SvREADONLY(@readonly, 1);
 eval { @readonly = sort @readonly; };
-main::cmp_ok(substr($@,0,length($fail_msg)),'eq',$fail_msg,'in-place sort of read-only array');
+main::cmp_ok(substr($@->{description},0,length($fail_msg)),'eq',$fail_msg,'in-place sort of read-only array');
 
 
 

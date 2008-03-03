@@ -18,7 +18,7 @@ BEGIN {
         plan skip_all => 'Non-Unix platform';
     }
     else {
-        plan tests => 109;
+        plan tests => 108;
     }
 }
 
@@ -31,15 +31,13 @@ my $class = 'ExtUtils::MM_Unix';
 
 # only one of the following can be true
 # test should be removed if MM_Unix ever stops handling other OS than Unix
-my $os =  ($ExtUtils::MM_Unix::Is_OS2 	|| 0)
-	+ ($ExtUtils::MM_Unix::Is_Win32 || 0) 
-	+ ($ExtUtils::MM_Unix::Is_Dos 	|| 0)
-	+ ($ExtUtils::MM_Unix::Is_VMS   || 0); 
+my $os =  ($ExtUtils::MM_Unix::Is{OS2}   || 0)
+        + ($ExtUtils::MM_Unix::Is{Win32} || 0) 
+        + ($ExtUtils::MM_Unix::Is{Dos}   || 0)
+        + ($ExtUtils::MM_Unix::Is{VMS}   || 0); 
 ok ( $os +<= 1,  'There can be only one (or none)');
 
-my $version = $ExtUtils::MM_Unix::VERSION;
-   $version =~ s/_//g;
-cmp_ok ($version, '+>=', '1.12606', 'Should be at least version 1.12606');
+cmp_ok ($ExtUtils::MM_Unix::VERSION, '+>=', '1.12606', 'Should be at least version 1.12606');
 
 # when the following calls like canonpath, catdir etc are replaced by
 # File::Spec calls, the test's become a bit pointless
@@ -172,15 +170,14 @@ is ($t->libscan('Fatty'), 'Fatty', 'libscan on something not a VC file' );
 # maybe_command
 
 open(FILE, ">", "command"); print FILE "foo"; close FILE;
+SKIP: {
+skip ("no separate execute mode", 1) if ($^O eq "vos");
 ok (!$t->maybe_command('command') ,"non executable file isn't a command");
+}
+
 chmod 0755, "command";
 ok ($t->maybe_command('command'),        "executable file is a command");
 unlink "command";
-
-###############################################################################
-# nicetext (dummy method)
-
-is ($t->nicetext('LOTR'),'LOTR','nicetext');
 
 
 ###############################################################################

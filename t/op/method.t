@@ -8,7 +8,7 @@ BEGIN {
     require "./test.pl";
 }
 
-print "1..57\n";
+print "1..56\n";
 
 @A::ISA = 'B';
 @B::ISA = 'C';
@@ -58,7 +58,7 @@ is(A->d, "D::d");
     eval 'sub B::d {"B::d1"}';	# Import now.
     is(A->d, "B::d1");	# Update hash table;
     undef &B::d;
-    is((eval { A->d }, ($@ =~ m/Undefined subroutine/)), 1);
+    is((eval { A->d }, ($@->{description} =~ m/Undefined subroutine/)), 1);
 }
 
 is(A->d, "D::d");		# Back to previous state
@@ -129,22 +129,22 @@ is(eval { A->x } || "nope", "nope");
 
 # test error messages if method loading fails
 is(do { eval 'my $e = bless {}, "E::A"; E::A->foo()';
-	  $@ =~ m/^\QCan't locate object method "foo" via package "E::A" at/ ? 1 : $@}, 1);
+	  $@->message =~ m/^\QCan't locate object method "foo" via package "E::A" at/ ? 1 : $@}, 1);
 is(do { eval 'my $e = bless {}, "E::B"; $e->foo()';  
-	  $@ =~ m/^\QCan't locate object method "foo" via package "E::B" at/ ? 1 : $@}, 1);
+	  $@->message =~ m/^\QCan't locate object method "foo" via package "E::B" at/ ? 1 : $@}, 1);
 is(do { eval 'E::C->foo()';
-	  $@ =~ m/^\QCan't locate object method "foo" via package "E::C" (perhaps / ? 1 : $@}, 1);
+	  $@->message =~ m/^\QCan't locate object method "foo" via package "E::C" (perhaps / ? 1 : $@}, 1);
 
 is(do { eval 'UNIVERSAL->E::D::foo()';
-	  $@ =~ m/^\QCan't locate object method "foo" via package "E::D" (perhaps / ? 1 : $@}, 1);
+	  $@->message =~ m/^\QCan't locate object method "foo" via package "E::D" (perhaps / ? 1 : $@}, 1);
 is(do { eval 'my $e = bless {}, "UNIVERSAL"; $e->E::E::foo()';
-	  $@ =~ m/^\QCan't locate object method "foo" via package "E::E" (perhaps / ? 1 : $@}, 1);
+	  $@->message =~ m/^\QCan't locate object method "foo" via package "E::E" (perhaps / ? 1 : $@}, 1);
 
 my $e = bless {}, "E::F";  # force package to exist
 is(do { eval 'UNIVERSAL->E::F::foo()';
-	  $@ =~ m/^\QCan't locate object method "foo" via package "E::F" at/ ? 1 : $@}, 1);
+	  $@->message =~ m/^\QCan't locate object method "foo" via package "E::F" at/ ? 1 : $@}, 1);
 is(do { eval '$e = bless {}, "UNIVERSAL"; $e->E::F::foo()';
-	  $@ =~ m/^\QCan't locate object method "foo" via package "E::F" at/ ? 1 : $@}, 1);
+	  $@->message =~ m/^\QCan't locate object method "foo" via package "E::F" at/ ? 1 : $@}, 1);
 
 # TODO: we need some tests for the SUPER:: pseudoclass
 
@@ -165,26 +165,13 @@ is( eval 'Foo->boogie(); 1'         ? "yes":"no", "no" );
 is( $::{"Foo::"} || "none", "none");  # still missing?
 
 is(do { eval 'Foo->boogie()';
-	  $@ =~ m/^\QCan't locate object method "boogie" via package "Foo" (perhaps / ? 1 : $@}, 1);
+	  $@->message =~ m/^\QCan't locate object method "boogie" via package "Foo" (perhaps / ? 1 : $@}, 1);
 
 eval 'sub Foo::boogie { "yes, sir!" }';
 is( $::{"Foo::"} ? "ok" : "none", "ok");  # should exist now
 is( Foo->boogie(), "yes, sir!");
 
 # TODO: universal.t should test NoSuchPackage->isa()/can()
-
-# This is actually testing parsing of indirect objects and undefined subs
-#   print foo("bar") where foo does not exist is not an indirect object.
-#   print foo "bar"  where foo does not exist is an indirect object.
-
-# Bug ID 20010902.002
-is(
-    eval q[
-	our $x = 'x';
-	sub Foo::x : lvalue { $x }
-	Foo->?$x = 'ok';
-    ] || $@, 'ok'
-);
 
 # [ID 20020305.025] PACKAGE::SUPER doesn't work anymore
 

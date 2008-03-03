@@ -1,7 +1,7 @@
 /*    hv.h
  *
  *    Copyright (C) 1991, 1992, 1993, 1996, 1997, 1998, 1999,
- *    2000, 2001, 2002, 2003, 2005, 2006, 2007, by Larry Wall and others
+ *    2000, 2001, 2002, 2003, 2005, 2006, 2007, 2008, by Larry Wall and others
  *
  *    You may distribute under the terms of either the GNU General Public
  *    License or the Artistic License, as specified in the README file.
@@ -41,18 +41,11 @@ struct shared_he {
    Use the funcs in mro.c
 */
 
-typedef enum {
-    MRO_C3,  /* 0 */
-    MRO_DFS  /* 1 */
-} mro_alg;
-
 struct mro_meta {
-    AV      *mro_linear_dfs; /* cached dfs @ISA linearization */
     AV      *mro_linear_c3;  /* cached c3 @ISA linearization */
     HV      *mro_nextmethod; /* next::method caching */
     U32     cache_gen;       /* Bumping this invalidates our method cache */
     U32     pkg_gen;         /* Bumps when local methods/@ISA change */
-    mro_alg mro_which;       /* which mro alg is in use? */
 };
 
 /* Subject to change.
@@ -67,56 +60,30 @@ struct xpvhv_aux {
     struct mro_meta *xhv_mro_meta;
 };
 
+#define _XPVHV_ALLOCATED_HEAD						    \
+    STRLEN	xhv_fill;	/* how full xhv_array currently is */	    \
+    STRLEN	xhv_max		/* subscript of last element of xhv_array */
+
+#define _XPVHV_HEAD	\
+    union _xnvu xnv_u;	\
+    _XPVHV_ALLOCATED_HEAD
+
 /* hash structure: */
 /* This structure must match the beginning of struct xpvmg in sv.h. */
 struct xpvhv {
-    union {
-	NV	xnv_nv;		/* numeric value, if any */
-	HV *	xgv_stash;
-	struct {
-	    U32	xlow;
-	    U32	xhigh;
-	}	xpad_cop_seq;	/* used by pad.c for cop_sequence */
-	struct {
-	    U32 xbm_previous;	/* how many characters in string before rare? */
-	    U8	xbm_flags;
-	    U8	xbm_rare;	/* rarest character in string */
-	}	xbm_s;		/* fields from PVBM */
-    }		xnv_u;
-    STRLEN	xhv_fill;	/* how full xhv_array currently is */
-    STRLEN	xhv_max;	/* subscript of last element of xhv_array */
-    union {
-	IV	xivu_iv;	/* integer value or pv offset */
-	UV	xivu_uv;
-	void *	xivu_p1;
-	I32	xivu_i32;
-	HEK *	xivu_namehek;
-    }		xiv_u;
-    union {
-	MAGIC*	xmg_magic;	/* linked list of magicalness */
-	HV*	xmg_ourstash;	/* Stash for our (when SvPAD_OUR is true) */
-    } xmg_u;
-    HV*		xmg_stash;	/* class package */
+    _XPVHV_HEAD;
+    _XPVMG_HEAD;
 };
 
 #define xhv_keys xiv_u.xivu_iv
 
 typedef struct {
-    STRLEN	xhv_fill;	/* how full xhv_array currently is */
-    STRLEN	xhv_max;	/* subscript of last element of xhv_array */
-    union {
-	IV	xivu_iv;	/* integer value or pv offset */
-	UV	xivu_uv;
-	void *	xivu_p1;
-	I32	xivu_i32;
-	HEK *	xivu_namehek;
-    }		xiv_u;
-    union {
-	MAGIC*	xmg_magic;	/* linked list of magicalness */
-	HV*	xmg_ourstash;	/* Stash for our (when SvPAD_OUR is true) */
-    } xmg_u;
-    HV*		xmg_stash;	/* class package */
+    _XPVHV_ALLOCATED_HEAD;
+    _XPVMG_HEAD;
 } xpvhv_allocated;
+
+#undef _XPVHV_ALLOCATED_HEAD
+#undef _XPVHV_HEAD
 
 /* hash a key */
 /* FYI: This is the "One-at-a-Time" algorithm by Bob Jenkins
@@ -192,6 +159,8 @@ is to be expected. (For information only--not to be used).
 =for apidoc AmU||Nullhv
 Null HV pointer.
 
+(deprecated - use C<(HV *)NULL> instead)
+
 =head1 Hash Manipulation Functions
 
 =for apidoc Am|char*|HvNAME|HV* stash
@@ -246,8 +215,9 @@ C<SV*>.
 /* these hash entry flags ride on hent_klen (for use only in magic/tied HVs) */
 #define HEf_SVKEY	-2	/* hent_key is an SV* */
 
-
-#define Nullhv Null(HV*)
+#ifndef PERL_CORE
+#  define Nullhv Null(HV*)
+#endif
 #define HvARRAY(hv)	((hv)->sv_u.svu_hash)
 #define HvFILL(hv)	((XPVHV*)  SvANY(hv))->xhv_fill
 #define HvMAX(hv)	((XPVHV*)  SvANY(hv))->xhv_max
@@ -304,7 +274,9 @@ C<SV*>.
 #define HvREHASH_on(hv)		(SvFLAGS(hv) |= SVphv_REHASH)
 #define HvREHASH_off(hv)	(SvFLAGS(hv) &= ~SVphv_REHASH)
 
-#define Nullhe Null(HE*)
+#ifndef PERL_CORE
+#  define Nullhe Null(HE*)
+#endif
 #define HeNEXT(he)		(he)->hent_next
 #define HeKEY_hek(he)		(he)->hent_hek
 #define HeKEY(he)		HEK_KEY(HeKEY_hek(he))
@@ -325,12 +297,14 @@ C<SV*>.
 #define HeSVKEY_force(he)	(HeKEY(he) ?				\
 				 ((HeKLEN(he) == HEf_SVKEY) ?		\
 				  HeKEY_sv(he) :			\
-				  sv_2mortal(newSVpvn(HeKEY(he),	\
-						     HeKLEN(he)))) :	\
+				  newSVpvn_flags(HeKEY(he),		\
+						 HeKLEN(he), SVs_TEMP)) : \
 				 &PL_sv_undef)
 #define HeSVKEY_set(he,sv)	((HeKLEN(he) = HEf_SVKEY), (HeKEY_sv(he) = sv))
 
-#define Nullhek Null(HEK*)
+#ifndef PERL_CORE
+#  define Nullhek Null(HEK*)
+#endif
 #define HEK_BASESIZE		STRUCT_OFFSET(HEK, hek_key[0])
 #define HEK_HASH(hek)		(hek)->hek_hash
 #define HEK_LEN(hek)		(hek)->hek_len
@@ -442,6 +416,16 @@ C<SV*>.
 #define HV_FETCH_LVALUE		0x10
 #define HV_FETCH_JUST_SV	0x20
 #define HV_DELETE		0x40
+
+/*
+=for apidoc newHV
+
+Creates a new HV.  The reference count is set to 1.
+
+=cut
+*/
+
+#define newHV()	((HV*)newSV_type(SVt_PVHV))
 
 /*
  * Local variables:

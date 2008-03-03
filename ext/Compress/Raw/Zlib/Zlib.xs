@@ -58,13 +58,6 @@
 #  define AT_LEAST_ZLIB_1_2_3
 #endif
 
-#ifdef USE_PPPORT_H
-#  define NEED_sv_2pvbyte
-#  define NEED_sv_2pv_nolen
-#  include "ppport.h"
-#endif
-
-
 typedef int                     DualType ;
 typedef int                     int_undef ;
 
@@ -481,7 +474,7 @@ PostInitStream(s, flags, bufsize, windowBits)
 
 static SV* 
 #ifdef CAN_PROTOTYPE
-deRef(SV * sv, char * string)
+deRef(SV * sv, const char * string)
 #else
 deRef(sv, string)
 SV * sv ;
@@ -513,7 +506,7 @@ char * string;
 
 static SV*
 #ifdef CAN_PROTOTYPE
-deRef_l(SV * sv, char * string)
+deRef_l(SV * sv, const char * string)
 #else
 deRef_l(sv, string)
 SV * sv ;

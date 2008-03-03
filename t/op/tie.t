@@ -45,14 +45,15 @@ use Tie::Hash ;
  use base 'Tie::StdHash';
  sub UNTIE
   {
-   warn "Untied\n";
+   warn "Untied";
   }
 }
 our %h;
 tie %h, 'Tie::HashUntie';
 untie %h;
 EXPECT
-Untied
+Untied at - line 8.
+    Tie::HashUntie::UNTIE called at - line 13.
 ########
 
 # standard behaviour, with 1 extra reference
@@ -255,8 +256,8 @@ EXPECT
 tie FH, 'main';
 EXPECT
 Can't modify constant item in tie at - line 3, near "'main';"
-Bareword "FH" not allowed while "strict subs" in use at - line 3.
-Execution of - aborted due to compilation errors.
+Bareword "FH" not allowed while "strict subs" in use
+Execution of - aborted due to compilation errors. at - line 3.
 ########
 
 # localizing tied hash slices

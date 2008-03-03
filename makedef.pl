@@ -159,7 +159,7 @@ my $sym_ord = 0;
 print STDERR "Defines: (" . join(' ', sort keys %define) . ")\n";
 
 if ($PLATFORM =~ /^win(?:32|ce)$/) {
-    (my $dll = ($define{PERL_DLL} || "perl59")) =~ s/\.dll$//i;
+    (my $dll = ($define{PERL_DLL} || "perl511")) =~ s/\.dll$//i;
     print "LIBRARY $dll\n";
     # The DESCRIPTION module definition file statement is not supported
     # by VC7 onwards.
@@ -215,7 +215,7 @@ elsif ($PLATFORM eq 'aix') {
 }
 elsif ($PLATFORM eq 'netware') {
 	if ($FILETYPE eq 'def') {
-	print "LIBRARY perl59\n";
+	print "LIBRARY perl511\n";
 	print "DESCRIPTION 'Perl interpreter for NetWare'\n";
 	print "EXPORTS\n";
 	}
@@ -734,7 +734,7 @@ unless ($define{'USE_ITHREADS'}) {
 		    Perl_he_dup
 		    Perl_mg_dup
 		    Perl_mro_meta_dup
-		    Perl_re_dup
+		    Perl_re_dup_guts
 		    Perl_sv_dup
 		    Perl_rvpv_dup
 		    Perl_hek_dup

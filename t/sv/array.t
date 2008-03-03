@@ -264,8 +264,8 @@ is ($got, '');
 
 {
     my @a;
-    eval '$a[-1] = 0';
-    like($@, qr/Modification of non-creatable array value attempted, subscript -1/, "\$a[-1] = 0");
+    eval_dies_like( '$a[-1] = 0', 
+                    qr/Modification of non-creatable array value attempted, subscript -1/, "\$a[-1] = 0");
 }
 
 sub test_arylen {
@@ -273,7 +273,7 @@ sub test_arylen {
     local $^W = 1;
     is ($$ref, undef, "\$# on freed array is undef");
     my @warn;
-    local $SIG{__WARN__} = sub {push @warn, "@_"};
+    local ${^WARN_HOOK} = sub {push @warn, $_[0]->message};
     $$ref = 1000;
     is (scalar @warn, 1);
     like ($warn[0], qr/^Attempt to set length of freed array/);

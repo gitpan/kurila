@@ -22,10 +22,9 @@ require DynaLoader;
 		 d_clock d_clock_nanosleep
 		 stat
 		);
-	
-$VERSION = v1.9708;
+
+$VERSION = v1.9712;
 $XS_VERSION = $VERSION;
-$VERSION = eval $VERSION;
 
 sub import {
     my $this = shift;

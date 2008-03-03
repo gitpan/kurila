@@ -14,7 +14,7 @@ BEGIN {
 }
 
 use strict;
-use Test::More 'no_plan';
+use Test::More tests => 28;
 
 use TieOut;
 use MakeMaker::Test::Utils;
@@ -38,8 +38,8 @@ ok( chdir 'Big-Dummy', "chdir'd to Big-Dummy" ) ||
 {
     ok( my $stdout = tie *STDOUT, 'TieOut' );
     my $warnings = '';
-    local $SIG{__WARN__} = sub {
-        $warnings .= join '', @_;
+    local ${^WARN_HOOK} = sub {
+        $warnings .= $_[0]->{description};
     };
 
     my $mm;
@@ -164,7 +164,7 @@ VERIFY
 
 
     SKIP: {
-        skip("Can't test version objects",2) unless eval { require version };
+        skip("Can't test version objects",6) unless eval { require version };
         version->import;
 
         my $version = version->new("1.2.3");

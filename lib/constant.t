@@ -10,7 +10,7 @@ BEGIN {
 use warnings;
 use vars qw{ @warnings $fagwoosh $putt $kloong};
 BEGIN {				# ...and save 'em for later
-    $SIG{'__WARN__'} = sub { push @warnings, @_ }
+    ${^WARN_HOOK} = sub { push @warnings, $_[0]->{description} }
 }
 END { print STDERR @warnings }
 
@@ -136,7 +136,7 @@ print $output CCODE->($curr_test+4);
 $TB->current_test($curr_test+4);
 
 eval q{ CCODE->{foo} };
-ok scalar($@ =~ m/^Constant is not a HASH/);
+ok scalar($@->{description} =~ m/^Constant is not a HASH/);
 
 
 # Allow leading underscore
@@ -147,7 +147,7 @@ is _PRIVATE, 47;
 eval q{
     use constant __DISALLOWED => "Oops";
 };
-like $@, qr/begins with '__'/;
+like $@->{description}, qr/begins with '__'/;
 
 # Check on declared() and %declared. This sub should be EXACTLY the
 # same as the one quoted in the docs!
@@ -201,21 +201,21 @@ eval q{
 
 my @Expected_Warnings = 
   (
-   qr/^Constant name 'BEGIN' is a Perl keyword at/,
-   qr/^Constant subroutine BEGIN redefined at/,
-   qr/^Constant name 'INIT' is a Perl keyword at/,
-   qr/^Constant name 'CHECK' is a Perl keyword at/,
-   qr/^Constant name 'UNITCHECK' is a Perl keyword at/,
-   qr/^Constant name 'END' is a Perl keyword at/,
-   qr/^Constant name 'DESTROY' is a Perl keyword at/,
-   qr/^Constant name 'STDIN' is forced into package main:: a/,
-   qr/^Constant name 'STDOUT' is forced into package main:: at/,
-   qr/^Constant name 'STDERR' is forced into package main:: at/,
-   qr/^Constant name 'ARGV' is forced into package main:: at/,
-   qr/^Constant name 'ARGVOUT' is forced into package main:: at/,
-   qr/^Constant name 'ENV' is forced into package main:: at/,
-   qr/^Constant name 'INC' is forced into package main:: at/,
-   qr/^Constant name 'SIG' is forced into package main:: at/,
+   qr/^Constant name 'BEGIN' is a Perl keyword/,
+   qr/^Constant subroutine BEGIN redefined/,
+   qr/^Constant name 'INIT' is a Perl keyword/,
+   qr/^Constant name 'CHECK' is a Perl keyword/,
+   qr/^Constant name 'UNITCHECK' is a Perl keyword/,
+   qr/^Constant name 'END' is a Perl keyword/,
+   qr/^Constant name 'DESTROY' is a Perl keyword/,
+   qr/^Constant name 'STDIN' is forced into package main::/,
+   qr/^Constant name 'STDOUT' is forced into package main::/,
+   qr/^Constant name 'STDERR' is forced into package main::/,
+   qr/^Constant name 'ARGV' is forced into package main::/,
+   qr/^Constant name 'ARGVOUT' is forced into package main::/,
+   qr/^Constant name 'ENV' is forced into package main::/,
+   qr/^Constant name 'INC' is forced into package main::/,
+   qr/^Constant name 'SIG' is forced into package main::/,
 );
 
 # when run under "make test"
@@ -226,7 +226,7 @@ if (0+@warnings == 0+@Expected_Warnings) {
 # when run directly: perl -wT -Ilib t/constant.t
 elsif (@warnings == @Expected_Warnings + 1) {
     splice @Expected_Warnings, 1, 0, 
-        qr/^Prototype mismatch: sub main::BEGIN \(\) vs none at/;
+        qr/^Prototype mismatch: sub main::BEGIN \(\) vs none/;
 }
 else {
     my $rule = " -" x 20;
@@ -271,7 +271,7 @@ sub slotch ();
 
 {
     my @warnings;
-    local $SIG{'__WARN__'} = sub { push @warnings, @_ };
+    local ${^WARN_HOOK} = sub { push @warnings, @_ };
     eval 'use constant slotch => 3; 1' or die $@;
 
     is ("@warnings", "", "No warnings if a prototype exists");
@@ -285,7 +285,7 @@ sub zit;
 
 {
     my @warnings;
-    local $SIG{'__WARN__'} = sub { push @warnings, @_ };
+    local ${^WARN_HOOK} = sub { push @warnings, $_[0]->{description} };
     eval 'use constant zit => 4; 1' or die $@;
 
     # empty prototypes are reported differently in different versions
@@ -306,7 +306,7 @@ $kloong = 'schlozhauer';
 
 {
     my @warnings;
-    local $SIG{'__WARN__'} = sub { push @warnings, @_ };
+    local ${^WARN_HOOK} = sub { push @warnings, @_ };
     eval 'use constant fagwoosh => 5; 1' or die $@;
 
     is ("@warnings", "", "No warnings if the typeglob exists already");

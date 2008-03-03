@@ -124,7 +124,7 @@ PERLVAR(Idefstash,	HV *)		/* main symbol table */
 PERLVAR(Icurstash,	HV *)		/* symbol table for current package */
 
 PERLVAR(Irestartop,	OP *)		/* propagating an error from croak? */
-PERLVAR(Icurcop,	COP * VOL)
+PERLVAR(Icurcop,	COP *)
 PERLVAR(Icurstack,	AV *)		/* THE STACK */
 PERLVAR(Icurstackinfo,	PERL_SI *)	/* current stack + context */
 PERLVAR(Imainstack,	AV *)		/* the stack when nothing funny is
@@ -187,12 +187,13 @@ PERLVAR(Ilocalizing,	U8)		/* are we processing a local() list? */
 PERLVAR(Icolorset,	bool)		/* from regcomp.c */
 PERLVARI(Idirty,	bool, FALSE)	/* in the middle of tearing things
 					   down? */
-PERLVAR(Iin_eval,	VOL U8)		/* trap "fatal" errors? */
+PERLVAR(Iin_eval,	U8)		/* trap "fatal" errors? */
 PERLVAR(Itainted,	bool)		/* using variables controlled by $< */
 
 /* This value may be set when embedding for full cleanup  */
 /* 0=none, 1=full, 2=full with checks */
-PERLVARI(Iperl_destruct_level,	U8,	0)
+/* mod_perl is special, and also assigns a meaning -1 */
+PERLVARI(Iperl_destruct_level,	signed char,	0)
 
 PERLVAR(Iperldb,	U32)
 
@@ -203,6 +204,7 @@ PERLVAR(Ienvgv,		GV *)
 PERLVAR(Iincgv,		GV *)
 PERLVAR(Ihintgv,	GV *)
 PERLVAR(Iorigfilename,	char *)
+PERLVAR(Ierrorcreatehook,	SV *)
 PERLVAR(Idiehook,	SV *)
 PERLVAR(Iwarnhook,	SV *)
 
@@ -218,7 +220,6 @@ PERLVAR(Iminus_l,	bool)
 PERLVAR(Iminus_a,	bool)
 PERLVAR(Iminus_F,	bool)
 PERLVAR(Idoswitches,	bool)
-
 PERLVAR(Iminus_E,	bool)
 
 /*
@@ -238,6 +239,7 @@ PERLVAR(Iexit_flags,	U8)		/* was exit() unexpected, etc. */
 PERLVAR(Isrand_called,	bool)
 /* Part of internal state, but makes the 16th 1 byte variable in a row.  */
 PERLVAR(Itainting,	bool)		/* doing taint checks */
+/* Space for a U8 */
 PERLVAR(Iinplace,	char *)
 PERLVAR(Ie_script,	SV *)
 
@@ -341,7 +343,7 @@ PERLVARI(Icurcopdb,	COP *,	NULL)
 PERLVAR(Ifilemode,	int)		/* so nextargv() can preserve mode */
 PERLVAR(Ilastfd,	int)		/* what to preserve mode on */
 PERLVAR(Ioldname,	char *)		/* what to preserve mode on */
-PERLVAR(IArgv,		char **)	/* stuff to free from do_aexec, vfork safe */
+PERLVAR(IArgv,		const char **)	/* stuff to free from do_aexec, vfork safe */
 PERLVAR(ICmd,		char *)		/* stuff to free from do_aexec, vfork safe */
 /* Elements in this array have ';' appended and are injected as a single line
    into the tokeniser. You can't put any (literal) newlines into any program
@@ -555,9 +557,13 @@ PERLVAR(Inumeric_radix_sv,	SV *)	/* The radix separator if not '.' */
 #endif
 
 #if defined(USE_ITHREADS)
-PERLVAR(Iregex_pad,     SV**)		/* All regex objects */
-PERLVAR(Iregex_padav,   AV*)		/* All regex objects */
-
+PERLVAR(Iregex_pad,     SV**)		/* Shortcut into the array of
+					   regex_padav */
+PERLVAR(Iregex_padav,   AV*)		/* All regex objects, indexed via the
+					   values in op_pmoffset of pmop.
+					   Entry 0 is an SV whose PV is a
+					   "packed" list of IVs listing
+					   the now-free slots in the array */
 #endif
 
 #ifdef USE_REENTRANT_API
@@ -627,8 +633,6 @@ PERLVARI(Ippid,		IV,		0)
 #endif
 
 PERLVARI(Ihash_seed, UV, 0)		/* Hash initializer */
-
-PERLVAR(IDBassertion,   SV *)
 
 PERLVARI(Irehash_seed, UV, 0)		/* 582 hash initializer */
 

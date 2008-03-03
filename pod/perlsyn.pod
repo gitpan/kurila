@@ -560,25 +560,25 @@ time. The exceptions are that when EXPR is:
 
 =over 4
 
-=item o
+=item *
 
 a subroutine or method call
 
-=item o
+=item *
 
 a regular expression match, i.e. C</REGEX/> or C<$foo =~ /REGEX/>,
 or a negated regular expression match C<$foo !~ /REGEX/>.
 
-=item o
+=item *
 
 a comparison such as C<$_ E<lt> 10> or C<$x eq "abc">
 (or of course C<$_ ~~ $c>)
 
-=item o
+=item *
 
 C<defined(...)>, C<exists(...)>, or C<eof(...)>
 
-=item o
+=item *
 
 A negated expression C<!(...)> or C<not (...)>, or a logical
 exclusive-or C<(...) xor (...)>.
@@ -607,7 +607,7 @@ is applied recursively to the first argument.
 These rules look complicated, but usually they will do what
 you want. For example you could write:
 
-    when (/^\d$/ && $_ < 75) { ... }
+    when (/^\d+$/ && $_ < 75) { ... }
 
 Another useful shortcut is that, if you use a literal array
 or hash as the argument to C<when>, it is turned into a
@@ -674,7 +674,7 @@ order, determines the match behaviour.
     Any     Code[+]   scalar sub truth         $b->($a)
 
     Hash    Hash      hash keys identical      [sort keys %$a]~~[sort keys %$b]
-    Hash    Array     hash value slice truth   grep $_, @$a{@$b}
+    Hash    Array     hash slice existence     grep {exists $a->{$_}} @$b
     Hash    Regex     hash key grep            grep /$b/, keys %$a
     Hash    Any       hash entry existence     exists $a->{$b}
 

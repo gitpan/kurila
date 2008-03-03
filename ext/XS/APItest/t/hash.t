@@ -42,7 +42,10 @@ main_tests (\@keys, \@testkeys, ' [utf8 hash]');
 {
   my %h = (a=>'cheat');
   tie %h, 'Tie::StdHash';
-  is (XS::APItest::Hash::store(\%h, chr 258,  1), undef);
+  # is bug 36327 fixed?
+  my $result = undef;
+
+  is (XS::APItest::Hash::store(\%h, chr 258,  1), $result);
     
   ok (exists $h{$utf8_for_258},
       "hv_store does insert a key with the raw utf8 on a tied hash");
@@ -57,12 +60,12 @@ main_tests (\@keys, \@testkeys, ' [utf8 hash]');
     };
     my $prefix = "Cannot modify shared string table in hv_";
     my $what = $prefix . 'fetch';
-    like ($@, qr/^$what/,$what);
+    like ($@->{description}, qr/^$what/,$what);
     eval {
 	XS::APItest::Hash::store($strtab, 'Boom!',  1)
     };
     $what = $prefix . 'store';
-    like ($@, qr/^$what/, $what);
+    like ($@->{description}, qr/^$what/, $what);
     if (0) {
 	A::B->method();
     }
@@ -71,7 +74,7 @@ main_tests (\@keys, \@testkeys, ' [utf8 hash]');
 	delete $strtab->{DESTROY};
     };
     $what = $prefix . 'delete';
-    like ($@, qr/^$what/, $what);
+    like ($@->{description}, qr/^$what/, $what);
     # I can't work out how to get to the code that flips the wasutf8 flag on
     # the hash key without some ikcy XS
 }
@@ -345,19 +348,23 @@ sub test_store {
 
   my $class = tied %$hash;
 
-  my %h1 = @$defaults;
-  my %h2 = @$defaults;
+  # It's important to do this with nice new hashes created each time round
+  # the loop, rather than hashes in the pad, which get recycled, and may have
+  # xhv_array non-NULL
+  my $h1 = {@$defaults};
+  my $h2 = {@$defaults};
   if (defined $class) {
-    tie %h1, ref $class;
-    tie %h2, ref $class;
+    tie %$h1, ref $class;
+    tie %$h2, ref $class;
+    # bug 36327 is fixed
     $HV_STORE_IS_CRAZY = undef;
   }
-  is (XS::APItest::Hash::store_ent(\%h1, $key, 1), $HV_STORE_IS_CRAZY,
-      "hv_store_ent$message $printable"); 
-  ok (brute_force_exists (\%h1, $key), "hv_store_ent$message $printable");
-  is (XS::APItest::Hash::store(\%h2, $key,  1), $HV_STORE_IS_CRAZY,
+  is (XS::APItest::Hash::store_ent($h1, $key, 1), $HV_STORE_IS_CRAZY,
+      "hv_store_ent$message $printable");
+  ok (brute_force_exists ($h1, $key), "hv_store_ent$message $printable");
+  is (XS::APItest::Hash::store($h2, $key,  1), $HV_STORE_IS_CRAZY,
       "hv_store$message $printable");
-  ok (brute_force_exists (\%h2, $key), "hv_store$message $printable");
+  ok (brute_force_exists ($h2, $key), "hv_store$message $printable");
 }
 
 sub test_fetch_present {

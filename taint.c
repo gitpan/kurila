@@ -22,10 +22,13 @@
 #include "perl.h"
 
 void
-Perl_taint_proper(pTHX_ const char *f, const char *s)
+Perl_taint_proper(pTHX_ const char *f, const char *const s)
 {
 #if defined(HAS_SETEUID) && defined(DEBUGGING)
     dVAR;
+
+    PERL_ARGS_ASSERT_TAINT_PROPER;
+
 #   if Uid_t_size == 1
     {
 	const UV  uid = PL_uid;

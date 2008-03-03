@@ -49,12 +49,12 @@ foreach (Foo->new) {
 }
 
 {
-    local $SIG{__WARN__} = sub {
+    local ${^WARN_HOOK} = sub {
         return if $_[0] =~ m/^Pseudo-hashes are deprecated/ 
     };
     my $phash;
     eval { $phash = fields::phash(name => "Joe", rank => "Captain") };
-    like $@, qr/^Pseudo-hashes have been removed from Perl/;
+    like $@->{description}, qr/^Pseudo-hashes have been removed from Perl/;
 }
 
 

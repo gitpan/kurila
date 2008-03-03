@@ -24,7 +24,7 @@ is(ref(\$foo), 'GLOB');
 is(Symbol::glob_name($foo), 'main::bar');
 is(ref(\$foo), 'GLOB');
 eval { my $x = "$foo" };
-like($@, qr/Tried to use glob as string/);
+like($@->{description}, qr/Tried to use glob as string/);
 
 # returning glob values
 sub foo {
@@ -63,7 +63,7 @@ is (scalar %foo, 0);
 {
     # test warnings from assignment of undef to glob
     my $msg = '';
-    local $SIG{__WARN__} = sub { $msg = $_[0] };
+    local ${^WARN_HOOK} = sub { $msg = $_[0]->message };
     use warnings;
     *foo = 'bar';
     is($msg, '');
@@ -76,15 +76,15 @@ is (scalar %foo, 0);
     foreach ($copy, *SKREEE) {
 	$msg = '';
 	eval { $victim = sprintf "%d", $_ };
-        like($@, qr/Tried to use glob as number/);
+        like($@->{description}, qr/Tried to use glob as number/);
 
 	eval { $victim = sprintf "%u", $_ };
-        like($@, qr/Tried to use glob as number/);
+        like($@->{description}, qr/Tried to use glob as number/);
 	eval { $victim = sprintf "%e", $_ };
-        like($@, qr/Tried to use glob as number/);
+        like($@->{description}, qr/Tried to use glob as number/);
 
 	eval { $victim = sprintf "%s", $_ };
-        like($@, qr/Tried to use glob as string/);
+        like($@->{description}, qr/Tried to use glob as string/);
     }
 }
 
@@ -110,8 +110,8 @@ is (Symbol::glob_name(*{*x{GLOB}}), "main::STDOUT");
     ++$test;
 
     my $warn;
-    local $SIG{__WARN__} = sub {
-	$warn .= $_[0];
+    local ${^WARN_HOOK} = sub {
+	$warn .= $_[0]->message;
     };
     my $val = *x{FILEHANDLE};
     print {*x{IO}} ($warn =~ m/is deprecated/
@@ -140,7 +140,6 @@ is (Symbol::glob_name(*{*x{GLOB}}), "main::STDOUT");
     my $state = "not";
     *{$a} = sub { $state = "ok" };
     ok(defined &{$a});
-    local our $TODO = 1;
     ok(defined &{Symbol::fetch_glob('SYM000')});
     &{*{$a}};
     is ($state, 'ok');
@@ -186,7 +185,7 @@ is($j[0], 1);
 
 {
     my $w = '';
-    local $SIG{__WARN__} = sub { $w = $_[0] };
+    local ${^WARN_HOOK} = sub { $w = $_[0]->message };
     sub abc1 ();
     local *abc1 = sub { };
     is ($w, '');
@@ -211,7 +210,7 @@ is($j[0], 1);
 {
     # test the assignment of a GLOB to an LVALUE
     my $e = '';
-    local $SIG{__DIE__} = sub { $e = $_[0] };
+    local ${^DIE_HOOK} = sub { $e = $_[0]->message };
     my $v;
     sub f { $_[0] = 0; $_[0] = "a"; $_[0] = *DATA }
     f($v);
@@ -223,7 +222,7 @@ is($j[0], 1);
 {
     $e = '';
     # GLOB assignment to tied element
-    local $SIG{__DIE__} = sub { $e = $_[0] };
+    local ${^DIE_HOOK} = sub { $e = $_[0]->message };
     sub T::TIEARRAY  { bless [] => "T" }
     sub T::STORE     { $_[0]->[ $_[1] ] = $_[2] }
     sub T::FETCH     { $_[0]->[ $_[1] ] }
@@ -242,7 +241,7 @@ is($j[0], 1);
     my $output = runperl(prog => <<'EOPROG');
 package M;
 $| = 1;
-sub DESTROY {eval {die qq{Farewell $_[0]}}; print $@}
+sub DESTROY {eval {die qq{Farewell {dump::view($_[0])}}}; print $@->{description}}
 package main;
 
 bless \$A::B, q{M};
@@ -317,7 +316,7 @@ my $ref_oonk = ''; # Was 'SCALAR';
 # Check that assignment to an existing typeglob works
 {
   my $w = '';
-  local $SIG{__WARN__} = sub { $w = $_[0] };
+  local ${^WARN_HOOK} = sub { $w = $_[0]->message };
   *{Symbol::fetch_glob("zwot")} = \&{Symbol::fetch_glob("oonk")};
   is($w, '', "Should be no warning");
 }
@@ -334,7 +333,7 @@ sub spritsits () {
 # Check that assignment to an existing subroutine works
 {
   my $w = '';
-  local $SIG{__WARN__} = sub { $w = $_[0] };
+  local ${^WARN_HOOK} = sub { $w = $_[0]->message };
   *{Symbol::fetch_glob("spritsits")} = \&{Symbol::fetch_glob("oonk")};
   like($w, qr/^Constant subroutine main::spritsits redefined/,
        "Redefining a constant sub should warn");
@@ -348,7 +347,7 @@ my $result;
 # Check that assignment to an existing typeglob works
 {
   my $w = '';
-  local $SIG{__WARN__} = sub { $w = $_[0] };
+  local ${^WARN_HOOK} = sub { $w = $_[0]->message };
   $result = *{Symbol::fetch_glob("plunk")} = \&{Symbol::fetch_glob("oonk")};
   is($w, '', "Should be no warning");
 }
@@ -364,7 +363,7 @@ my $gr = eval '\*plunk' or die;
 
 {
   my $w = '';
-  local $SIG{__WARN__} = sub { $w = $_[0] };
+  local ${^WARN_HOOK} = sub { $w = $_[0]->message };
   $result = *{$gr} = \&{Symbol::fetch_glob("oonk")};
   is($w, '', "Redefining a constant sub to another constant sub with the same underlying value should not warn (It's just re-exporting, and that was always legal)");
 }
@@ -419,13 +418,13 @@ is (ref \$::{plunk}, 'GLOB', "Symbol table has full typeglob");
 	}
     }
     eval {slosh->rip;};
-    like ($@, qr/^Can't locate object method "rip"/, "Even with SUPER");
+    like ($@->{description}, qr/^Can't locate object method "rip"/, "Even with SUPER");
 
     is(slosh->isa('swoosh'), '');
 
     $CORE::GLOBAL::{"lock"}=[];
     eval "no warnings; lock";
-    like($@, qr/^Not enough arguments for lock/,
+    like($@->{description}, qr/^Not enough arguments for lock/,
        "Can't trip up general keyword overloading");
 
     $CORE::GLOBAL::{"readline"}=[];
@@ -445,6 +444,7 @@ is (ref \$::{plunk}, 'GLOB', "Symbol table has full typeglob");
              "Assigment works when glob created midway (bug 45607)"); 1'
 	or die $@;
 }
+
 __END__
 Perl
 Rules

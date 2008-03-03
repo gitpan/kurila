@@ -19,13 +19,13 @@ ok( require 'open.pm', 'requiring open' );
 
 # this should fail
 eval { import() };
-like( $@, qr/needs explicit list of PerlIO layers/,
+like( $@->{description}, qr/needs explicit list of PerlIO layers/,
 	'import should fail without args' );
 
 # prevent it from loading I18N::Langinfo, so we can test encoding failures
 my $warn;
-local $SIG{__WARN__} = sub {
-	$warn .= shift;
+local ${^WARN_HOOK} = sub {
+	$warn .= shift->{description};
 };
 
 # and it shouldn't be able to find this layer
@@ -52,7 +52,7 @@ is( $^H{'open_IN'}, 'raw', 'should have reset to raw layer' );
 
 # it dies if you don't set IN, OUT, or IO
 eval { import( 'sideways', ':raw' ) };
-like( $@, qr/Unknown PerlIO layer class/, 'should croak with unknown class' );
+like( $@->{description}, qr/Unknown PerlIO layer class/, 'should croak with unknown class' );
 
 # but it handles them all so well together
 import( 'IO', ':raw :crlf' );
@@ -189,7 +189,7 @@ SKIP: {
     eval {
 	require Symbol; # Anything that exists but we havn't loaded
     };
-    like($@, qr/Can't locate Symbol|Recursive call/i,
+    like($@->{description}, qr/Can't locate Symbol|Recursive call/i,
 	 "test for an endless loop in PerlIO_find_layer");
 }
 

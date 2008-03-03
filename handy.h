@@ -19,23 +19,25 @@
 #endif
 #endif
 
-#define Null(type) ((type)NULL)
+#ifndef PERL_CORE
+#  define Null(type) ((type)NULL)
 
 /*
 =head1 Handy Values
 
 =for apidoc AmU||Nullch
-Null character pointer.
+Null character pointer. (No longer available when C<PERL_CORE> is defined.)
 
 =for apidoc AmU||Nullsv
-Null SV pointer.
+Null SV pointer. (No longer available when C<PERL_CORE> is defined.)
 
 =cut
 */
 
-#define Nullch Null(char*)
-#define Nullfp Null(PerlIO*)
-#define Nullsv Null(SV*)
+#  define Nullch Null(char*)
+#  define Nullfp Null(PerlIO*)
+#  define Nullsv Null(SV*)
+#endif
 
 #ifdef TRUE
 #undef TRUE
@@ -175,7 +177,7 @@ typedef U64TYPE U64;
 #endif
 
 /* HMB H.Merijn Brand - a placeholder for preparing Configure patches */
-#if defined(HAS_MALLOC_SIZE) && defined(LOCALTIME_R_NEEDS_TZSET) && defined(HAS_PSEUDOFORK)
+#if defined(HAS_MALLOC_SIZE) && defined(LOCALTIME_R_NEEDS_TZSET) && defined(HAS_PSEUDOFORK) && defined(USE_DTRACE)
 /* Not (yet) used at top level, but mention them for metaconfig */
 #endif
 
@@ -242,6 +244,10 @@ typedef U64TYPE U64;
 =for apidoc Ama|SV*|newSVpvs|const char* s
 Like C<newSVpvn>, but takes a literal string instead of a string/length pair.
 
+=for apidoc Ama|SV*|newSVpvs_flags|const char* s|U32 flags
+Like C<newSVpvn_flags>, but takes a literal string instead of a string/length
+pair.
+
 =for apidoc Ama|SV*|newSVpvs_share|const char* s
 Like C<newSVpvn_share>, but takes a literal string instead of a string/length
 pair and omits the hash parameter.
@@ -284,6 +290,8 @@ and omits the hash parameter.
 
 /* STR_WITH_LEN() shortcuts */
 #define newSVpvs(str) Perl_newSVpvn(aTHX_ STR_WITH_LEN(str))
+#define newSVpvs_flags(str,flags)	\
+    Perl_newSVpvn_flags(aTHX_ STR_WITH_LEN(str), flags)
 #define newSVpvs_share(str) Perl_newSVpvn_share(aTHX_ STR_WITH_LEN(str), 0)
 #define sv_catpvs(sv, str) Perl_sv_catpvn_flags(aTHX_ sv, STR_WITH_LEN(str), SV_GMAGIC)
 #define sv_setpvs(sv, str) Perl_sv_setpvn(aTHX_ sv, STR_WITH_LEN(str))
@@ -848,3 +856,12 @@ Malloc_t Perl_mem_log_free(Malloc_t oldalloc, const char *filename, const int li
 #define pTHX__VALUE
 #endif /* USE_ITHREADS */
 
+/*
+ * Local variables:
+ * c-indentation-style: bsd
+ * c-basic-offset: 4
+ * indent-tabs-mode: t
+ * End:
+ *
+ * ex: set ts=8 sts=4 sw=4 noet:
+ */

@@ -144,7 +144,7 @@ my $testpkgs = {
 		    compile_stats clearsym class
 		    )],
 	XS => [qw(
-		  warnhook walkoptree_debug walkoptree threadsv_names
+		  warnhook walkoptree_debug walkoptree 
 		  svref_2object sv_yes sv_undef sv_no save_BEGINs
 		  regex_padav ppname perlstring opnumber minus_c
 		  main_start main_root main_cv init_av inc_gv hash
@@ -159,7 +159,7 @@ my $testpkgs = {
 	XS => [qw( svref_2object perlstring opnumber main_start
 		   main_root main_cv )],
 
-	constant => [qw/ ASSIGN CVf_LOCKED CVf_LVALUE
+	constant => [qw/ ASSIGN CVf_LOCKED
 		     CVf_METHOD LIST_CONTEXT OP_CONST OP_LIST OP_RV2SV
 		     OP_STRINGIFY OPf_KIDS OPf_MOD OPf_REF OPf_SPECIAL
 		     OPf_STACKED OPf_WANT OPf_WANT_LIST OPf_WANT_SCALAR
@@ -178,7 +178,7 @@ my $testpkgs = {
 
     POSIX => { dflt => 'constant',			# all but 252/589
 	       skip => [qw/ _POSIX_JOB_CONTROL /],	# platform varying
-	       perl => [qw/ import croak load_imports
+	       perl => [qw/ import load_imports
                             usage redef unimpl assert tolower toupper closedir
                             opendir readdir rewinddir errno creat fcntl getgrgid
                             getgrnam atan2 cos exp fabs log pow sin sqrt getpwnam

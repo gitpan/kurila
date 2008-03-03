@@ -6,14 +6,15 @@ BEGIN {
         chdir 't';
         unshift @INC, '../lib';
     }
-    use Config;
-    if (! $Config{'useithreads'}) {
-        print("1..0 # Skip: Perl not compiled with 'useithreads'\n");
-        exit(0);
-    }
 
     require($ENV{PERL_CORE} ? "./test.pl" : "./t/test.pl");
+
+    use Config;
+    if (! $Config{'useithreads'}) {
+        skip_all(q/Perl not compiled with 'useithreads'/);
+    }
 }
+
 our $TODO;
 
 use ExtUtils::testlib;
@@ -23,11 +24,10 @@ use threads;
 BEGIN {
     eval {
         require threads::shared;
-        import threads::shared;
+        threads::shared->import;
     };
     if ($@ || ! $threads::shared::threads_shared) {
-        print("1..0 # Skip: threads::shared not available\n");
-        exit(0);
+        skip_all('threads::shared not available');
     }
 
     $| = 1;
@@ -38,11 +38,11 @@ ok(1, 'Loaded');
 
 ### Start of Testing ###
 
-$SIG{'__WARN__'} = sub {
+${^WARN_HOOK} = sub {
     my $msg = shift;
     ok(0, "WARN in main: $msg");
 };
-$SIG{'__DIE__'} = sub {
+${^DIE_HOOK} = sub {
     my $msg = shift;
     ok(0, "DIE in main: $msg");
 };
@@ -57,7 +57,7 @@ my $rc = $thr->join();
 ok(! defined($rc), 'Exited: threads->exit()');
 
 
-run_perl(prog => 'use threads 1.67;' .
+run_perl(prog => 'use threads v1.67;' .
                  'threads->exit(86);' .
                  'exit(99);',
          nolib => ($ENV{PERL_CORE}) ? 0 : 1,
@@ -107,7 +107,7 @@ $rc = $thr->join();
 ok(! defined($rc), 'Exited: $thr->set_thread_exit_only');
 
 
-run_perl(prog => 'use threads 1.67 qw(exit thread_only);' .
+run_perl(prog => 'use threads v1.67 qw(exit thread_only);' .
                  'threads->create(sub { exit(99); })->join();' .
                  'exit(86);',
          nolib => ($ENV{PERL_CORE}) ? 0 : 1,
@@ -117,7 +117,7 @@ run_perl(prog => 'use threads 1.67 qw(exit thread_only);' .
     is($?>>8, 86, "'use threads 'exit' => 'thread_only'");
 }
 
-my $out = run_perl(prog => 'use threads 1.67;' .
+my $out = run_perl(prog => 'use threads v1.67;' .
                            'threads->create(sub {' .
                            '    exit(99);' .
                            '});' .
@@ -133,7 +133,7 @@ my $out = run_perl(prog => 'use threads 1.67;' .
 like($out, '1 finished and unjoined', "exit(status) in thread");
 
 
-$out = run_perl(prog => 'use threads 1.67 qw(exit thread_only);' .
+$out = run_perl(prog => 'use threads v1.67 qw(exit thread_only);' .
                         'threads->create(sub {' .
                         '   threads->set_thread_exit_only(0);' .
                         '   exit(99);' .
@@ -150,9 +150,9 @@ $out = run_perl(prog => 'use threads 1.67 qw(exit thread_only);' .
 like($out, '1 finished and unjoined', "set_thread_exit_only(0)");
 
 
-run_perl(prog => 'use threads 1.67;' .
+run_perl(prog => 'use threads v1.67;' .
                  'threads->create(sub {' .
-                 '   $SIG{__WARN__} = sub { exit(99); };' .
+                 '   ${^DIE_HOOK} = sub { exit(99); };' .
                  '   die();' .
                  '})->join();' .
                  'exit(86);',
@@ -164,8 +164,8 @@ run_perl(prog => 'use threads 1.67;' .
 }
 
 $thr = threads->create(sub {
-    $SIG{__WARN__} = sub { threads->exit(); };
-    local $SIG{__DIE__} = 'DEFAULT';
+    ${^WARN_HOOK} = sub { threads->exit(); };
+    local ${^DIE_HOOK} = sub { };
     die('Died');
 });
 ok($thr, 'Created: threads->exit() in thread warn handler');

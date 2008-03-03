@@ -362,6 +362,8 @@ Perl_delimcpy(pTHX_ register char *to, register const char *toend, register cons
     register I32 tolen;
     PERL_UNUSED_CONTEXT;
 
+    PERL_ARGS_ASSERT_DELIMCPY;
+
     for (tolen = 0; from < fromend; from++, tolen++) {
 	if (*from == '\\') {
 	    if (from[1] != delim) {
@@ -390,6 +392,8 @@ Perl_instr(pTHX_ register const char *big, register const char *little)
 {
     register I32 first;
     PERL_UNUSED_CONTEXT;
+
+    PERL_ARGS_ASSERT_INSTR;
 
     if (!little)
 	return (char*)big;
@@ -421,11 +425,12 @@ Perl_instr(pTHX_ register const char *big, register const char *little)
 char *
 Perl_ninstr(pTHX_ const char *big, const char *bigend, const char *little, const char *lend)
 {
+    PERL_ARGS_ASSERT_NINSTR;
     PERL_UNUSED_CONTEXT;
     if (little >= lend)
         return (char*)big;
     {
-        char first = *little++;
+        const char first = *little++;
         const char *s, *x;
         bigend -= lend - little;
     OUTER:
@@ -451,6 +456,8 @@ Perl_rninstr(pTHX_ register const char *big, const char *bigend, const char *lit
     register const I32 first = *little;
     register const char * const littleend = lend;
     PERL_UNUSED_CONTEXT;
+
+    PERL_ARGS_ASSERT_RNINSTR;
 
     if (little >= littleend)
 	return (char*)bigend;
@@ -500,6 +507,8 @@ Perl_fbm_compile(pTHX_ SV *sv, U32 flags)
     STRLEN len;
     U32 rarest = 0;
     U32 frequency = 256;
+
+    PERL_ARGS_ASSERT_FBM_COMPILE;
 
     if (flags & FBMcf_TAIL) {
 	MAGIC * const mg = SvMAGICAL(sv) ? mg_find(sv, PERL_MAGIC_utf8) : NULL;
@@ -577,6 +586,8 @@ Perl_fbm_instr(pTHX_ char *big, register char *bigend, SV *littlestr, U32 flags)
 	= SvPV_const(littlestr,l);
     register STRLEN littlelen = l;
     register const I32 multiline = flags & FBMrf_MULTILINE;
+
+    PERL_ARGS_ASSERT_FBM_INSTR;
 
     if ((STRLEN)(bigend - big) < littlelen) {
 	if ( SvTAIL(littlestr)
@@ -781,6 +792,7 @@ Perl_screaminstr(pTHX_ SV *bigstr, SV *littlestr, I32 start_shift, I32 end_shift
     register const unsigned char *littleend;
     I32 found = 0;
 
+    PERL_ARGS_ASSERT_SCREAMINSTR;
     assert(SvTYPE(littlestr) == SVt_PVMG);
     assert(SvVALID(littlestr));
 
@@ -806,6 +818,9 @@ Perl_screaminstr(pTHX_ SV *bigstr, SV *littlestr, I32 start_shift, I32 end_shift
     big = (const unsigned char *)(SvPVX_const(bigstr));
     /* The value of pos we can stop at: */
     stop_pos = SvCUR(bigstr) - end_shift - (SvCUR(littlestr) - 1 - previous);
+    /* Always return the stop_pos if looking for last and tail (might be a false positive) */
+    if (last && SvTAIL(littlestr))
+	return big + stop_pos;
     if (previous + start_shift > stop_pos) {
 /*
   stop_pos does not include SvTAIL in the count, so this check is incorrect
@@ -864,6 +879,8 @@ Perl_ibcmp(pTHX_ const char *s1, const char *s2, register I32 len)
     register const U8 *b = (const U8 *)s2;
     PERL_UNUSED_CONTEXT;
 
+    PERL_ARGS_ASSERT_IBCMP;
+
     while (len--) {
 	if (*a != *b && *a != PL_fold[*b])
 	    return 1;
@@ -879,6 +896,8 @@ Perl_ibcmp_locale(pTHX_ const char *s1, const char *s2, register I32 len)
     register const U8 *a = (const U8 *)s1;
     register const U8 *b = (const U8 *)s2;
     PERL_UNUSED_CONTEXT;
+
+    PERL_ARGS_ASSERT_IBCMP_LOCALE;
 
     while (len--) {
 	if (*a != *b && *a != PL_fold_locale[*b])
@@ -985,7 +1004,9 @@ char *
 Perl_savesharedpvn(pTHX_ const char *const pv, const STRLEN len)
 {
     char *const newaddr = (char*)PerlMemShared_malloc(len + 1);
-    assert(pv);
+
+    PERL_ARGS_ASSERT_SAVESHAREDPVN;
+
     if (!newaddr) {
 	return write_no_mem();
     }
@@ -1009,6 +1030,8 @@ Perl_savesvpv(pTHX_ SV *sv)
     const char * const pv = SvPV_const(sv, len);
     register char *newaddr;
 
+    PERL_ARGS_ASSERT_SAVESVPV;
+
     ++len;
     Newx(newaddr,len,char);
     return (char *) CopyD(pv,newaddr,len,char);
@@ -1025,7 +1048,7 @@ S_mess_alloc(pTHX)
     XPVMG *any;
 
     if (!PL_dirty)
-	return sv_2mortal(newSVpvs(""));
+	return newSVpvs_flags("", SVs_TEMP);
 
     if (PL_mess_sv)
 	return PL_mess_sv;
@@ -1048,6 +1071,7 @@ Perl_form_nocontext(const char* pat, ...)
     dTHX;
     char *retval;
     va_list args;
+    PERL_ARGS_ASSERT_FORM_NOCONTEXT;
     va_start(args, pat);
     retval = vform(pat, &args);
     va_end(args);
@@ -1080,6 +1104,7 @@ Perl_form(pTHX_ const char* pat, ...)
 {
     char *retval;
     va_list args;
+    PERL_ARGS_ASSERT_FORM;
     va_start(args, pat);
     retval = vform(pat, &args);
     va_end(args);
@@ -1090,6 +1115,7 @@ char *
 Perl_vform(pTHX_ const char *pat, va_list *args)
 {
     SV * const sv = mess_alloc();
+    PERL_ARGS_ASSERT_VFORM;
     sv_vsetpvfn(sv, pat, strlen(pat), args, NULL, 0, NULL);
     return SvPVX(sv);
 }
@@ -1101,6 +1127,7 @@ Perl_mess_nocontext(const char *pat, ...)
     dTHX;
     SV *retval;
     va_list args;
+    PERL_ARGS_ASSERT_MESS_NOCONTEXT;
     va_start(args, pat);
     retval = vmess(pat, &args);
     va_end(args);
@@ -1113,43 +1140,11 @@ Perl_mess(pTHX_ const char *pat, ...)
 {
     SV *retval;
     va_list args;
+    PERL_ARGS_ASSERT_MESS;
     va_start(args, pat);
     retval = vmess(pat, &args);
     va_end(args);
     return retval;
-}
-
-STATIC const COP*
-S_closest_cop(pTHX_ const COP *cop, const OP *o)
-{
-    dVAR;
-    /* Look for PL_op starting from o.  cop is the last COP we've seen. */
-
-    if (!o || o == PL_op)
-	return cop;
-
-    if (o->op_flags & OPf_KIDS) {
-	const OP *kid;
-	for (kid = cUNOPo->op_first; kid; kid = kid->op_sibling) {
-	    const COP *new_cop;
-
-	    /* If the OP_NEXTSTATE has been optimised away we can still use it
-	     * the get the file and line number. */
-
-	    if (kid->op_type == OP_NULL && kid->op_targ == OP_NEXTSTATE)
-		cop = (const COP *)kid;
-
-	    /* Keep searching, and return when we've found something. */
-
-	    new_cop = closest_cop(cop, kid);
-	    if (new_cop)
-		return new_cop;
-	}
-    }
-
-    /* Nothing found. */
-
-    return NULL;
 }
 
 SV *
@@ -1158,37 +1153,9 @@ Perl_vmess(pTHX_ const char *pat, va_list *args)
     dVAR;
     SV * const sv = mess_alloc();
 
+    PERL_ARGS_ASSERT_VMESS;
+
     sv_vsetpvfn(sv, pat, strlen(pat), args, NULL, 0, NULL);
-    if (!SvCUR(sv) || *(SvEND(sv) - 1) != '\n') {
-	/*
-	 * Try and find the file and line for PL_op.  This will usually be
-	 * PL_curcop, but it might be a cop that has been optimised away.  We
-	 * can try to find such a cop by searching through the optree starting
-	 * from the sibling of PL_curcop.
-	 */
-
-	const COP *cop = closest_cop(PL_curcop, PL_curcop->op_sibling);
-	if (!cop)
-	    cop = PL_curcop;
-
-	if (CopLINE(cop))
-	    Perl_sv_catpvf(aTHX_ sv, " at %s line %"IVdf,
-	    OutCopFILE(cop), (IV)CopLINE(cop));
-	/* Seems that GvIO() can be untrustworthy during global destruction. */
-	if (GvIO(PL_last_in_gv) && (SvTYPE(GvIOp(PL_last_in_gv)) == SVt_PVIO)
-		&& IoLINES(GvIOp(PL_last_in_gv)))
-	{
-	    const bool line_mode = (RsSIMPLE(PL_rs) &&
-			      SvCUR(PL_rs) == 1 && *SvPVX_const(PL_rs) == '\n');
-	    Perl_sv_catpvf(aTHX_ sv, ", <%s> %s %"IVdf,
-			   PL_last_in_gv == PL_argvgv ? "" : GvNAME(PL_last_in_gv),
-			   line_mode ? "line" : "chunk",
-			   (IV)IoLINES(GvIOp(PL_last_in_gv)));
-	}
-	if (PL_dirty)
-	    sv_catpvs(sv, " during global destruction");
-	sv_catpvs(sv, ".\n");
-    }
     return sv;
 }
 
@@ -1198,6 +1165,8 @@ Perl_write_to_stderr(pTHX_ const char* message, int msglen)
     dVAR;
     IO *io;
     MAGIC *mg;
+
+    PERL_ARGS_ASSERT_WRITE_TO_STDERR;
 
     if (PL_stderrgv && SvREFCNT(PL_stderrgv) 
 	&& (io = GvIO(PL_stderrgv))
@@ -1216,7 +1185,7 @@ Perl_write_to_stderr(pTHX_ const char* message, int msglen)
 	PUSHMARK(SP);
 	EXTEND(SP,2);
 	PUSHs(SvTIED_obj((SV*)io, mg));
-	PUSHs(sv_2mortal(newSVpvn(message, msglen)));
+	mPUSHp(message, msglen);
 	PUTBACK;
 	call_method("PRINT", G_SCALAR);
 
@@ -1239,10 +1208,10 @@ Perl_write_to_stderr(pTHX_ const char* message, int msglen)
     }
 }
 
-/* Common code used by vcroak, vdie, vwarn and vwarner  */
+/* Common code used by vdie, vwarn and vwarner  */
 
-STATIC bool
-S_vdie_common(pTHX_ const char *message, STRLEN msglen, I32 utf8, bool warn)
+bool
+Perl_vdie_common(pTHX_ SV *msv, bool warn)
 {
     dVAR;
     HV *stash;
@@ -1252,7 +1221,20 @@ S_vdie_common(pTHX_ const char *message, STRLEN msglen, I32 utf8, bool warn)
     /* sv_2cv might call Perl_croak() or Perl_warner() */
     SV * const oldhook = *hook;
 
-    assert(oldhook);
+    if ( *hook == NULL ) {
+	const char *msg;
+	STRLEN msglen;
+	msg = SvPV_const(msv, msglen);
+	write_to_stderr(msg, msglen);
+	return FALSE;
+    }
+    if ( *hook == PERL_DIEHOOK_IGNORE ) {
+	return FALSE;
+    }
+    if ( *hook == PERL_DIEHOOK_FATAL ) {
+	write_to_stderr("recursive die\n", 13);
+	return FALSE;
+    }
 
     ENTER;
     SAVESPTR(*hook);
@@ -1261,27 +1243,17 @@ S_vdie_common(pTHX_ const char *message, STRLEN msglen, I32 utf8, bool warn)
     LEAVE;
     if (cv && !CvDEPTH(cv) && (CvROOT(cv) || CvXSUB(cv))) {
 	dSP;
-	SV *msg;
 
 	ENTER;
 	save_re_context();
-	if (warn) {
-	    SAVESPTR(*hook);
-	    *hook = NULL;
-	}
-	if (warn || message) {
-	    msg = newSVpvn(message, msglen);
-	    SvFLAGS(msg) |= utf8;
-	    SvREADONLY_on(msg);
-	    SAVEFREESV(msg);
-	}
-	else {
-	    msg = ERRSV;
-	}
+/* 	if (warn) { */
+	SAVESPTR(*hook);
+	*hook = PERL_DIEHOOK_FATAL;
+/* 	} */
 
 	PUSHSTACKi(warn ? PERLSI_WARNHOOK : PERLSI_DIEHOOK);
 	PUSHMARK(SP);
-	XPUSHs(msg);
+	XPUSHs(msv);
 	PUTBACK;
 	call_sv((SV*)cv, G_DISCARD);
 	POPSTACK;
@@ -1291,107 +1263,84 @@ S_vdie_common(pTHX_ const char *message, STRLEN msglen, I32 utf8, bool warn)
     return FALSE;
 }
 
-STATIC const char *
-S_vdie_croak_common(pTHX_ const char* pat, va_list* args, STRLEN* msglen,
-		    I32* utf8)
+STATIC SV*
+S_vdie_croak_common(pTHX_ const char* pat, va_list* args)
 {
     dVAR;
-    const char *message;
+    SV * msv;
+    assert(pat);
+    msv = vmess(pat, args);
 
     if (pat) {
-	SV * const msv = vmess(pat, args);
+	dSP;
+
 	if (PL_errors && SvCUR(PL_errors)) {
 	    sv_catsv(PL_errors, msv);
-	    message = SvPV_const(PL_errors, *msglen);
+	    msv = sv_mortalcopy(PL_errors);
 	    SvCUR_set(PL_errors, 0);
 	}
-	else
-	    message = SvPV_const(msv,*msglen);
-    }
-    else {
-	message = NULL;
+
+	if (PL_errorcreatehook) { 
+	    ENTER;
+	    PUSHSTACKi(PERLSI_DIEHOOK);
+	    PUSHMARK(SP);
+
+	    XPUSHs(msv);
+
+	    PUTBACK;
+	    call_sv(PL_errorcreatehook, G_SCALAR);
+	    msv = TOPs;
+	    POPSTACK;
+	    LEAVE;
+	}
     }
 
     DEBUG_S(PerlIO_printf(Perl_debug_log,
-			  "%p: die/croak: message = %s\ndiehook = %p\n",
-			  (void*)thr, message, (void*)PL_diehook));
-    if (PL_diehook) {
-	S_vdie_common(aTHX_ message, *msglen, *utf8, FALSE);
-    }
-    return message;
+			  "%p: die/croak\ndiehook = %p\n",
+			  (void*)thr, (void*)PL_diehook));
+    vdie_common(msv, FALSE);
+    return msv;
 }
 
-OP *
+void
 Perl_vdie(pTHX_ const char* pat, va_list *args)
 {
     dVAR;
-    const char *message;
-    const int was_in_eval = PL_in_eval;
-    STRLEN msglen;
-    I32 utf8 = 0;
+    SV* msv;
 
     DEBUG_S(PerlIO_printf(Perl_debug_log,
 			  "%p: die: curstack = %p, mainstack = %p\n",
 			  (void*)thr, (void*)PL_curstack, (void*)PL_mainstack));
 
-    message = vdie_croak_common(pat, args, &msglen, &utf8);
-
-    PL_restartop = die_where(message, msglen);
-    SvFLAGS(ERRSV) |= utf8;
-    DEBUG_S(PerlIO_printf(Perl_debug_log,
-	  "%p: die: restartop = %p, was_in_eval = %d, top_env = %p\n",
-	  (void*)thr, (void*)PL_restartop, was_in_eval, (void*)PL_top_env));
-    if ((!PL_restartop && was_in_eval) || PL_top_env->je_prev)
-	JMPENV_JUMP(3);
-    return PL_restartop;
+    msv = vdie_croak_common(pat, args);
+    die_where(msv);
+    /* NOTREACHED */
+    return;
 }
-
-#if defined(PERL_IMPLICIT_CONTEXT)
-OP *
-Perl_die_nocontext(const char* pat, ...)
-{
-    dTHX;
-    OP *o;
-    va_list args;
-    va_start(args, pat);
-    o = vdie(pat, &args);
-    va_end(args);
-    return o;
-}
-#endif /* PERL_IMPLICIT_CONTEXT */
 
 OP *
 Perl_die(pTHX_ const char* pat, ...)
 {
-    OP *o;
     va_list args;
     va_start(args, pat);
-    o = vdie(pat, &args);
+    vdie(pat, &args);
+    /* NOTREACHED */
     va_end(args);
-    return o;
+    return NULL;
 }
 
+#if defined(PERL_IMPLICIT_CONTEXT)
 void
-Perl_vcroak(pTHX_ const char* pat, va_list *args)
+Perl_die_nocontext(const char* pat, ...)
 {
-    dVAR;
-    const char *message;
-    STRLEN msglen;
-    I32 utf8 = 0;
-
-    message = S_vdie_croak_common(aTHX_ pat, args, &msglen, &utf8);
-
-    if (PL_in_eval) {
-	PL_restartop = die_where(message, msglen);
-	SvFLAGS(ERRSV) |= utf8;
-	JMPENV_JUMP(3);
-    }
-    else if (!message)
-	message = SvPVx_const(ERRSV, msglen);
-
-    write_to_stderr(message, msglen);
-    my_failure_exit();
+    dTHX;
+    va_list args;
+    va_start(args, pat);
+    vdie(pat, &args);
+    /* NOTREACHED */
+    va_end(args);
 }
+#endif /* PERL_IMPLICIT_CONTEXT */
 
 #if defined(PERL_IMPLICIT_CONTEXT)
 void
@@ -1399,8 +1348,9 @@ Perl_croak_nocontext(const char *pat, ...)
 {
     dTHX;
     va_list args;
+    PERL_ARGS_ASSERT_CROAK_NOCONTEXT;
     va_start(args, pat);
-    vcroak(pat, &args);
+    vdie(pat, &args);
     /* NOTREACHED */
     va_end(args);
 }
@@ -1431,7 +1381,7 @@ Perl_croak(pTHX_ const char *pat, ...)
 {
     va_list args;
     va_start(args, pat);
-    vcroak(pat, &args);
+    vdie(pat, &args);
     /* NOTREACHED */
     va_end(args);
 }
@@ -1439,18 +1389,34 @@ Perl_croak(pTHX_ const char *pat, ...)
 void
 Perl_vwarn(pTHX_ const char* pat, va_list *args)
 {
-    dVAR;
-    STRLEN msglen;
-    SV * const msv = vmess(pat, args);
-    const I32 utf8 = 1;
-    const char * const message = SvPV_const(msv, msglen);
+    SV* msv;
 
-    if (PL_warnhook) {
-	if (vdie_common(message, msglen, utf8, TRUE))
-	    return;
+    PERL_ARGS_ASSERT_VWARN;
+
+    {
+	dSP;
+	msv = vmess(pat, args);
+
+	if (PL_errors && SvCUR(PL_errors)) {
+	    sv_catsv(PL_errors, msv);
+	    msv = sv_mortalcopy(PL_errors);
+	    SvCUR_set(PL_errors, 0);
+	}
+
+	ENTER;
+	PUSHSTACKi(PERLSI_WARNHOOK);
+	PUSHMARK(SP);
+	XPUSHs(msv);
+	PUTBACK;
+	call_sv(PL_errorcreatehook, G_SCALAR);
+	SPAGAIN;
+	msv = POPs;
+	PUTBACK;
+	POPSTACK;
+	LEAVE;
     }
 
-    write_to_stderr(message, msglen);
+    vdie_common(msv, TRUE);
 }
 
 #if defined(PERL_IMPLICIT_CONTEXT)
@@ -1459,6 +1425,7 @@ Perl_warn_nocontext(const char *pat, ...)
 {
     dTHX;
     va_list args;
+    PERL_ARGS_ASSERT_WARN_NOCONTEXT;
     va_start(args, pat);
     vwarn(pat, &args);
     va_end(args);
@@ -1478,6 +1445,7 @@ void
 Perl_warn(pTHX_ const char *pat, ...)
 {
     va_list args;
+    PERL_ARGS_ASSERT_WARN;
     va_start(args, pat);
     vwarn(pat, &args);
     va_end(args);
@@ -1489,6 +1457,7 @@ Perl_warner_nocontext(U32 err, const char *pat, ...)
 {
     dTHX; 
     va_list args;
+    PERL_ARGS_ASSERT_WARNER_NOCONTEXT;
     va_start(args, pat);
     vwarner(err, pat, &args);
     va_end(args);
@@ -1499,6 +1468,7 @@ void
 Perl_warner(pTHX_ U32  err, const char* pat,...)
 {
     va_list args;
+    PERL_ARGS_ASSERT_WARNER;
     va_start(args, pat);
     vwarner(err, pat, &args);
     va_end(args);
@@ -1508,22 +1478,10 @@ void
 Perl_vwarner(pTHX_ U32  err, const char* pat, va_list* args)
 {
     dVAR;
+    PERL_ARGS_ASSERT_VWARNER;
     if (PL_warnhook == PERL_WARNHOOK_FATAL || ckDEAD(err)) {
-	SV * const msv = vmess(pat, args);
-	STRLEN msglen;
-	const char * const message = SvPV_const(msv, msglen);
-	const I32 utf8 = 1;
-
-	if (PL_diehook) {
-	    assert(message);
-	    S_vdie_common(aTHX_ message, msglen, utf8, FALSE);
-	}
-	if (PL_in_eval) {
-	    PL_restartop = die_where(message, msglen);
-	    JMPENV_JUMP(3);
-	}
-	write_to_stderr(message, msglen);
-	my_failure_exit();
+	vdie(pat, args);
+	/* NOTREACHED */
     }
     else {
 	Perl_vwarn(aTHX_ pat, args);
@@ -1588,6 +1546,7 @@ Perl_new_warnings_bitfield(pTHX_ STRLEN *buffer, const char *const bits,
 			   STRLEN size) {
     const MEM_SIZE len_wanted = sizeof(STRLEN) + size;
     PERL_UNUSED_CONTEXT;
+    PERL_ARGS_ASSERT_NEW_WARNINGS_BITFIELD;
 
     buffer = (STRLEN*)
 	(specialWARN(buffer) ?
@@ -1735,6 +1694,8 @@ Perl_setenv_getix(pTHX_ const char *nam)
 {
     register I32 i;
     register const I32 len = strlen(nam);
+
+    PERL_ARGS_ASSERT_SETENV_GETIX;
     PERL_UNUSED_CONTEXT;
 
     for (i = 0; environ[i]; i++) {
@@ -1759,6 +1720,8 @@ Perl_unlnk(pTHX_ const char *f)	/* unlink all versions of a file */
 {
     I32 retries = 0;
 
+    PERL_ARGS_ASSERT_UNLNK;
+
     while (PerlLIO_unlink(f) >= 0)
 	retries++;
     return retries ? 0 : -1;
@@ -1771,6 +1734,8 @@ char *
 Perl_my_bcopy(register const char *from,register char *to,register I32 len)
 {
     char * const retval = to;
+
+    PERL_ARGS_ASSERT_MY_BCOPY;
 
     if (from - to >= 0) {
 	while (len--)
@@ -1793,6 +1758,8 @@ Perl_my_memset(register char *loc, register I32 ch, register I32 len)
 {
     char * const retval = loc;
 
+    PERL_ARGS_ASSERT_MY_MEMSET;
+
     while (len--)
 	*loc++ = ch;
     return retval;
@@ -1805,6 +1772,8 @@ char *
 Perl_my_bzero(register char *loc, register I32 len)
 {
     char * const retval = loc;
+
+    PERL_ARGS_ASSERT_MY_BZERO;
 
     while (len--)
 	*loc++ = 0;
@@ -1820,6 +1789,8 @@ Perl_my_memcmp(const char *s1, const char *s2, register I32 len)
     register const U8 *a = (const U8 *)s1;
     register const U8 *b = (const U8 *)s2;
     register I32 tmp;
+
+    PERL_ARGS_ASSERT_MY_MEMCMP;
 
     while (len--) {
         if ((tmp = *a++ - *b++))
@@ -2204,6 +2175,8 @@ Perl_my_swabn(void *ptr, int n)
     register char *e = s + (n-1);
     register char tc;
 
+    PERL_ARGS_ASSERT_MY_SWABN;
+
     for (n /= 2; n > 0; s++, e--, n--) {
       tc = *s;
       *s = *e;
@@ -2212,7 +2185,7 @@ Perl_my_swabn(void *ptr, int n)
 }
 
 PerlIO *
-Perl_my_popen_list(pTHX_ char *mode, int n, SV **args)
+Perl_my_popen_list(pTHX_ const char *mode, int n, SV * const *args)
 {
 #if (!defined(DOSISH) || defined(HAS_FORK) || defined(AMIGAOS)) && !defined(OS2) && !defined(VMS) && !defined(__OPEN_VM) && !defined(EPOC) && !defined(MACOS_TRADITIONAL) && !defined(NETWARE) && !defined(__LIBCATAMOUNT__)
     dVAR;
@@ -2222,6 +2195,8 @@ Perl_my_popen_list(pTHX_ char *mode, int n, SV **args)
     SV *sv;
     I32 did_pipes = 0;
     int pp[2];
+
+    PERL_ARGS_ASSERT_MY_POPEN_LIST;
 
     PERL_FLUSHALL_FOR_CHILD;
     This = (*mode == 'w');
@@ -2341,7 +2316,7 @@ Perl_my_popen_list(pTHX_ char *mode, int n, SV **args)
     return PerlIO_fdopen(p[This], mode);
 #else
 #  ifdef OS2	/* Same, without fork()ing and all extra overhead... */
-    return my_syspopen4(aTHX_ Nullch, mode, n, args);
+    return my_syspopen4(aTHX_ NULL, mode, n, args);
 #  else
     Perl_croak(aTHX_ "List form of piped open not implemented");
     return (PerlIO *) NULL;
@@ -2362,6 +2337,8 @@ Perl_my_popen(pTHX_ const char *cmd, const char *mode)
     const I32 doexec = !(*cmd == '-' && cmd[1] == '\0');
     I32 did_pipes = 0;
     int pp[2];
+
+    PERL_ARGS_ASSERT_MY_POPEN;
 
     PERL_FLUSHALL_FOR_CHILD;
 #ifdef OS2
@@ -2511,6 +2488,7 @@ FILE *popen();
 PerlIO *
 Perl_my_popen(pTHX_ const char *cmd, const char *mode)
 {
+    PERL_ARGS_ASSERT_MY_POPEN;
     PERL_FLUSHALL_FOR_CHILD;
     /* Call system's popen() to get a FILE *, then import it.
        used 0 for 2nd parameter to PerlIO_importFILE;
@@ -2596,10 +2574,12 @@ Perl_my_fork(void)
 
 #ifdef DUMP_FDS
 void
-Perl_dump_fds(pTHX_ char *s)
+Perl_dump_fds(pTHX_ const char *const s)
 {
     int fd;
     Stat_t tmpstatbuf;
+
+    PERL_ARGS_ASSERT_DUMP_FDS;
 
     PerlIO_printf(Perl_debug_log,"%s", s);
     for (fd = 0; fd < 32; fd++) {
@@ -2699,6 +2679,8 @@ Perl_rsignal_save(pTHX_ int signo, Sighandler_t handler, Sigsave_t *save)
 {
     dVAR;
     struct sigaction act;
+
+    PERL_ARGS_ASSERT_RSIGNAL_SAVE;
 
 #ifdef USE_ITHREADS
     /* only "parent" interpreter can diddle signals */
@@ -2872,6 +2854,7 @@ Perl_wait4pid(pTHX_ Pid_t pid, int *statusp, int flags)
 {
     dVAR;
     I32 result = 0;
+    PERL_ARGS_ASSERT_WAIT4PID;
     if (!pid)
 	return -1;
 #ifdef PERL_USES_PL_PIDSTATUS
@@ -3002,6 +2985,8 @@ Perl_repeatcpy(pTHX_ register char *to, register const char *from, I32 len, regi
     register const char * const frombase = from;
     PERL_UNUSED_CONTEXT;
 
+    PERL_ARGS_ASSERT_REPEATCPY;
+
     if (len == 1) {
 	register const char c = *from;
 	while (count-- > 0)
@@ -3025,6 +3010,8 @@ Perl_same_dirent(pTHX_ const char *a, const char *b)
     Stat_t tmpstatbuf1;
     Stat_t tmpstatbuf2;
     SV * const tmpsv = sv_newmortal();
+
+    PERL_ARGS_ASSERT_SAME_DIRENT;
 
     if (fa)
 	fa++;
@@ -3087,6 +3074,8 @@ Perl_find_script(pTHX_ const char *scriptname, bool dosearch,
     PERL_UNUSED_ARG(search_ext);
 #  define MAX_EXT_LEN 0
 #endif
+
+    PERL_ARGS_ASSERT_FIND_SCRIPT;
 
     /*
      * If dosearch is true and if scriptname does not contain path
@@ -3316,6 +3305,7 @@ void
 Perl_set_context(void *t)
 {
     dVAR;
+    PERL_ARGS_ASSERT_SET_CONTEXT;
 #if defined(USE_ITHREADS)
 #  ifdef I_MACH_CTHREADS
     cthread_set_data(cthread_self(), t);
@@ -3380,6 +3370,7 @@ Perl_getenv_len(pTHX_ const char *env_elem, unsigned long *len)
 {
     char * const env_trans = PerlEnv_getenv(env_elem);
     PERL_UNUSED_CONTEXT;
+    PERL_ARGS_ASSERT_GETENV_LEN;
     if (env_trans)
 	*len = strlen(env_trans);
     return env_trans;
@@ -3670,11 +3661,13 @@ Perl_init_tm(pTHX_ struct tm *ptm)	/* see mktime, strftime and asctime */
 #ifdef HAS_TM_TM_ZONE
     Time_t now;
     const struct tm* my_tm;
+    PERL_ARGS_ASSERT_INIT_TM;
     (void)time(&now);
     my_tm = localtime(&now);
     if (my_tm)
         Copy(my_tm, ptm, 1, struct tm);
 #else
+    PERL_ARGS_ASSERT_INIT_TM;
     PERL_UNUSED_ARG(ptm);
 #endif
 }
@@ -3691,6 +3684,8 @@ Perl_mini_mktime(pTHX_ struct tm *ptm)
     int month, mday, year, jday;
     int odd_cent, odd_year;
     PERL_UNUSED_CONTEXT;
+
+    PERL_ARGS_ASSERT_MINI_MKTIME;
 
 #define	DAYS_PER_YEAR	365
 #define	DAYS_PER_QYEAR	(4*DAYS_PER_YEAR+1)
@@ -3886,6 +3881,8 @@ Perl_my_strftime(pTHX_ const char *fmt, int sec, int min, int hour, int mday, in
   struct tm mytm;
   int len;
 
+  PERL_ARGS_ASSERT_MY_STRFTIME;
+
   init_tm(&mytm);	/* XXX workaround - see init_tm() above */
   mytm.tm_sec = sec;
   mytm.tm_min = min;
@@ -3992,6 +3989,8 @@ Perl_getcwd_sv(pTHX_ register SV *sv)
 #ifndef INCOMPLETE_TAINTS
     SvTAINTED_on(sv);
 #endif
+
+    PERL_ARGS_ASSERT_GETCWD_SV;
 
 #ifdef HAS_GETCWD
     {
@@ -4165,11 +4164,10 @@ Perl_scan_version(pTHX_ const char *s, SV *rv, bool qv)
     bool vinf = FALSE;
     AV * const av = newAV();
     SV * const hv = newSVrv(rv, "version"); /* create an SV and upgrade the RV */
-    (void)sv_upgrade(hv, SVt_PVHV); /* needs to be an HV type */
 
-#ifndef NODEFAULT_SHAREKEYS
-    HvSHAREKEYS_on(hv);         /* key-sharing on by default */
-#endif
+    PERL_ARGS_ASSERT_SCAN_VERSION;
+
+    (void)sv_upgrade(hv, SVt_PVHV); /* needs to be an HV type */
 
     while (isSPACE(*s)) /* leading whitespace is OK */
 	s++;
@@ -4369,6 +4367,7 @@ Perl_new_version(pTHX_ SV *ver)
 {
     dVAR;
     SV * const rv = newSV(0);
+    PERL_ARGS_ASSERT_NEW_VERSION;
     if ( sv_derived_from(ver,"version") ) /* can just copy directly */
     {
 	I32 key;
@@ -4377,9 +4376,6 @@ Perl_new_version(pTHX_ SV *ver)
 	/* This will get reblessed later if a derived class*/
 	SV * const hv = newSVrv(rv, "version"); 
 	(void)sv_upgrade(hv, SVt_PVHV); /* needs to be an HV type */
-#ifndef NODEFAULT_SHAREKEYS
-	HvSHAREKEYS_on(hv);         /* key-sharing on by default */
-#endif
 
 	if ( SvROK(ver) )
 	    ver = SvRV(ver);
@@ -4435,6 +4431,8 @@ SV *
 Perl_upg_version(pTHX_ SV *ver, bool qv)
 {
     const char *version, *s;
+
+    PERL_ARGS_ASSERT_UPG_VERSION;
 
     if ( SvNOK(ver) && !( SvPOK(ver) && sv_len(ver) == 3 ) )
     {
@@ -4494,6 +4492,9 @@ bool
 Perl_vverify(pTHX_ SV *vs)
 {
     SV *sv;
+
+    PERL_ARGS_ASSERT_VVERIFY;
+
     if ( SvROK(vs) )
 	vs = SvRV(vs);
 
@@ -4529,6 +4530,9 @@ Perl_vnumify(pTHX_ SV *vs)
     bool alpha = FALSE;
     SV * const sv = newSV(0);
     AV *av;
+
+    PERL_ARGS_ASSERT_VNUMIFY;
+
     if ( SvROK(vs) )
 	vs = SvRV(vs);
 
@@ -4607,6 +4611,9 @@ Perl_vnormal(pTHX_ SV *vs)
     bool alpha = FALSE;
     SV * const sv = newSV(0);
     AV *av;
+
+    PERL_ARGS_ASSERT_VNORMAL;
+
     if ( SvROK(vs) )
 	vs = SvRV(vs);
 
@@ -4662,6 +4669,9 @@ SV *
 Perl_vstringify(pTHX_ SV *vs)
 {
     SV *pv;
+
+    PERL_ARGS_ASSERT_VSTRINGIFY;
+
     if ( SvROK(vs) )
 	vs = SvRV(vs);
     
@@ -4693,6 +4703,9 @@ Perl_vcmp(pTHX_ SV *lhv, SV *rhv)
     I32 left = 0;
     I32 right = 0;
     AV *lav, *rav;
+
+    PERL_ARGS_ASSERT_VCMP;
+
     if ( SvROK(lhv) )
 	lhv = SvRV(lhv);
     if ( SvROK(rhv) )
@@ -5054,6 +5067,8 @@ Perl_parse_unicode_opts(pTHX_ const char **popt)
   const char *p = *popt;
   U32 opt = 0;
 
+  PERL_ARGS_ASSERT_PARSE_UNICODE_OPTS;
+
   if (*p) {
        if (isDIGIT(*p)) {
 	    opt = (U32) atoi(p);
@@ -5233,6 +5248,7 @@ Perl_stashpv_hvname_match(pTHX_ const COP *c, const HV *hv)
     const char * const stashpv = CopSTASHPV(c);
     const char * const name = HvNAME_get(hv);
     PERL_UNUSED_CONTEXT;
+    PERL_ARGS_ASSERT_STASHPV_HVNAME_MATCH;
 
     if (stashpv == name)
 	return TRUE;
@@ -5309,6 +5325,7 @@ Perl_init_global_struct(pTHX)
 void
 Perl_free_global_struct(pTHX_ struct perl_vars *plvarsp)
 {
+    PERL_ARGS_ASSERT_FREE_GLOBAL_STRUCT;
 # ifdef PERL_GLOBAL_STRUCT
 #  ifdef PERL_UNSET_VARS
     PERL_UNSET_VARS(plvarsp);
@@ -5507,6 +5524,7 @@ int
 Perl_my_sprintf(char *buffer, const char* pat, ...)
 {
     va_list args;
+    PERL_ARGS_ASSERT_MY_SPRINTF;
     va_start(args, pat);
     vsprintf(buffer, pat, args);
     va_end(args);
@@ -5532,6 +5550,7 @@ Perl_my_snprintf(char *buffer, const Size_t len, const char *format, ...)
     dTHX;
     int retval;
     va_list ap;
+    PERL_ARGS_ASSERT_MY_SNPRINTF;
     va_start(ap, format);
 #ifdef HAS_VSNPRINTF
     retval = vsnprintf(buffer, len, format, ap);
@@ -5563,6 +5582,9 @@ Perl_my_vsnprintf(char *buffer, const Size_t len, const char *format, va_list ap
     int retval;
 #ifdef NEED_VA_COPY
     va_list apc;
+
+    PERL_ARGS_ASSERT_MY_VSNPRINTF;
+
     Perl_va_copy(ap, apc);
 # ifdef HAS_VSNPRINTF
     retval = vsnprintf(buffer, len, format, apc);
@@ -5652,6 +5674,7 @@ Perl_my_cxt_init(pTHX_ int *index, size_t size)
 {
     dVAR;
     void *p;
+    PERL_ARGS_ASSERT_MY_CXT_INIT;
     if (*index == -1) {
 	/* this module hasn't been allocated an index yet */
 	MUTEX_LOCK(&PL_my_ctx_mutex);
@@ -5686,6 +5709,8 @@ Perl_my_cxt_index(pTHX_ const char *my_cxt_key)
     dVAR;
     int index;
 
+    PERL_ARGS_ASSERT_MY_CXT_INDEX;
+
     for (index = 0; index < PL_my_cxt_index; index++) {
 	const char *key = PL_my_cxt_keys[index];
 	/* try direct pointer compare first - there are chances to success,
@@ -5703,6 +5728,8 @@ Perl_my_cxt_init(pTHX_ const char *my_cxt_key, size_t size)
     dVAR;
     void *p;
     int index;
+
+    PERL_ARGS_ASSERT_MY_CXT_INIT;
 
     index = Perl_my_cxt_index(aTHX_ my_cxt_key);
     if (index == -1) {
@@ -5790,6 +5817,8 @@ Perl_get_db_sub(pTHX_ SV **svp, CV *cv)
      * it's for informational purposes only.
      */
 
+    PERL_ARGS_ASSERT_GET_DB_SUB;
+
     save_item(dbsv);
     if (!PERLDB_SUB_NN) {
 	GV * const gv = CvGV(cv);
@@ -5833,17 +5862,15 @@ Perl_my_dirfd(pTHX_ DIR * dir) {
 REGEXP *
 Perl_get_re_arg(pTHX_ SV *sv) {
     SV    *tmpsv;
-    MAGIC *mg;
 
     if (sv) {
         if (SvMAGICAL(sv))
             mg_get(sv);
         if (SvROK(sv) &&
             (tmpsv = (SV*)SvRV(sv)) &&            /* assign deliberate */
-            SvTYPE(tmpsv) == SVt_PVMG &&
-            (mg = mg_find(tmpsv, PERL_MAGIC_qr))) /* assign deliberate */
+            SvTYPE(tmpsv) == SVt_REGEXP)
         {
-            return (REGEXP *)mg->mg_obj;
+            return (REGEXP*) tmpsv;
         }
     }
  

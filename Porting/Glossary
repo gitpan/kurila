@@ -34,7 +34,7 @@ afsroot (afs.U):
 	This variable is by default set to '/afs'. In the unlikely case
 	this is not the correct root, it is possible to override this with
 	a hint value or command line option.  This will be used in subsequent
-	tests for AFSness in the Perl configure and test process.
+	tests for AFSness in the configure and test process.
 
 alignbytes (alignbytes.U):
 	This variable holds the number of bytes required to align a
@@ -2414,6 +2414,9 @@ drand48_r_proto (d_drand48_r.U):
 	REENTRANT_PROTO_T_ABC macros of reentr.h if d_drand48_r
 	is defined.
 
+dtrace (usedtrace.U):
+	This variable holds the location of the dtrace executable.
+
 dynamic_ext (Extensions.U):
 	This variable holds a list of XS extension files we want to
 	link dynamically into the package.  It is used by Makefile.
@@ -2823,6 +2826,11 @@ i8type (perlxv.U):
 i_arpainet (i_arpainet.U):
 	This variable conditionally defines the I_ARPA_INET symbol,
 	and indicates whether a C program should include <arpa/inet.h>.
+
+i_assert (i_assert.U):
+	This variable conditionally defines the I_ASSERT symbol, which
+	indicates to the C program that <assert.h> exists and could be
+	included.
 
 i_bsdioctl (i_sysioctl.U):
 	This variable conditionally defines the I_SYS_BSDIOCTL symbol, which
@@ -3664,11 +3672,6 @@ man3ext (man3dir.U):
 	have: one of 'n', 'l', or '3'.  The Makefile must supply the '.'.
 	See man3dir.
 
-Mcc (Loc.U):
-	This variable is used internally by Configure to determine the
-	full pathname (if any) of the Mcc program.  After Configure runs,
-	the value is reset to a plain "Mcc" and is not useful.
-
 mips_type (usrinc.U):
 	This variable holds the environment type for the mips system.
 	Possible values are "BSD 4.3" and "System V".
@@ -3791,6 +3794,11 @@ nroff (Loc.U):
 	This variable is used internally by Configure to determine the
 	full pathname (if any) of the nroff program.  After Configure runs,
 	the value is reset to a plain "nroff" and is not useful.
+
+nv_overflows_integers_at (perlxv.U):
+	This variable gives the largest integer value that NVs can hold
+	as a constant floating point expression.
+	If it could not be determined, it holds the value 0.
 
 nv_preserves_uv_bits (perlxv.U):
 	This variable indicates how many of bits type uvtype
@@ -4534,9 +4542,9 @@ srandom_r_proto (d_srandom_r.U):
 	is defined.
 
 src (src.U):
-	This variable holds the path to the package source. It is up to
-	the Makefile to use this variable and set VPATH accordingly to
-	find the sources remotely.
+	This variable holds the (possibly relative) path of the package source.
+	It is up to the Makefile to use this variable and set VPATH accordingly
+	to find the sources remotely.  Use $pkgsrc to have an absolute path.
 
 sSCNfldbl (longdblfio.U):
 	This variable, if defined, contains the string used by stdio to
@@ -4782,6 +4790,10 @@ usecrosscompile (Cross.U):
 usedl (dlsrc.U):
 	This variable indicates if the system supports dynamic
 	loading of some sort.  See also dlsrc and dlobj.
+
+usedtrace (usedtrace.U):
+	This variable indicates whether we are compiling with dtrace
+	support. See also dtrace.
 
 usefaststdio (usefaststdio.U):
 	This variable conditionally defines the USE_FAST_STDIO symbol,

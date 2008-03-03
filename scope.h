@@ -43,7 +43,7 @@
 #define SAVEt_I8		32
 #define SAVEt_COMPPAD		33
 #define SAVEt_GENERIC_PVREF	34
-#define SAVEt_PADSV		35
+#define SAVEt_PADSV_AND_MORTALIZE	35
 #define SAVEt_MORTALIZESV	36
 #define SAVEt_SHARED_PVREF	37
 #define SAVEt_BOOL		38
@@ -125,7 +125,7 @@ Closing bracket on a callback.  See C<ENTER> and L<perlcall>.
 #define SAVESPTR(s)	save_sptr((SV**)&(s))
 #define SAVEPPTR(s)	save_pptr((char**)&(s))
 #define SAVEVPTR(s)	save_vptr((void*)&(s))
-#define SAVEPADSV(s)	save_padsv(s)
+#define SAVEPADSVANDMORTALIZE(s)	save_padsv_and_mortalize(s)
 #define SAVEFREESV(s)	save_freesv((SV*)(s))
 #define SAVEMORTALIZESV(s)	save_mortalizesv((SV*)(s))
 #define SAVEFREEOP(o)	save_freeop((OP*)(o))
@@ -247,3 +247,12 @@ Closing bracket on a callback.  See C<ENTER> and L<perlcall>.
 #define SSPTR(off,type)         ((type)  ((char*)PL_savestack + off))
 #define SSPTRt(off,type)        ((type*) ((char*)PL_savestack + off))
 
+/*
+ * Local variables:
+ * c-indentation-style: bsd
+ * c-basic-offset: 4
+ * indent-tabs-mode: t
+ * End:
+ *
+ * ex: set ts=8 sts=4 sw=4 noet:
+ */

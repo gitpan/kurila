@@ -41,6 +41,24 @@
 #   endif
 #endif
 
+/* This logic needs to come after reading config.h, but before including
+   proto.h  */
+#ifdef IAMSUID
+#  ifndef DOSUID
+#    define DOSUID
+#  endif
+#endif
+
+#ifdef SETUID_SCRIPTS_ARE_SECURE_NOW
+#  ifdef DOSUID
+#    undef DOSUID
+#  endif
+#  ifdef IAMSUID
+#    undef IAMSUID
+#    define SETUID_SCRIPTS_ARE_SECURE_NOW_AND_IAMSUID
+#  endif
+#endif
+
 /* See L<perlguts/"The Perl API"> for detailed notes on
  * PERL_IMPLICIT_CONTEXT and PERL_IMPLICIT_SYS */
 
@@ -201,72 +219,68 @@
 #define CALLREGCOMP_ENG(prog, sv, flags) \
     CALL_FPTR(((prog)->comp))(aTHX_ sv, flags)
 #define CALLREGEXEC(prog,stringarg,strend,strbeg,minend,screamer,data,flags) \
-    CALL_FPTR((prog)->engine->exec)(aTHX_ (prog),(stringarg),(strend), \
+    CALL_FPTR(RX_ENGINE(prog)->exec)(aTHX_ (prog),(stringarg),(strend), \
         (strbeg),(minend),(screamer),(data),(flags))
 #define CALLREG_INTUIT_START(prog,sv,strpos,strend,flags,data) \
-    CALL_FPTR((prog)->engine->intuit)(aTHX_ (prog), (sv), (strpos), \
+    CALL_FPTR(RX_ENGINE(prog)->intuit)(aTHX_ (prog), (sv), (strpos), \
         (strend),(flags),(data))
 #define CALLREG_INTUIT_STRING(prog) \
-    CALL_FPTR((prog)->engine->checkstr)(aTHX_ (prog))
-
-#define CALLREG_AS_STR(mg,lp,flags,haseval) \
-        Perl_reg_stringify(aTHX_ (mg), (lp), (flags), (haseval))
-#define CALLREG_STRINGIFY(mg,lp,flags) CALLREG_AS_STR(mg,lp,flags,0)
+    CALL_FPTR(RX_ENGINE(prog)->checkstr)(aTHX_ (prog))
 
 #define CALLREGFREE(prog) \
     Perl_pregfree(aTHX_ (prog))
 
 #define CALLREGFREE_PVT(prog) \
-    if(prog) CALL_FPTR((prog)->engine->free)(aTHX_ (prog))
+    if(prog) CALL_FPTR(RX_ENGINE(prog)->free)(aTHX_ (prog))
 
 #define CALLREG_NUMBUF_FETCH(rx,paren,usesv)                                \
-    CALL_FPTR((rx)->engine->numbered_buff_FETCH)(aTHX_ (rx),(paren),(usesv))
+    CALL_FPTR(RX_ENGINE(rx)->numbered_buff_FETCH)(aTHX_ (rx),(paren),(usesv))
 
 #define CALLREG_NUMBUF_STORE(rx,paren,value) \
-    CALL_FPTR((rx)->engine->numbered_buff_STORE)(aTHX_ (rx),(paren),(value))
+    CALL_FPTR(RX_ENGINE(rx)->numbered_buff_STORE)(aTHX_ (rx),(paren),(value))
 
 #define CALLREG_NUMBUF_LENGTH(rx,sv,paren)                              \
-    CALL_FPTR((rx)->engine->numbered_buff_LENGTH)(aTHX_ (rx),(sv),(paren))
+    CALL_FPTR(RX_ENGINE(rx)->numbered_buff_LENGTH)(aTHX_ (rx),(sv),(paren))
 
 #define CALLREG_NAMED_BUFF_FETCH(rx, key, flags) \
-    CALL_FPTR((rx)->engine->named_buff)(aTHX_ (rx), (key), NULL, ((flags) | RXapif_FETCH))
+    CALL_FPTR(RX_ENGINE(rx)->named_buff)(aTHX_ (rx), (key), NULL, ((flags) | RXapif_FETCH))
 
 #define CALLREG_NAMED_BUFF_STORE(rx, key, value, flags) \
-    CALL_FPTR((rx)->engine->named_buff)(aTHX_ (rx), (key), (value), ((flags) | RXapif_STORE))
+    CALL_FPTR(RX_ENGINE(rx)->named_buff)(aTHX_ (rx), (key), (value), ((flags) | RXapif_STORE))
 
 #define CALLREG_NAMED_BUFF_DELETE(rx, key, flags) \
-    CALL_FPTR((rx)->engine->named_buff)(aTHX_ (rx),(key), NULL, ((flags) | RXapif_DELETE))
+    CALL_FPTR(RX_ENGINE(rx)->named_buff)(aTHX_ (rx),(key), NULL, ((flags) | RXapif_DELETE))
 
 #define CALLREG_NAMED_BUFF_CLEAR(rx, flags) \
-    CALL_FPTR((rx)->engine->named_buff)(aTHX_ (rx), NULL, NULL, ((flags) | RXapif_CLEAR))
+    CALL_FPTR(RX_ENGINE(rx)->named_buff)(aTHX_ (rx), NULL, NULL, ((flags) | RXapif_CLEAR))
 
 #define CALLREG_NAMED_BUFF_EXISTS(rx, key, flags) \
-    CALL_FPTR((rx)->engine->named_buff)(aTHX_ (rx), (key), NULL, ((flags) | RXapif_EXISTS))
+    CALL_FPTR(RX_ENGINE(rx)->named_buff)(aTHX_ (rx), (key), NULL, ((flags) | RXapif_EXISTS))
 
 #define CALLREG_NAMED_BUFF_FIRSTKEY(rx, flags) \
-    CALL_FPTR((rx)->engine->named_buff_iter)(aTHX_ (rx), NULL, ((flags) | RXapif_FIRSTKEY))
+    CALL_FPTR(RX_ENGINE(rx)->named_buff_iter)(aTHX_ (rx), NULL, ((flags) | RXapif_FIRSTKEY))
 
 #define CALLREG_NAMED_BUFF_NEXTKEY(rx, lastkey, flags) \
-    CALL_FPTR((rx)->engine->named_buff_iter)(aTHX_ (rx), (lastkey), ((flags) | RXapif_NEXTKEY))
+    CALL_FPTR(RX_ENGINE(rx)->named_buff_iter)(aTHX_ (rx), (lastkey), ((flags) | RXapif_NEXTKEY))
 
 #define CALLREG_NAMED_BUFF_SCALAR(rx, flags) \
-    CALL_FPTR((rx)->engine->named_buff)(aTHX_ (rx), NULL, NULL, ((flags) | RXapif_SCALAR))
+    CALL_FPTR(RX_ENGINE(rx)->named_buff)(aTHX_ (rx), NULL, NULL, ((flags) | RXapif_SCALAR))
 
 #define CALLREG_NAMED_BUFF_COUNT(rx) \
-    CALL_FPTR((rx)->engine->named_buff)(aTHX_ (rx), NULL, NULL, RXapif_REGNAMES_COUNT)
+    CALL_FPTR(RX_ENGINE(rx)->named_buff)(aTHX_ (rx), NULL, NULL, RXapif_REGNAMES_COUNT)
 
 #define CALLREG_NAMED_BUFF_ALL(rx, flags) \
-    CALL_FPTR((rx)->engine->named_buff)(aTHX_ (rx), NULL, NULL, flags)
+    CALL_FPTR(RX_ENGINE(rx)->named_buff)(aTHX_ (rx), NULL, NULL, flags)
 
 #define CALLREG_PACKAGE(rx) \
-    CALL_FPTR((rx)->engine->qr_package)(aTHX_ (rx))
+    CALL_FPTR(RX_ENGINE(rx)->qr_package)(aTHX_ (rx))
 
 #if defined(USE_ITHREADS)         
 #define CALLREGDUPE(prog,param) \
     Perl_re_dup(aTHX_ (prog),(param))
 
 #define CALLREGDUPE_PVT(prog,param) \
-    (prog ? CALL_FPTR((prog)->engine->dupe)(aTHX_ (prog),(param)) \
+    (prog ? CALL_FPTR(RX_ENGINE(prog)->dupe)(aTHX_ (prog),(param)) \
           : (REGEXP *)NULL) 
 #endif
 
@@ -434,8 +448,12 @@ register struct op *Perl_op asm(stringify(OP_IN_REGISTER));
 
 /* gcc (-ansi) -pedantic doesn't allow gcc statement expressions,
  * g++ allows them but seems to have problems with them
- * (insane errors ensue). */
-#if defined(PERL_GCC_PEDANTIC) || (defined(__GNUC__) && defined(__cplusplus))
+ * (insane errors ensue).
+ * g++ does not give insane errors now (RMB 2008-01-30, gcc 4.2.2).
+ */
+#if defined(PERL_GCC_PEDANTIC) || \
+    (defined(__GNUC__) && defined(__cplusplus) && \
+	((__GNUC__ < 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ < 2))))
 #  ifndef PERL_GCC_BRACE_GROUPS_FORBIDDEN
 #    define PERL_GCC_BRACE_GROUPS_FORBIDDEN
 #  endif
@@ -510,11 +528,7 @@ register struct op *Perl_op asm(stringify(OP_IN_REGISTER));
 #endif
 
 #if defined(HASVOLATILE) || defined(STANDARD_C)
-#   ifdef __cplusplus
-#	define VOL		/* to temporarily suppress warnings */
-#   else
 #	define VOL volatile
-#   endif
 #else
 #   define VOL
 #endif
@@ -921,6 +935,11 @@ EXTERN_C int usleep(unsigned int);
    at least on FreeBSD.  YMMV, so experiment.  */
 #ifndef PERL_ARENA_SIZE
 #define PERL_ARENA_SIZE 4080
+#endif
+
+/* Maximum level of recursion */
+#ifndef PERL_SUB_DEPTH_WARN
+#define PERL_SUB_DEPTH_WARN 100
 #endif
 
 #endif /* PERL_CORE */
@@ -1710,7 +1729,7 @@ typedef UVTYPE UV;
  */
 #if (IVSIZE == PTRSIZE) && (UVSIZE == PTRSIZE)
 #  define PTRV			UV
-#  define INT2PTR(any,d)	(any)(d)
+#  define INT2PTR(any,d)	((any)(d))
 #else
 #  if PTRSIZE == LONGSIZE
 #    define PTRV		unsigned long
@@ -1721,7 +1740,7 @@ typedef UVTYPE UV;
 #endif
 
 #ifndef INT2PTR
-#  define INT2PTR(any,d)	(any)(PTRV)(d)
+#  define INT2PTR(any,d)	((any)(PTRV)(d))
 #endif
 
 #ifndef PTR2ul
@@ -2352,7 +2371,8 @@ typedef struct STRUCT_SV SV;
 typedef struct av AV;
 typedef struct hv HV;
 typedef struct cv CV;
-typedef struct regexp REGEXP;
+typedef struct regexp ORANGE;	/* This is the body structure.  */
+typedef struct p5rx REGEXP;
 typedef struct gp GP;
 typedef struct gv GV;
 typedef struct io IO;
@@ -2698,6 +2718,7 @@ typedef struct clone_params CLONE_PARAMS;
  * have HASATTRIBUTE_FORMAT).
  */
 
+#ifndef PERL_MICRO
 #if defined __GNUC__ && !defined(__INTEL_COMPILER)
 #  if __GNUC__ >= 3 /* 3.0 -> */ /* XXX Verify this version */
 #    define HASATTRIBUTE_FORMAT
@@ -2727,6 +2748,7 @@ typedef struct clone_params CLONE_PARAMS;
 #    define HASATTRIBUTE_WARN_UNUSED_RESULT
 #  endif
 #endif
+#endif /* #ifndef PERL_MICRO */ 
 
 /* USE_5005THREADS needs to be after unixish.h as <pthread.h> includes
  * <sys/signal.h> which defines NSIG - which will stop inclusion of <signal.h>
@@ -3305,8 +3327,19 @@ struct nextmadtoken {
 };
 #endif
 
-#include "regexp.h"
+/* macros to define bit-fields in structs. */
+#ifndef PERL_BITFIELD8
+#  define PERL_BITFIELD8 unsigned
+#endif
+#ifndef PERL_BITFIELD16
+#  define PERL_BITFIELD16 unsigned
+#endif
+#ifndef PERL_BITFIELD32
+#  define PERL_BITFIELD32 unsigned
+#endif
+
 #include "sv.h"
+#include "regexp.h"
 #include "util.h"
 #include "form.h"
 #include "gv.h"
@@ -3322,6 +3355,11 @@ struct nextmadtoken {
 #include "warnings.h"
 #include "utf8.h"
 
+/* defined in sv.c, but also used in [ach]v.c */
+#undef _XPV_ALLOCATED_HEAD
+#undef _XPV_HEAD
+#undef _XPVMG_HEAD
+#undef _XPVCV_COMMON
 
 typedef struct _sublex_info SUBLEXINFO;
 struct _sublex_info {
@@ -3756,14 +3794,17 @@ Gid_t getegid (void);
 #define PERL_MAGIC_arylen_p	  '@' /* to move arylen out of XPVAV */
 #define PERL_MAGIC_ext		  '~' /* Available for use by extensions */
 
-
-#ifndef assert  /* <assert.h> might have been included somehow */
-#define assert(what)	PERL_DEB( 					\
-	((what) ? ((void) 0) :						\
-	    (Perl_croak_nocontext("Assertion %s failed: file \"" __FILE__ \
-			"\", line %d", STRINGIFY(what), __LINE__),	\
-	    (void) 0)))
+#if defined(DEBUGGING) 
+#  if defined(I_ASSERT)
+#    include <assert.h>
+#  endif
+#  ifndef assert
+#    error "'assert' is missing"
+#  endif
+#else
+#  define assert(a)
 #endif
+
 
 struct ufuncs {
     I32 (*uf_val)(pTHX_ IV, SV*);
@@ -3962,7 +4003,7 @@ typedef Sighandler_t Sigsave_t;
 #endif
 
 #ifdef USE_PERLIO
-EXTERN_C void PerlIO_teardown();
+EXTERN_C void PerlIO_teardown(void);
 # ifdef USE_ITHREADS
 #  define PERLIO_INIT MUTEX_INIT(&PL_perlio_mutex)
 #  define PERLIO_TERM 				\
@@ -4325,14 +4366,17 @@ EXTCONST unsigned char PL_freq[];
 #ifdef DOINIT
 EXTCONST char* const PL_block_type[] = {
 	"NULL",
-	"SUB",
-	"EVAL",
-	"LOOP",
-	"SUBST",
+	"WHEN",
 	"BLOCK",
-	"FORMAT",
 	"GIVEN",
-	"WHEN"
+	"LOOP_FOR",
+	"LOOP_PLAIN",
+	"LOOP_LAZYSV",
+	"LOOP_LAZYIV",
+	"SUB",
+	"FORMAT",
+	"EVAL",
+	"SUBST"
 };
 #else
 EXTCONST char* PL_block_type[];
@@ -4586,7 +4630,7 @@ typedef regexp*(CPERLscope(*regdupe_t)) (pTHX_ const regexp* r, CLONE_PARAMS *pa
 
 typedef void (*DESTRUCTORFUNC_NOCONTEXT_t) (void*);
 typedef void (*DESTRUCTORFUNC_t) (pTHX_ void*);
-typedef void (*SVFUNC_t) (pTHX_ SV*);
+typedef void (*SVFUNC_t) (pTHX_ SV* const);
 typedef I32  (*SVCOMPARE_t) (pTHX_ SV*, SV*);
 typedef void (*XSINIT_t) (pTHX);
 typedef void (*ATEXIT_t) (pTHX_ void*);
@@ -4719,6 +4763,11 @@ START_EXTERN_C
 END_EXTERN_C
 #endif
 
+#ifdef PERL_CORE
+/* All core uses now exterminated. Ensure no zombies can return:  */
+#  undef PL_na
+#endif
+
 #if defined(WIN32)
 /* Now all the config stuff is setup we can include embed.h */
 #  include "embed.h"
@@ -4742,6 +4791,8 @@ END_EXTERN_C
 #undef PERLVARIC
 
 START_EXTERN_C
+
+#include "svx.h"
 
 /* PERL_GLOBAL_STRUCT_PRIVATE wants to keep global data like the
  * magic vtables const, but this is incompatible with SWIG which
@@ -4884,7 +4935,7 @@ MGVTBL_SET(
     0,
     MEMBER_TO_FPTR(Perl_magic_setisa),
     0,
-    MEMBER_TO_FPTR(Perl_magic_setisa),
+    MEMBER_TO_FPTR(Perl_magic_clearisa),
     0,
     0,
     0,
@@ -4990,7 +5041,19 @@ MGVTBL_SET(
 MGVTBL_SET(
     PL_vtbl_bm,
     0,
-    MEMBER_TO_FPTR(Perl_magic_setbm),
+    MEMBER_TO_FPTR(Perl_magic_setregexp),
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+);
+
+MGVTBL_SET(
+    PL_vtbl_fm,
+    0,
+    MEMBER_TO_FPTR(Perl_magic_setregexp),
     0,
     0,
     0,
@@ -5029,7 +5092,7 @@ MGVTBL_SET(
     MEMBER_TO_FPTR(Perl_magic_setregexp),
     0,
     0,
-    MEMBER_TO_FPTR(Perl_magic_freeregexp),
+    0,
     0,
     0,
     0
@@ -5516,6 +5579,7 @@ typedef struct am_table_short AMTS;
 #define START_MY_CXT	static my_cxt_t my_cxt;
 #define dMY_CXT_SV	dNOOP
 #define dMY_CXT		dNOOP
+#define dMY_CXT_INTERP(my_perl)	dNOOP
 #define MY_CXT_INIT	NOOP
 #define MY_CXT_CLONE	NOOP
 #define MY_CXT		my_cxt
@@ -5641,7 +5705,7 @@ int flock(int fd, int op);
 #endif
 
 #ifndef EXEC_ARGV_CAST
-#define EXEC_ARGV_CAST(x) x
+#define EXEC_ARGV_CAST(x) (char **)x
 #endif
 
 #define IS_NUMBER_IN_UV		      0x01 /* number within UV range (maybe not
@@ -5881,3 +5945,13 @@ extern void moncontrol(int);
 */
 
 #endif /* Include guard */
+
+/*
+ * Local variables:
+ * c-indentation-style: bsd
+ * c-basic-offset: 4
+ * indent-tabs-mode: t
+ * End:
+ *
+ * ex: set ts=8 sts=4 sw=4 noet:
+ */

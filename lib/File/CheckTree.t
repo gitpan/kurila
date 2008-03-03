@@ -5,7 +5,7 @@ BEGIN {
     @INC = '../lib';
 }
 
-use Test;
+use Test::More;
 
 BEGIN { plan tests => 8 }
 
@@ -39,7 +39,7 @@ chdir(File::Spec->updir) or die "cannot change to parent of t/ directory: $!";
     $path_to_README = File::Spec->rel2abs('README');
 
     my @warnings;
-    local $SIG{__WARN__} = sub { push @warnings, "@_" };
+    local ${^WARN_HOOK} = sub { push @warnings, $_[0]->{description} };
 
     eval {
         $num_warnings = validate qq{
@@ -68,7 +68,7 @@ chdir(File::Spec->updir) or die "cannot change to parent of t/ directory: $!";
 {
     my ($num_warnings, @warnings);
 
-    local $SIG{__WARN__} = sub { push @warnings, "@_" };
+    local ${^WARN_HOOK} = sub { push @warnings, $_[0]->{description} };
 
     eval {
         $num_warnings = validate qq{
@@ -97,7 +97,7 @@ chdir(File::Spec->updir) or die "cannot change to parent of t/ directory: $!";
 {
     my ($num_warnings, @warnings);
 
-    local $SIG{__WARN__} = sub { push @warnings, "@_" };
+    local ${^WARN_HOOK} = sub { push @warnings, $_[0]->{description} };
 
     eval {
         $num_warnings = validate q{
@@ -130,18 +130,18 @@ chdir(File::Spec->updir) or die "cannot change to parent of t/ directory: $!";
     $path_to_libFile = File::Spec->rel2abs(File::Spec->catdir('lib','File'));
     $path_to_dist    = File::Spec->rel2abs(File::Spec->curdir);
 
-    local $SIG{__WARN__} = sub { push @warnings, "@_" };
+    local ${^WARN_HOOK} = sub { push @warnings, $_[0]->{description} };
 
     eval {
         $num_warnings = validate qq{
             lib                -d || die
-            $path_to_libFile   cd
+            '$path_to_libFile' cd
             Spec               -e
             Spec               -f
-            $path_to_dist      cd
+            '$path_to_dist'    cd
             README             -ef
             INSTALL            -d || warn
-            $path_to_libFile   -d || die
+            '$path_to_libFile' -d || die
         };
     };
 
@@ -171,13 +171,13 @@ chdir(File::Spec->updir) or die "cannot change to parent of t/ directory: $!";
         };
     };
 
-    if ( $@ && $@ =~ m/lib is not a plain file/
+    if ( $@ && $@->{description} =~ m/lib is not a plain file/
             && not defined $num_warnings )
     {
         ok(1);
     }
     else {
-        ok(0);
+        ok(0, "$@");
     }
 }
 
@@ -194,7 +194,7 @@ chdir(File::Spec->updir) or die "cannot change to parent of t/ directory: $!";
         };
     };
 
-    if ( $@ && $@ =~ m/yadda lib yadda/
+    if ( $@ && $@->{description} =~ m/yadda lib yadda/
             && not defined $num_warnings )
     {
         ok(1);
@@ -232,7 +232,7 @@ chdir(File::Spec->updir) or die "cannot change to parent of t/ directory: $!";
         };
     };
 
-    if ( $@ =~ m/syntax error/) {
+    if ( $@->{description} =~ m/syntax error/) {
 	# We got a syntax error for a malformed file query
         ok(1);
     } else {

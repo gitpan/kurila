@@ -183,6 +183,16 @@ for f in $nonxs_ext; do
     nonxs_list="$nonxs_list ext/$f/pm_to_blib"
 done
 
+dtrace_h=''
+dtrace_o=''
+case "$usedtrace" in
+define|true)
+	dtrace_h='perldtrace.h' 
+	$dtrace -G -s perldtrace.d -o perldtrace.tmp >/dev/null 2>&1 \
+		&& rm -f perldtrace.tmp && dtrace_o='perldtrace$(OBJ_EXT)'
+	;;
+esac
+
 echo "Extracting Makefile (with variable substitutions)"
 $spitshell >Makefile <<!GROK!THIS!
 # Makefile.SH
@@ -274,6 +284,10 @@ PATH_SEP = $p_
 # then you'll need to change this, or override it on the make command line.
 VALGRIND=valgrind
 
+DTRACE = $dtrace
+DTRACE_H = $dtrace_h
+DTRACE_O = $dtrace_o
+
 FIRSTMAKEFILE = $firstmakefile
 
 # Any special object files needed by this architecture, e.g. os2/os2.obj
@@ -357,7 +371,7 @@ h1 = EXTERN.h INTERN.h XSUB.h av.h config.h cop.h cv.h dosish.h
 h2 = embed.h form.h gv.h handy.h hv.h keywords.h mg.h op.h opcode.h
 h3 = pad.h patchlevel.h perl.h perlapi.h perly.h pp.h proto.h regcomp.h
 h4 = regexp.h scope.h sv.h unixish.h util.h iperlsys.h thread.h
-h5 = utf8.h warnings.h
+h5 = utf8.h warnings.h mydtrace.h
 h = $(h1) $(h2) $(h3) $(h4) $(h5)
 
 c1 = av.c scope.c op.c doop.c doio.c dump.c gv.c hv.c mg.c reentr.c mro.c perl.c
@@ -372,7 +386,8 @@ obj1 = $(madlyobj) $(mallocobj) gv$(OBJ_EXT) toke$(OBJ_EXT) perly$(OBJ_EXT) op$(
 obj2 = hv$(OBJ_EXT) av$(OBJ_EXT) perl$(OBJ_EXT) run$(OBJ_EXT) pp_hot$(OBJ_EXT) sv$(OBJ_EXT) pp$(OBJ_EXT) scope$(OBJ_EXT) pp_ctl$(OBJ_EXT) pp_sys$(OBJ_EXT)
 obj3 = doop$(OBJ_EXT) doio$(OBJ_EXT) regexec$(OBJ_EXT) utf8$(OBJ_EXT) taint$(OBJ_EXT) deb$(OBJ_EXT) universal$(OBJ_EXT) xsutils$(OBJ_EXT) globals$(OBJ_EXT) perlio$(OBJ_EXT) perlapi$(OBJ_EXT) numeric$(OBJ_EXT) mathoms$(OBJ_EXT) locale$(OBJ_EXT) pp_pack$(OBJ_EXT) pp_sort$(OBJ_EXT)
 
-obj = $(obj1) $(obj2) $(obj3) $(ARCHOBJS)
+ndt_obj = $(obj1) $(obj2) $(obj3) $(ARCHOBJS)
+obj = $(ndt_obj) $(DTRACE_O)
 
 lintflags = \
     -b \
@@ -444,6 +459,15 @@ splintfiles = $(c1)
 all: $(FIRSTMAKEFILE) miniperl$(EXE_EXT) extra.pods $(private) $(unidatafiles) $(public) $(dynamic_ext) $(nonxs_ext) extras.make
 	@echo " ";
 	@echo "	Everything is up to date. Type '$(MAKE) test' to run test suite."
+
+sperl$(OBJ_EXT): perl.c $(h)
+	$(RMS) sperl.c
+	$(LNS) perl.c sperl.c
+	$(CCCMD) -DIAMSUID sperl.c
+	$(RMS) sperl.c
+
+sperl.i: perl.c $(h)
+	$(CCCMDSRC) -DIAMSUID -E perl.c > sperl.i
 
 .PHONY: all utilities
 
@@ -583,6 +607,26 @@ if test -r $Makefile_s ; then
 Makefile: $Makefile_s
 !GROK!THIS!
 else
+	case "$dtrace_h" in
+	?*)
+		$spitshell >>Makefile <<'!NO!SUBS!'
+$(DTRACE_H): perldtrace.d
+	$(DTRACE) -h -s perldtrace.d -o $(DTRACE_H)
+
+mydtrace.h: $(DTRACE_H)
+
+!NO!SUBS!
+		;;
+	esac
+	case "$dtrace_o" in
+	?*)
+		$spitshell >>Makefile <<'!NO!SUBS!'
+$(DTRACE_O): perldtrace.d
+	$(DTRACE) -G -s perldtrace.d -o $(DTRACE_O) $(ndt_obj)
+
+!NO!SUBS!
+		;;
+    esac
 	$spitshell >>Makefile <<'!NO!SUBS!'
 $(LIBPERL): $& $(obj) $(DYNALOADER) $(LIBPERLEXPORT)
 !NO!SUBS!
@@ -797,12 +841,6 @@ fi
 
 $spitshell >>Makefile <<'!NO!SUBS!'
 
-sperl$(OBJ_EXT): perl.c $(h)
-	$(RMS) sperl.c
-	$(LNS) perl.c sperl.c
-	$(CCCMD) -DIAMSUID sperl.c
-	$(RMS) sperl.c
-
 # We have to call our ./makedir because Ultrix 4.3 make can't handle the line
 #	test -d lib/auto || mkdir lib/auto
 # We need to autosplit in two steps because VOS can't handle so many args
@@ -849,7 +887,7 @@ extra.pods: miniperl$(EXE_EXT)
 	-@rm -f pod/perlvms.pod
 	-@test -f vms/perlvms.pod && cd pod && $(LNS) ../vms/perlvms.pod perlvms.pod && cd .. && echo "pod/perlvms.pod" >> extra.pods
 	-@rm -f pod/perldelta.pod
-	-@test -f pod/perl5100delta.pod && cd pod && $(LNS) perl5100delta.pod perldelta.pod && cd .. && echo "pod/perldelta.pod" >> extra.pods # See buildtoc
+	-@test -f pod/perl5110delta.pod && cd pod && $(LNS) perl5110delta.pod perldelta.pod && cd .. && echo "pod/perldelta.pod" >> extra.pods # See buildtoc
 
 extras.make: perl$(EXE_EXT)
 	-@test ! -s extras.lst || PATH="`pwd`:${PATH}" PERL5LIB="`pwd`/lib" $(LDLIBPTH) $(RUN) ./perl -Ilib -MCPAN -e '@ARGV&&make(@ARGV)' `cat extras.lst`
@@ -997,7 +1035,7 @@ d_dummy $(dynamic_ext):	miniperl$(EXE_EXT) preplibrary $(DYNALOADER) FORCE
 s_dummy $(static_ext):	miniperl$(EXE_EXT) preplibrary $(DYNALOADER) FORCE
 	@$(LDLIBPTH) sh ext/util/make_ext $(STATIC) $@ MAKE=$(MAKE) LIBPERL_A=$(LIBPERL)
 
-n_dummy $(nonxs_ext):	miniperl$(EXE_EXT) preplibrary $(DYNALOADER) FORCE
+n_dummy $(nonxs_ext):	miniperl$(EXE_EXT) preplibrary FORCE
 	@$(LDLIBPTH) sh ext/util/make_ext nonxs $@ MAKE=$(MAKE) LIBPERL_A=$(LIBPERL)
 !NO!SUBS!
 
@@ -1048,7 +1086,7 @@ _mopup:
 	-rm -f cygwin.c libperl*.def libperl*.dll cygperl*.dll *.exe.stackdump
 	-rm -f perl$(EXE_EXT) suidperl$(EXE_EXT) miniperl$(EXE_EXT) $(LIBPERL) libperl.* microperl
 	-rm -f opcode.h-old opnames.h-old pp.sym-old pp_proto.h-old
-	-rm -f config.over
+	-rm -f config.over $(DTRACE_H)
 
 # Do not 'make _tidy' directly.
 _tidy:
@@ -1087,7 +1125,8 @@ _cleaner2:
 	rm -f lib/ExtUtils/ParseXS/t/XSTest.c
 	rm -f lib/ExtUtils/ParseXS/t/XSTest$(OBJ_EXT)
 	rm -f lib/ExtUtils/ParseXS/t/XSTest$(DLSUFFIX)
-	-rmdir lib/B lib/Data
+	rm -fr lib/B
+	-rmdir lib/Data
 	-rmdir lib/Filter/Util lib/IO/Socket
 	-rmdir lib/List lib/MIME lib/Scalar lib/Sys
 	-rmdir lib/threads lib/XS
@@ -1141,7 +1180,7 @@ makedepend: makedepend.SH config.sh
 	test.utf16 check.utf16 utest.utf16 ucheck.utf16 \
 	test.third check.third utest.third ucheck.third test_notty.third \
 	test.deparse test_notty.deparse test_harness test_harness_notty \
-	minitest coretest test.taintwarn
+	minitest coretest test.taintwarn test-reonly
 
 # Cannot delegate rebuilding of t/perl to make
 # to allow interlaced test and minitest
@@ -1174,9 +1213,9 @@ cleanup_unpacked_files:
 # see t/op/stat.t
 _test:
 	if (true </dev/tty) >/dev/null 2>&1; then \
-	  $(MAKE) TEST_ARGS=$(TEST_ARGS) TESTFILE=$(TESTFILE) _test_tty   ; \
+	  $(MAKE) TEST_ARGS='$(TEST_ARGS)' TESTFILE=$(TESTFILE) _test_tty   ; \
 	else \
-	  $(MAKE) TEST_ARGS=$(TEST_ARGS) TESTFILE=$(TESTFILE) _test_notty ; \
+	  $(MAKE) TEST_ARGS='$(TEST_ARGS)' TESTFILE=$(TESTFILE) _test_notty ; \
 	fi
 	@echo "Ran tests" > t/rantests
 
@@ -1210,7 +1249,7 @@ test.torture torturetest:	test_prep
 
 minitest.utf16: minitest.prep
 	- cd t && (rm -f perl$(EXE_EXT); $(LNS) ../miniperl$(EXE_EXT) perl$(EXE_EXT)) \
-		&& $(LDLIBPTH) $(RUN) ./perl TEST -minitest -utf16 base/*.t comp/*.t cmd/*.t run/*.t io/*.t op/*.t uni/*.t </dev/tty
+		&& $(LDLIBPTH) $(RUN) ./perl TEST -minitest -utf16 base/*.t comp/*.t cmd/*.t run/*.t io/*.t op/*.t uni/*.t mro/*.t </dev/tty
 
 test.utf16 check.utf16: test_prep
 	PERL=./perl $(MAKE) TEST_ARGS=-utf16 _test
@@ -1271,7 +1310,7 @@ minitest.prep:
 # is crashing.
 minitest: miniperl$(EXE_EXT) lib/re.pm minitest.prep
 	- cd t && (rm -f perl$(EXE_EXT); $(LNS) ../miniperl$(EXE_EXT) perl$(EXE_EXT)) \
-		&& $(LDLIBPTH) $(RUN) ./perl TEST -minitest base/*.t comp/*.t cmd/*.t run/*.t io/*.t op/*.t uni/*.t </dev/tty
+		&& $(LDLIBPTH) $(RUN) ./perl TEST -minitest base/*.t comp/*.t cmd/*.t run/*.t io/*.t op/*.t uni/*.t mro/*.t </dev/tty
 
 # Test via harness
 
@@ -1280,6 +1319,9 @@ test_harness: test_prep
 
 test_harness_notty: test_prep
 	PERL=./perl HARNESS_NOTTY=1 $(MAKE) TESTFILE=harness _test
+
+test-reonly: test_prep
+	PERL=./perl TEST_ARGS='-re \\bpat\\b \\breg \\bre\b \\bsubst \\brxcode' $(MAKE) TESTFILE=harness _test
 
 # Handy way to run perlbug -ok without having to install and run the
 # installed perlbug. We don't re-run the tests here - we trust the user.

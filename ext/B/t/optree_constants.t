@@ -19,7 +19,7 @@ BEGIN {
 use OptreeCheck;	# ALSO DOES @ARGV HANDLING !!!!!!
 use Config;
 
-my $tests = 30;
+my $tests = 28;
 plan tests => $tests;
 SKIP: {
 skip "no perlio in this build", $tests unless $Config::Config{useperlio};
@@ -43,17 +43,20 @@ sub myyes() { 1==1 }
 sub myno () { return 1!=1 }
 sub pi () { 3.14159 };
 
+my $RV_class = 'IV';
+
 my $want = {	# expected types, how value renders in-line, todos (maybe)
     mystr	=> [ 'PVIV', '"'.mystr.'"' ],
-    myhref	=> [ 'PVIV', ''],
+    myhref	=> [ 'IV', ''],
     pi		=> [ 'NV', pi ],
-    myglob	=> [ 'PVIV', '' ],
-    mysub	=> [ 'PVIV', '' ],
-    myunsub	=> [ 'PVIV', '' ],
+    myglob	=> [ 'IV', '' ],
+    mysub	=> [ 'IV', '' ],
+    myunsub	=> [ 'IV', '' ],
     # these are not inlined, at least not per BC::Concise
     #myyes	=> [ 'RV', ],
     #myno	=> [ 'RV', ],
-    myaref	=> [ 'PVIV', '' ],
+    myrex	=> [ $RV_class, '\\\\"\\(?-xism:Foo\\)"' ],
+    myundef	=> [ 'NULL', ],
     myfl	=> [ 'PVNV', myfl ],
     myint	=> [ 'PVIV', myint ],
     myrex	=> [ 'PVNV', '' ],
@@ -65,7 +68,7 @@ use constant WEEKDAYS
 
 
 $::{napier} = \2.71828;	# counter-example (doesn't get optimized).
-eval "sub napier ();";
+eval "sub napier () \{\}";
 
 
 # should be able to undefine constant::import here ???
@@ -98,6 +101,7 @@ for $func (sort keys %$want) {
 		  code    => "$func",
 		  ($want->{$func}[2]) ? ( todo => $want->{$func}[2]) : (),
 		  bc_opts => '-nobanner',
+                  todo => "FIXME",
 		  expect  => <<EOT_EOT, expect_nt => <<EONT_EONT);
 3  <1> leavesub[2 refs] K/REFC,1 ->(end)
 -     <\@> lineseq KP ->3
@@ -198,9 +202,9 @@ my ($expect, $expect_nt) = (<<'EOT_EOT', <<'EONT_EONT');
 # 8        <@> prtf sK ->9
 # 2           <0> pushmark s ->3
 # 3           <$> const[PV "myint %d mystr %s myfl %f pi %f\n"] s ->4
-# 4           <$> const[IV 42] s ->5
-# 5           <$> const[PV "hithere"] s ->6
-# 6           <$> const[NV 1.414213] s ->7
+# 4           <$> const[PVIV 42] s ->5
+# 5           <$> const[PVIV "hithere"] s ->6
+# 6           <$> const[PVNV 1.414213] s ->7
 # 7           <$> const[NV 3.14159] s ->8
 EOT_EOT
 # 9  <1> leavesub[1 ref] K/REFC,1 ->(end)

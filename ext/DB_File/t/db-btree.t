@@ -121,7 +121,7 @@ sub safeUntie
 {
     my $hashref = shift ;
     my $no_inner = 1;
-    local $SIG{__WARN__} = sub {-- $no_inner } ;
+    local ${^WARN_HOOK} = sub {-- $no_inner } ;
     untie %$hashref;
     return $no_inner;
 }
@@ -169,9 +169,9 @@ ok(14, $dbh->{maxkeypage} == 1234 );
 
 # Check that an invalid entry is caught both for store & fetch
 eval '$dbh->{fred} = 1234' ;
-ok(15, $@ =~ m/^DB_File::BTREEINFO::STORE - Unknown element 'fred' at/ ) ;
+ok(15, $@->{description} =~ m/^DB_File::BTREEINFO::STORE - Unknown element 'fred' at/ ) ;
 eval 'my $q = $dbh->{fred}' ;
-ok(16, $@ =~ m/^DB_File::BTREEINFO::FETCH - Unknown element 'fred' at/ ) ;
+ok(16, $@->{description} =~ m/^DB_File::BTREEINFO::FETCH - Unknown element 'fred' at/ ) ;
 
 # Now check the interface to BTREE
 
@@ -623,7 +623,7 @@ unlink $Dfile1 ;
     my $filename = "xyz" ;
     my @x ;
     eval { tie @x, 'DB_File', $filename, O_RDWR^|^O_CREAT, 0640, $DB_BTREE ; } ;
-    ok(90, $@ =~ m/^DB_File can only tie an associative array to a DB_BTREE database/) ;
+    ok(90, $@->{description} =~ m/^DB_File can only tie an associative array to a DB_BTREE database/) ;
     unlink $filename ;
 }
 
@@ -904,7 +904,7 @@ EOM
    $db->filter_store_key (sub { $_ = $h{$_} }) ;
 
    eval '$h{1} = 1234' ;
-   ok(146, $@ =~ m/^recursion detected in filter_store_key at/ );
+   ok(146, $@->{description} =~ m/^recursion detected in filter_store_key/ );
    
    undef $db ;
    untie %h;
@@ -1307,7 +1307,7 @@ EOM
     unlink $Dfile;
     my %h ;
     my $a = "";
-    local $SIG{__WARN__} = sub {$a = $_[0]} ;
+    local ${^WARN_HOOK} = sub {$a = $_[0]} ;
     
     tie %h, 'DB_File', $Dfile, O_RDWR^|^O_CREAT, 0664, $DB_BTREE
 	or die "Can't open file: $!\n" ;
@@ -1327,7 +1327,7 @@ EOM
     unlink $Dfile;
     my %h ;
     my $a = "";
-    local $SIG{__WARN__} = sub {$a = $_[0]} ;
+    local ${^WARN_HOOK} = sub {$a = $_[0]} ;
     
     tie %h, 'DB_File', $Dfile, O_RDWR^|^O_CREAT, 0664, $DB_BTREE
 	or die "Can't open file: $!\n" ;
@@ -1384,10 +1384,10 @@ EOM
     my $dbh = DB_File::BTREEINFO->new() ;
 
     eval { $dbh->{compare} = 2 };
-    ok(162, $@ =~ m/^Key 'compare' not associated with a code reference at/);
+    ok(162, $@->{description} =~ m/^Key 'compare' not associated with a code reference at/);
 
     eval { $dbh->{prefix} = 2 };
-    ok(163, $@ =~ m/^Key 'prefix' not associated with a code reference at/);
+    ok(163, $@->{description} =~ m/^Key 'prefix' not associated with a code reference at/);
 
 }
 
@@ -1472,7 +1472,7 @@ ok(165,1);
    $h{"fred"} = "joe" ;
    ok(173, $h{"fred"} eq "joe");
 
-   eval { grep { $h{$_} } (1, 2, 3) };
+   eval { my @r= grep { $h{$_} } (1, 2, 3) };
    ok (174, ! $@);
 
 
@@ -1488,7 +1488,7 @@ ok(165,1);
 
    ok(176, $db->FIRSTKEY() eq "fred") ;
    
-   eval { grep { $h{$_} } (1, 2, 3) };
+   eval { my @r= grep { $h{$_} } (1, 2, 3) };
    ok (177, ! $@);
 
    undef $db ;
@@ -1561,7 +1561,7 @@ ok(165,1);
     ok(188, $db = tie(%h, 'DB_File', $Dfile, O_RDWR^|^O_CREAT, 0640, $DB_BTREE ));
 
     my $warned = '';
-    local $SIG{__WARN__} = sub {$warned = $_[0]} ;
+    local ${^WARN_HOOK} = sub {$warned = $_[0]} ;
 
     # db-put with substr of key
     my %remember = () ;

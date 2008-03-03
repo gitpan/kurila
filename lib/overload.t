@@ -278,7 +278,7 @@ is("b${a}c", "bxxc");
 # Negative overloading:
 
 $na = eval { ^~^$a };
-like($@, qr/no method found/);
+like($@->{description}, qr/no method found/);
 
 eval "package Oscalar; sub numify \{ return '_!_' . shift() . '_!_' \} use overload '0+' => \\&numify";
 is $@, '';
@@ -286,7 +286,7 @@ eval "package Oscalar; sub rshft \{ return '_!_' . shift() . '_!_' \} use overlo
 is $@, '';
 
 $na = eval { $aI >> 1 };       # Hash was not updated
-like($@, qr/no method found/);
+like($@->{description}, qr/no method found/);
 
 bless \$x, 'OscalarI';
 
@@ -873,34 +873,34 @@ unless ($aaa) {
 {
     # check the Odd number of arguments for overload::constant warning
     my $a = "" ;
-    local $SIG{__WARN__} = sub {$a = $_[0]} ;
+    local ${^WARN_HOOK} = sub {$a = $_[0]} ;
     $x = eval ' overload::constant "integer" ; ' ;
     is($a, "");
     use warnings 'overload' ;
     $x = eval ' overload::constant "integer" ; ' ;
-    like($a, qr/^Odd number of arguments for overload::constant at/);
+    like($a->{description}, qr/^Odd number of arguments for overload::constant/);
 }
 
 {
     # check the `$_[0]' is not an overloadable type warning
     my $a = "" ;
-    local $SIG{__WARN__} = sub {$a = $_[0]} ;
+    local ${^WARN_HOOK} = sub {$a = $_[0]} ;
     $x = eval ' overload::constant "fred" => sub {} ; ' ;
     is($a, "");
     use warnings 'overload' ;
     $x = eval ' overload::constant "fred" => sub {} ; ' ;
-    like($a, qr/^`fred' is not an overloadable type at/);
+    like($a->{description}, qr/^`fred' is not an overloadable type/);
 }
 
 {
     # check the `$_[1]' is not a code reference warning
     my $a = "" ;
-    local $SIG{__WARN__} = sub {$a = $_[0]} ;
+    local ${^WARN_HOOK} = sub {$a = $_[0]} ;
     $x = eval ' overload::constant "integer" => 1; ' ;
     is($a, "");
     use warnings 'overload' ;
     $x = eval ' overload::constant "integer" => 1; ' ;
-    like($a, qr/^`1' is not a code reference at/);
+    like($a->{description}, qr/^`1' is not a code reference/);
 }
 
 {
@@ -1016,7 +1016,7 @@ my $a = Foo->new;
 $a->xet('b', 42);
 is ($a->xet('b'), 42);
 ok (!defined eval { $a->{b} });
-like ($@, qr/zap/);
+like ($@->{description}, qr/zap/);
 
 {
    package t229;
@@ -1026,7 +1026,7 @@ like ($@, qr/zap/);
 
    my $warn;
    {  
-     local $SIG{__WARN__} = sub { $warn++ };
+     local ${^WARN_HOOK} = sub { $warn++ };
       my $x = t229->new;
       my $y = $x;
       eval { $y++ };
@@ -1073,7 +1073,7 @@ like ($@, qr/zap/);
     like(overload::StrVal(sub{1}),    qr/^CODE\(0x[0-9a-f]+\)$/);
     like(overload::StrVal(\*GLOB),    qr/^GLOB\(0x[0-9a-f]+\)$/);
     like(overload::StrVal(\$o),       qr/^REF\(0x[0-9a-f]+\)$/);
-    like(overload::StrVal(qr/a/),     qr/^Regexp=SCALAR\(0x[0-9a-f]+\)$/);
+    like(overload::StrVal(qr/a/),     qr/^Regexp=REGEXP\(0x[0-9a-f]+\)$/);
     like(overload::StrVal($o),        qr/^perl31793=ARRAY\(0x[0-9a-f]+\)$/);
     like(overload::StrVal($of),       qr/^perl31793_fb=ARRAY\(0x[0-9a-f]+\)$/);
     like(overload::StrVal($no),       qr/^no_overload=ARRAY\(0x[0-9a-f]+\)$/);
@@ -1248,7 +1248,7 @@ foreach my $op (qw(<+> == != +< +<= +> +>=)) {
 
     package main;
     local $^W = 1;
-    local $SIG{__WARN__} = sub { $warning = $_[0] };
+    local ${^WARN_HOOK} = sub { $warning = $_[0] };
 
     my $f = bless [], 'nomethod_false';
     ($warning, $method) = ("", "");
@@ -1278,7 +1278,7 @@ foreach my $op (qw(<+> == != +< +<= +> +>=)) {
     ($warning, $method) = ("", "");
     ok($t eq 'whatever', 'eq falls back to cmp (nomethod not called)');
     is($method, 'cmp');
-    like($warning, qr/isn't numeric/, 'cmp should return number');
+    like($warning->{description}, qr/isn't numeric/, 'cmp should return number');
 
 }
 

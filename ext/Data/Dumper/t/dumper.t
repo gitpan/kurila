@@ -56,7 +56,7 @@ sub TEST {
 
   ok(($t eq $WANT and not $@), $name);
   if ($@) {
-      diag("error: $@");
+      diag("error: {$@->message}");
   }
   if ($t ne $WANT) {
       diag("--Expected--\n$WANT\n--Got--\n$@$t\n");
@@ -318,7 +318,7 @@ $foo = { "abc\000\'\efg" => "mno\000",
 
   $WANT = <<"EOT";
 #\$VAR1 = \{
-#  "abc\\x00'\efg" => "mno\\x00",
+#  "abc\\x[00]'\efg" => "mno\\x[00]",
 #  "reftest" => \\\\1
 #\};
 EOT
