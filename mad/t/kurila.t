@@ -16,7 +16,7 @@ use Fatal qw|open close|;
 use Convert;
 
 my $from = 'kurila-1.7';
-my $to = 'kurila-1.71';
+my $to = 'kurila-1.8';
 
 sub p5convert {
     my ($input, $expected) = @_;
@@ -31,6 +31,8 @@ sub p5convert {
     is($output, $expected) or $TODO or die;
 }
 
+t_no_sigil_change();
+#t_carp();
 #t_parenthesis();
 #t_change_deref();
 #t_anon_hash();
@@ -781,7 +783,7 @@ like($@->{description}, qr/foo/);
 ====
 $SIG{__DIE__} = 1;
 ----
-${^DIE_HOOK} = 1;
+$^DIE_HOOK = 1;
 ====
 like($@->{description}, qr/foo/);
 ----
@@ -789,7 +791,7 @@ like($@->{description}, qr/foo/);
 ====
 $SIG{'__WARN__'} = 1;
 ----
-${^WARN_HOOK} = 1;
+$^WARN_HOOK = 1;
 END
 }
 
@@ -853,5 +855,75 @@ s/${a}{4}//g;
 s//ab\{c/g;
 s''de{f'g;
 s/${a}{4}//g;
+END
+}
+
+sub t_carp {
+    my $x = "abc";
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+use Carp;
+confess "foo";
+----
+use Carp;
+die "foo";
+====
+END
+}
+
+sub t_no_sigil_change {
+    my $x = "abc";
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+my @foo;
+$#foo;
+----
+my @foo;
+(@foo-1);
+====
+$#$foo
+----
+(@$foo-1)
+====
+my @foo;
+$foo[1];
+$foo[$a];
+sub x { $_[1]++; }
+----
+my @foo;
+@foo[1];
+@foo[$a];
+sub x { @_[1]++; }
+====
+my %foo;
+$foo{1};
+$foo{$a};
+exists $foo{$a};
+----
+my %foo;
+%foo{1};
+%foo{$a};
+exists %foo{$a};
+====
+@foo{@bar};
+my %mfoo;
+@mfoo{@bar};
+----
+%foo{[@bar]};
+my %mfoo;
+%mfoo{[@bar]};
+====
+@foo[1,2];
+(1,2,3)[0..2];
+----
+@foo[[1,2]];
+(1,2,3)[[0..2]];
+====
+"%"
+----
+"\%"
+====
+split m/$foo::baz{bar}/, $a;
+----
+split m/%foo::baz{bar}/, $a;
+====
 END
 }

@@ -41,8 +41,8 @@ my ($x100, $x101);
     $x101 = "\x{101}";
 }
 
-$a = "${x100}${x101}Aa";
-$b = "${x101}${x100}aA";
+$a = "{$x100}{$x101}Aa";
+$b = "{$x101}{$x100}aA";
 {
     use utf8;
 
@@ -73,21 +73,21 @@ $b = "${x101}${x100}aA";
 
     local $TODO="no utf8 lc";
 
-    is("\Q$a\E."      , "${x100}${x101}Aa.", '\Q\E ${x100}${x101}Aa');
+    is("\Q$a\E."      , "{$x100}{$x101}Aa.", '\Q\E ${x100}${x101}Aa');
 
-    is(quotemeta($a)  , "${x100}${x101}Aa",  'quotemeta');
-    is(ucfirst($a)    , "${x100}${x101}Aa",  'ucfirst');
-    is(lcfirst($a)    , "${x100}${x101}Aa",  'lcfirst');
-    is(uc($a)         , "${x100}${x101}AA",  'uc');
-    is(lc($a)         , "${x100}${x101}aa",  'lc');
+    is(quotemeta($a)  , "{$x100}{$x101}Aa",  'quotemeta');
+    is(ucfirst($a)    , "{$x100}{$x101}Aa",  'ucfirst');
+    is(lcfirst($a)    , "{$x100}{$x101}Aa",  'lcfirst');
+    is(uc($a)         , "{$x100}{$x101}AA",  'uc');
+    is(lc($a)         , "{$x100}{$x101}aa",  'lc');
 
-    is("\Q$b\E."      , "${x101}${x100}aA.", '\Q\E ${x101}${x100}aA');
+    is("\Q$b\E."      , "{$x101}{$x100}aA.", '\Q\E ${x101}${x100}aA');
 
-    is(quotemeta($b)  , "${x101}${x100}aA",  'quotemeta');
-    is(ucfirst($b)    , "${x101}${x100}aA",  'ucfirst');
-    is(lcfirst($b)    , "${x101}${x100}aA",  'lcfirst');
-    is(uc($b)         , "${x101}${x100}AA",  'uc');
-    is(lc($b)         , "${x101}${x100}aa",  'lc');
+    is(quotemeta($b)  , "{$x101}{$x100}aA",  'quotemeta');
+    is(ucfirst($b)    , "{$x101}{$x100}aA",  'ucfirst');
+    is(lcfirst($b)    , "{$x101}{$x100}aA",  'lcfirst');
+    is(uc($b)         , "{$x101}{$x100}AA",  'uc');
+    is(lc($b)         , "{$x101}{$x100}aa",  'lc');
 }
 
 # \x{DF} is LATIN SMALL LETTER SHARP S, its uppercase is SS or \x{53}\x{53};
@@ -209,7 +209,7 @@ for (map { $_ } "a\x{100}", "abc\x{100}", "\x{100}") {
     chop; # get ("a", "abc", "") in utf8
     my $return =  uc($_) =~ m/\G(.?)/g;
     my $result = $return ? $1 : "not";
-    my $expect = (uc($_) =~ m/(.?)/g)[0];
+    my $expect = (uc($_) =~ m/(.?)/g)[[0]];
     is($return, 1,       "[perl #38619]");
     is($result, $expect, "[perl #38619]");
 }
@@ -218,7 +218,7 @@ for (map { $_ } "A\x{100}", "ABC\x{100}", "\x{100}") {
     chop; # get ("A", "ABC", "") in utf8
     my $return =  lc($_) =~ m/\G(.?)/g;
     my $result = $return ? $1 : "not";
-    my $expect = (lc($_) =~ m/(.?)/g)[0];
+    my $expect = (lc($_) =~ m/(.?)/g)[[0]];
     is($return, 1,       "[perl #38619]");
     is($result, $expect, "[perl #38619]");
 }

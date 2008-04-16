@@ -1,5 +1,5 @@
 BEGIN {
-    if ($ENV{PERL_CORE}) {
+    if (%ENV{PERL_CORE}) {
 	chdir 't' if -d 't';
 	@INC = ("../lib", "lib/compress");
     }
@@ -28,14 +28,14 @@ BEGIN
 
 my $Inc = join " ", map qq["-I$_"] => @INC;
 $Inc = '"-MExtUtils::testlib"'
-    if ! $ENV{PERL_CORE} && eval " require ExtUtils::testlib; " ;
+    if ! %ENV{PERL_CORE} && eval " require ExtUtils::testlib; " ;
 
-my $Perl = ($ENV{'FULLPERL'} or $^X or 'perl') ;
+my $Perl = (%ENV{'FULLPERL'} or $^X or 'perl') ;
 $Perl = qq["$Perl"] if $^O eq 'MSWin32' ;
  
 $Perl = "$Perl $Inc -w" ;
 #$Perl .= " -Mblib " ;
-my $examples = $ENV{PERL_CORE} ? "../ext/Compress/Zlib/examples" 
+my $examples = %ENV{PERL_CORE} ? "../ext/Compress/Zlib/examples" 
                                : "./examples";
 
 my $hello1 = <<EOM ;
@@ -106,17 +106,17 @@ sub check
 # #####
 
 title "gzcat - command line" ;
-check "$Perl ${examples}/gzcat $file1 $file2",  $hello1 . $hello2;
+check "$Perl {$examples}/gzcat $file1 $file2",  $hello1 . $hello2;
 
 title "gzcat - stdin" ;
-check "$Perl ${examples}/gzcat <$file1 ", $hello1;
+check "$Perl {$examples}/gzcat <$file1 ", $hello1;
 
 
 # gzgrep
 # ######
 
 title "gzgrep";
-check "$Perl  ${examples}/gzgrep the $file1 $file2",
+check "$Perl  {$examples}/gzgrep the $file1 $file2",
         join('', grep(m/the/, @hello1, @hello2));
 
 for ($file1, $file2, $stderr) { 1 while unlink $_ } ;
@@ -129,10 +129,10 @@ for ($file1, $file2, $stderr) { 1 while unlink $_ } ;
 {
     title "gzstream" ;
     writeFile($file1, $hello1) ;
-    check "$Perl ${examples}/gzstream <$file1 >$file2";
+    check "$Perl {$examples}/gzstream <$file1 >$file2";
 
     title "gzcat" ;
-    check "$Perl ${examples}/gzcat $file2", $hello1 ;
+    check "$Perl {$examples}/gzcat $file2", $hello1 ;
 }
 
 END

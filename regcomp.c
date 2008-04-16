@@ -1357,7 +1357,7 @@ S_make_trie(pTHX_ RExC_state_t *pRExC_state, regnode *startbranch, regnode *firs
         We now know what we are dealing with in terms of unique chars and
         string sizes so we can calculate how much memory a naive
         representation using a flat table  will take. If it's over a reasonable
-        limit (as specified by ${^RE_TRIE_MAXBUF}) we use a more memory
+        limit (as specified by $^RE_TRIE_MAXBUF) we use a more memory
         conservative but potentially much slower representation using an array
         of lists.
 
@@ -4742,7 +4742,7 @@ Perl_reg_numbered_buff_length(pTHX_ REGEXP * const r, const SV * const sv,
 
     /* Some of this code was originally in C<Perl_magic_len> in F<mg.c> */
 	switch (paren) {
-      /* $` / ${^PREMATCH} */
+      /* $` / $^PREMATCH */
       case RX_BUFF_IDX_PREMATCH:
         if (rx->offs[0].start != -1) {
 			i = rx->offs[0].start;
@@ -4753,7 +4753,7 @@ Perl_reg_numbered_buff_length(pTHX_ REGEXP * const r, const SV * const sv,
 			}
 	    }
         return 0;
-      /* $' / ${^POSTMATCH} */
+      /* $' / $^POSTMATCH */
       case RX_BUFF_IDX_POSTMATCH:
 	    if (rx->offs[0].end != -1) {
 			i = rx->sublen - rx->offs[0].end;
@@ -4764,7 +4764,7 @@ Perl_reg_numbered_buff_length(pTHX_ REGEXP * const r, const SV * const sv,
 			}
 	    }
         return 0;
-      /* $& / ${^MATCH}, $1, $2, ... */
+      /* $& / $^MATCH, $1, $2, ... */
       default:
 	    if (paren <= (I32)rx->nparens &&
             (s1 = rx->offs[paren].start) != -1 &&
@@ -6359,7 +6359,9 @@ S_reg_namedseq(pTHX_ RExC_state_t *pRExC_state, UV *valuep)
         char *s; 
         char *p, *pend;        
         STRLEN charlen = 1;
+#ifdef RE_TRACK_PATTERN_OFFSETS
         char * parse_start = name-3; /* needed for the offsets */
+#endif
         GET_RE_DEBUG_FLAGS_DECL;     /* needed for the offsets */
         
 	if (FOLD) {
@@ -6663,7 +6665,7 @@ tryagain:
 	case 'P':
 	    {	
 		char* const oldregxend = RExC_end;
-#ifdef DEBUGGING
+#ifdef RE_TRACK_PATTERN_OFFSETS
 		char* parse_start = RExC_parse - 2;
 #endif
 

@@ -54,18 +54,6 @@
      Constant subroutine %s redefined 
         sub fred() {1;} sub fred() {1;}
  
-     Format FRED redefined at /tmp/x line 5.
-       format FRED =
-       .
-       format FRED =
-       .
- 
-     Array @%s missing the @ in argument %d of %s() 
-	push fred ;
- 
-     Hash %%%s missing the %% in argument %d of %s() 
-	keys joe ;
- 
      Statement unlikely to be reached
      	(Maybe you meant system() when you said exec()?
  	exec "true" ; my $a
@@ -164,7 +152,7 @@ wantarray ; 		# OP_WANTARRAY
 			# OP_PADAV
 			# OP_PADHV
 			# OP_PADANY
-			# OP_AV2ARYLEN
+
 ref ;			# OP_REF
 \@a ;			# OP_REFGEN
 \$a ;			# OP_SREFGEN
@@ -177,17 +165,17 @@ vec $a,1,2 ;		# OP_VEC
 index $a,1,2 ;		# OP_INDEX
 rindex $a,1,2 ;		# OP_RINDEX
 sprintf $a ;		# OP_SPRINTF
-$a[0] ;			# OP_AELEM
+@a[0] ;			# OP_AELEM
 			# OP_AELEMFAST
-@a[0] ;			# OP_ASLICE
+@a[[0]] ;		# OP_ASLICE
 #values %a ;		# OP_VALUES
 #keys %a ;		# OP_KEYS
-$a{0} ;			# OP_HELEM
-@a{0} ;			# OP_HSLICE
+%a{0} ;			# OP_HELEM
+%a{[0]} ;		# OP_HSLICE
 unpack "a", "a" ;	# OP_UNPACK
 pack $a,"" ;		# OP_PACK
 join "" ;		# OP_JOIN
-(@a)[0,1] ;		# OP_LSLICE
+(@a)[[0,1]] ;		# OP_LSLICE
 			# OP_ANONLIST
 			# OP_ANONHASH
 sort(1,2) ;		# OP_SORT
@@ -269,7 +257,7 @@ wantarray ; 		# OP_WANTARRAY
 			# OP_PADAV
 			# OP_PADHV
 			# OP_PADANY
-			# OP_AV2ARYLEN
+
 ref ;			# OP_REF
 \@a ;			# OP_REFGEN
 \$a ;			# OP_SREFGEN
@@ -282,17 +270,17 @@ vec $a,1,2 ;		# OP_VEC
 index $a,1,2 ;		# OP_INDEX
 rindex $a,1,2 ;		# OP_RINDEX
 sprintf $a ;		# OP_SPRINTF
-$a[0] ;			# OP_AELEM
+@a[0] ;			# OP_AELEM
 			# OP_AELEMFAST
-@a[0] ;			# OP_ASLICE
+@a[[0]] ;		# OP_ASLICE
 #values %a ;		# OP_VALUES
 #keys %a ;		# OP_KEYS
-$a{0} ;			# OP_HELEM
-@a{0} ;			# OP_HSLICE
+%a{0} ;			# OP_HELEM
+%a{[0]} ;		# OP_HSLICE
 unpack "a", "a" ;	# OP_UNPACK
 pack $a,"" ;		# OP_PACK
 join "" ;		# OP_JOIN
-(@a)[0,1] ;		# OP_LSLICE
+(@a)[[0,1]] ;		# OP_LSLICE
 			# OP_ANONLIST
 			# OP_ANONHASH
 sort(1,2) ;		# OP_SORT
@@ -328,7 +316,7 @@ Useless use of string in void context at - line 3.
 use warnings 'void' ;
 use Config ;
 BEGIN {
-    if ( ! $Config{d_telldir}) {
+    if ( ! %Config{d_telldir}) {
         print <<EOM ;
 SKIPPED
 # telldir not present
@@ -346,7 +334,7 @@ Useless use of telldir in void context at - line 13.
 use warnings 'void' ;
 use Config ;
 BEGIN {
-    if ( ! $Config{d_getppid}) {
+    if ( ! %Config{d_getppid}) {
         print <<EOM ;
 SKIPPED
 # getppid not present
@@ -364,7 +352,7 @@ Useless use of getppid in void context at - line 13.
 use warnings 'void' ;
 use Config ;
 BEGIN {
-    if ( ! $Config{d_getpgrp}) {
+    if ( ! %Config{d_getpgrp}) {
         print <<EOM ;
 SKIPPED
 # getpgrp not present
@@ -382,7 +370,7 @@ Useless use of getpgrp in void context at - line 13.
 use warnings 'void' ;
 use Config ;
 BEGIN {
-    if ( ! $Config{d_times}) {
+    if ( ! %Config{d_times}) {
         print <<EOM ;
 SKIPPED
 # times not present
@@ -400,7 +388,7 @@ Useless use of times in void context at - line 13.
 use warnings 'void' ;
 use Config ;
 BEGIN {
-    if ( ! $Config{d_getprior} or $^O eq 'os2') { # Locks before fixpak22
+    if ( ! %Config{d_getprior} or $^O eq 'os2') { # Locks before fixpak22
         print <<EOM ;
 SKIPPED
 # getpriority not present
@@ -418,7 +406,7 @@ Useless use of getpriority in void context at - line 13.
 use warnings 'void' ;
 use Config ;
 BEGIN {
-    if ( ! $Config{d_getlogin}) {
+    if ( ! %Config{d_getlogin}) {
         print <<EOM ;
 SKIPPED
 # getlogin not present
@@ -435,7 +423,7 @@ Useless use of getlogin in void context at - line 13.
 # op.c
 use warnings 'void' ;
 use Config ; BEGIN {
-if ( ! $Config{d_socket}) {
+if ( ! %Config{d_socket}) {
     print <<EOM ;
 SKIPPED
 # getsockname not present
@@ -729,22 +717,6 @@ EXPECT
 Constant subroutine main::fred redefined at - line 4.
 ########
 # op.c
-use warnings 'deprecated' ;
-push FRED;
-no warnings 'deprecated' ;
-push FRED;
-EXPECT
-Array @FRED missing the @ in argument 1 of push() at - line 3.
-########
-# op.c
-use warnings 'deprecated' ;
-@a = keys FRED ;
-no warnings 'deprecated' ;
-@a = keys FRED ;
-EXPECT
-Hash %FRED missing the % in argument 1 of keys() at - line 3.
-########
-# op.c
 BEGIN {
     if ($^O eq 'MacOS') {
 	print <<EOM;
@@ -848,7 +820,7 @@ print "in mainline\n";
 1;
 --FILE--
 use abc;
-delete $INC{"abc.pm"};
+delete %INC{"abc.pm"};
 require abc;
 do "abc.pm";
 EXPECT
@@ -1001,22 +973,22 @@ local($x?$y:$z) = 1;	# OP_COND_EXPR		ok
 #local(@$a);		# OP_RV2AV		ok
 #local(%$a);		# OP_RV2HV		ok
 local(*a);		# OP_RV2GV		ok
-local(@a[1,2]);		# OP_ASLICE		ok
-local(@a{1,2});		# OP_HSLICE		ok
+local(@a[[1,2]]);	# OP_ASLICE		ok
+local(%a{[1,2]});	# OP_HSLICE		ok
 local(@a = (1,2));	# OP_AASSIGN
 #local($$x);		# OP_RV2SV		ok
-local($#a);		# OP_AV2ARYLEN
+
 local($x =   1);	# OP_SASSIGN
 local($x &&= 1);	# OP_ANDASSIGN
 local($x ||= 1);	# OP_ORASSIGN
 local($x //= 1);	# OP_DORASSIGN
-local($a[0]);		# OP_AELEMFAST		ok
+local(@a[0]);		# OP_AELEMFAST		ok
 
                  	# OP_SUBSTR
 local(pos($x));		# OP_POS
 local(vec($x,0,1));	# OP_VEC
-local($a[$b]);		# OP_AELEM		ok
-local($a{$b});		# OP_HELEM		ok
+local(@a[$b]);		# OP_AELEM		ok
+local(%a{$b});		# OP_HELEM		ok
 
 no warnings 'syntax';
 EXPECT
@@ -1039,7 +1011,6 @@ Useless localization of integer modulus (%) at - line 26.
 Useless localization of integer addition (+) at - line 27.
 Useless localization of integer subtraction (-) at - line 28.
 Useless localization of list assignment at - line 37.
-Useless localization of array length at - line 39.
 Useless localization of scalar assignment at - line 40.
 Useless localization of logical and assignment (&&=) at - line 41.
 Useless localization of logical or assignment (||=) at - line 42.

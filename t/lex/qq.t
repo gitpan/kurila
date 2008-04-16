@@ -25,7 +25,7 @@ sub is {
 ), $test++, $left, $right;
 
     printf q(# Failed test at line %d
-), (caller)[2];
+), (caller)[[2]];
 
     return 0;
 }
@@ -44,7 +44,7 @@ is ("\x{x4E}", chr 0);
 
 is("\x[65]", chr 101);
 is("\x[FF]", bytes::chr(0xFF));
-is("\x[%0]", chr 0);
+is("\x[\%0]", chr 0);
 is("\x[9]", '');
 is("\x[FF9]", "\x[FF]");
 
@@ -54,7 +54,7 @@ is(qq{ \{ 1 \} }, ' { 1 } ', " curly braces inside curly braces");
 is (eval "qq\x{263A}foo\x{263A}", 'foo', "Unicode delimeters");
 
 {
-    local ${^WARN_HOOK} = sub { };
+    local $^WARN_HOOK = sub { };
     is (eval '"\x53"', chr 83);
     is (eval '"\x4EE"', chr (78) . 'E');
     is (eval '"\x4i"', chr (4) . 'i');	# This will warn

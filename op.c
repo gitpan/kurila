@@ -358,11 +358,9 @@ S_no_bareword_allowed(pTHX_ const OP *o)
 {
     PERL_ARGS_ASSERT_NO_BAREWORD_ALLOWED;
 
-    if (PL_madskills)
-	return;		/* various ok barewords are hidden in extra OP_NULL */
-    qerror(Perl_mess(aTHX_
-		     "Bareword \"%"SVf"\" not allowed while \"strict subs\" in use\n",
-		     SVfARG(cSVOPo_sv)));
+    yyerror(Perl_form(aTHX_
+		      "Bareword \"%"SVf"\" not allowed while \"strict subs\" in use",
+		      SVfARG(cSVOPo_sv)));
 }
 
 /* "register" allocation */
@@ -904,7 +902,6 @@ Perl_scalarvoid(pTHX_ OP *o)
     case OP_PADAV:
     case OP_PADHV:
     case OP_PADANY:
-    case OP_AV2ARYLEN:
     case OP_REF:
     case OP_REFGEN:
     case OP_SREFGEN:
@@ -1435,7 +1432,6 @@ Perl_mod(pTHX_ OP *o, I32 type)
 	localize = 1;
 	/* FALL THROUGH */
     case OP_GV:
-    case OP_AV2ARYLEN:
 	PL_hints |= HINT_BLOCK_SCOPE;
     case OP_SASSIGN:
     case OP_ANDASSIGN:
@@ -5480,7 +5476,6 @@ Perl_newATTRSUB(pTHX_ I32 floor, OP *o, OP *proto, OP *attrs, OP *block)
 	    GvCV(gv) = cv;
 	    if (PL_madskills) {
 		if (strEQ(name, "import")) {
-		    PL_formfeed = (SV*)cv;
 		    Perl_warner(aTHX_ packWARN(WARN_VOID), "%lx\n", (long)cv);
 		}
 	    }
@@ -5877,16 +5872,15 @@ Perl_oopsAV(pTHX_ OP *o)
     PERL_ARGS_ASSERT_OOPSAV;
 
     switch (o->op_type) {
-    case OP_PADSV:
-	o->op_type = OP_PADAV;
-	o->op_ppaddr = PL_ppaddr[OP_PADAV];
+    case OP_PADAV:
 	return ref(o, OP_RV2AV);
 
-    case OP_RV2SV:
-	o->op_type = OP_RV2AV;
-	o->op_ppaddr = PL_ppaddr[OP_RV2AV];
+    case OP_RV2AV:
 	ref(o, OP_RV2AV);
 	break;
+
+    case OP_ANONLIST:
+	return ref(newAVREF(o), OP_RV2AV);
 
     default:
 	if (ckWARN_d(WARN_INTERNAL))
@@ -5904,16 +5898,10 @@ Perl_oopsHV(pTHX_ OP *o)
     PERL_ARGS_ASSERT_OOPSHV;
 
     switch (o->op_type) {
-    case OP_PADSV:
-    case OP_PADAV:
-	o->op_type = OP_PADHV;
-	o->op_ppaddr = PL_ppaddr[OP_PADHV];
+    case OP_PADHV:
 	return ref(o, OP_RV2HV);
 
-    case OP_RV2SV:
-    case OP_RV2AV:
-	o->op_type = OP_RV2HV;
-	o->op_ppaddr = PL_ppaddr[OP_RV2HV];
+    case OP_RV2HV:
 	ref(o, OP_RV2HV);
 	break;
 
@@ -6500,48 +6488,12 @@ Perl_ck_fun(pTHX_ OP *o)
 			"Useless use of %s with no values",
 			PL_op_desc[type]);
 
-		if (kid->op_type == OP_CONST &&
-		    (kid->op_private & OPpCONST_BARE))
-		{
-		    OP * const newop = newAVREF(newGVOP(OP_GV, 0,
-			gv_fetchsv(((SVOP*)kid)->op_sv, GV_ADD, SVt_PVAV) ));
-		    if (ckWARN2(WARN_DEPRECATED, WARN_SYNTAX))
-			Perl_warner(aTHX_ packWARN2(WARN_DEPRECATED, WARN_SYNTAX),
-			    "Array @%"SVf" missing the @ in argument %"IVdf" of %s()",
-			    SVfARG(((SVOP*)kid)->op_sv), (IV)numargs, PL_op_desc[type]);
-#ifdef PERL_MAD
-		    op_getmad(kid,newop,'K');
-#else
-		    op_free(kid);
-#endif
-		    kid = newop;
-		    kid->op_sibling = sibl;
-		    *tokid = kid;
-		}
-		else if (kid->op_type != OP_RV2AV && kid->op_type != OP_PADAV)
+		if (kid->op_type != OP_RV2AV && kid->op_type != OP_PADAV)
 		    bad_type(numargs, "array", PL_op_desc[type], kid);
 		mod(kid, type);
 		break;
 	    case OA_HVREF:
-		if (kid->op_type == OP_CONST &&
-		    (kid->op_private & OPpCONST_BARE))
-		{
-		    OP * const newop = newHVREF(newGVOP(OP_GV, 0,
-			gv_fetchsv(((SVOP*)kid)->op_sv, GV_ADD, SVt_PVHV) ));
-		    if (ckWARN2(WARN_DEPRECATED, WARN_SYNTAX))
-			Perl_warner(aTHX_ packWARN2(WARN_DEPRECATED, WARN_SYNTAX),
-			    "Hash %%%"SVf" missing the %% in argument %"IVdf" of %s()",
-			    SVfARG(((SVOP*)kid)->op_sv), (IV)numargs, PL_op_desc[type]);
-#ifdef PERL_MAD
-		    op_getmad(kid,newop,'K');
-#else
-		    op_free(kid);
-#endif
-		    kid = newop;
-		    kid->op_sibling = sibl;
-		    *tokid = kid;
-		}
-		else if (kid->op_type != OP_RV2HV && kid->op_type != OP_PADHV)
+		if (kid->op_type != OP_RV2HV && kid->op_type != OP_PADHV)
 		    bad_type(numargs, "hash", PL_op_desc[type], kid);
 		mod(kid, type);
 		break;

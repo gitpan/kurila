@@ -134,15 +134,15 @@ static I32 utf16rev_textfilter(pTHX_ int idx, SV *sv, int maxlen);
 
 /* #define LEX_NOTPARSING		11 is done in perl.h. */
 
-#define LEX_NORMAL		 8 /* normal code (ie not within "...")     */
-#define LEX_INTERPNORMAL	 7 /* code within a string, eg "$foo[$x+1]" */
-#define LEX_INTERPCASEMOD	 6 /* expecting a \U, \Q or \E etc          */
-#define LEX_INTERPPUSH		 5 /* starting a new sublex parse level     */
-#define LEX_INTERPSTART		 4 /* expecting the start of a $var         */
+#define LEX_INTERPBLOCK          8 /* block inside { ... } */
+#define LEX_NORMAL		 7 /* normal code (ie not within "...")     */
+#define LEX_INTERPNORMAL	 6 /* code within a string, eg "$foo[$x+1]" */
+#define LEX_INTERPCASEMOD	 5 /* expecting a \U, \Q or \E etc          */
+#define LEX_INTERPPUSH		 4 /* starting a new sublex parse level     */
+#define LEX_INTERPSTART		 3 /* expecting the start of a $var         */
 
 				   /* at end of code, eg "$x" followed by:  */
-#define LEX_INTERPEND		 3 /* ... eg not one of [, { or ->          */
-#define LEX_INTERPENDMAYBE	 2 /* ... eg one of [, { or ->              */
+#define LEX_INTERPEND		 2 /* ... eg not one of [, { or ->          */
 
 #define LEX_INTERPCONCAT	 1 /* expecting anything, eg at start of
 				        string or after \E, $foo, etc       */
@@ -153,13 +153,13 @@ static I32 utf16rev_textfilter(pTHX_ int idx, SV *sv, int maxlen);
 static const char* const lex_state_names[] = {
     "KNOWNEXT",
     "INTERPCONCAT",
-    "INTERPENDMAYBE",
     "INTERPEND",
     "INTERPSTART",
     "INTERPPUSH",
     "INTERPCASEMOD",
     "INTERPNORMAL",
-    "NORMAL"
+    "NORMAL",
+    "INTERPBLOCK"
 };
 #endif
 
@@ -192,7 +192,7 @@ static const char* const lex_state_names[] = {
  * Convenience functions to return different tokens and prime the
  * lexer for the next token.  They all take an argument.
  *
- * TOKEN        : generic token (used for '(', DOLSHARP, etc)
+ * TOKEN        : generic token (used for '(', etc)
  * OPERATOR     : generic operator
  * AOPERATOR    : assignment operator
  * PREBLOCK     : beginning the block after an if, while, foreach, ...
@@ -305,7 +305,6 @@ static struct debug_tokens {
     { CONTINUE,		TOKENTYPE_NONE,		"CONTINUE" },
     { DEFAULT,		TOKENTYPE_NONE,		"DEFAULT" },
     { DO,		TOKENTYPE_NONE,		"DO" },
-    { DOLSHARP,		TOKENTYPE_NONE,		"DOLSHARP" },
     { DORDOR,		TOKENTYPE_NONE,		"DORDOR" },
     { DOROP,		TOKENTYPE_OPNUM,	"DOROP" },
     { DOTDOT,		TOKENTYPE_IVAL,		"DOTDOT" },
@@ -2131,6 +2130,14 @@ S_scan_const(pTHX_ char *start)
 	    if (!in_pat && (s[1] == '+' || s[1] == '-'))
 		break; /* in regexp, neither @+ nor @- are interpolated */
 	}
+	else if (*s == '%' && s[1]) {
+	    if (isALNUM_lazy_if(s+1,UTF))
+		break;
+	    if (strchr(":'{$", s[1]))
+		break;
+	    if (!in_pat && (s[1] == '+' || s[1] == '-'))
+		break; /* in regexp, neither %+ nor %- are interpolated */
+	}
 
 	/* check for embedded scalars.  only stop if we're sure it's a
 	   variable.
@@ -2901,7 +2908,7 @@ Perl_yylex(pTHX)
 	DEBUG_T({ PerlIO_printf(Perl_debug_log,
               "### Interpolated variable\n"); });
 	if (*PL_bufptr == '{') {
-	    PL_lex_state = LEX_INTERPNORMAL;
+	    PL_lex_state = LEX_INTERPBLOCK;
 	    PL_expect = XREF;
 
 	    start_force(PL_curforce);
@@ -2949,13 +2956,6 @@ Perl_yylex(pTHX)
 		Aop(OP_CONCAT);
 	}
 	return yylex();
-
-    case LEX_INTERPENDMAYBE:
-	if (intuit_more(PL_bufptr)) {
-	    PL_lex_state = LEX_INTERPNORMAL;	/* false alarm, more expr */
-	    break;
-	}
-	/* FALL THROUGH */
 
     case LEX_INTERPEND:
 	if (PL_lex_dojoin) {
@@ -3257,7 +3257,7 @@ Perl_yylex(pTHX)
 		     * at least, set argv[0] to the basename of the Perl
 		     * interpreter. So, having found "#!", we'll set it right.
 		     */
-		    SV * const x = GvSV(gv_fetchpvs("\030", GV_ADD|GV_NOTQUAL,
+		    SV * const x = GvSV(gv_fetchpvs("^X", GV_ADD|GV_NOTQUAL,
 						    SVt_PV)); /* $^X */
 		    assert(SvPOK(x) || SvGMAGICAL(x));
 		    if (sv_eq(x, CopFILESV(PL_curcop))) {
@@ -3737,13 +3737,20 @@ Perl_yylex(pTHX)
 	}
 	Perl_croak(aTHX_ "Unknown operator '~' found");
     case '[':
-	PL_lex_brackets++;
-	/* FALL THROUGH */
-    case ',':
-	{
-	    const char tmp = *s++;
-	    OPERATOR(tmp);
+	s++;
+	if (PL_expect == XOPERATOR && *s == '[') {
+	    s++;
+	    PL_lex_brackstack[PL_lex_brackets++] = XSTATE;
+	    PL_lex_brackstack[PL_lex_brackets++] = XSTATE;
+	    PL_expect = XSTATE;
+	    TOKEN(ASLICE);
+	    /* NOT REACHED */
 	}
+	PL_lex_brackets++;
+	OPERATOR('[');
+    case ',':
+	s++;
+	OPERATOR(',');
     case ':':
 	if (s[1] == ':') {
 	    len = 0;
@@ -3948,6 +3955,14 @@ Perl_yylex(pTHX)
 		PL_lex_brackstack[PL_lex_brackets++] = XOPERATOR;
 	    OPERATOR(HASHBRACK);
 	case XOPERATOR:
+	    if (*s == '[') {
+		s++;
+		PL_lex_brackstack[PL_lex_brackets++] = XSTATE;
+		PL_lex_brackstack[PL_lex_brackets++] = XSTATE;
+		PL_expect = XSTATE;
+		TOKEN(HSLICE);
+		/* NOT REACHED */
+	    }
 	    while (s < PL_bufend && SPACE_OR_TAB(*s))
 		s++;
 	    d = s;
@@ -4106,6 +4121,18 @@ Perl_yylex(pTHX)
 	    Perl_croak(aTHX_ "Unmatched right curly bracket");
 	else
 	    PL_expect = (expectation)PL_lex_brackstack[--PL_lex_brackets];
+	if (PL_lex_state == LEX_INTERPBLOCK) {
+	    if (PL_lex_brackets == 0) 
+		PL_lex_state = LEX_INTERPEND;
+	    if (PL_lex_brackets == 0) {
+		if (PL_expect & XFAKEBRACK) {
+		    PL_expect &= XENUMMASK;
+		    PL_lex_state = LEX_INTERPEND;
+		    PL_bufptr = s;
+		    return yylex();	/* ignore fake brackets */
+		}
+	    }
+	}
 	if (PL_lex_state == LEX_INTERPNORMAL) {
 	    if ( ! intuit_more(s))
 		PL_lex_state = LEX_INTERPEND;
@@ -4284,16 +4311,7 @@ Perl_yylex(pTHX)
 	CLINE;
 
 	if (s[1] == '#' && (isIDFIRST_lazy_if(s+2,UTF) || strchr("{$:+-", s[2]))) {
-	    PL_tokenbuf[0] = '@';
-	    s = scan_ident(s + 1, PL_bufend, PL_tokenbuf + 1,
-			   sizeof PL_tokenbuf - 1, FALSE);
-	    if (PL_expect == XOPERATOR)
-		no_op("Array length", s);
-	    if (!PL_tokenbuf[1])
-		PREREF(DOLSHARP);
-	    PL_expect = XOPERATOR;
-	    PL_pending_ident = '#';
-	    TOKEN(DOLSHARP);
+	    Perl_croak(aTHX_ "$# is not allowed");
 	}
 
 	PL_tokenbuf[0] = '$';
@@ -4316,44 +4334,13 @@ Perl_yylex(pTHX)
 	    if ((PL_expect != XREF || PL_oldoldbufptr == PL_last_lop)
 		&& intuit_more(s)) {
 		if (*s == '[') {
+		    Perl_croak(aTHX_ "array element should be @%s[...] instead of $%s[...]",
+			       &PL_tokenbuf[1], &PL_tokenbuf[1]);
 		    PL_tokenbuf[0] = '@';
-		    if (ckWARN(WARN_SYNTAX)) {
-			char *t = s+1;
-
-			while (isSPACE(*t) || isALNUM_lazy_if(t,UTF) || *t == '$')
-			    t++;
-			if (*t++ == ',') {
-			    PL_bufptr = PEEKSPACE(PL_bufptr); /* XXX can realloc */
-			    while (t < PL_bufend && *t != ']')
-				t++;
-			    Perl_warner(aTHX_ packWARN(WARN_SYNTAX),
-					"Multidimensional syntax %.*s not supported",
-				    (int)((t - PL_bufptr) + 1), PL_bufptr);
-			}
-		    }
 		}
 		else if (*s == '{') {
-		    char *t;
-		    PL_tokenbuf[0] = '%';
-		    if (strEQ(PL_tokenbuf+1, "SIG")  && ckWARN(WARN_SYNTAX)
-			&& (t = strchr(s, '}')) && (t = strchr(t, '=')))
-			{
-			    char tmpbuf[sizeof PL_tokenbuf];
-			    do {
-				t++;
-			    } while (isSPACE(*t));
-			    if (isIDFIRST_lazy_if(t,UTF)) {
-				STRLEN len;
-				t = scan_word(t, tmpbuf, sizeof tmpbuf, TRUE,
-					      &len);
-				while (isSPACE(*t))
-				    t++;
-				if (*t == ';' && get_cvn_flags(tmpbuf, len, 0))
-				    Perl_warner(aTHX_ packWARN(WARN_SYNTAX),
-						"You need to quote \"%s\"",
-						tmpbuf);
-			    }
-			}
+		    Perl_croak(aTHX_ "hash element should be %%%s{...} instead of $%s{...}",
+			       &PL_tokenbuf[1], &PL_tokenbuf[1]);
 		}
 	    }
 
@@ -4413,22 +4400,26 @@ Perl_yylex(pTHX)
 	if (PL_lex_state == LEX_NORMAL)
 	    s = SKIPSPACE1(s);
 	if ((PL_expect != XREF || PL_oldoldbufptr == PL_last_lop) && intuit_more(s)) {
-	    if (*s == '{')
+	    if (*s == '{') {
+		Perl_croak(aTHX_ "hash slice should be %%%s{[...]} instead of @%s{...}",
+			   PL_tokenbuf+1, PL_tokenbuf+1);
 		PL_tokenbuf[0] = '%';
+	    }
 
-	    /* Warn about @ where they meant $. */
-	    if (*s == '[' || *s == '{') {
+	    /* Warn about @...[...] where they meant @...[[...]]. */
+	    if (*s == '[') {
 		if (ckWARN(WARN_SYNTAX)) {
-		    const char *t = s + 1;
-		    while (*t && (isALNUM_lazy_if(t,UTF) || strchr(" \t$#+-'\"", *t)))
+		    char *t = s+1;
+
+		    while (isSPACE(*t) || isALNUM_lazy_if(t,UTF) || *t == '$')
 			t++;
-		    if (*t == '}' || *t == ']') {
-			t++;
+		    if (*t++ == ',') {
 			PL_bufptr = PEEKSPACE(PL_bufptr); /* XXX can realloc */
+			while (t < PL_bufend && *t != ']')
+			    t++;
 			Perl_warner(aTHX_ packWARN(WARN_SYNTAX),
-			    "Scalar value %.*s better written as $%.*s",
-			    (int)(t-PL_bufptr), PL_bufptr,
-			    (int)(t-PL_bufptr-1), PL_bufptr+1);
+				    "Multidimensional syntax %.*s not supported",
+				    (int)((t - PL_bufptr) + 1), PL_bufptr);
 		    }
 		}
 	    }
@@ -4509,7 +4500,7 @@ Perl_yylex(pTHX)
 	/* FIXME. I think that this can be const if char *d is replaced by
 	   more localised variables.  */
 	for (d = SvPV(PL_lex_stuff.str_sv, len); len; len--, d++) {
-	    if (*d == '{' || *d == '$' || *d == '@' || *d == '\\' || !UTF8_IS_INVARIANT(*d)) {
+	    if (*d == '{' || *d == '$' || *d == '@' || *d == '%' || *d == '\\' || !UTF8_IS_INVARIANT(*d)) {
 		pl_yylval.ival = OP_STRINGIFY;
 		break;
 	    }
@@ -9835,12 +9826,13 @@ STATIC char *
 S_scan_ident(pTHX_ register char *s, register const char *send, char *dest, STRLEN destlen, I32 ck_uni)
 {
     dVAR;
-    char *bracket = NULL;
-    char funny = *s++;
     register char *d = dest;
     register char * const e = d + destlen + 3;    /* two-character token, ending NUL */
 
     PERL_ARGS_ASSERT_SCAN_IDENT;
+
+    /* skip sigil */
+    s++;
 
     if (isSPACE(*s))
 	s = PEEKSPACE(s);
@@ -9852,6 +9844,10 @@ S_scan_ident(pTHX_ register char *s, register const char *send, char *dest, STRL
 	}
     }
     else {
+	/* allow initial ^ */
+	if (*s == '^') {
+	    *d++ = *s++;
+	}
 	for (;;) {
 	    if (d >= e)
 		Perl_croak(aTHX_ ident_too_long);
@@ -9879,10 +9875,12 @@ S_scan_ident(pTHX_ register char *s, register const char *send, char *dest, STRL
     d = dest;
     if (*d) {
 	if (PL_lex_state != LEX_NORMAL) {
-	    if (intuit_more(s)) {
-		PL_lex_state = LEX_INTERPNORMAL;
-	    } else {
-		PL_lex_state = LEX_INTERPEND;
+	    if (PL_lex_brackets == 0) {
+		if (intuit_more(s)) {
+		    PL_lex_state = LEX_INTERPNORMAL;
+		} else {
+		    PL_lex_state = LEX_INTERPEND;
+		}
 	    }
 	}
 	return s;
@@ -9893,102 +9891,18 @@ S_scan_ident(pTHX_ register char *s, register const char *send, char *dest, STRL
 	return s;
     }
     if (*s == '{') {
-	bracket = s;
-	s++;
+	*d = '\0';
+	return s;
     }
     else if (ck_uni)
 	check_uni();
     if (s < send)
 	*d = *s++;
     d[1] = '\0';
-    if (*d == '^' && *s && isCONTROLVAR(*s)) {
-	*d = toCTRL(*s);
-	s++;
+    if (*d == '^') {
+	*d++ = *s++;
     }
-    if (bracket) {
-	if (isSPACE(s[-1])) {
-	    while (s < send) {
-		const char ch = *s++;
-		if (!SPACE_OR_TAB(ch)) {
-		    *d = ch;
-		    break;
-		}
-	    }
-	}
-	if (isIDFIRST_lazy_if(d,UTF)) {
-	    d++;
-	    if (UTF) {
-		char *end = s;
-		while ((end < send && isALNUM_lazy_if(end,UTF)) || *end == ':') {
-		    end += UTF8SKIP(end);
-		    while (end < send && UTF8_IS_CONTINUED(*end) && is_utf8_mark(end))
-			end += UTF8SKIP(end);
-		}
-		Copy(s, d, end - s, char);
-		d += end - s;
-		s = end;
-	    }
-	    else {
-		while ((isALNUM(*s) || *s == ':') && d < e)
-		    *d++ = *s++;
-		if (d >= e)
-		    Perl_croak(aTHX_ ident_too_long);
-	    }
-	    *d = '\0';
-	    while (s < send && SPACE_OR_TAB(*s))
-		s++;
-	    if ((*s == '[' || (*s == '{' && strNE(dest, "sub")))) {
-		if (ckWARN(WARN_AMBIGUOUS) && keyword(dest, d - dest, 0)) {
-		    const char * const brack =
-			(const char *)
-			((*s == '[') ? "[...]" : "{...}");
-		    Perl_warner(aTHX_ packWARN(WARN_AMBIGUOUS),
-			"Ambiguous use of %c{%s%s} resolved to %c%s%s",
-			funny, dest, brack, funny, dest, brack);
-		}
-		bracket++;
-		PL_lex_brackstack[PL_lex_brackets++] = (char)(XOPERATOR | XFAKEBRACK);
-		return s;
-	    }
-	}
-	/* Handle extended ${^Foo} variables
-	 * 1999-02-27 mjd-perl-patch@plover.com */
-	else if (!isALNUM(*d) && !isPRINT(*d) /* isCTRL(d) */
-		 && isALNUM(*s))
-	{
-	    d++;
-	    while (isALNUM(*s) && d < e) {
-		*d++ = *s++;
-	    }
-	    if (d >= e)
-		Perl_croak(aTHX_ ident_too_long);
-	    *d = '\0';
-	}
-	if (*s == '}') {
-	    s++;
-	    if (PL_lex_state == LEX_INTERPNORMAL && !PL_lex_brackets) {
-		PL_lex_state = LEX_INTERPEND;
-		PL_expect = XREF;
-	    }
-	    if (PL_lex_state == LEX_NORMAL) {
-		if (ckWARN(WARN_AMBIGUOUS) &&
-		    (keyword(dest, d - dest, 0)
-		     || get_cvn_flags(dest, d - dest, 0)))
-		{
-		    if (funny == '#')
-			funny = '@';
-		    Perl_warner(aTHX_ packWARN(WARN_AMBIGUOUS),
-			"Ambiguous use of %c{%s} resolved to %c%s",
-			funny, dest, funny, dest);
-		}
-	    }
-	}
-	else {
-	    s = bracket;		/* let the parser handle it */
-	    *dest = '\0';
-	}
-    }
-    else if (PL_lex_state == LEX_INTERPNORMAL && !PL_lex_brackets && !intuit_more(s))
+    if (PL_lex_state == LEX_INTERPNORMAL && !PL_lex_brackets && !intuit_more(s))
 	PL_lex_state = LEX_INTERPEND;
     return s;
 }
@@ -10713,7 +10627,7 @@ S_scan_str(pTHX_ char *start, int escape, int keep_delims, yy_str_info *str_info
     }
 
 
-    assert(str_info->str_sv == NULL);
+    /*     assert(str_info->str_sv == NULL); */ /* Might fail if compilation was aborted inside a s///  */
     str_info->str_sv = sv;
 
     return s;

@@ -810,19 +810,6 @@ ext/Unicode/Normalize/t/test.t	Unicode::Normalize
 ext/Unicode/Normalize/t/tie.t	Unicode::Normalize
 ext/util/make_ext		Used by Makefile to execute extension Makefiles
 ext/util/make_ext_cross		Cross-compilation
-ext/Win32API/File/buffers.h	Win32API::File extension
-ext/Win32API/File/cFile.h	Win32API::File extension
-ext/Win32API/File/cFile.pc	Win32API::File extension
-ext/Win32API/File/Changes	Win32API::File extension changes
-ext/Win32API/File/const2perl.h	Win32API::File extension
-ext/Win32API/File/ExtUtils/Myconst2perl.pm	Win32API::File extension
-ext/Win32API/File/File.pm	Win32API::File extension
-ext/Win32API/File/File.xs	Win32API::File extension
-ext/Win32API/File/Makefile.PL	Win32API::File extension makefile write
-ext/Win32API/File/README	Win32API::File extension Readme
-ext/Win32API/File/t/file.t	See if Win32API::File extension works
-ext/Win32API/File/t/tie.t	See if Win32API::File extension works
-ext/Win32API/File/typemap	Win32API::File extension interface types
 ext/Win32/Changes		Changes for Win32 extension module
 ext/Win32CORE/Makefile.PL	Win32CORE extension
 ext/Win32CORE/t/win32core.t	Win32CORE extension
@@ -1063,29 +1050,6 @@ lib/Config.t			See if Config works
 lib/constant.pm			For "use constant"
 lib/constant.t			See if compile-time constants work
 lib/CORE.pod			document the CORE namespace
-lib/CPAN/API/HOWTO.pm		recipe book for programming with CPAN.pm
-lib/CPAN/bin/cpan		easily interact with CPAN from the command line
-lib/CPAN/Debug.pm		helper package for CPAN.pm
-lib/CPAN/DeferedCode.pm		helper package for CPAN.pm
-lib/CPAN/FirstTime.pm		Utility for creating CPAN config files
-lib/CPAN/HandleConfig.pm	helper package for CPAN.pm
-lib/CPAN/Kwalify/distroprefs.dd		helper file for validating config files
-lib/CPAN/Kwalify/distroprefs.yml	helper file for validating config files
-lib/CPAN/Kwalify.pm		helper package for CPAN.pm
-lib/CPAN/Nox.pm			Runs CPAN while avoiding compiled extensions
-lib/CPAN/PAUSE2003.pub		CPAN public key
-lib/CPAN/PAUSE2005.pub		CPAN public key
-lib/CPAN/PAUSE2007.pub		CPAN public key
-lib/CPAN.pm			Interface to Comprehensive Perl Archive Network
-lib/CPAN/Queue.pm		queueing system for CPAN.pm
-lib/CPAN/SIGNATURE		CPAN public key
-lib/CPAN/t/01loadme.t		See if CPAN the module works
-lib/CPAN/t/02nox.t		See if CPAN::Nox works
-lib/CPAN/t/03pkgs.t		See if CPAN::Version works
-lib/CPAN/t/10version.t		See if CPAN the module works
-lib/CPAN/t/11mirroredby.t		See if CPAN::Mirrored::By works
-lib/CPAN/Tarzip.pm		helper package for CPAN.pm
-lib/CPAN/Version.pm		Simple math with different flavors of version strings
 lib/Cwd.pm			Various cwd routines (getcwd, fastcwd, chdir)
 lib/DB.pm			Debugger API (draft)
 lib/DB.t			See if DB works
@@ -2177,6 +2141,7 @@ pod/buildtoc			Update files based on pod.lst
 pod/checkpods.PL		Tool to check for common errors in pods
 pod/kurila01delta.pod	What is new for Perl Kurila 0.1
 pod/kurila02delta.pod	What is new for Perl Kurila 0.2
+pod/kurila110delta.pod	What is new for Perl Kurila 1.10
 pod/kurila13delta.pod	What is new for Perl Kurila 1.3
 pod/kurila14delta.pod	What is new for Perl Kurila 1.4
 pod/kurila15delta.pod	What is new for Perl Kurila 1.5
@@ -2246,7 +2211,6 @@ pod/perlfaq9.pod		Networking
 pod/perlfaq.pod			Perl frequently asked questions
 pod/perlfilter.pod		Perl source filters
 pod/perlfork.pod		Perl fork() information
-pod/perlform.pod		Perl formats
 pod/perlfunc.pod		Perl built-in functions
 pod/perlglossary.pod		Perl Glossary
 pod/perlgpl.pod			GNU General Public License
@@ -2704,6 +2668,7 @@ t/op/exists_sub.t		See if exists(&sub) works
 t/op/exp.t			See if math functions work
 t/op/filetest.t			See if file tests work
 t/op/fork.t			See if fork works
+t/op/fun.t			See if op.c:Perl_ck_fun works
 t/op/getpid.t			See if $$ and getppid work with threads
 t/op/getppid.t			See if getppid works
 t/op/glob.t			See if <*> works

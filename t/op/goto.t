@@ -387,7 +387,7 @@ sub recurse1 {
 }
 sub recurse2 {
     my $x = shift;
-    $_[0] ? +1 + recurse1($_[0] - 1) : 0
+    @_[0] ? +1 + recurse1(@_[0] - 1) : 0
 }
 is(recurse1(500), 500, 'recursive goto &foo');
 
@@ -395,7 +395,7 @@ is(recurse1(500), 500, 'recursive goto &foo');
 
 sub a32039 { @_=("foo"); goto &b32039; }
 sub b32039 { goto &c32039; }
-sub c32039 { is($_[0], 'foo', 'chained &goto') }
+sub c32039 { is(@_[0], 'foo', 'chained &goto') }
 a32039();
 
 # [perl #35214] next and redo re-entered the loop with the wrong cop,
@@ -431,7 +431,7 @@ like($@->{description}, qr/Can't goto subroutine from an eval-block/, 'eval bloc
 {
     my $r = runperl(
 		stderr => 1,
-		prog => 'my $d; my $w = sub { return if $d++; warn q(bar)}; local ${^WARN_HOOK} = sub { goto &$w; }; warn q(foo);'
+		prog => 'my $d; my $w = sub { return if $d++; warn q(bar)}; local $^WARN_HOOK = sub { goto &$w; }; warn q(foo);'
     );
     like($r, qr/recursive die/, "goto &foo in warn");
 }

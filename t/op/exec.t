@@ -11,8 +11,8 @@ use vmsish qw(hushed);
 
 $| = 1;				# flush stdout
 
-$ENV{LC_ALL}   = 'C';		# Forge English error messages.
-$ENV{LANGUAGE} = 'C';		# Ditto in GNU.
+%ENV{LC_ALL}   = 'C';		# Forge English error messages.
+%ENV{LANGUAGE} = 'C';		# Ditto in GNU.
 
 my $Is_VMS   = $^O eq 'VMS';
 my $Is_Win32 = $^O eq 'MSWin32';
@@ -43,7 +43,7 @@ is( $exit, 0, '  exited 0' );
 my $quote = $Is_VMS || $Is_Win32 ? '"' : '';
 $tnum = curr_test();
 $exit = system $Perl, '-le', 
-               "${quote}print q<ok $tnum - system(PROG, LIST)>${quote}";
+               "{$quote}print q<ok $tnum - system(PROG, LIST)>{$quote}";
 next_test();
 is( $exit, 0, '  exited 0' );
 
@@ -97,7 +97,7 @@ unless( ok($rc == 255 << 8 or $rc == -1 or $rc == 256 or $rc == 512) ) {
 unless ( ok( $! == 2  or  $! =~ m/\bno\b.*\bfile/i or  
              $! == 13 or  $! =~ m/permission denied/i or
              $! == 22 or  $! =~ m/invalid argument/i  ) ) {
-    printf "# \$! eq %d, '%s'\n", $!, $!;
+    printf "# \$! eq \%d, '\%s'\n", $!, $!;
 }
 
 
@@ -125,5 +125,5 @@ TODO: {
 }
 
 my $test = curr_test();
-exec $Perl, '-le', qq{${quote}print 'ok $test - exec PROG, LIST'${quote}};
+exec $Perl, '-le', qq{{$quote}print 'ok $test - exec PROG, LIST'{$quote}};
 fail("This should never be reached if the exec() worked");

@@ -4,7 +4,7 @@
 # WriteMakefile.
 
 BEGIN {
-    if( $ENV{PERL_CORE} ) {
+    if( %ENV{PERL_CORE} ) {
         chdir 't' if -d 't';
         @INC = ('../lib', 'lib');
     }
@@ -38,8 +38,8 @@ ok( chdir 'Big-Dummy', "chdir'd to Big-Dummy" ) ||
 {
     ok( my $stdout = tie *STDOUT, 'TieOut' );
     my $warnings = '';
-    local ${^WARN_HOOK} = sub {
-        $warnings .= $_[0]->{description};
+    local $^WARN_HOOK = sub {
+        $warnings .= @_[0]->{description};
     };
 
     my $mm;

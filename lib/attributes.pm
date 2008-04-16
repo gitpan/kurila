@@ -19,7 +19,7 @@ use strict;
 BEGIN { attributes->bootstrap }
 
 sub import {
-    @_ +> 2 && ref $_[2] or do {
+    @_ +> 2 && ref @_[2] or do {
 	require Exporter;
 	goto &Exporter::import;
     };
@@ -27,7 +27,7 @@ sub import {
 
     my $svtype = uc reftype($svref);
     my $pkgmeth;
-    $pkgmeth = UNIVERSAL::can($home_stash, "MODIFY_${svtype}_ATTRIBUTES")
+    $pkgmeth = UNIVERSAL::can($home_stash, "MODIFY_{$svtype}_ATTRIBUTES")
 	if defined $home_stash && $home_stash ne '';
     my @badattrs;
     if ($pkgmeth) {
@@ -60,14 +60,14 @@ sub import {
 }
 
 sub get ($) {
-    @_ == 1  && ref $_[0] or
+    @_ == 1  && ref @_[0] or
 	die 'Usage: '.__PACKAGE__.'::get $ref';
     my $svref = shift;
     my $svtype = uc reftype $svref;
     my $stash = _guess_stash $svref;
     $stash = caller unless defined $stash;
     my $pkgmeth;
-    $pkgmeth = UNIVERSAL::can($stash, "FETCH_${svtype}_ATTRIBUTES")
+    $pkgmeth = UNIVERSAL::can($stash, "FETCH_{$svtype}_ATTRIBUTES")
 	if defined $stash && $stash ne '';
     return $pkgmeth ?
 		(_fetch_attrs($svref), $pkgmeth->($stash, $svref)) :

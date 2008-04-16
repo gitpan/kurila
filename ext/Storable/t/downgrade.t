@@ -13,14 +13,14 @@
 # are encountered.
 
 sub BEGIN {
-    if ($ENV{PERL_CORE}){
+    if (%ENV{PERL_CORE}){
 	chdir('t') if -d 't';
 	@INC = ('.', '../lib');
     } else {
 	unshift @INC, 't';
     }
     require Config; Config->import;
-    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ m/\bStorable\b/) {
+    if (%ENV{PERL_CORE} and %Config{'extensions'} !~ m/\bStorable\b/) {
         print "1..0 # Skip: Storable was not built\n";
         exit 0;
     }
@@ -52,7 +52,7 @@ use vars qw(@RESTRICT_TESTS %R_HASH %U_HASH $UTF8_CROAK $RESTRICTED_CROAK);
   # an a circumflex, so we need to be explicit.
 
   my $a_circumflex = "\xe5"; # a byte.
-  %U_HASH = (map {$_, $_} 'castle', "ch${a_circumflex}teau", $utf8, chr 0x57CE);
+  %U_HASH = (map {$_, $_} 'castle', "ch{$a_circumflex}teau", $utf8, chr 0x57CE);
   plan tests => 162;
 }
 
@@ -71,14 +71,14 @@ my %tests;
     }
     next unless oct $1 == ord 'A'; # Skip ASCII on EBCDIC, and vice versa
     my $data = unpack 'u', $3;
-    $tests{$2} = $data;
+    %tests{$2} = $data;
   }
 }
 
 # use Data::Dumper; $Data::Dumper::Useqq = 1; print Dumper \%tests;
 sub thaw_hash {
   my ($name, $expected) = @_;
-  my $hash = eval {thaw $tests{$name}};
+  my $hash = eval {thaw %tests{$name}};
   is ($@, '', "Thawed $name without error?");
   isa_ok ($hash, 'HASH');
   ok (defined $hash && eq_hash($hash, $expected),
@@ -89,7 +89,7 @@ sub thaw_hash {
 
 sub thaw_scalar {
   my ($name, $expected, $bug) = @_;
-  my $scalar = eval {thaw $tests{$name}};
+  my $scalar = eval {thaw %tests{$name}};
   is ($@, '', "Thawed $name without error?");
   isa_ok ($scalar, 'SCALAR', "Thawed $name?");
   is ($$scalar, $expected, "And it is the data we expected?");
@@ -98,7 +98,7 @@ sub thaw_scalar {
 
 sub thaw_fail {
   my ($name, $expected) = @_;
-  my $thing = eval {thaw $tests{$name}};
+  my $thing = eval {thaw %tests{$name}};
   is ($thing, undef, "Thawed $name failed as expected?");
   like ($@->{description}, $expected, "Error as predicted?");
 }

@@ -7,12 +7,12 @@ my $x = 'x';
 print "#1	:$x: eq :x:\n";
 if ($x eq 'x') {print "ok 1\n";} else {print "not ok 1\n";}
 
-$x = $#[0];
+$x = @#[0];
 
 if ($x eq '') {print "ok 2\n";} else {print "not ok 2\n";}
 
 our @x;
-$x = $#x;
+$x = (@x-1);
 
 if ($x eq '-1') {print "ok 3\n";} else {print "not ok 3\n";}
 
@@ -28,7 +28,7 @@ m/^/ && (print "ok 5\n");
 
 our ($foo, %foo, $bar, $bar, @ary, $A, $X, @X, $N);
 
-eval '$foo{1} / 1;';
+eval '%foo{1} / 1;';
 if (!$@) {print "ok 6\n";} else {print "not ok 6 $@\n";}
 
 eval '$foo = 123+123.4+123e4+123.4E5+123.4e+5+.12;';
@@ -94,25 +94,25 @@ E1
 {
     $foo = 'FOO';
     $bar = 'BAR';
-    $foo{$bar} = 'BAZ';
-    $ary[0] = 'ABC';
+    %foo{$bar} = 'BAZ';
+    @ary[0] = 'ABC';
 }
 
-print "$foo{$bar}" eq "BAZ" ? "ok 21\n" : "not ok 21\n";
+print "%foo{$bar}" eq "BAZ" ? "ok 21\n" : "not ok 21\n";
 
-print "${foo}\{$bar\}" eq "FOO\{BAR\}" ? "ok 22\n" : "not ok 22\n";
-print "${foo{$bar}}" eq "BAZ" ? "ok 23\n" : "not ok 23\n";
+print "{$foo}\{$bar\}" eq "FOO\{BAR\}" ? "ok 22\n" : "not ok 22\n";
+print "{%foo{$bar}}" eq "BAZ" ? "ok 23\n" : "not ok 23\n";
 
 #print "FOO:" =~ m/$foo[:]/ ? "ok 24\n" : "not ok 24\n";
 print "ok 24\n";
-print "ABC" =~ m/^$ary[$A]$/ ? "ok 25\n" : "not ok 25\n";
+print "ABC" =~ m/^@ary[$A]$/ ? "ok 25\n" : "not ok 25\n";
 #print "FOOZ" =~ m/^$foo[$A-Z]$/ ? "ok 26\n" : "not ok 26\n";
 print "ok 26\n";
 
 # MJD 19980425
 ($X, @X) = qw(a b c d); 
-print "d" =~ m/^$X[-1]$/ ? "ok 27\n" : "not ok 27\n";
-print "a1" !~ m/^$X[-1]$/ ? "ok 28\n" : "not ok 28\n";
+print "d" =~ m/^@X[-1]$/ ? "ok 27\n" : "not ok 27\n";
+print "a1" !~ m/^@X[-1]$/ ? "ok 28\n" : "not ok 28\n";
 
 print (((q{{\{\(}} . q{{\)\}}}) eq '{\{\(}} . q{{\)\}}') ? "ok 29\n" : "not ok 29\n");
 
@@ -126,25 +126,25 @@ print $foo;
 # MJD 19990227
 
 { no strict 'refs';
-  my $CX = "\cX";
-  my $CXY  ="\cXY";
-  $ {*{Symbol::fetch_glob($CX)}} = 17;
-  $ {*{Symbol::fetch_glob($CXY)}} = 23;
-  if ($ {^XY} != 23) { print "not "  }
+  my $CX = "^X";
+  my $CXY  ="^XY";
+  ${*{Symbol::fetch_glob($CX)}} = 17;
+  ${*{Symbol::fetch_glob($CXY)}} = 23;
+  if ($^XY != 23) { print "not "  }
   print "ok 31\n";
  
-# Does the syntax where we use the literal control character still work?
-  if (eval "\$ \{\cX\}" != 17 or $@) { print "not "  }
+# the literal control character does not work anymore.
+  if (eval "\$\cX" == 17) { print "not "  }
   print "ok 32\n";
 
   eval "\$\cQ = 24";                 # Literal control character
   if ($@ or ${*{Symbol::fetch_glob("\cQ")}} != 24) {  print "not "  }
   print "ok 33\n";
-  if ($^Q != 24) {  print "not "  }  # Control character escape sequence
+  if ($^Q == 24) {  print "not "  }  # Control character is NOT escape sequence
   print "ok 34\n";
 
 # Does the old UNBRACED syntax still do what it used to?
-  if ("$^XY" ne "17Y") { print "not " }
+  if ("$^XY" ne "23") { print "not " }
   print "ok 35\n";
 
   sub XX () { 6 }
@@ -166,7 +166,7 @@ print $foo;
   print "ok 37\n";
 #  print "($@)\n" if $@;
 
-  eval 'my $ {^XYZ};';
+  eval 'my $^XYZ;';
   print "not " unless index ($@->{description}, q|Can't use global $^XYZ in "my"|) +> -1;
   print "ok 38\n";
 #  print "($@)\n" if $@;
@@ -174,14 +174,14 @@ print $foo;
 # Now let's make sure that caret variables are all forced into the main package.
   package Someother;
   $^Q = 'Someother';
-  $ {^Quixote} = 'Someother 2';
-  $ {^M} = 'Someother 3';
+  $^Quixote = 'Someother 2';
+  $^M = 'Someother 3';
   package main;
   print "not " unless $^Q eq 'Someother';
   print "ok 39\n";
-  print "not " unless $ {^Quixote} eq 'Someother 2';
+  print "not " unless $^Quixote eq 'Someother 2';
   print "ok 40\n";
-  print "not " unless $ {^M} eq 'Someother 3';
+  print "not " unless $^M eq 'Someother 3';
   print "ok 41\n";
 
   
@@ -267,9 +267,9 @@ my %str = (
 );
 
 my $test = 52;
-print ((exists $str{foo}      ? "" : "not ")."ok $test\n"); ++$test;
-print ((exists $str{bar}      ? "" : "not ")."ok $test\n"); ++$test;
-print ((exists $str{'xyz::bar'} ? "" : "not ")."ok $test\n"); ++$test;
+print ((exists %str{foo}      ? "" : "not ")."ok $test\n"); ++$test;
+print ((exists %str{bar}      ? "" : "not ")."ok $test\n"); ++$test;
+print ((exists %str{'xyz::bar'} ? "" : "not ")."ok $test\n"); ++$test;
 
 sub foo::::::bar { print "ok $test\n"; $test++ }
 foo::::::bar;

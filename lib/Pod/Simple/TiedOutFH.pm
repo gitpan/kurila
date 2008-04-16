@@ -10,11 +10,11 @@ sub handle_on { # some horrible frightening things are encapsulated in here
   my $class = shift;
   $class = ref($class) || $class;
   
-  Carp::croak "Usage: ${class}->handle_on(\$somescalar)" unless @_;
+  Carp::croak "Usage: {$class}->handle_on(\$somescalar)" unless @_;
   
-  my $x = (defined($_[0]) and ref($_[0]))
-    ? $_[0]
-    : ( \( $_[0] ) )[0]
+  my $x = (defined(@_[0]) and ref(@_[0]))
+    ? @_[0]
+    : ( \( @_[0] ) )[[0]]
   ;
   $$x = '' unless defined $$x;
   
@@ -43,7 +43,7 @@ sub PRINT {
 }
 
 sub FETCH {
-  return ${$_[0]};
+  return ${@_[0]};
 }
 
 sub PRINTF {
@@ -53,7 +53,7 @@ sub PRINTF {
   return 1;
 }
 
-sub FILENO { ${ $_[0] } + 100 } # just to produce SOME number
+sub FILENO { ${ @_[0] } + 100 } # just to produce SOME number
 
 sub CLOSE { 1 }
 

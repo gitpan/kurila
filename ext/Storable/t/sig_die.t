@@ -7,14 +7,14 @@
 #
 
 sub BEGIN {
-    if ($ENV{PERL_CORE}){
+    if (%ENV{PERL_CORE}){
        chdir('t') if -d 't';
        @INC = ('.', '../lib');
     } else {
        unshift @INC, 't';
     }
     require Config; Config->import;
-    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ m/\bStorable\b/) {
+    if (%ENV{PERL_CORE} and %Config{'extensions'} !~ m/\bStorable\b/) {
         print "1..0 # Skip: Storable was not built\n";
         exit 0;
     }
@@ -34,8 +34,8 @@ BEGIN {
 BEGIN { plan tests => 1 }
 
 my @warns;
-${^WARN_HOOK} = sub { push @warns, shift };
-${^DIE_HOOK}  = sub { require Carp; warn Carp::longmess(); warn "Evil die!" };
+$^WARN_HOOK = sub { push @warns, shift };
+$^DIE_HOOK  = sub { require Carp; warn Carp::longmess(); warn "Evil die!" };
 
 require Storable;
 

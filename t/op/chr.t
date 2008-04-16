@@ -34,7 +34,7 @@ is(chr(ord("A")), "A");
     # ASCII characters
     is chr(0x65), "\x[65]";
     my $warn;
-    ${^WARN_HOOK} = sub { $warn = shift->message };
+    $^WARN_HOOK = sub { $warn = shift->message };
     is chr(0x80), "\x[80]";
     like $warn, qr"chr\(\) ambiguous with highbit without use bytes or use utf8", "highbit warning";
 }
@@ -58,7 +58,7 @@ is(chr(ord("A")), "A");
 sub hexes {
     no warnings 'utf8'; # avoid surrogate and beyond Unicode warnings
     use utf8;
-    join(" ",map{sprintf"%02x",$_}unpack("C*",chr($_[0])));
+    join(" ",map{sprintf"\%02x",$_}unpack("C*",chr(@_[0])));
 }
 
 # The following code points are some interesting steps in UTF-8.

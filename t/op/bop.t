@@ -13,7 +13,7 @@ BEGIN {
 # If you find tests are failing, please try adding names to tests to track
 # down where the failure is, and supply your new names as a patch.
 # (Just-in-time test naming)
-plan tests => 136;
+plan tests => 135;
 
 our ($Aoz, $Aaz, $Axz, $foo, $bar, $zap, $neg1, $neg7, $x, $y);
 
@@ -64,10 +64,10 @@ is (($foo ^|^ $bar), ($Aoz x 75 . $zap));
 is (($foo ^^^ $bar), ($Axz x 75 . $zap));
 
 # everything using bytes
-is (sprintf("%vd", utf8::chr(0x321)), '204.161');
-is (sprintf("%vd", utf8::chr(0xfff) ^&^ utf8::chr(0x321)), '192.161');
-is (sprintf("%vd", utf8::chr(0xfff) ^|^ utf8::chr(0x321)), '236.191.191');
-is (sprintf("%vd", utf8::chr(0xfff) ^^^ utf8::chr(0x321)), '44.30.191');
+is (sprintf("\%vd", utf8::chr(0x321)), '204.161');
+is (sprintf("\%vd", utf8::chr(0xfff) ^&^ utf8::chr(0x321)), '192.161');
+is (sprintf("\%vd", utf8::chr(0xfff) ^|^ utf8::chr(0x321)), '236.191.191');
+is (sprintf("\%vd", utf8::chr(0xfff) ^^^ utf8::chr(0x321)), '44.30.191');
 
 #
 # UTF8 ~ behaviour: ~ always works on bytes
@@ -84,12 +84,12 @@ ok (^~^ $neg7 == 6);
 
 # double magic tests
 
-sub TIESCALAR { bless { value => $_[1], orig => $_[1] } }
-sub STORE { $_[0]{store}++; $_[0]{value} = $_[1] }
-sub FETCH { $_[0]{fetch}++; $_[0]{value} }
-sub stores { tied($_[0])->{value} = tied($_[0])->{orig};
-             delete(tied($_[0])->{store}) || 0 }
-sub fetches { delete(tied($_[0])->{fetch}) || 0 }
+sub TIESCALAR { bless { value => @_[1], orig => @_[1] } }
+sub STORE { @_[0]{store}++; @_[0]{value} = @_[1] }
+sub FETCH { @_[0]{fetch}++; @_[0]{value} }
+sub stores { tied(@_[0])->{value} = tied(@_[0])->{orig};
+             delete(tied(@_[0])->{store}) || 0 }
+sub fetches { delete(tied(@_[0])->{fetch}) || 0 }
 
 # numeric double magic tests
 
@@ -224,13 +224,6 @@ is(stores($y), 0);
 is(^~^^~^$y, "c");
 is(fetches($y), 1);
 is(stores($y), 0);
-
-# [rt.perl.org 33003]
-# This would cause a segfault without malloc wrap
-SKIP: {
-  skip "No malloc wrap checks" unless $Config::Config{usemallocwrap};
-  like( runperl(prog => 'eval q($#a>>=1); print 1'), "^1\n?" );
-}
 
 # [perl #37616] Bug in &= (string) and/or m//
 {

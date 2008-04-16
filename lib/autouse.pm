@@ -15,7 +15,7 @@ sub import {
 
     (my $pm = $module) =~ s{::}{/}g;
     $pm .= '.pm';
-    if (exists $INC{$pm}) {
+    if (exists %INC{$pm}) {
 	vet_import $module;
 	local $Exporter::ExportLevel = $Exporter::ExportLevel + 1;
 	# $Exporter::Verbose = 1;
@@ -35,7 +35,7 @@ sub import {
 	my $closure_func = $func;		# Name inside package
 	my $index = rindex($func, '::');
 	if ($index == -1) {
-	    $closure_import_func = "${callpkg}::$func";
+	    $closure_import_func = "{$callpkg}::$func";
 	} else {
 	    $closure_func = substr $func, $index + 2;
 	    die "autouse into different package attempted"
@@ -45,12 +45,12 @@ sub import {
 
         no strict 'refs';
 	my $load_sub = sub {
-	    unless ($INC{$pm}) {
+	    unless (%INC{$pm}) {
 		require $pm;
 		vet_import $module;
 	    }
             no warnings qw(redefine prototype);
-	    *$closure_import_func = \&{*{Symbol::fetch_glob("${module}::$closure_func")}};
+	    *$closure_import_func = \&{*{Symbol::fetch_glob("{$module}::$closure_func")}};
 	    print "autousing $module; "
 		  ."imported $closure_func as $closure_import_func\n"
 		if $autouse::DEBUG;

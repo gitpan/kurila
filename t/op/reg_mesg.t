@@ -17,7 +17,7 @@ my $marker2 = " <-- HERE ";
 
 eval 'use Config';         # assume defaults if fail
 our %Config;
-my $inf_m1 = ($Config{reg_infty} || 32767) - 1;
+my $inf_m1 = (%Config{reg_infty} || 32767) - 1;
 my $inf_p1 = $inf_m1 + 2;
 my @death =
 (
@@ -143,7 +143,7 @@ while (@death)
 
 
 our $warning;
-${^WARN_HOOK} = sub { $warning = shift };
+$^WARN_HOOK = sub { $warning = shift };
 
 while (@warning)
 {

@@ -57,11 +57,11 @@ BEGIN {
 
     if ($qr_embed_thr) {
 	require Config;
-	if (!$Config::Config{useithreads}) {
+	if (!%Config::Config{useithreads}) {
 	    print "1..0 # Skip: no ithreads\n";
 		exit 0;
 	}
-	if ($ENV{PERL_CORE_MINITEST}) {
+	if (%ENV{PERL_CORE_MINITEST}) {
 	    print "1..0 # Skip: no dynamic loading on miniperl, no threads\n";
 		exit 0;
 	}
@@ -92,13 +92,13 @@ BEGIN {
     }
 }
 
-$bang = sprintf "\\%03o", ord "!"; # \41 would not be portable.
+$bang = sprintf "\\\%03o", ord "!"; # \41 would not be portable.
 $ffff  = "\x[FF]\x[FF]";
 $nulnul = "\0" x 2;
 $OP = $qr ? 'qr' : 'm';
 
 $| = 1;
-printf "1..%d\n# $iters iterations\n", scalar @tests;
+printf "1..\%d\n# $iters iterations\n", scalar @tests;
 
 my $test;
 TEST:
@@ -112,14 +112,14 @@ foreach (@tests) {
     chomp;
     s/\\n/\n/g;
     my ($pat, $subject, $result, $repl, $expect, $reason) = split(m/\t/,$_,6);
-    if ($result =~ m/c/ and $ENV{PERL_VALGRIND}) {
+    if ($result =~ m/c/ and %ENV{PERL_VALGRIND}) {
         print "ok $test # TODO fix memory leak with compilation error\n";
         next;
     }
     $reason = '' unless defined $reason;
     my $input = join(':',$pat,$subject,$result,$repl,$expect);
     $pat = "'$pat'" unless $pat =~ m/^[:'\/]/;
-    $pat =~ s/(\$\{\w+\})/{eval $1}/g;
+    $pat =~ s/\$\{(\w+)\}/{eval '$'.$1}/g;
     $pat =~ s/\\n/\n/g;
     $subject = eval qq("$subject"); die "error in '$subject': $@" if $@;
     $expect  = eval qq("$expect"); die "error in '$expect': $@" if $@;
@@ -139,7 +139,7 @@ foreach (@tests) {
                 $utf8;
                 $study;
                 pos(\$subject)=0;
-                \$match = ( \$subject =~ m${pat}g );
+                \$match = ( \$subject =~ m{$pat}g );
                 \$got = pos(\$subject);
 EOFCODE
         }
@@ -193,8 +193,8 @@ EOFCODE
 	    print "not ok $test # todo", length($reason) ? " - $reason" : '', "\n";
 	    next TEST;
 	}
-	elsif ($@) {
-	    print "not ok $test $input => error `$err'\n$code\n$@\n"; next TEST;
+	elsif ($err) {
+	    print "not ok $test $input => error: '{$@->message}'\n{dump::view($code)}\n"; next TEST;
 	}
 	elsif ($result =~ m/^n/) {
 	    if ($match) { print "not ok $test ($study) $input => false positive\n"; next TEST }

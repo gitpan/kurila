@@ -29,19 +29,19 @@ while ( ~< *DATA) {
     s/^\s*>//; s/<\s*$//;
     ($template, $data, $result, $comment) = split(m/<\s*>/, $_, 4);
     if ($^O eq 'os390' || $^O eq 's390') { # non-IEEE (s390 is UTS)
-        $data   =~ s/([eE])96$/${1}63/;      # smaller exponents
-        $result =~ s/([eE]\+)102$/${1}69/;   #  "       "
-        $data   =~ s/([eE])\-101$/${1}-56/;  # larger exponents
-        $result =~ s/([eE])\-102$/${1}-57/;  #  "       "
+        $data   =~ s/([eE])96$/$163/;      # smaller exponents
+        $result =~ s/([eE]\+)102$/$169/;   #  "       "
+        $data   =~ s/([eE])\-101$/$1-56/;  # larger exponents
+        $result =~ s/([eE])\-102$/$1-57/;  #  "       "
     }
     if ($Is_VMS_VAX || $Is_Ultrix_VAX) {
 	# VAX DEC C 5.3 at least since there is no
 	# ccflags =~ m/float=ieee/ on VAX.
 	# AXP is unaffected whether or not it's using ieee.
-        $data   =~ s/([eE])96$/${1}26/;      # smaller exponents
-        $result =~ s/([eE]\+)102$/${1}32/;   #  "       "
-        $data   =~ s/([eE])\-101$/${1}-24/;  # larger exponents
-        $result =~ s/([eE])\-102$/${1}-25/;  #  "       "
+        $data   =~ s/([eE])96$/$126/;      # smaller exponents
+        $result =~ s/([eE]\+)102$/$132/;   #  "       "
+        $data   =~ s/([eE])\-101$/$1-24/;  # larger exponents
+        $result =~ s/([eE])\-102$/$1-25/;  #  "       "
     }
 
     $evalData = eval $data;
@@ -52,13 +52,13 @@ while ( ~< *DATA) {
 
 print '1..', scalar @tests, "\n";
 
-${^WARN_HOOK} = sub {
-    if ($_[0]->{description} =~ m/^Invalid conversion/) {
+$^WARN_HOOK = sub {
+    if (@_[0]->{description} =~ m/^Invalid conversion/) {
 	$w = ' INVALID';
-    } elsif ($_[0]->{description}=~ m/^Use of uninitialized value/) {
+    } elsif (@_[0]->{description}=~ m/^Use of uninitialized value/) {
 	$w = ' UNINIT';
     } else {
-	warn $_[0]->{description};
+	warn @_[0]->{description};
     }
 };
 
@@ -87,7 +87,7 @@ for ($i = 1; @tests; $i++) {
     my $skip = 0;
     if ($comment =~ s/\s+skip:\s*(.*)//) {
 	my $os  = $1;
-	my $osv = exists $Config{osvers} ? $Config{osvers} : "0";
+	my $osv = exists %Config{osvers} ? %Config{osvers} : "0";
 	# >comment skip: all<
 	if ($os =~ m/\ball\b/i) {
 	    $skip = 1;

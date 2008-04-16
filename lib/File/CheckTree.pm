@@ -75,7 +75,7 @@ sub validate {
     $cwd = "";
     $Warnings = 0;
 
-    foreach my $check (split m/\n/, $_[0]) {
+    foreach my $check (split m/\n/, @_[0]) {
         my ($testlist, @testlist);
 
         # skip blanks/comments
@@ -148,14 +148,14 @@ sub validate {
             {
                 # count warnings, either from valmess or '-r || warn "my msg"'
                 # also, call any pre-existing signal handler for __WARN__
-                my $orig_sigwarn = ${^WARN_HOOK};
-                local ${^WARN_HOOK} = sub {
+                my $orig_sigwarn = $^WARN_HOOK;
+                local $^WARN_HOOK = sub {
                     ++$Warnings;
                     if ( $orig_sigwarn ) {
                         $orig_sigwarn->(@_);
                     }
                     else {
-                        print STDERR $_[0]->message;
+                        print STDERR @_[0]->message;
                     }
                 };
 
@@ -218,7 +218,7 @@ sub valmess {
     if ($test =~ m/ ^ (!?) -(\w) \s* $ /x) {
         my ($neg, $ftype) = ($1, $2);
 
-        $ferror = "$file $Val_Message{$ftype}";
+        $ferror = "$file %Val_Message{$ftype}";
 
         if ($neg eq '!') {
             $ferror =~ s/ is not / should not be / ||

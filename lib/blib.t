@@ -50,13 +50,13 @@ _mkdirs( @blib_dirs );
 
 {
     my $warnings = '';
-    local ${^WARN_HOOK} = sub { $warnings = join '', @_ };
+    local $^WARN_HOOK = sub { $warnings = join '', @_ };
     use_ok('blib');
     is( $warnings, '',  'use blib is nice and quiet' );
 }
 
 is( @INC, 3, '@INC now has 3 elements' );
-is( $INC[2],    '../lib',       'blib added to the front of @INC' );
+is( @INC[2],    '../lib',       'blib added to the front of @INC' );
 
 if ($^O eq 'VMS') {
     # Unix syntax is accepted going in but it's not what comes out
@@ -71,7 +71,7 @@ elsif ($^O ne 'MacOS')
 }
 
 
-ok( grep(m|\Q$blib_lib\E$|, @INC[0,1])  == 1,     "  $blib_lib in \@INC");
-ok( grep(m|\Q$blib_arch\E$|, @INC[0,1]) == 1,     "  $blib_arch in \@INC");
+ok( grep(m|\Q$blib_lib\E$|, @INC[[0,1]])  == 1,     "  $blib_lib in \@INC");
+ok( grep(m|\Q$blib_arch\E$|, @INC[[0,1]]) == 1,     "  $blib_arch in \@INC");
 
 END { _cleanup( @blib_dirs ); }

@@ -5,8 +5,6 @@ no strict 'refs';
 
 # On one line so MakeMaker will see it.
 require Exporter;  our $VERSION = $Exporter::VERSION;
-# Carp does this now for us, so we can finally live w/o Carp
-#$Carp::Internal{"Exporter::Heavy"} = 1;
 
 =head1 NAME
 
@@ -30,11 +28,11 @@ No user-serviceable parts inside.
 sub _rebuild_cache {
     my ($pkg, $exports, $cache) = @_;
     s/^&// foreach @$exports;
-    @{$cache}{@$exports} = (1) x @$exports;
-    my $ok = \@{*{Symbol::fetch_glob("${pkg}::EXPORT_OK")}};
+    %{$cache}{[@$exports]} = (1) x @$exports;
+    my $ok = \@{*{Symbol::fetch_glob("{$pkg}::EXPORT_OK")}};
     if (@$ok) {
 	s/^&// foreach @$ok;
-	@{$cache}{@$ok} = (1) x @$ok;
+	%{$cache}{[@$ok]} = (1) x @$ok;
     }
 }
 
@@ -42,8 +40,8 @@ sub heavy_export {
 
     my($pkg, $callpkg, @imports) = @_;
     my($type, $sym, $cache_is_current, $oops);
-    my($exports, $export_cache) = (\@{*{Symbol::fetch_glob("${pkg}::EXPORT")}},
-                                   $Exporter::Cache{$pkg} ||= {});
+    my($exports, $export_cache) = (\@{*{Symbol::fetch_glob("{$pkg}::EXPORT")}},
+                                   %Exporter::Cache{$pkg} ||= {});
 
     if (@imports) {
 	if (!%$export_cache) {
@@ -52,12 +50,12 @@ sub heavy_export {
 	}
 
 	if (grep m{^[/!:]}, @imports) {
-	    my $tagsref = \%{*{Symbol::fetch_glob("${pkg}::EXPORT_TAGS")}};
+	    my $tagsref = \%{*{Symbol::fetch_glob("{$pkg}::EXPORT_TAGS")}};
 	    my $tagdata;
 	    my %imports;
 	    my($remove, $spec, @names, @allexports);
 	    # negated first item implies starting with default set:
-	    unshift @imports, ':DEFAULT' if $imports[0] =~ m/^!/;
+	    unshift @imports, ':DEFAULT' if @imports[0] =~ m/^!/;
 	    foreach $spec (@imports){
 		$remove = $spec =~ s/^!//;
 
@@ -69,7 +67,7 @@ sub heavy_export {
 			@names = @$tagdata;
 		    }
 		    else {
-			warn qq["$spec" is not defined in %${pkg}::EXPORT_TAGS];
+			warn qq["$spec" is not defined in \%{$pkg}::EXPORT_TAGS];
 			++$oops;
 			next;
 		    }
@@ -87,10 +85,10 @@ sub heavy_export {
 		    if $Exporter::Verbose;
 
 		if ($remove) {
-		   foreach $sym (@names) { delete $imports{$sym} } 
+		   foreach $sym (@names) { delete %imports{$sym} } 
 		}
 		else {
-		    @imports{@names} = (1) x @names;
+		    %imports{[@names]} = (1) x @names;
 		}
 	    }
 	    @imports = keys %imports;
@@ -109,7 +107,7 @@ sub heavy_export {
 		    }
 		    # We need a way to emulate 'use Foo ()' but still
 		    # allow an easy version check: "use Foo 1.23, ''";
-		    if (@imports == 2 and !$imports[1]) {
+		    if (@imports == 2 and !@imports[1]) {
 			@imports = ();
 			last;
 		    }
@@ -133,15 +131,15 @@ sub heavy_export {
 	    }
 	}
 	if ($oops) {
-	    die("@{carp}Can't continue after import errors");
+	    die("{join ' ', @carp}Can't continue after import errors");
 	}
     }
     else {
 	@imports = @$exports;
     }
 
-    my($fail, $fail_cache) = (\@{*{Symbol::fetch_glob("${pkg}::EXPORT_FAIL")}},
-                              $Exporter::FailCache{$pkg} ||= {});
+    my($fail, $fail_cache) = (\@{*{Symbol::fetch_glob("{$pkg}::EXPORT_FAIL")}},
+                              %Exporter::FailCache{$pkg} ||= {});
 
     if (@$fail) {
 	if (!%$fail_cache) {
@@ -149,21 +147,19 @@ sub heavy_export {
 	    # barewords twice... both with and without a leading &.
 	    # (Technique could be applied to $export_cache at cost of memory)
 	    my @expanded = map { m/^\w/ ? ($_, '&'.$_) : $_ } @$fail;
-	    warn "${pkg}::EXPORT_FAIL cached: @expanded" if $Exporter::Verbose;
-	    @{$fail_cache}{@expanded} = (1) x @expanded;
+	    warn "{$pkg}::EXPORT_FAIL cached: @expanded" if $Exporter::Verbose;
+	    %{$fail_cache}{[@expanded]} = (1) x @expanded;
 	}
 	my @failed;
 	foreach $sym (@imports) { push(@failed, $sym) if $fail_cache->{$sym} }
 	if (@failed) {
 	    @failed = $pkg->export_fail(@failed);
 	    foreach $sym (@failed) {
-                require Carp;
-		Carp::carp(qq["$sym" is not implemented by the $pkg module ],
-			"on this architecture");
+		warn(qq["$sym" is not implemented by the $pkg module ]
+			. "on this architecture");
 	    }
 	    if (@failed) {
-		require Carp;
-		Carp::croak("Can't continue after import errors");
+		die("Can't continue after import errors");
 	    }
 	}
     }
@@ -173,17 +169,17 @@ sub heavy_export {
 
     foreach $sym (@imports) {
 	# shortcut for the common case of no type character
-	(*{Symbol::fetch_glob("${callpkg}::$sym")} = \&{*{Symbol::fetch_glob("${pkg}::$sym")}}, next)
+	(*{Symbol::fetch_glob("{$callpkg}::$sym")} = \&{*{Symbol::fetch_glob("{$pkg}::$sym")}}, next)
 	    unless $sym =~ s/^(\W)//;
 	$type = $1;
 	no warnings 'once';
-	*{Symbol::fetch_glob("${callpkg}::$sym")} =
-	    $type eq '&' ? \&{*{Symbol::fetch_glob("${pkg}::$sym")}} :
-	    $type eq '$' ? \${*{Symbol::fetch_glob("${pkg}::$sym")}} :
-	    $type eq '@' ? \@{*{Symbol::fetch_glob("${pkg}::$sym")}} :
-	    $type eq '%' ? \%{*{Symbol::fetch_glob("${pkg}::$sym")}} :
-	    $type eq '*' ?  *{Symbol::fetch_glob("${pkg}::$sym")} :
-	    do { require Carp; Carp::croak("Can't export symbol: $type$sym") };
+	*{Symbol::fetch_glob("{$callpkg}::$sym")} =
+	    $type eq '&' ? \&{*{Symbol::fetch_glob("{$pkg}::$sym")}} :
+	    $type eq '$' ? \${*{Symbol::fetch_glob("{$pkg}::$sym")}} :
+	    $type eq '@' ? \@{*{Symbol::fetch_glob("{$pkg}::$sym")}} :
+	    $type eq '%' ? \%{*{Symbol::fetch_glob("{$pkg}::$sym")}} :
+	    $type eq '*' ?  *{Symbol::fetch_glob("{$pkg}::$sym")} :
+	    warn("Can't export symbol: $type$sym");
     }
 }
 
@@ -201,30 +197,29 @@ sub heavy_export_to_level
 sub _push_tags {
     my($pkg, $var, $syms) = @_;
     my @nontag = ();
-    my $export_tags = \%{*{Symbol::fetch_glob("${pkg}::EXPORT_TAGS")}};
-    push(@{*{Symbol::fetch_glob("${pkg}::$var")}},
+    my $export_tags = \%{*{Symbol::fetch_glob("{$pkg}::EXPORT_TAGS")}};
+    push(@{*{Symbol::fetch_glob("{$pkg}::$var")}},
 	map { $export_tags->{$_} ? @{$export_tags->{$_}} 
                                  : scalar(push(@nontag,$_),$_) }
 		(@$syms) ? @$syms : keys %$export_tags);
     if (@nontag and $^W) {
 	# This may change to a die one day
-	require Carp;
-	Carp::carp(join(", ", @nontag)." are not tags of $pkg");
+	warn(join(", ", @nontag)." are not tags of $pkg");
     }
 }
 
 sub heavy_require_version {
     my($self, $wanted) = @_;
     my $pkg = ref $self || $self;
-    return ${pkg}->VERSION($wanted);
+    return $pkg->VERSION($wanted);
 }
 
 sub heavy_export_tags {
-  _push_tags((caller)[0], "EXPORT",    \@_);
+  _push_tags((caller)[[0]], "EXPORT",    \@_);
 }
 
 sub heavy_export_ok_tags {
-  _push_tags((caller)[0], "EXPORT_OK", \@_);
+  _push_tags((caller)[[0]], "EXPORT_OK", \@_);
 }
 
 1;

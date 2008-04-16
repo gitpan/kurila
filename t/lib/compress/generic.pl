@@ -74,14 +74,14 @@ sub run
         }
 
         eval ' $gz->write({})' ;
-like $@->{description}, mkEvalErr("^${CompressClass}::write: not a scalar reference");
+like $@->{description}, mkEvalErr("^{$CompressClass}::write: not a scalar reference");
 #like $@, mkEvalErr("^${CompressClass}::write: input parameter not a filename, filehandle, array ref or scalar ref");
 
 eval ' $gz->syswrite("abc", 1, 5)' ;
-like $@->{description}, mkEvalErr("^${CompressClass}::write: offset outside string");
+like $@->{description}, mkEvalErr("^{$CompressClass}::write: offset outside string");
 
 eval ' $gz->syswrite("abc", 1, -4)' ;
-like $@->{description}, mkEvalErr("^${CompressClass}::write: offset outside string");
+like $@->{description}, mkEvalErr("^{$CompressClass}::write: offset outside string");
 }
 
 
@@ -618,8 +618,8 @@ EOM
     is $io->write("xxx\n", 100, -1), 1, "  write 1";
 
     for (1..3) {
-        $io->printf("i(%d)", $_);
-        $io->printf("[%d]\n", $_);
+        $io->printf("i(\%d)", $_);
+        $io->printf("[\%d]\n", $_);
     }
     $io->print("\n");
 
@@ -668,7 +668,7 @@ EOT
         my @lines = $io->getlines();
         is @lines, 6
             or print "# Got " . scalar(@lines) . " lines, expected 6\n" ;
-        is $lines[1], "of a paragraph\n" ;
+        is @lines[1], "of a paragraph\n" ;
         is join('', @lines), $str ;
         is $., 6; 
         is $io->input_line_number, 6; 
@@ -694,7 +694,7 @@ EOT
         is $., 1; 
         is $io->input_line_number, 1; 
         ok $io->eof;
-        ok @lines == 1 && $lines[0] eq $str;
+        ok @lines == 1 && @lines[0] eq $str;
 
         $io = $UncompressClass->new($name);
         ok ! $io->eof;
@@ -715,9 +715,9 @@ EOT
         ok $io->eof;
         ok @lines == 2 
             or print "# Got " . scalar(@lines) . " lines, expected 2\n" ;
-        ok $lines[0] eq "This is an example\nof a paragraph\n\n\n"
-            or print "# $lines[0]\n";
-        ok $lines[1] eq "and a single line.\n\n";
+        ok @lines[0] eq "This is an example\nof a paragraph\n\n\n"
+            or print "# @lines[0]\n";
+        ok @lines[1] eq "and a single line.\n\n";
     }
 
     {
@@ -738,9 +738,9 @@ EOT
         ok $io->eof;
         is @lines, $expected_records, 
             "Got $expected_records records\n" ;
-        ok $lines[0] eq substr($str, 0, $reclen)
-            or print "# $lines[0]\n";
-        ok $lines[1] eq substr($str, $reclen, $reclen);
+        ok @lines[0] eq substr($str, 0, $reclen)
+            or print "# @lines[0]\n";
+        ok @lines[1] eq substr($str, $reclen, $reclen);
     }
 
     {
@@ -828,7 +828,7 @@ EOT
         ok $io->tell() == 0 ;
         my @lines = $io->getlines();
         is @lines, 6; 
-        ok $lines[1] eq "of a paragraph\n" ;
+        ok @lines[1] eq "of a paragraph\n" ;
         ok join('', @lines) eq $str ;
         is $., 6; 
         is $io->input_line_number, 6; 
@@ -852,7 +852,7 @@ EOT
         is $., 1; 
         is $io->input_line_number, 1; 
         ok $io->eof;
-        ok @lines == 1 && $lines[0] eq $str;
+        ok @lines == 1 && @lines[0] eq $str;
 
         $io = $UncompressClass->new($name);
         ok ! $io->eof;
@@ -873,9 +873,9 @@ EOT
         ok $io->eof;
         ok @lines == 2 
             or print "# exected 2 lines, got " . scalar(@lines) . "\n";
-        ok $lines[0] eq "This is an example\nof a paragraph\n\n\n"
-            or print "# [$lines[0]]\n" ;
-        ok $lines[1] eq "and a single line.\n\n";
+        ok @lines[0] eq "This is an example\nof a paragraph\n\n\n"
+            or print "# [@lines[0]]\n" ;
+        ok @lines[1] eq "and a single line.\n\n";
     }
 
     {
@@ -896,9 +896,9 @@ EOT
         ok $io->eof;
         is @lines, $expected_records, 
             "Got $expected_records records\n" ;
-        ok $lines[0] eq substr($str, 0, $reclen)
-            or print "# $lines[0]\n";
-        ok $lines[1] eq substr($str, $reclen, $reclen);
+        ok @lines[0] eq substr($str, 0, $reclen)
+            or print "# @lines[0]\n";
+        ok @lines[1] eq substr($str, $reclen, $reclen);
     }
 
     {
@@ -1100,10 +1100,10 @@ foreach my $file (0, 1)
 
     ok ! $a->error() ;
     eval { $a->seek(-1, 10) ; };
-    like $@->{description}, mkErr("^${CompressClass}::seek: unknown value, 10, for whence parameter");
+    like $@->{description}, mkErr("^{$CompressClass}::seek: unknown value, 10, for whence parameter");
 
     eval { $a->seek(-1, SEEK_END) ; };
-    like $@->{description}, mkErr("^${CompressClass}::seek: cannot seek backwards");
+    like $@->{description}, mkErr("^{$CompressClass}::seek: cannot seek backwards");
 
     $a->write("fred");
     $a->close ;
@@ -1112,13 +1112,13 @@ foreach my $file (0, 1)
     my $u = $UncompressClass-> new((\$b))  ;
 
     eval { $u->seek(-1, 10) ; };
-    like $@->{description}, mkErr("^${UncompressClass}::seek: unknown value, 10, for whence parameter");
+    like $@->{description}, mkErr("^{$UncompressClass}::seek: unknown value, 10, for whence parameter");
 
     eval { $u->seek(-1, SEEK_END) ; };
-    like $@->{description}, mkErr("^${UncompressClass}::seek: SEEK_END not allowed");
+    like $@->{description}, mkErr("^{$UncompressClass}::seek: SEEK_END not allowed");
 
     eval { $u->seek(-1, SEEK_CUR) ; };
-    like $@->{description}, mkErr("^${UncompressClass}::seek: cannot seek backwards");
+    like $@->{description}, mkErr("^{$UncompressClass}::seek: cannot seek backwards");
 }
 
 foreach my $fb (qw(filename buffer filehandle))
@@ -1369,12 +1369,12 @@ foreach my $file (0, 1)
     #ok ! -e $name1, "  File $name1 does not exist";
 
     my @data = (
-        [ '{ }',         "${CompressClass}::write: input parameter not a filename, filehandle, array ref or scalar ref" ], 
-        [ '[ { } ]',     "${CompressClass}::write: input parameter not a filename, filehandle, array ref or scalar ref" ], 
-        [ '[ [ { } ] ]', "${CompressClass}::write: input parameter not a filename, filehandle, array ref or scalar ref" ], 
-        [ '[ "" ]',      "${CompressClass}::write: input filename is undef or null string" ], 
-        [ '[ undef ]',   "${CompressClass}::write: input filename is undef or null string" ], 
-        [ '[ \$Answer ]',"${CompressClass}::write: input and output buffer are identical" ], 
+        [ '{ }',         "{$CompressClass}::write: input parameter not a filename, filehandle, array ref or scalar ref" ], 
+        [ '[ { } ]',     "{$CompressClass}::write: input parameter not a filename, filehandle, array ref or scalar ref" ], 
+        [ '[ [ { } ] ]', "{$CompressClass}::write: input parameter not a filename, filehandle, array ref or scalar ref" ], 
+        [ '[ "" ]',      "{$CompressClass}::write: input filename is undef or null string" ], 
+        [ '[ undef ]',   "{$CompressClass}::write: input filename is undef or null string" ], 
+        [ '[ \$Answer ]',"{$CompressClass}::write: input and output buffer are identical" ], 
         #[ "not readable", 'xx' ], 
         # same filehandle twice, 'xx'
        ) ;
@@ -1382,7 +1382,7 @@ foreach my $file (0, 1)
     foreach my $data (@data)
     {
         my ($send, $get) = @$data ;
-        title "${CompressClass}::write( $send )";
+        title "{$CompressClass}::write( $send )";
         my($copy);
         eval "\$copy = $send";
         my $x = $CompressClass-> new((\$Answer));
@@ -1417,15 +1417,15 @@ foreach my $file (0, 1)
 
 #    sub deepCopy
 #    {
-#        if (! ref $_[0] || ref $_[0] eq 'SCALAR')
+#        if (! ref @_[0] || ref @_[0] eq 'SCALAR')
 #        {
-#            return $_[0] ;
+#            return @_[0] ;
 #        }
 #
-#        if (ref $_[0] eq 'ARRAY')
+#        if (ref @_[0] eq 'ARRAY')
 #        {
 #            my @a ;
-#            for my $x ( @{ $_[0] })
+#            for my $x ( @{ @_[0] })
 #            {
 #                push @a, deepCopy($x);
 #            }
@@ -1433,41 +1433,41 @@ foreach my $file (0, 1)
 #            return \@a ;
 #        }
 #
-#        croak "bad! $_[0]";
+#        croak "bad! @_[0]";
 #
 #    }
 #
 #    sub deepSubst
 #    {
 #        #my $data = shift ;
-#        my $from = $_[1] ;
-#        my $to   = $_[2] ;
+#        my $from = @_[1] ;
+#        my $to   = @_[2] ;
 #
-#        if (! ref $_[0])
+#        if (! ref @_[0])
 #        {
-#            $_[0] = $to 
-#                if $_[0] eq $from ;
+#            @_[0] = $to 
+#                if @_[0] eq $from ;
 #            return ;    
 #
 #        }
 #
-#        if (ref $_[0] eq 'SCALAR')
+#        if (ref @_[0] eq 'SCALAR')
 #        {
-#            $_[0] = \$to 
-#                if defined ${ $_[0] } && ${ $_[0] } eq $from ;
+#            @_[0] = \$to 
+#                if defined ${ @_[0] } && ${ @_[0] } eq $from ;
 #            return ;    
 #
 #        }
 #
-#        if (ref $_[0] eq 'ARRAY')
+#        if (ref @_[0] eq 'ARRAY')
 #        {
-#            for my $x ( @{ $_[0] })
+#            for my $x ( @{ @_[0] })
 #            {
 #                deepSubst($x, $from, $to);
 #            }
 #            return ;
 #        }
-#        #croak "bad! $_[0]";
+#        #croak "bad! @_[0]";
 #    }
 
 #    {

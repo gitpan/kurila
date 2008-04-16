@@ -8,7 +8,7 @@ BEGIN {
 }    
 
 ### verbose is good for debugging ###
-$Params::Check::VERBOSE = $Params::Check::VERBOSE = $ARGV[0] ? 1 : 0;
+$Params::Check::VERBOSE = $Params::Check::VERBOSE = @ARGV[0] ? 1 : 0;
 
 ### basic things first, allow function ###
 
@@ -263,7 +263,7 @@ use constant TRUE   => sub { 1 };
 
 ### store => \$foo tests
 {   ### quell warnings
-    local ${^WARN_HOOK} = sub {};
+    local $^WARN_HOOK = sub {};
     
     my $tmpl = { foo => { store => '' } };
     check( $tmpl, {} );

@@ -3,7 +3,7 @@
 # Wherein we ensure that postamble works ok.
 
 BEGIN {
-    if( $ENV{PERL_CORE} ) {
+    if( %ENV{PERL_CORE} ) {
         chdir 't' if -d 't';
         @INC = ('../lib', 'lib');
     }
@@ -36,7 +36,7 @@ ok( chdir 'Big-Dummy', q{chdir'd to Big-Dummy} ) ||
 
 {
     my $warnings = '';
-    local ${^WARN_HOOK} = sub {
+    local $^WARN_HOOK = sub {
         $warnings = join '', @_;
     };
 

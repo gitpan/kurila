@@ -20,11 +20,11 @@ our $VERSION = "0.08";
 #use strict;
 
 # enable debug/trace messages from DynaLoader perl code
-# $dl_debug = $ENV{PERL_DL_DEBUG} || 0 unless defined $dl_debug;
+# $dl_debug = %ENV{PERL_DL_DEBUG} || 0 unless defined $dl_debug;
 
 EOT
 
-print OUT '  my $dl_dlext = ', to_string($Config::Config{'dlext'}), ";\n" ;
+print OUT '  my $dl_dlext = ', to_string(%Config::Config{'dlext'}), ";\n" ;
 
 print OUT <<'EOT';
 
@@ -41,7 +41,7 @@ sub load {
 
     die q{XSLoader::load('Your::Module', $Your::Module::VERSION)} unless @_;
 
-    my($module) = $_[0];
+    my($module) = @_[0];
 
     # work with static linking too
     my $b = "$module\::bootstrap";
@@ -50,7 +50,7 @@ sub load {
     goto retry unless $module and defined &dl_load_file;
 
     my @modparts = split(m/::/,$module);
-    my $modfname = $modparts[-1];
+    my $modfname = @modparts[-1];
 
 EOT
 
@@ -107,27 +107,22 @@ print OUT <<'EOT';
     # in this perl code simply because this was the last perl code
     # it executed.
 
-    my $libref = dl_load_file($file, 0) or do { 
-        require Carp;
-        Carp::croak("Can't load '$file' for module $module: " . dl_error());
-    };
+    my $libref = dl_load_file($file, 0) or
+          die("Can't load '$file' for module $module: " . dl_error());
     push(@DynaLoader::dl_librefs,$libref);  # record loaded object
 
     my @unresolved = dl_undef_symbols();
     if (@unresolved) {
-        require Carp;
-        Carp::carp("Undefined symbols present after loading $file: @unresolved\n");
+        warn("Undefined symbols present after loading $file: @unresolved\n");
     }
 
-    $boot_symbol_ref = dl_find_symbol($libref, $bootname) or do {
-        require Carp;
-        Carp::croak("Can't find '$bootname' symbol in $file\n");
-    };
+    $boot_symbol_ref = dl_find_symbol($libref, $bootname) or 
+        die("Can't find '$bootname' symbol in $file\n");
 
     push(@DynaLoader::dl_modules, $module); # record loaded module
 
   boot:
-    my $xs = dl_install_xsub("${module}::bootstrap", $boot_symbol_ref, $file);
+    my $xs = dl_install_xsub("{$module}::bootstrap", $boot_symbol_ref, $file);
 
     # See comment block above
     push(@DynaLoader::dl_shared_objects, $file); # record files loaded
@@ -143,7 +138,7 @@ print OUT <<'EOT';
 sub bootstrap_inherit {
     package DynaLoader;
 
-    my $module = $_[0];
+    my $module = @_[0];
     local *DynaLoader::isa = *{Symbol::fetch_glob("$module\::ISA")};
     local @DynaLoader::isa = (@DynaLoader::isa, 'DynaLoader');
     # Cannot goto due to delocalization.  Will report errors on a wrong line?

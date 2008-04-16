@@ -91,7 +91,7 @@ sub new {
 sub TIESCALAR {
     my $pkg = shift;
 	if ($pkg->can('new') and $pkg ne __PACKAGE__) {
-	warnings::warnif("WARNING: calling ${pkg}->new since ${pkg}->TIESCALAR is missing");
+	warnings::warnif("WARNING: calling {$pkg}->new since {$pkg}->TIESCALAR is missing");
 	$pkg->new(@_);
     }
     else {
@@ -100,12 +100,12 @@ sub TIESCALAR {
 }
 
 sub FETCH {
-    my $pkg = ref $_[0];
+    my $pkg = ref @_[0];
     die "$pkg doesn't define a FETCH method";
 }
 
 sub STORE {
-    my $pkg = ref $_[0];
+    my $pkg = ref @_[0];
     die "$pkg doesn't define a STORE method";
 }
 
@@ -124,15 +124,15 @@ sub TIESCALAR {
 }
 
 sub FETCH {
-    return ${$_[0]};
+    return ${@_[0]};
 }
 
 sub STORE {
-    ${$_[0]} = $_[1];
+    ${@_[0]} = @_[1];
 }
 
 sub DESTROY {
-    undef ${$_[0]};
+    undef ${@_[0]};
 }
 
 1;

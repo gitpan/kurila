@@ -14,7 +14,7 @@ krunch.pm krunch.pmc whap.pm whap.pmc);
 
 
 my $Is_EBCDIC = (ord('A') == 193) ? 1 : 0;
-my $Is_UTF8   = (${^OPEN} || "") =~ m/:utf8/;
+my $Is_UTF8   = ($^OPEN || "") =~ m/:utf8/;
 my $total_tests = 38;
 if ($Is_EBCDIC || $Is_UTF8) { $total_tests -= 3; }
 print "1..$total_tests\n";
@@ -64,7 +64,7 @@ do_require "0;\n";
 print "# $@\nnot " unless $@->message =~ m/did not return a true/;
 print "ok ",$i++,"\n";
 
-print "not " if exists $INC{'bleah.pm'};
+print "not " if exists %INC{'bleah.pm'};
 print "ok ",$i++,"\n";
 
 my $flag_file = 'bleah.flg';
@@ -78,7 +78,7 @@ for my $expected_compile (1,0) {
     print "ok ",$i++,"\n";
     print "not " unless -e $flag_file xor $expected_compile;
     print "ok ",$i++,"\n";
-    print "not " unless exists $INC{'bleah.pm'};
+    print "not " unless exists %INC{'bleah.pm'};
     print "ok ",$i++,"\n";
 }
 
@@ -90,7 +90,7 @@ print "# $@\nnot " unless $@->message =~ m/(syntax|parse) error/mi;
 print "ok ",$i++,"\n";
 
 # previous failure cached in %INC
-print "not " unless exists $INC{'bleah.pm'};
+print "not " unless exists %INC{'bleah.pm'};
 print "ok ",$i++,"\n";
 write_file($flag_file, 1);
 write_file('bleah.pm', "unlink '$flag_file'; 1");
@@ -100,7 +100,7 @@ print "# $@\nnot " unless $@->message =~ m/Compilation failed/i;
 print "ok ",$i++,"\n";
 print "not " unless -e $flag_file;
 print "ok ",$i++,"\n";
-print "not " unless exists $INC{'bleah.pm'};
+print "not " unless exists %INC{'bleah.pm'};
 print "ok ",$i++,"\n";
 
 # successful require
@@ -128,13 +128,13 @@ print "ok $i - require() context\n";
 **BLEAH**
 );
 our ($foo, @foo);
-                              delete $INC{"bleah.pm"}; ++$::i;
-$foo = eval q{require bleah}; delete $INC{"bleah.pm"}; ++$::i;
-@foo = eval q{require bleah}; delete $INC{"bleah.pm"}; ++$::i;
-       eval q{require bleah}; delete $INC{"bleah.pm"}; ++$::i;
-       eval q{$_=$_+2;require bleah}; delete $INC{"bleah.pm"}; ++$::i;
-$foo = eval  {require bleah}; delete $INC{"bleah.pm"}; ++$::i;
-@foo = eval  {require bleah}; delete $INC{"bleah.pm"}; ++$::i;
+                              delete %INC{"bleah.pm"}; ++$::i;
+$foo = eval q{require bleah}; delete %INC{"bleah.pm"}; ++$::i;
+@foo = eval q{require bleah}; delete %INC{"bleah.pm"}; ++$::i;
+       eval q{require bleah}; delete %INC{"bleah.pm"}; ++$::i;
+       eval q{$_=$_+2;require bleah}; delete %INC{"bleah.pm"}; ++$::i;
+$foo = eval  {require bleah}; delete %INC{"bleah.pm"}; ++$::i;
+@foo = eval  {require bleah}; delete %INC{"bleah.pm"}; ++$::i;
        eval  {require bleah};
 
 # Test for fix of RT #24404 : "require $scalar" may load a directory
@@ -148,7 +148,7 @@ if($@->message =~ m/Can't locate threads in \@INC/) {
 }
 
 write_file('bleah.pm', qq(die "This is an expected error";\n));
-delete $INC{"bleah.pm"}; ++$::i;
+delete %INC{"bleah.pm"}; ++$::i;
 eval { CORE::require bleah; };
 if ($@->message =~ m/^This is an expected error/) {
     print "ok $i\n";
@@ -168,8 +168,8 @@ EOT
     # Right. We really really need Config here.
     require Config;
     die "Failed to load Config for some reason"
-	unless $Config::Config{version};
-    my $ccflags = $Config::Config{ccflags};
+	unless %Config::Config{version};
+    my $ccflags = %Config::Config{ccflags};
     die "Failed to get ccflags for some reason" unless defined $ccflags;
 
     my $simple = ++$i;
@@ -220,7 +220,7 @@ EOT
     $err .= "\n" unless $err =~ m/\n$/;
     unless ($err =~ m/Global symbol "\$nosuchvar" requires /) {
 	$err =~ s/^/# /mg;
-	print "${err}not ";
+	print "{$err}not ";
     }
     print "ok ", ++$i, " [perl #49472]\n";
 }
@@ -237,7 +237,7 @@ if ($Is_EBCDIC || $Is_UTF8) { exit; }
 require utf8;
 my $utf8 = utf8::chr(0xFEFF);
 
-$i++; do_require(qq(${utf8}print "ok $i\n"; 1;\n));
+$i++; do_require(qq({$utf8}print "ok $i\n"; 1;\n));
 
 END {
     foreach my $file (@fjles_to_delete) {

@@ -9,7 +9,7 @@ sub import {
     my $who = _who();
 
     {   no strict 'refs';
-        *{Symbol::fetch_glob("${who}::load")} = *load;
+        *{Symbol::fetch_glob("{$who}::load")} = *load;
     }
 }
 
@@ -67,7 +67,7 @@ sub _to_file{
     return $file;
 }
 
-sub _who { (caller(1))[0] }
+sub _who { (caller(1))[[0]] }
 
 sub _is_file {
     local $_ = shift;

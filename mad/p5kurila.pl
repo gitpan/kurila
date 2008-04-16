@@ -4,6 +4,7 @@ use lib "$ENV{madpath}/mad";
 
 use strict;
 use warnings;
+use version;
 
 use XML::Twig;
 use XML::Twig::XPath;
@@ -559,7 +560,7 @@ sub rename_pointy_ops {
 
     # rename '<' to '+<'
     for my $op (map { $xml->findnodes(qq'//$_') } map { ("op_i_$_", "op_$_") } qw|lt le gt ge|) {
-        next unless get_madprop($op, "operator") =~ m/^[<>]/;
+        next unless get_madprop($op, "operator") =~ m/^(?:&lt;|&gt;)/;
         set_madprop($op, operator => '+' . get_madprop($op, "operator") );
     }
 
@@ -567,34 +568,6 @@ sub rename_pointy_ops {
     for my $op (map { $xml->findnodes("//$_") } qw|op_ncmp op_i_ncmp|) {
         next unless get_madprop($op, "operator") eq "&lt;=&gt;";
         set_madprop($op, operator => '&lt;+&gt;');
-    }
-}
-
-sub qq_block_escape {
-    my $op = shift;
-
-    for my $prop (qw|assign value|) {
-        my $v = get_madprop($op, $prop);
-        next unless $v;
-        # sort of parser of '\\' and '\x{...}'
-        my @v = split m/\\\\/, $v, -1;
-        my @v_x = map { [split m'(\\[xN]{[^}]+})', $_, -1] } @v;
-        for my $vx (@v_x) {
-            my $i = 0;
-            for (@$vx) {
-                next if $i++ % 2;
-                s/(\A|[^\\])([}])/$1\\$2/g;
-                s/(\A|[^\\])([}])/$1\\$2/g;
-                s/(\A|[^\\])([{])/$1\\$2/g;
-                s/(\A|[^\\])([{])/$1\\$2/g;
-            }
-        }
-        $v = join "\\\\", map { join '', @$_ } @v_x;
-        set_madprop($op, $prop, $v);
-    }
-    for my $child ($op->children) {
-        next if $child->tag eq "madprops";
-        qq_block_escape($child);
     }
 }
 
@@ -648,7 +621,7 @@ sub error_str {
         set_madprop($op, "variable", '$@->{description}');
     }
 
-    # replae $SIG{__DIE__} with ${^DIE_HOOK}
+    # replae $SIG{__DIE__} with $^DIE_HOOK
     for my $op_const ($xml->findnodes('//op_const')) {
         for my $name (qw|DIE WARN|) {
             next unless ($op_const->att('PV') || '') eq "__${name}__";
@@ -656,7 +629,7 @@ sub error_str {
             my $rv2hv = $op_const->parent->child(1);
             next unless $rv2hv->tag eq "op_rv2hv";
             next unless get_madprop($rv2hv, "variable") eq '$SIG';
-            set_madprop($rv2hv, "variable", '${^' . $name . '_HOOK}');
+            set_madprop($rv2hv, "variable", '$^' . $name . '_HOOK');
             set_madprop($op_const->parent, "curly_open", '');
             set_madprop($op_const->parent, "curly_close", '');
             set_madprop($op_const, $_, '') for qw|value quote_open quote_close assign|;
@@ -681,24 +654,6 @@ sub qstring {
     }
 }
 
-sub qq_block {
-    # escape '{' and '}' inside a double quoted string
-    my $xml = shift;
-    for my $mad_quote ($xml->findnodes(qq|//madprops/mad_null_type_first[\@val="quote"]|)) {
-        my $op = $mad_quote->parent->parent;
-        next unless get_madprop($op, "quote_open") =~ m/^(&#34;|&lt;&lt;[^']|qq)/;
-        qq_block_escape($op);
-    }
-
-    # '{' and '}' inside s/../../g;
-    for my $op_subst ($xml->findnodes(qq|//op_subst/|)) {
-        my $op = $op_subst->child(-1);
-        next unless $op and $op->tag ne "op_regcomp";
-        next unless get_madprop($op_subst, "subst_open") ne "'";
-        qq_block_escape($op);
-    }
-}
-
 sub pointy_anon_hash {
     my $xml = shift;
     for my $op ($xml->findnodes(qq|//op_anonhash|)) {
@@ -708,10 +663,116 @@ sub pointy_anon_hash {
     }
 }
 
+sub remove_dolsharp {
+    my $xml = shift;
+    # conversion of $#foo to (@foo-1)
+    for my $op (map { $xml->findnodes($_) } qw|//op_av2arylen|) {
+        my $varop = (grep { $_->tag =~ m/^op_(pad.v|rv2av)$/ } $op->children)[0] || $op;
+        if (get_madprop($varop, "arylen") =~ m/^\$\#/) {
+            my $name = get_madprop($varop, "arylen");
+            $name =~ s/^\$\#/\@/;
+            set_madprop($varop, "arylen", $name);
+            set_madprop($varop, "wrap_open", "(");
+            set_madprop($varop, "wrap_close", "-1)");
+        }
+    }
+}
+
+sub qq_escape_op {
+    my ($op, $chars) = @_;
+
+    for my $prop (qw|assign value|) {
+        my $v = get_madprop($op, $prop);
+        next unless $v;
+        # sort of parser of '\\' and '\x{...}'
+        my @v = split m/\\\\/, $v, -1;
+        my @v_x = map { [split m'(\\[xN]{[^}]+})', $_, -1] } @v;
+        for my $vx (@v_x) {
+            my $i = 0;
+            for (@$vx) {
+                next if $i++ % 2;
+                for my $char (@$chars) {
+                    s/(\A|[^\\])([$char])/$1\\$2/g;
+                    s/(\A|[^\\])([$char])/$1\\$2/g;
+                }
+            }
+        }
+        $v = join "\\\\", map { join '', @$_ } @v_x;
+        set_madprop($op, $prop, $v);
+    }
+    for my $child ($op->children) {
+        next if $child->tag eq "madprops";
+        qq_escape_op($child, $chars);
+    }
+}
+
+sub qq_escape {
+    # escape '%' inside a double quoted string
+    my ($xml, $chars) = @_;
+    for my $mad_quote ($xml->findnodes(qq|//madprops/mad_null_type_first[\@val="quote"]|)) {
+        my $op = $mad_quote->parent->parent;
+        next unless get_madprop($op, "quote_open") =~ m/^(&#34;|&lt;&lt;[^']|qq)/;
+        qq_escape_op($op, $chars);
+    }
+
+    # '{' and '}' inside s/../../g;
+    for my $op_subst ($xml->findnodes(qq|//op_subst/|)) {
+        my $op = $op_subst->child(-1);
+        next unless $op and $op->tag ne "op_regcomp";
+        next unless get_madprop($op_subst, "subst_open") ne "'";
+        qq_escape_op($op, $chars);
+    }
+}
+
+sub no_sigil_change {
+    my $xml = shift;
+
+    # conversion of $foo[1] to @foo[1]
+    for my $op (map { $xml->findnodes($_) } qw|//op_aelemfast|) {
+        if ((get_madprop($op, "variable") || '') =~ m/^\$/) {
+            my $name = get_madprop($op, "variable");
+            $name =~ s/^\$/\@/;
+            set_madprop($op, "variable", $name);
+        }
+    }
+
+    # conversion of $foo[$a] to @foo[$a] and $foo{$a} to %foo{$a}
+    for my $op (map { $xml->findnodes($_) } qw|//op_aelem //op_null[@was='aelem'] //op_helem //op_null[@was='helem']|) {
+        my $varop = $op;
+        if (my $cop = $op->child(1)) {
+            $varop = $cop if ($cop->tag || '') =~ m/^op_pad.v$/;
+            $varop = $cop if ($cop->att('was') || $cop->tag || '') =~ m/^(op_)?rv2.v$/;
+        }
+        if ((get_madprop($varop, "variable") || '') =~ m/^\$/) {
+            my $name = get_madprop($varop, "variable");
+            ($op->tag eq "op_helem" || ($op->att('was') || '') eq 'helem') ? $name =~ s/^\$/\%/ : $name =~ s/^\$/\@/;
+            set_madprop($varop, "variable", $name);
+        }
+    }
+
+    # conversion of @foo{@bar} to %foo{[@bar]}
+    for my $op (map { $xml->findnodes($_) } qw|//op_hslice //op_null[@was='hslice']|) {
+        set_madprop($op, "curly_open", '{[');
+        set_madprop($op, "curly_close", ']}');
+        my $vop = $op->child(-1);
+        next unless $vop->tag =~ m/hv$/;
+        next unless get_madprop($vop, "ary") =~ m/^\@/;
+        my $name = get_madprop($vop, "ary");
+        $name =~ s/^\@/\%/;
+        set_madprop($vop, 'ary', $name);
+    }
+
+    # conversion of @foo[1,2] to @foo[[1,2]]
+    for my $op (map { $xml->findnodes($_) } qw|//op_aslice //op_null[@was='aslice'] //op_lslice //op_null[@was='lslice']|) {
+        set_madprop($op, "square_open", '[[');
+        set_madprop($op, "square_close", ']]');
+    }
+}
+
 my $from; # floating point number with starting version of kurila.
 GetOptions("from=s" => \$from);
 $from =~ m/(\w+)[-]([\d.]+)$/ or die "invalid from: '$from'";
-$from = { branch => $1, 'v' => $2};
+$from = { branch => $1, 'v' => qv $2};
 
 my $filename = shift @ARGV;
 
@@ -722,7 +783,7 @@ my $twig= XML::Twig->new( # keep_spaces => 1,
 
 $twig->parsefile( "-" );
 
-if ($from->{v} < 1.4 - 0.05) {
+if ($from->{branch} ne "kurila" or $from->{v} < v1.4) {
     # replacing.
     for my $op ($twig->findnodes(q|//op_entersub|)) {
         entersub_handler($twig, $op);
@@ -740,7 +801,7 @@ if ($from->{v} < 1.4 - 0.05) {
     remove_typed_declaration($twig);
 }
 
-if ($from->{v} < 1.5 - 0.05) {
+if ($from->{branch} ne "kurila" or $from->{v} < v1.5) {
     rename_bit_operators($twig);
     remove_useversion($twig);
     change_deref_method($twig);
@@ -752,22 +813,30 @@ if ($from->{v} < 1.5 - 0.05) {
 }
 #t_parenthesis($twig);
 
-if ($from->{v} < 1.6 - 0.05) {
+if ($from->{branch} ne "kurila" or $from->{v} < v1.6) {
     remove_vstring( $twig );
     use_pkg_version($twig);
     lvalue_subs( $twig );
 }
 
-#rename_pointy_ops( $twig );
 #pointy_anon_hash( $twig );
-if ($from->{v} < 1.7 - 0.05) {
-     force_m( $twig );
-     qq_block( $twig );
-     qstring( $twig );
-     open_3args($twig);
+if ($from->{branch} ne "kurila" or $from->{v} < v1.7) {
+    rename_pointy_ops( $twig );
+    force_m( $twig );
+    qq_escape( $twig, ['{', '}'] );
+    qstring( $twig );
+    open_3args($twig);
 }
 
-error_str($twig);
+if ($from->{branch} ne "kurila" or $from->{v} < v1.8) {
+    error_str($twig);
+}
+
+if ($from->{branch} ne "kurila" or $from->{v} < qv '1.10') {
+    remove_dolsharp($twig);
+    qq_escape($twig, ['%']);
+    no_sigil_change($twig);
+}
 
 # print
 $twig->print( pretty_print => 'indented' );

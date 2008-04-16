@@ -61,8 +61,8 @@ SKIP: { # Test exit status from pod2usage()
                || $^O eq 'NetWare'
                || $^O eq 'VMS') ? '"'
               : "");
-    my @params = ( "${cq}-I../lib$cq",  "${cq}-MPod::Usage$cq", '-e' );
-    my $prg = qq[${cq}pod2usage(\{ $args \})$cq];
+    my @params = ( "{$cq}-I../lib$cq",  "{$cq}-MPod::Usage$cq", '-e' );
+    my $prg = qq[{$cq}pod2usage(\{ $args \})$cq];
     my @cmd = ( $^X, @params, $prg );
 
     print "# cmd = @cmd\n";
@@ -102,7 +102,7 @@ is( $pod2usage, $pod2text, 'Verbose level >= 2 eq pod2text' );
 
 package CatchOut;
 sub TIEHANDLE { bless \( my $self ), shift }
-sub PRINT     { my $self = shift; $$self .= $_[0] }
+sub PRINT     { my $self = shift; $$self .= @_[0] }
 
 __END__
 

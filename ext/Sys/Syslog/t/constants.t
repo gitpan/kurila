@@ -4,7 +4,7 @@ use File::Spec;
 use Test::More;
 
 # NB. For PERL_CORE to be set, taint mode must not be enabled
-my $macrosall = $ENV{PERL_CORE} ? File::Spec->catfile(qw(.. ext Sys Syslog macros.all))
+my $macrosall = %ENV{PERL_CORE} ? File::Spec->catfile(qw(.. ext Sys Syslog macros.all))
                                 : 'macros.all';
 open(MACROS, "<", $macrosall) or plan skip_all => "can't read '$macrosall': $!";
 my @names = map {chomp;$_} ~< *MACROS;
@@ -14,10 +14,10 @@ plan tests => @names * 2 + 2;
 my $callpack = my $testpack = 'Sys::Syslog';
 eval "use $callpack";
 
-eval "${callpack}::This()";
+eval "{$callpack}::This()";
 like( $@->{description}, "/^Undefined subroutine/", "trying a non-existing macro");
 
-eval "${callpack}::NOSUCHNAME()";
+eval "{$callpack}::NOSUCHNAME()";
 like( $@->{description}, "/^Undefined subroutine/", "trying a non-existing macro");
 
 # Testing all macros
@@ -26,7 +26,7 @@ if(@names) {
         SKIP: {
             $name =~ m/^(\w+)$/ or skip "invalid name '$name'", 2;
             $name = $1;
-            my $v = eval "${callpack}::$name()";
+            my $v = eval "{$callpack}::$name()";
 
             if(defined $v and $v =~ m/^\d+$/) {
                 is( $@, '', "calling the constant $name as a function" );
