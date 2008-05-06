@@ -10,6 +10,7 @@ package Nomad;
 use strict;
 use warnings;
 use Carp;
+use version;
 
 use P5AST;
 use P5re;
@@ -25,7 +26,7 @@ sub xml_to_p5 {
 
     $::curenc = 0;		# start in utf8.
     $options{'version'} =~ m/(\w+)[-]([\d.]+)$/ or die "invalid version: '$options{version}'";
-    $::version = { branch => $1, 'v' => $2};
+    $::version = { branch => $1, 'v' => qv($2)};
 
     # parse file
     use XML::Parser;
@@ -852,7 +853,7 @@ sub innerpmop {
 	    }
 	    $really = $$really{Kids}[0];
 	}
-        if ( $::version->{branch} eq 'kurila' and $::version->{'v'} > 1.6 ) {
+        if ( $::version->{branch} eq 'kurila' and $::version->{'v'} > v1.6 ) {
             if ((ref $really) =~ m/PLXML::op_(scope|leave)/) {
                 # remove whitespace in front of the '{'
                 if (ref $really eq 'PLXML::op_scope' and
@@ -2141,7 +2142,7 @@ package PLXML::op_aelemfast;
 
 sub ast {
     my $self = shift;
-    return $self->madness('$');
+    return $self->madness('$ @'); # '$' for perl5, '@' for perl kurila
 }
 
 package PLXML::op_aelem;
@@ -2153,20 +2154,20 @@ sub astnull {
     for my $kid (@{$$self{Kids}}) {
 	push @newkids, $kid->ast($self, @_);
     }
-    splice @newkids, -1, 0, $self->madness('a [');
-    push @newkids, $self->madness(']');
+    splice @newkids, -1, 0, $self->madness('( a [');
+    push @newkids, $self->madness('] )');
     return P5AST::op_aelem->new(Kids => [@newkids]);
 }
 
 sub ast {
     my $self = shift;
 
-    my @before = $self->madness('dx d');
+    my @before = $self->madness('dx d (');
     my @newkids;
     for my $kid (@{$$self{Kids}}) {
 	push @newkids, $kid->ast(@_);
     }
-    splice @newkids, -1, 0, $self->madness('a [');
+    splice @newkids, -1, 0, $self->madness(') a [');
     push @newkids, $self->madness(']');
 
     return $self->newtype->new(Kids => [@before, @newkids]);
@@ -2372,7 +2373,7 @@ sub ast {
 
     my $slice = $$self{Kids}[0];
     push @newkids, $slice->ast($self, @_);
-    push @newkids, $self->madness(']');
+    push @newkids, $self->madness('slice_close ]');
 
     return $self->newtype->new(Kids => [@newkids]);
 }

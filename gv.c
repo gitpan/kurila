@@ -1046,8 +1046,14 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 			if (strEQ(name2, "DIE_HOOK"))
 			    goto magicalize;
 			break;
-		    case 'E':	/* $^ENCODING */
+		    case 'E':	/* $^ENCODING  $^EGID */
 			if (strEQ(name2, "ENCODING"))
+			    goto magicalize;
+			if (strEQ(name2, "EGID"))
+			    goto magicalize;
+			break;
+		    case 'G':   /* $^GID */
+			if (strEQ(name2, "GID"))
 			    goto magicalize;
 			break;
 		    case 'M':        /* $^MATCH */
@@ -1060,6 +1066,11 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 		    case 'P':        /* $^PREMATCH  $^POSTMATCH */
 			if (strEQ(name2, "PREMATCH") || strEQ(name2, "POSTMATCH"))
 			    goto magicalize;  
+			break;
+		    case 'R':        /* $^RE_TRIE_MAXBUF */
+			if (strEQ(name2, "RE_TRIE_MAXBUF") || strEQ(name2, "RE_DEBUG_FLAGS"))
+			    goto no_magicalize;
+			break;
 		    case 'T':	/* $^TAINT */
 			if (strEQ(name2, "TAINT"))
 			    goto ro_magicalize;
@@ -1079,6 +1090,7 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 			    goto magicalize;
 			break;
 		    }
+		    Perl_croak(aTHX_ "Unknown magic variable '$%s'", name);
 		} else {
 		    switch (*name2) {
 		    case 'H':	/* $^H */
@@ -1100,13 +1112,20 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 		    case 'T':	/* $^T */
 		    case 'W':	/* $^W */
 			goto magicalize;
+		    case 'M':   /* $^M */
+		    case 'R':   /* $^R */
+		    case 'X':   /* $^X */
+			goto no_magicalize;
 		    case 'V':	/* $^V */
 		    {
 			SV * const sv = GvSVn(gv);
 			sv_setsv(sv, PL_patchlevel);
-			break;
+			goto no_magicalize;
 		    }
 		    }
+		    Perl_croak(aTHX_ "Unknown magic variable '%c%s'",
+			       sv_type == SVt_PVAV ? '@' : sv_type == SVt_PVHV ? '%' : '$',
+			       name);
 		}
 	    case '1':
 	    case '2':
@@ -1184,12 +1203,6 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 
             break;
 	}
-	case '*':
-	case '#':
-	    if (sv_type == SVt_PV && ckWARN2_d(WARN_DEPRECATED, WARN_SYNTAX))
-		Perl_warner(aTHX_ packWARN2(WARN_DEPRECATED, WARN_SYNTAX),
-			    "$%c is no longer supported", *name);
-	    break;
 	case '|':
 	    sv_setiv(GvSVn(gv), (IV)(IoFLAGS(GvIOp(PL_defoutgv)) & IOf_FLUSH) != 0);
 	    goto magicalize;
@@ -1206,10 +1219,7 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 	case '7':
 	case '8':
 	case '9':
-	case '[':
 	case '.':
-	case '(':
-	case ')':
 	case '<':
 	case '>':
 	case ',':
@@ -1217,16 +1227,30 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 	case '/':
 	magicalize:
 	    sv_magic(GvSVn(gv), (SV*)gv, PERL_MAGIC_sv, name, len);
+
+	case '$':
+	case '@':
+	case '"':
+	case '0':
+	case '_':
+	case 'a':
+	case 'b':
+	no_magicalize:
 	    break;
 
 	case ';':
 	    sv_setpvn(GvSVn(gv),"\034",1);
 	    break;
 	case ']':
-	{
 	    Perl_croak(aTHX_ "$] is obsolete. Use $^V or $kurila::VERSION");
-	}
-	break;
+	case '*':
+	case '#':
+	case '(':
+	case ')':
+	case '[':
+	    Perl_croak(aTHX_ "Unknown magic variable '%c%s'",
+		       sv_type == SVt_PVAV ? '@' : sv_type == SVt_PVHV ? '%' : '$',
+		       name);
 	}
     }
     return gv;
@@ -1928,179 +1952,6 @@ Perl_amagic_call(pTHX_ SV *left, SV *right, int method, int flags)
       return res;
     }
   }
-}
-
-/*
-=for apidoc is_gv_magical_sv
-
-Returns C<TRUE> if given the name of a magical GV. Calls is_gv_magical.
-
-=cut
-*/
-
-bool
-Perl_is_gv_magical_sv(pTHX_ SV *name, U32 flags)
-{
-    STRLEN len;
-    const char * const temp = SvPV_const(name, len);
-
-    PERL_ARGS_ASSERT_IS_GV_MAGICAL_SV;
-
-    return is_gv_magical(temp, len, flags);
-}
-
-/*
-=for apidoc is_gv_magical
-
-Returns C<TRUE> if given the name of a magical GV.
-
-Currently only useful internally when determining if a GV should be
-created even in rvalue contexts.
-
-C<flags> is not used at present but available for future extension to
-allow selecting particular classes of magical variable.
-
-Currently assumes that C<name> is NUL terminated (as well as len being valid).
-This assumption is met by all callers within the perl core, which all pass
-pointers returned by SvPV.
-
-=cut
-*/
-bool
-Perl_is_gv_magical(pTHX_ const char *name, STRLEN len, U32 flags)
-{
-    PERL_UNUSED_CONTEXT;
-    PERL_UNUSED_ARG(flags);
-
-    PERL_ARGS_ASSERT_IS_GV_MAGICAL;
-
-    if (len > 1) {
-	switch (*name) {
-	case 'I':
-	    if (len == 3 && name[1] == 'S' && name[2] == 'A')
-		goto yes;
-	    break;
-	case 'O':
-	    if (len == 8 && strEQ(name, "OVERLOAD"))
-		goto yes;
-	    break;
-	case 'S':
-	    if (len == 3 && name[1] == 'I' && name[2] == 'G')
-		goto yes;
-	    break;
-	    /* Using ${^...} variables is likely to be sufficiently rare that
-	       it seems sensible to avoid the space hit of also checking the
-	       length.  */
-	case '^':
-	    if (len > 2) {
-		const char * const name1 = name + 2;
-		switch (name[1]) {
-		case 'D':    /* $^DIE_HOOK */
-		    if (strEQ(name1, "IE_HOOK"))
-			goto yes;
-		    break;
-		case 'O':   /* $^OPEN */
-		    if (strEQ(name1, "PEN"))
-			goto yes;
-		    break;
-		case 'T':   /* $^TAINT */
-		    if (strEQ(name1, "AINT"))
-			goto yes;
-		    break;
-		case 'U':	/* $^UNICODE */
-		    if (strEQ(name1, "NICODE"))
-			goto yes;
-		    if (strEQ(name1, "TF8LOCALE"))
-			goto yes;
-		    break;
-		case 'W':   /* $^WARNING_BITS */
-		    if (strEQ(name1, "ARNING_BITS"))
-			goto yes;
-		    if (strEQ(name1, "ARN_HOOK"))
-			goto yes;
-		    break;
-		}
-	    } else {
-		switch (name[1]) {
-		case 'C':   /* $^C */
-		case 'D':   /* $^D */
-		case 'E':   /* $^E */
-		case 'F':   /* $^F */
-		case 'H':   /* $^H */
-		case 'I':   /* $^I */
-		case 'N':   /* $^N */
-		case 'O':   /* $^O */
-		case 'P':   /* $^P */
-		case 'S':   /* $^S */
-		case 'T':   /* $^T */
-		case 'V':   /* $^V */
-		case 'W':   /* $^W */
-		    goto yes;
-		}
-	    }
-	case '1':
-	case '2':
-	case '3':
-	case '4':
-	case '5':
-	case '6':
-	case '7':
-	case '8':
-	case '9':
-	{
-	    const char *end = name + len;
-	    while (--end > name) {
-		if (!isDIGIT(*end))
-		    return FALSE;
-	    }
-	    goto yes;
-	}
-	}
-    } else {
-	/* Because we're already assuming that name is NUL terminated
-	   below, we can treat an empty name as "\0"  */
-	switch (*name) {
-	case '&':
-	case '`':
-	case '\'':
-	case ':':
-	case '?':
-	case '!':
-	case '-':
-	case '#':
-	case '[':
-	case '^':
-	case '~':
-	case '=':
-	case '%':
-	case '.':
-	case '(':
-	case ')':
-	case '<':
-	case '>':
-	case ',':
-	case '\\':
-	case '/':
-	case '|':
-	case '+':
-	case ';':
-	case ']':
-	case '1':
-	case '2':
-	case '3':
-	case '4':
-	case '5':
-	case '6':
-	case '7':
-	case '8':
-	case '9':
-	yes:
-	    return TRUE;
-	default:
-	    break;
-	}
-    }
-    return FALSE;
 }
 
 void

@@ -204,7 +204,7 @@ sub Tgetent
     my $class = shift;
     my ($self) = @_;
 
-    $self = {} unless defined $self;
+    $self = \%() unless defined $self;
     bless $self, $class;
 
     my ( $term, $cap, $search, $field, $max, $tmp_term, $TERMCAP );
@@ -645,8 +645,8 @@ sub Tgoto
 	}
 	elsif ($code eq '>') {
 	    ($code,$tmp,$string) = unpack("CCa99",$string);
-	    if (@tmp[$[] +> $code) {
-		@tmp[$[] += $tmp;
+	    if (@tmp[0] +> $code) {
+		@tmp[0] += $tmp;
 	    }
 	}
 	elsif ($code eq '2') {

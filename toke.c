@@ -297,6 +297,7 @@ static struct debug_tokens {
     { ANDAND,		TOKENTYPE_NONE,		"ANDAND" },
     { ANDOP,		TOKENTYPE_NONE,		"ANDOP" },
     { ANONSUB,		TOKENTYPE_IVAL,		"ANONSUB" },
+    { ANONARY,		TOKENTYPE_IVAL,		"ANONARY" },
     { ARROW,		TOKENTYPE_NONE,		"ARROW" },
     { ASSIGNOP,		TOKENTYPE_OPNUM,	"ASSIGNOP" },
     { BITANDOP,		TOKENTYPE_OPNUM,	"BITANDOP" },
@@ -317,7 +318,6 @@ static struct debug_tokens {
     { FUNC0SUB,		TOKENTYPE_OPVAL,	"FUNC0SUB" },
     { FUNC1,		TOKENTYPE_OPNUM,	"FUNC1" },
     { GIVEN,		TOKENTYPE_IVAL,		"GIVEN" },
-    { HASHBRACK,	TOKENTYPE_NONE,		"HASHBRACK" },
     { IF,		TOKENTYPE_IVAL,		"IF" },
     { LABEL,		TOKENTYPE_PVAL,		"LABEL" },
     { LOCAL,		TOKENTYPE_IVAL,		"LOCAL" },
@@ -3699,6 +3699,13 @@ Perl_yylex(pTHX)
 	    ++s;
 	    Mop(OP_MODULO);
 	}
+
+	if (s[1] == '(') {
+	    /* anonymous hash constructor */
+	    s += 2;
+	    OPERATOR(ANONHSH);
+	}
+
 	PL_tokenbuf[0] = '%';
 	s = scan_ident(s, PL_bufend, PL_tokenbuf + 1,
 		sizeof PL_tokenbuf - 1, FALSE);
@@ -3745,6 +3752,9 @@ Perl_yylex(pTHX)
 	    PL_expect = XSTATE;
 	    TOKEN(ASLICE);
 	    /* NOT REACHED */
+	}
+	if (PL_expect != XOPERATOR) {
+	    yyerror("'[...]' should be '\\@(...)'");
 	}
 	PL_lex_brackets++;
 	OPERATOR('[');
@@ -3927,7 +3937,7 @@ Perl_yylex(pTHX)
 	{
 	    const char tmp = *s++;
 	    s = SKIPSPACE1(s);
-	    if (*s == '{')
+	    if (*s == '{' && PL_expect != XOPERATOR)
 		PREBLOCK(tmp);
 	    TERM(tmp);
 	}
@@ -3953,7 +3963,7 @@ Perl_yylex(pTHX)
 		PL_lex_brackstack[PL_lex_brackets++] = XTERM;
 	    else
 		PL_lex_brackstack[PL_lex_brackets++] = XOPERATOR;
-	    OPERATOR(HASHBRACK);
+	    yyerror("'{' should be '\%(' expected");
 	case XOPERATOR:
 	    if (*s == '[') {
 		s++;
@@ -4000,114 +4010,17 @@ Perl_yylex(pTHX)
 	    yyerror("panic: Unknown PL_expect");
 	    break;
 	case XSTATE:
-	case XREF: {
-		const char *t;
-		if (PL_oldoldbufptr == PL_last_lop)
-		    PL_lex_brackstack[PL_lex_brackets++] = XTERM;
-		else
-		    PL_lex_brackstack[PL_lex_brackets++] = XOPERATOR;
-		s = SKIPSPACE1(s);
-		if (*s == '}') {
-		    if (PL_expect == XREF && PL_lex_state == LEX_INTERPNORMAL) {
-			PL_expect = XTERM;
-			/* This hack is to get the ${} in the message. */
-			PL_bufptr = s+1;
-			yyerror("syntax error");
-			break;
-		    }
-		    OPERATOR(HASHBRACK);
-		}
-		/* This hack serves to disambiguate a pair of curlies
-		 * as being a block or an anon hash.  Normally, expectation
-		 * determines that, but in cases where we're not in a
-		 * position to expect anything in particular (like inside
-		 * eval"") we have to resolve the ambiguity.  This code
-		 * covers the case where the first term in the curlies is a
-		 * quoted string.  Most other cases need to be explicitly
-		 * disambiguated by prepending a "+" before the opening
-		 * curly in order to force resolution as an anon hash.
-		 *
-		 * XXX should probably propagate the outer expectation
-		 * into eval"" to rely less on this hack, but that could
-		 * potentially break current behavior of eval"".
-		 * GSAR 97-07-21
-		 */
-
-/* 		yyerror("{ ... } unknown hash or block"); */
-/* 		break; */
-
-		t = s;
-		if (*s == '\'' || *s == '"' || *s == '`') {
-		    /* common case: get past first string, handling escapes */
-		    for (t++; t < PL_bufend && *t != *s;)
-			if (*t++ == '\\' && (*t == '\\' || *t == *s))
-			    t++;
-		    t++;
-		}
-		else if (*s == 'q') {
-		    if (++t < PL_bufend
-			&& (!isALNUM(*t)
-			    || ((*t == 'q' || *t == 'x') && ++t < PL_bufend
-				&& !isALNUM(*t))))
-		    {
-			/* skip q//-like construct */
-			const char *tmps;
-			char open, close, term;
-			I32 brackets = 1;
-
-			while (t < PL_bufend && isSPACE(*t))
-			    t++;
-			/* check for q => */
-			if (t+1 < PL_bufend && t[0] == '=' && t[1] == '>') {
-			    OPERATOR(HASHBRACK);
-			}
-			term = *t;
-			open = term;
-			if (term && (tmps = strchr("([{< )]}> )]}>",term)))
-			    term = tmps[5];
-			close = term;
-			if (open == close)
-			    for (t++; t < PL_bufend; t++) {
-				if (*t == '\\' && t+1 < PL_bufend && open != '\\')
-				    t++;
-				else if (*t == open)
-				    break;
-			    }
-			else {
-			    for (t++; t < PL_bufend; t++) {
-				if (*t == '\\' && t+1 < PL_bufend)
-				    t++;
-				else if (*t == close && --brackets <= 0)
-				    break;
-				else if (*t == open)
-				    brackets++;
-			    }
-			}
-			t++;
-		    }
-		    else
-			/* skip plain q word */
-			while (t < PL_bufend && isALNUM_lazy_if(t,UTF))
-			     t += UTF8SKIP(t);
-		}
-		else if (isALNUM_lazy_if(t,UTF)) {
-		    t += UTF8SKIP(t);
-		    while (t < PL_bufend && isALNUM_lazy_if(t,UTF))
-			 t += UTF8SKIP(t);
-		}
-		while (t < PL_bufend && isSPACE(*t))
-		    t++;
-		/* if comma follows first term, call it an anon hash */
-		/* XXX it could be a comma expression with loop modifiers */
-		if (t < PL_bufend && ((*t == ',' && (*s == 'q' || !isLOWER(*s)))
-				   || (*t == '=' && t[1] == '>')))
-		    OPERATOR(HASHBRACK);
-		if (PL_expect == XREF)
-		    PL_expect = XTERM;
-		else {
-		    PL_lex_brackstack[PL_lex_brackets-1] = XSTATE;
-		    PL_expect = XSTATE;
-		}
+	case XREF:
+	    if (PL_oldoldbufptr == PL_last_lop)
+		PL_lex_brackstack[PL_lex_brackets++] = XTERM;
+	    else
+		PL_lex_brackstack[PL_lex_brackets++] = XOPERATOR;
+	    s = SKIPSPACE1(s);
+	    if (PL_expect == XREF)
+		PL_expect = XTERM;
+	    else {
+		PL_lex_brackstack[PL_lex_brackets-1] = XSTATE;
+		PL_expect = XSTATE;
 	    }
 	    break;
 	}
@@ -4336,7 +4249,6 @@ Perl_yylex(pTHX)
 		if (*s == '[') {
 		    Perl_croak(aTHX_ "array element should be @%s[...] instead of $%s[...]",
 			       &PL_tokenbuf[1], &PL_tokenbuf[1]);
-		    PL_tokenbuf[0] = '@';
 		}
 		else if (*s == '{') {
 		    Perl_croak(aTHX_ "hash element should be %%%s{...} instead of $%s{...}",
@@ -4392,6 +4304,13 @@ Perl_yylex(pTHX)
     case '@':
 	if (PL_expect == XOPERATOR)
 	    no_op("Array", s);
+
+	if (s[1] == '(') {
+	    /* array constructor */
+	    s += 2;
+	    OPERATOR(ANONARY);
+	}
+
 	PL_tokenbuf[0] = '@';
 	s = scan_ident(s, PL_bufend, PL_tokenbuf + 1, sizeof PL_tokenbuf - 1, FALSE);
 	if (!PL_tokenbuf[1]) {
@@ -4482,6 +4401,7 @@ Perl_yylex(pTHX)
 	if (PL_expect == XOPERATOR) {
 	    no_op("String",s);
 	}
+	
 	if (!s)
 	    missingterminator(NULL);
 	DEBUG_T( { printbuf("### Saw string before %s\n", s); } );
@@ -6203,9 +6123,6 @@ S_pending_ident(pTHX)
           "### Pending identifier '%s'\n", PL_tokenbuf); });
 
     /* if we're in a my(), we can't allow dynamics here.
-       $foo'bar has already been turned into $foo::bar, so
-       just check for colons.
-
        if it's a legal name, the OP is a PADANY.
     */
     if (PL_in_my) {
@@ -9723,7 +9640,7 @@ S_new_constant(pTHX_ const char *s, STRLEN len, const char *key, STRLEN keylen,
     }
     cvp = hv_fetch(table, key, keylen, FALSE);
     if (!cvp || !SvOK(*cvp)) {
-	why1 = "$^H{";
+	why1 = "%^H{";
 	why2 = key;
 	why3 = "} is not defined";
 	goto report;
@@ -9771,7 +9688,7 @@ S_new_constant(pTHX_ const char *s, STRLEN len, const char *key, STRLEN keylen,
     POPSTACK;
 
     if (!SvOK(res)) {
- 	why1 = "Call to &{$^H{";
+ 	why1 = "Call to &{%^H{";
  	why2 = key;
  	why3 = "}} did not return a defined value";
  	sv = res;

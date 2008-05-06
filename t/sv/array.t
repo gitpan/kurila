@@ -1,6 +1,6 @@
 #!./perl
 
-require './test.pl';
+BEGIN { require './test.pl'; }
 
 plan (86);
 
@@ -230,7 +230,7 @@ my $got = runperl (
 	prog => q{
                     our @a;
 		    sub X::DESTROY { @a = () }
-		    @a = (bless {}, "X");
+		    @a = (bless \%(), "X");
 		    @a = ();
 		},
 	stderr => 1
@@ -258,8 +258,9 @@ is ($got, '');
 
 {
     my @a;
-    eval_dies_like( '@a[-1] = 0', 
-                    qr/Modification of non-creatable array value attempted, subscript -1/, "\$a[-1] = 0");
+    eval '@a[-1] = 0';
+    like $@->message,
+      qr/Modification of non-creatable array value attempted, subscript -1/, "\$a[-1] = 0";
 }
 
 {
@@ -268,7 +269,7 @@ is ($got, '');
     use vars '@array';
     for (1,2) {
 	{
-	    local @a;
+	    local our @a;
 	    is ((@a-1), -1);
 	    @a=(1..4)
 	}

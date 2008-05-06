@@ -108,7 +108,7 @@ like $@->{description}, qr/Bareword "nothing" not allowed/, "compsub lexical sco
                 $kid = $padsv;
             } elsif ($kid->name eq "list" or $kid->name eq "pushmark") {
                 # ignore
-            } elsif ($kid->name eq "anonhash") {
+            } elsif ($kid->name eq "refgen") {
                 # ignore, assume it is the last item in the list.
             } else {
                 die "Expected constant opcode but got " . $kid->name;
@@ -127,7 +127,7 @@ like $@->{description}, qr/Bareword "nothing" not allowed/, "compsub lexical sco
 
     {
         sub foobar {
-            params 'foo', 'bar', { @_ };
+            params 'foo', 'bar', \%( @_ );
             is $foo, 'foo-value', '$foo declared and initialized';
             is $bar, 'bar-value';
         }

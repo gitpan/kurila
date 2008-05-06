@@ -977,42 +977,6 @@ intrpvar.h			Variables held in each interpreter instance
 iperlsys.h			Perl's interface to the system
 keywords.h			The keyword numbers
 keywords.pl			Program to write keywords.h
-lib/Archive/Extract.pm	Archive::Extract
-lib/Archive/Extract/t/01_Archive-Extract.t	Archive::Extract tests
-lib/Archive/Extract/t/src/double_dir.zip.packed	Archive::Extract tests
-lib/Archive/Extract/t/src/x.bz2.packed	Archive::Extract tests
-lib/Archive/Extract/t/src/x.gz.packed	Archive::Extract tests
-lib/Archive/Extract/t/src/x.jar.packed	Archive::Extract tests
-lib/Archive/Extract/t/src/x.lzma.packed	Archive::Extract tests
-lib/Archive/Extract/t/src/x.par.packed	Archive::Extract tests
-lib/Archive/Extract/t/src/x.tar.gz.packed	Archive::Extract tests
-lib/Archive/Extract/t/src/x.tar.packed	Archive::Extract tests
-lib/Archive/Extract/t/src/x.tgz.packed	Archive::Extract tests
-lib/Archive/Extract/t/src/x.zip.packed	Archive::Extract tests
-lib/Archive/Extract/t/src/x.Z.packed	Archive::Extract tests
-lib/Archive/Extract/t/src/y.jar.packed	Archive::Extract tests
-lib/Archive/Extract/t/src/y.par.packed	Archive::Extract tests
-lib/Archive/Extract/t/src/y.tar.bz2.packed	Archive::Extract tests
-lib/Archive/Extract/t/src/y.tar.gz.packed	Archive::Extract tests
-lib/Archive/Extract/t/src/y.tar.packed	Archive::Extract tests
-lib/Archive/Extract/t/src/y.tbz.packed	Archive::Extract tests
-lib/Archive/Extract/t/src/y.tgz.packed	Archive::Extract tests
-lib/Archive/Extract/t/src/y.zip.packed	Archive::Extract tests
-lib/Archive/Tar/bin/ptar	the ptar utility
-lib/Archive/Tar/bin/ptardiff	the ptardiff utility
-lib/Archive/Tar/Constant.pm	Archive::Tar
-lib/Archive/Tar/File.pm		Archive::Tar
-lib/Archive/Tar.pm		Archive::Tar
-lib/Archive/Tar/t/01_use.t	Archive::Tar tests
-lib/Archive/Tar/t/02_methods.t	Archive::Tar tests
-lib/Archive/Tar/t/03_file.t	Archive::Tar tests
-lib/Archive/Tar/t/04_resolved_issues.t	Archive::Tar tests
-lib/Archive/Tar/t/src/long/b	Archive::Tar tests
-lib/Archive/Tar/t/src/long/bar.tar.packed	Archive::Tar tests
-lib/Archive/Tar/t/src/long/foo.tgz.packed	Archive::Tar tests
-lib/Archive/Tar/t/src/short/b	Archive::Tar tests
-lib/Archive/Tar/t/src/short/bar.tar.packed	Archive::Tar tests
-lib/Archive/Tar/t/src/short/foo.tgz.packed	Archive::Tar tests
 lib/attributes.pm		For "sub foo : attrlist"
 lib/autouse.pm			Load and call a function only when it's used
 lib/autouse.t			See if autouse works
@@ -2141,6 +2105,7 @@ pod/buildtoc			Update files based on pod.lst
 pod/checkpods.PL		Tool to check for common errors in pods
 pod/kurila01delta.pod	What is new for Perl Kurila 0.1
 pod/kurila02delta.pod	What is new for Perl Kurila 0.2
+pod/kurila111delta.pod	What is new for Perl Kurila 1.11
 pod/kurila110delta.pod	What is new for Perl Kurila 1.10
 pod/kurila13delta.pod	What is new for Perl Kurila 1.3
 pod/kurila14delta.pod	What is new for Perl Kurila 1.4
@@ -2511,6 +2476,8 @@ t/lex/qq.t			See if qq works
 t/lex/qr.t			See if qr work
 t/lex/use.t			See if use works
 t/lex/ver.t			See if v-strings and the %v format flag work
+t/op/anon_array.t		See if @( ... ) work
+t/op/anon_hash.t		See if %( ... ) work
 t/lib/1_compile.t		See if the various libraries and extensions compile
 t/lib/Cname.pm			Test charnames in regexes (op/pat.t)
 t/lib/common.pl			Helper for lib/{warnings,feature}.t
