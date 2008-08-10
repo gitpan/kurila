@@ -42,7 +42,7 @@ rename_if_different("keywords.h-new", "keywords.h");
 
 ###########################################################################
 sub tab {
-    my ($l, $t) = @_;
+    my ($l, $t) = < @_;
     $t .= "\t" x ($l - (length($t) + 1) / 8);
     $t;
 }
@@ -70,7 +70,6 @@ atan2
 bind
 binmode
 bless
-break
 caller
 chdir
 chmod
@@ -86,7 +85,6 @@ connect
 continue
 cos
 crypt
-default
 defined
 delete
 die
@@ -140,7 +138,6 @@ getservbyport
 getservent
 getsockname
 getsockopt
-given
 glob
 gmtime
 goto
@@ -164,6 +161,8 @@ localtime
 lock
 log
 lstat
+nelems
+nkeys
 m
 map
 mkdir
@@ -267,6 +266,7 @@ time
 times
 tr
 truncate
+try
 uc
 ucfirst
 umask
@@ -285,7 +285,6 @@ wait
 waitpid
 wantarray
 warn
-when
 while
 write
 x

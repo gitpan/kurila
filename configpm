@@ -53,11 +53,11 @@ while ($how_many_common--) {
 }
 
 # names of things which may need to have slashes changed to double-colons
-my %Extensions = map {($_,$_)}
-                 qw(dynamic_ext static_ext extensions known_extensions);
+my %Extensions = %( map {($_,$_)}
+                 qw(dynamic_ext static_ext extensions known_extensions) );
 
 # allowed opts as well as specifies default and initial values
-my %Allowed_Opts = (
+my %Allowed_Opts = %(
     'cross'    => '', # --cross=PLATFORM - crosscompiling for PLATFORM
     'glossary' => 1,  # --no-glossary  - no glossary file inclusion,
                       #                  for compactness
@@ -65,26 +65,26 @@ my %Allowed_Opts = (
 
 sub opts {
     # user specified options
-    my %given_opts = (
+    my %given_opts = %(
         # --opt=smth
-        (map {m/^--([\-_\w]+)=(.*)$/} @ARGV),
+        (map {m/^--([\-_\w]+)=(.*)$/} < @ARGV),
         # --opt --no-opt --noopt
-        (map {m/^no-?(.*)$/i?($1=>0):($_=>1)} map {m/^--([\-_\w]+)$/} @ARGV),
+        (map {m/^no-?(.*)$/i?($1=>0):($_=>1)} map {m/^--([\-_\w]+)$/} < @ARGV),
     );
 
-    my %opts = (%Allowed_Opts, %given_opts);
+    my %opts = %(< %Allowed_Opts, < %given_opts);
 
     for my $opt (grep {!exists %Allowed_Opts{$_}} keys %given_opts) {
         warn "option '$opt' is not recognized";
 	usage;
     }
-    @ARGV = grep {!m/^--/} @ARGV;
+    @ARGV = @( grep {!m/^--/} < @ARGV );
 
     return %opts;
 }
 
 
-my %Opts = opts();
+my %Opts = %( < opts() );
 
 my ($Config_SH, $Config_PM, $Config_heavy, $Config_POD);
 my $Glossary = 'Porting/Glossary';
@@ -119,9 +119,9 @@ package Config;
 # use vars pulls in Carp
 
 BEGIN {
-   my @heavy_subs = (qw|myconfig fetch_string FIRSTKEY NEXTKEY EXISTS STORE config_sh config_re
+   my @heavy_subs = @(qw|myconfig fetch_string FIRSTKEY NEXTKEY EXISTS STORE config_sh config_re
                        config_vars|);
-   for (@heavy_subs) { undef Symbol::fetch_glob($_)->*; }
+   for (< @heavy_subs) { undef Symbol::fetch_glob($_)->*; }
 }
 
 ENDOFBEG
@@ -136,13 +136,13 @@ package Config;
 # use strict;
 # use warnings; Pulls in Carp
 # use vars pulls in Carp
-@Config::EXPORT = qw(%%Config);
-@Config::EXPORT_OK = qw(myconfig config_sh config_vars config_re);
+@Config::EXPORT = @(qw(%%Config));
+@Config::EXPORT_OK = @(qw(myconfig config_sh config_vars config_re));
 
 # Need to stub all the functions to make code such as print Config::config_sh
 # keep working
 
-my %%Export_Cache = map {($_ => 1)} (@Config::EXPORT, @Config::EXPORT_OK);
+my %%Export_Cache = %%( map {($_ => 1)} (< @Config::EXPORT, < @Config::EXPORT_OK) );
 
 our %%Config;
 
@@ -151,12 +151,12 @@ sub import {
     my $pkg = shift;
     @_ = @Config::EXPORT unless @_;
 
-    my @funcs = grep $_ ne '%%Config', @_;
-    my $export_Config = @funcs +< @_ ? 1 : 0;
+    my @funcs = @( grep $_ ne '%%Config', < @_ );
+    my $export_Config = (nelems @funcs) +< (nelems @_) ? 1 : 0;
 
     no strict 'refs';
     my $callpkg = caller(0);
-    foreach my $func (@funcs) {
+    foreach my $func (< @funcs) {
 	die qq{"$func" is not exported by the {__PACKAGE__} module\n}
              unless %%Export_Cache{$func};
 	*{Symbol::fetch_glob($callpkg.'::'.$func)} = \&{$func};
@@ -172,10 +172,10 @@ $^V eq '%s'
 ENDOFBEG
 
 
-my @non_v    = ();
-my @v_others = ();
+my @non_v    = @( () );
+my @v_others = @( () );
 my $in_v     = 0;
-my %Data     = ();
+my %Data     = %( () );
 
 
 my %seen_quotes;
@@ -235,7 +235,7 @@ my $fetch_string = <<'EOT';
 
 # Search for it in the big string
 sub fetch_string {
-    my($self, $key) = @_;
+    my($self, $key) = < @_;
 
 EOT
 
@@ -303,7 +303,7 @@ die if $@;
 
 # Calculation for the keys for byteorder
 # This is somewhat grim, but I need to run fetch_string here.
-$Config_SH_expanded = join "\n", '', @v_others;
+$Config_SH_expanded = join "\n", '', < @v_others;
 
 my $t = fetch_string (\%(), 'ivtype');
 my $s = fetch_string (\%(), 'ivsize');
@@ -394,7 +394,7 @@ if (fetch_string(\%(),'userelocatableinc')) {
 }
 
 my %need_relocation;
-%need_relocation{[@need_relocation]} = @need_relocation;
+%need_relocation{[< @need_relocation]} = < @need_relocation;
 
 # This can have .../ anywhere:
 if (fetch_string(\%(), 'otherlibdirs') =~ m!\.\.\./!) {
@@ -442,7 +442,7 @@ if (%need_relocation) {
   }
 }
 
-$heavy_txt .= join('', @non_v) . "\n";
+$heavy_txt .= join('', < @non_v) . "\n";
 
 # copy config summary format from the myconfig.SH script
 $heavy_txt .= "our \$summary = <<'!END!';\n";
@@ -464,7 +464,7 @@ local *_ = \my $a;
 $_ = <<'!END!';
 EOT
 
-$heavy_txt .= join('', sort @v_others) . "!END!\n";
+$heavy_txt .= join('', sort < @v_others) . "!END!\n";
 
 # Only need the dynamic byteorder code in Config.pm if 'byteorder' is one of
 # the precached keys
@@ -474,8 +474,8 @@ if (%Common{byteorder}) {
     $heavy_txt .= $byteorder_code;
 }
 
-if (@need_relocation) {
-$heavy_txt .= 'foreach my $what (qw(' . join (' ', @need_relocation) .
+if ((nelems @need_relocation)) {
+$heavy_txt .= 'foreach my $what (qw(' . join (' ', < @need_relocation) .
       ")) \{\n" . <<'EOT';
     s/^($what=)(['"])(.*?)\2/$1 . $2 . relocate_inc($3) . $2/me;
 }
@@ -513,19 +513,19 @@ foreach my $prefix (qw(libs libswanted)) {
     my $withlf = fetch_string (\%(), 'libswanted_uselargefiles');
     next unless defined $withlf;
     my @lflibswanted
-       = split(' ', fetch_string (\%(), 'libswanted_uselargefiles'));
-    if (@lflibswanted) {
+       = @( split(' ', fetch_string (\%(), 'libswanted_uselargefiles')) );
+    if ((nelems @lflibswanted)) {
 	my %lflibswanted;
-	%lflibswanted{[@lflibswanted]} = ();
+	%lflibswanted{[< @lflibswanted]} = ();
 	if ($prefix eq 'libs') {
-	    my @libs = grep { m/^-l(.+)/ &&
+	    my @libs = @( grep { m/^-l(.+)/ &&
                             not exists %lflibswanted{$1} }
-		                    split(' ', fetch_string (\%(), 'libs'));
-	    $value = join(' ', @libs);
+		                    split(' ', fetch_string (\%(), 'libs')) );
+	    $value = join(' ', < @libs);
 	} else {
-	    my @libswanted = grep { not exists %lflibswanted{$_} }
-	                          split(' ', fetch_string (\%(), 'libswanted'));
-	    $value = join(' ', @libswanted);
+	    my @libswanted = @( grep { not exists %lflibswanted{$_} }
+	                          split(' ', fetch_string (\%(), 'libswanted')) );
+	    $value = join(' ', < @libswanted);
 	}
     }
     $heavy_txt .= "{$prefix}_nolargefiles='$value'\n";
@@ -538,7 +538,7 @@ $heavy_txt .= $fetch_string;
 $config_txt .= <<'ENDOFEND';
 
 sub FETCH {
-    my($self, $key) = @_;
+    my($self, $key) = < @_;
 
     # check for cached value (which may be undef so we use exists not defined)
     return $self->{$key} if exists $self->{$key};
@@ -602,13 +602,13 @@ sub config_sh {
 
 sub config_re {
     my $re = shift;
-    return map { chomp; $_ } grep eval{ m/^(?:$re)=/ }, split m/^/,
-    $Config_SH_expanded;
+    return @(map { chomp; $_ } grep try{ m/^(?:$re)=/ }, split m/^/,
+             $Config_SH_expanded );
 }
 
 sub config_vars {
     # implements -V:cfgvar option (see perlrun -V:)
-    foreach (@_) {
+    foreach (<@_) {
 	# find optional leading, trailing colons; and query-spec
 	my ($notag,$qry,$lncont) = m/^(:)?(.*?)(:)?$/;	# flags fore and aft, 
 	# map colon-flags to print decorations
@@ -617,9 +617,9 @@ sub config_vars {
 
 	# all config-vars are by definition \w only, any \W means regex
 	if ($qry =~ m/\W/) {
-	    my @matches = config_re($qry);
-	    print map "$_$lnend", @matches ? @matches : "$qry: not found"		if !$notag;
-	    print map { s/\w+=//; "$_$lnend" } @matches ? @matches : "$qry: not found"	if  $notag;
+	    my @matches = @(<config_re($qry));
+	    print map "$_$lnend", @matches ? <@matches : "$qry: not found"		if !$notag;
+	    print map { s/\w+=//; "$_$lnend" } @matches ? <@matches : "$qry: not found"	if  $notag;
 	} else {
 	    my $v = (exists %Config::Config{$qry}) ? %Config::Config{$qry}
 						   : 'UNKNOWN';
@@ -693,9 +693,9 @@ my $fast_config = join '', map { "    $_,\n" } sort values %Common;
 # &launcher for some reason (eg it got truncated)
 $config_txt .= sprintf <<'ENDOFTIE', $fast_config;
 
-my @heavy_subs = (qw|myconfig fetch_string FIRSTKEY NEXTKEY EXISTS STORE config_sh config_re
+my @heavy_subs = @(qw|myconfig fetch_string FIRSTKEY NEXTKEY EXISTS STORE config_sh config_re
                      config_vars|);
-for my $name (@heavy_subs) {
+for my $name (< @heavy_subs) {
     Symbol::fetch_glob("Config::$name")->* =
        sub { require 'Config_heavy.pl';
              goto &{Symbol::fetch_glob("Config::$name")->*};
@@ -832,7 +832,7 @@ ENDOFTAIL
 if (%Opts{glossary}) {
   open(*GLOS, "<", "$Glossary") or die "Can't open $Glossary: $!";
 }
-my %seen = ();
+my %seen = %( () );
 my $text = 0;
 $/ = '';
 
@@ -982,8 +982,8 @@ die "$0: error processing $Config_PM"
 	;
 
 die "$0: error processing $Config_PM"
-	if eval '$Config{"cc"} = 1'
-	or eval 'delete $Config{"cc"}'
+	if eval '%Config{"cc"} = 1'
+	or eval 'delete %Config{"cc"}'
 	;
 
 

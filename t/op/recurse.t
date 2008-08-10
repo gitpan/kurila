@@ -59,7 +59,7 @@ is(fibonacci(10), 89, "fibonacci(10) == 89");
 
 is(fibonacci(fibonacci(7)), 17711, "fibonacci(fibonacci(7)) == 17711");
 
-my @ack = qw(1 2 3 4 2 3 4 5 3 5 7 9 5 13 29 61);
+my @ack = @( qw(1 2 3 4 2 3 4 5 3 5 7 9 5 13 29 61) );
 
 for my $x (0..3) { 
     for my $y (0..3) {
@@ -74,7 +74,7 @@ is(takeuchi($x, $y, $z), $z + 1, "takeuchi($x, $y, $z) == $z + 1");
 
 {
     sub get_first1 {
-	get_list1(@_)->[0];
+	get_list1(< @_)->[0];
     }
 
     sub get_list1 {
@@ -88,7 +88,7 @@ is(takeuchi($x, $y, $z), $z + 1, "takeuchi($x, $y, $z) == $z + 1");
 
 {
     sub get_first2 {
-	return get_list2(@_)->[0];
+	return get_list2(< @_)->[0];
     }
 
     sub get_list2 {
@@ -113,7 +113,7 @@ is(takeuchi($x, $y, $z), $z + 1, "takeuchi($x, $y, $z) == $z + 1");
 # check ok for recursion depth > 65536
 {
     my $r;
-    eval { 
+    try { 
 	$r = runperl(
 		     nolib => 1,
 		     stderr => 1,

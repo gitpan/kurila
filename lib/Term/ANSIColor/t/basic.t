@@ -8,10 +8,8 @@
 ##############################################################################
 
 BEGIN { $| = 1; print "1..16\n" }
-END   { print "not ok 1\n" unless $loaded }
 delete %ENV{ANSI_COLORS_DISABLED};
 use Term::ANSIColor qw(:constants color colored uncolor);
-$loaded = 1;
 print "ok 1\n";
 
 ##############################################################################
@@ -72,16 +70,16 @@ if (colored (\@('bold', 'on_green'), "test\n", "\n", "test")
     eq "\e[1;42mtest\e[0m\n\n\e[1;42mtest\e[0m") {
     print "ok 8\n";
 } else {
-    print colored (\@('bold', 'on_green'), "test\n", "\n", "test");
+    print < colored (\@('bold', 'on_green'), "test\n", "\n", "test");
     print "not ok 8\n";
 }
 
 # Test uncolor.
-my @names = uncolor ('1;42', "\e[m", '', "\e[0m");
-if (join ('|', @names) eq 'bold|on_green|clear') {
+my @names = @( < uncolor ('1;42', "\e[m", '', "\e[0m") );
+if (join ('|', < @names) eq 'bold|on_green|clear') {
     print "ok 9\n";
 } else {
-    print join ('|', @names), "\n";
+    print join ('|', < @names), "\n";
     print "not ok 9\n";
 }
 

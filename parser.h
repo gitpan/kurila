@@ -110,11 +110,11 @@ typedef struct yy_parser {
     SV		*thiswhite;
 
 /* What we know when we're in LEX_KNOWNEXT state. */
-    NEXTMADTOKE	nexttoke[5];	/* value of next token, if any */
+    NEXTMADTOKE	nexttoke[6];	/* value of next token, if any */
     I32		curforce;
 #else
-    YYSTYPE	nextval[5];	/* value of next token, if any */
-    I32		nexttype[5];	/* type of next token */
+    YYSTYPE	nextval[6];	/* value of next token, if any */
+    I32		nexttype[6];	/* type of next token */
     I32		nexttoke;
 #endif
 
@@ -122,6 +122,28 @@ typedef struct yy_parser {
     char	tokenbuf[256];
 
 } yy_parser;
+
+
+/* LEX_* are values for PL_lex_state, the state of the lexer.
+ * They are arranged oddly so that the guard on the switch statement
+ * can get by with a single comparison (if the compiler is smart enough).
+ */
+
+/* #define LEX_NOTPARSING		11 is done in perl.h. */
+
+#define LEX_INTERPBLOCK          8 /* block inside { ... } */
+#define LEX_NORMAL		 7 /* normal code (ie not within "...")     */
+#define LEX_INTERPNORMAL	 6 /* code within a string, eg "$foo[$x+1]" */
+#define LEX_INTERPCASEMOD	 5 /* expecting a \U, \Q or \E etc          */
+#define LEX_INTERPPUSH		 4 /* starting a new sublex parse level     */
+#define LEX_INTERPSTART		 3 /* expecting the start of a $var         */
+
+				   /* at end of code, eg "$x" followed by:  */
+#define LEX_INTERPEND		 2 /* ... eg not one of [, { or ->          */
+
+#define LEX_INTERPCONCAT	 1 /* expecting anything, eg at start of
+				        string or after \E, $foo, etc       */
+#define LEX_KNOWNEXT		 0 /* next token known; just return it      */
 
 /*
  * Local variables:

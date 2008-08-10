@@ -22,8 +22,8 @@ $|=1;
 our (@prgs, $tmpfile, $CAT, $status, $i);
 
 undef $/;
-@prgs = split "\n########\n", ~< *DATA;
-print "1..", scalar @prgs, "\n";
+@prgs = @( split "\n########\n", ~< *DATA );
+print "1..", scalar nelems @prgs, "\n";
 
 $tmpfile = "forktmp000";
 1 while -f ++$tmpfile;
@@ -31,7 +31,7 @@ END { close TEST; unlink $tmpfile if $tmpfile; }
 
 $CAT = (($^O eq 'MSWin32') ? '.\perl -e "print ~< *ARGV"' : (($^O eq 'NetWare') ? 'perl -e "print ~< *ARGV"' : 'cat'));
 
-for (@prgs){
+for (< @prgs){
     my $switch;
     if (s/^\s*(-\w.*)//){
 	$switch = $1;
@@ -39,7 +39,7 @@ for (@prgs){
     my($prog,$expected) = split(m/\nEXPECT\n/, $_);
     $expected =~ s/\n+$//;
     # results can be in any order, so sort 'em
-    my @expected = sort split m/\n/, $expected;
+    my @expected = @( sort split m/\n/, $expected );
     open TEST, ">", "$tmpfile" or die "Cannot open $tmpfile: $!";
     print TEST $prog, "\n";
     close TEST or die "Cannot close $tmpfile: $!";
@@ -62,8 +62,8 @@ for (@prgs){
     $results =~ s/^(syntax|parse) error/syntax error/mig;
     $results =~ s/^\n*Process terminated by SIG\w+\n?//mg
 	if $^O eq 'os2';
-    my @results = sort split m/\n/, $results;
-    if ( "@results" ne "@expected" ) {
+    my @results = @( sort split m/\n/, $results );
+    if ( "{join ' ', <@results}" ne "{join ' ', <@expected}" ) {
 	print STDERR "PROG: $switch\n$prog\n";
 	print STDERR "EXPECTED:\n$expected\n";
 	print STDERR "GOT:\n$results\n";
@@ -74,9 +74,9 @@ for (@prgs){
 
 __END__
 $| = 1;
-if ($cid = fork) {
+if (my $cid = fork) {
     sleep 1;
-    if ($result = (kill 9, $cid)) {
+    if (my $result = (kill 9, $cid)) {
 	print "ok 2\n";
     }
     else {
@@ -93,7 +93,7 @@ ok 1
 ok 2
 ########
 $| = 1;
-if ($cid = fork) {
+if (my $cid = fork) {
     sleep 1;
     print "not " unless kill 'INT', $cid;
     print "ok 2\n";
@@ -111,6 +111,7 @@ ok 1
 ok 2
 ########
 $| = 1;
+our $i;
 sub forkit {
     print "iteration $i start\n";
     my $x = fork;
@@ -167,8 +168,8 @@ parent
 child
 ########
 $| = 1;
-@a = (1..3);
-for (@a) {
+my @a = @(1..3);
+for (<@a) {
     if (fork) {
 	print "parent $_\n";
 	$_ = "[$_]";
@@ -178,7 +179,7 @@ for (@a) {
 	$_ = "-$_-";
     }
 }
-print "@a\n";
+print "{join ' ', <@a}\n";
 EXPECT
 parent 1
 child 1
@@ -299,7 +300,7 @@ parent after: bar
 ########
 $| = 1;
 $\ = "\n";
-if ($pid = fork) {
+if (my $pid = fork) {
     waitpid($pid,0);
     print "parent got $?"
 }
@@ -312,7 +313,7 @@ parent got 10752
 $| = 1;
 $\ = "\n";
 my $echo = 'echo';
-if ($pid = fork) {
+if (my $pid = fork) {
     waitpid($pid,0);
     print "parent got $?"
 }
@@ -333,12 +334,12 @@ EXPECT
 parent died at - line 2.
 child died at - line 5.
 ########
-if ($pid = fork) {
-    eval { die "parent died" };
+if (my $pid = fork) {
+    try { die "parent died" };
     print $@->message;
 }
 else {
-    sleep 1; eval { die "child died" };
+    sleep 1; try { die "child died" };
     print $@->message;
 }
 EXPECT
@@ -347,6 +348,7 @@ parent died at - line 2.
 child died at - line 6.
     (eval) called at - line 2.
 ########
+my $pid;
 if (eval q{$pid = fork}) {
     eval q{ die "parent died" };
     print $@->message;
@@ -357,9 +359,9 @@ else {
 }
 EXPECT
 parent died at (eval 2) line 1.
-    (eval) called at - line 2.
+    (eval) called at - line 3.
 child died at (eval 2) line 1.
-    (eval) called at - line 6.
+    (eval) called at - line 7.
 ########
 BEGIN {
     $| = 1;
@@ -426,7 +428,7 @@ pipe_from_fork
 pipe_to_fork
 ########
 $|=1;
-if ($pid = fork()) {
+if (my $pid = fork()) {
     print "forked first kid\n";
     print "waitpid() returned ok\n" if waitpid($pid,0) == $pid;
 }
@@ -434,7 +436,7 @@ else {
     print "first child\n";
     exit(0);
 }
-if ($pid = fork()) {
+if (my $pid = fork()) {
     print "forked second kid\n";
     print "wait() returned ok\n" if wait() == $pid;
 }
@@ -469,7 +471,7 @@ EXPECT
 1
 ########
 # [perl #39145] Perl_dounwind() crashing with Win32's fork() emulation
-sub { @_ = 3; fork ? die "1" : die "1" }->(2);
+sub { @_ = @(3); fork ? die "1" : die "1" }->(2);
 EXPECT
 1 at - line 2.
     main::__ANON__ called at - line 2.

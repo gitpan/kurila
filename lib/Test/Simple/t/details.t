@@ -3,7 +3,7 @@
 BEGIN {
     if( %ENV{PERL_CORE} ) {
         chdir 't';
-        @INC = ('../lib', 'lib');
+        @INC = @('../lib', 'lib');
     }
     else {
         unshift @INC, 't/lib';
@@ -19,7 +19,7 @@ $Test->level(0);
 
 my @Expected_Details;
 
-$Test->is_num( scalar $Test->summary(), 0,   'no tests yet, no summary' );
+$Test->is_num( (nelems $Test->summary()), 0,   'no tests yet, no summary' );
 push @Expected_Details, \%( 'ok'      => 1,
                           actual_ok => 1,
                           name      => 'no tests yet, no summary',
@@ -32,10 +32,10 @@ push @Expected_Details, \%( 'ok'      => 1,
 my $out_fh  = $Test->output;
 my $todo_fh = $Test->todo_output;
 my $start_test = $Test->current_test + 1;
-require TieOut;
-tie *FH, 'TieOut';
-$Test->output(\*FH);
-$Test->todo_output(\*FH);
+my $new_out = "";
+open my $new_fh, '>>', \$new_out or die;
+$Test->output($new_fh);
+$Test->todo_output($new_fh);
 
 SKIP: {
     $Test->skip( 'just testing skip' );
@@ -71,7 +71,7 @@ for ($start_test..$Test->current_test) { print "ok $_\n" }
 $Test->output($out_fh);
 $Test->todo_output($todo_fh);
 
-$Test->is_num( scalar $Test->summary(), 4,   'summary' );
+$Test->is_num( (nelems $Test->summary()), 4,   'summary' );
 push @Expected_Details, \%( 'ok'      => 1,
                           actual_ok => 1,
                           name      => 'summary',
@@ -88,8 +88,8 @@ push @Expected_Details, \%( 'ok'      => 1,
                           reason    => 'incrementing test number',
                         );
 
-my @details = $Test->details();
-$Test->is_num( scalar @details, 6,
+my @details = @( < $Test->details() );
+$Test->is_num( scalar nelems @details, 6,
     'details() should return a list of all test details');
 
 $Test->level(1);
@@ -100,8 +100,8 @@ is_deeply( \@details, \@Expected_Details );
 {
     my $curr_test = $Test->current_test;
     $Test->current_test(4);
-    my @details = $Test->details();
+    my @details = @( < $Test->details() );
 
     $Test->current_test($curr_test);
-    $Test->is_num( scalar @details, 4 );
+    $Test->is_num( scalar nelems @details, 4 );
 }

@@ -1,10 +1,10 @@
 #!./perl
 
-print "1..70\n";
+print "1..66\n";
 
 my $test = 0;
 sub ok ($$) {
-    my ($ok, $name) = @_;
+    my ($ok, $name) = < @_;
     ++$test;
     print $ok ? "ok $test - $name\n" : "not ok $test - $name\n";
 }
@@ -21,8 +21,6 @@ ok( $_ eq 'glabol', 's/// on global $_' );
     ok( $_ eq 'lacol', 's/// on my $_' );
     m/(..)/;
     ok( $1 eq 'la', '// on my $_' );
-    ok( tr/c/d/ == 1, 'tr/// on my $_ counts correctly' );
-    ok( $_ eq 'ladol', 'tr/// on my $_' );
     {
 	my $_ = 'nested';
 	ok( $_ eq 'nested', 'my $_ nested' );
@@ -33,7 +31,7 @@ ok( $_ eq 'glabol', 's/// on global $_' );
 	our $_;
 	ok( $_ eq 'glabol', 'gains access to our global $_' );
     }
-    ok( $_ eq 'ladol', 'my $_ restored' );
+    ok( $_ eq 'lacol', 'my $_ restored' );
 }
 ok( $_ eq 'glabol', 'global $_ restored' );
 s/abo/oba/;
@@ -113,12 +111,6 @@ $_ = "global";
     ok( $x eq '1globallocal-2globallocal', 'map without {}' );
 }
 {
-    for my $_ (1) {
-	my $x = map $_, qw(a b);
-	ok( $x == 2, 'map in scalar context' );
-    }
-}
-{
     my $buf = '';
     sub tgrep1 { m/(.)/; $buf .= $1 }
     my $_ = 'y';
@@ -139,7 +131,7 @@ $_ = "global";
     my $_ = 'local';
     sub tgrep4 () { return $_ };
     my $x = join '-', grep $_=$_.tgrep3.tgrep4, 1 .. 2;
-    ok( $x eq '1globallocal-2globallocal', 'grep without {} with side-effect' );
+    ok( $x eq '1globallocal-2globallocal', 'grep without {} with side-effect # TODO' );
     ok( $_ eq 'local', '...but without extraneous side-effects' );
 }
 {
@@ -157,17 +149,11 @@ $_ = "global";
 }
 
 {
-    my $_ = "abc";
-    my $x = reverse;
-    ok( $x eq "cba", 'reverse without arguments picks up $_' );
-}
-
-{
     package notmain;
     our $_ = 'notmain';
-    ::ok( $::_ eq 'notmain', 'our $_ forced into main::' );
+    main::ok( $::_ eq 'notmain', 'our $_ forced into main::' );
     m/(.*)/;
-    ::ok( $1 eq 'notmain', '...m// defaults to our $_ in main::' );
+    main::ok( $1 eq 'notmain', '...m// defaults to our $_ in main::' );
 }
 
 my $file = 'dolbar1.tmp';
@@ -190,6 +176,6 @@ END { unlink $file; }
     ok( $fqdb::_ eq 'fqdb', 'fully qualified $_ is not in main' );
     ok( eval q/$fqdb::_/ eq 'fqdb', 'fully qualified, evaled $_ is not in main' );
     package fqdb;
-    ::ok( $_ ne 'fqdb', 'unqualified $_ is in main' );
-    ::ok( q/$_/ ne 'fqdb', 'unqualified, evaled $_ is in main' );
+    main::ok( $_ ne 'fqdb', 'unqualified $_ is in main' );
+    main::ok( q/$_/ ne 'fqdb', 'unqualified, evaled $_ is in main' );
 }

@@ -1,12 +1,5 @@
 # t/html-styles.t
 
-BEGIN {
-    if(%ENV{PERL_CORE}) {
-        chdir 't';
-        @INC = '../lib';
-    }
-}
-
 #use Pod::Simple::Debug (10);
 
 use strict;
@@ -21,7 +14,7 @@ sub x ($) { Pod::Simple::HTML->_out(
 
 ok 1;
 
-my @pairs = (
+my @pairs = @(
 \@( "I<italicized>"   => qq{\n<p><i>italicized</i></p>\n} ),
 \@( 'B<bolded>'       => qq{\n<p><b>bolded</b></p>\n}           ),
 \@( 'C<code>'         => qq{\n<p><code>code</code></p>\n} ),
@@ -30,7 +23,7 @@ my @pairs = (
 );
  
  
-foreach( @pairs ) {
+foreach( < @pairs ) {
   print "# Testing pod source @$_[0] ...\n" unless $_->[0] =~ m/\n/;
   ok( x($_->[0]), $_->[1] )
 }

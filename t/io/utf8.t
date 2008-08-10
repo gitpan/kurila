@@ -1,8 +1,6 @@
 #!./perl
 
 BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
     unless ('PerlIO::Layer'->find('perlio')) {
 	print "1..0 # Skip: not perlio\n";
 	exit 0;
@@ -44,8 +42,8 @@ seek(F,0,0);
 binmode(F,":utf8");
 is( scalar( ~< *F), "\x{100}\x[c2]\x[a3]\n" );
 seek(F,0,0);
-$buf = chr(0x200);
-$count = read(F,$buf,2,1);
+my $buf = chr(0x200);
+my $count = read(F,$buf,2,1);
 cmp_ok( $count, '==', 2 );
 is( $buf, "\x{200}\x{100}\x[c2]\x[a3]" );
 close(F);
@@ -59,7 +57,7 @@ close(F);
     close F;
 
     open F, "<:utf8", 'a' or die $!;
-    $x = ~< *F;
+    my $x = ~< *F;
     chomp($x);
     is( $x, chr(300) );
 
@@ -127,7 +125,7 @@ close F;
 
 open F, "<", "a" or die $!;
 binmode(F, ":bytes");
-$x = ~< *F; chomp $x;
+my $x = ~< *F; chomp $x;
 $chr = chr(130);
 is( $x, $a . $chr );
 
@@ -143,11 +141,7 @@ close F;
 open F, "<", "a" or die $!;
 binmode(F, ":bytes");
 $x = ~< *F; chomp $x;
-SKIP: {
-    skip("Defaulting to UTF-8 output means that we can't generate a mangled file")
-	if $UTF8_OUTPUT;
-    is( $x, $a . bytes::chr(130) );
-}
+is( $x, $a . bytes::chr(130) );
 
 # Now we have a deformed file.
 
@@ -156,8 +150,8 @@ SKIP: {
 	open F, "<:utf8", "a" or die $!;
 	$x = ~< *F; chomp $x;
 	local $^WARN_HOOK = sub { push @warnings, @_[0]->message; };
-	eval { sprintf "\%vd\n", $x };
-	is (scalar @warnings, 1);
+	try { sprintf "\%vd\n", $x };
+	is (nelems @warnings, 1);
 	like (@warnings[0], qr/Malformed UTF-8 character \(unexpected continuation byte 0x82, with no preceding start byte/);
 }
 
@@ -165,9 +159,9 @@ close F;
 unlink('a');
 
 open F, ">:utf8", "a";
-@a = map { chr(1 << ($_ << 2)) } 0..5; # 0x1, 0x10, .., 0x100000
+my @a = @( map { chr(1 << ($_ << 2)) } 0..5 ); # 0x1, 0x10, .., 0x100000
 unshift @a, chr(0); # ... and a null byte in front just for fun
-print F @a;
+print F < @a;
 close F;
 
 my $c;
@@ -176,7 +170,7 @@ my $c;
 open F, "<:utf8", "a";
 $a = 0;
 my $failed;
-for (@a) {
+for (< @a) {
     unless (($c = read(F, $b, 1) == 1)  &&
             length($b)           == 1  &&
             ord($b)              == ord($_) &&
@@ -184,7 +178,7 @@ for (@a) {
         print '# ord($_)           == ', ord($_), "\n";
         print '# ord($b)           == ', ord($b), "\n";
         print '# length($b)        == ', length($b), "\n";
-        print '# bytes::length($b) == ', bytes::length($b), "\n";
+        print '# bytes::length($b) == ', < bytes::length($b), "\n";
         print '# tell(F)           == ', tell(F), "\n";
         print '# $a                == ', $a, "\n";
         print '# $c                == ', $c, "\n";
@@ -196,13 +190,13 @@ close F;
 is($failed, undef);
 
 {
-    my @a = ( \@( 0x007F, "bytes" ),
+    my @a = @( \@( 0x007F, "bytes" ),
 	      \@( 0x0080, "bytes" ),
 	      \@( 0x0080, "utf8"  ),
 	      \@( 0x0100, "utf8"  ) );
     my $t = 34;
-    for my $u (@a) {
-	for my $v (@a) {
+    for my $u (< @a) {
+	for my $v (< @a) {
 	    # print "# @$u - @$v\n";
 	    open F, ">", "a";
 	    binmode(F, ":" . $u->[1]);
@@ -251,11 +245,11 @@ is($failed, undef);
     undef $@;
     my $line = ~< *F;
     my ($chrE4, $chrF6) = ("E4", "F6");
-    like( $@->message, qr/utf8 "\\x$chrE4" does not map to Unicode .+ <F> line 1/,
+    like( $@->message, qr/utf8 "\\x$chrE4" does not map to Unicode .+/,
 	  "<:utf8 readline must warn about bad utf8");
     undef $@;
     $line .= ~< *F;
-    like( $@->message, qr/utf8 "\\x$chrF6" does not map to Unicode .+ <F> line 2/,
+    like( $@->message, qr/utf8 "\\x$chrF6" does not map to Unicode .+/,
 	  "<:utf8 rcatline must warn about bad utf8");
     close F;
 }

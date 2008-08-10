@@ -71,6 +71,7 @@
 #define av_shift		Perl_av_shift
 #define av_store		Perl_av_store
 #define av_undef		Perl_av_undef
+#define av_tmprefcnt		Perl_av_tmprefcnt
 #define av_unshift		Perl_av_unshift
 #ifdef PERL_CORE
 #define bind_match		Perl_bind_match
@@ -121,12 +122,12 @@
 #define cv_ckproto_len		Perl_cv_ckproto_len
 #define cv_clone		Perl_cv_clone
 #endif
-#define gv_const_sv		Perl_gv_const_sv
 #define cv_const_sv		Perl_cv_const_sv
 #ifdef PERL_CORE
 #define op_const_sv		Perl_op_const_sv
 #endif
 #define cv_undef		Perl_cv_undef
+#define cv_tmprefcnt		Perl_cv_tmprefcnt
 #define cx_dump			Perl_cx_dump
 #define filter_add		Perl_filter_add
 #define filter_del		Perl_filter_del
@@ -207,6 +208,8 @@
 #define do_join			Perl_do_join
 #ifdef PERL_CORE
 #define do_kv			Perl_do_kv
+#define bad_arg			Perl_bad_arg
+#define do_arg_check		Perl_do_arg_check
 #endif
 #define do_open9		Perl_do_open9
 #define do_openn		Perl_do_openn
@@ -220,7 +223,6 @@
 #ifdef PERL_CORE
 #define do_sysseek		Perl_do_sysseek
 #define do_tell			Perl_do_tell
-#define do_trans		Perl_do_trans
 #define do_vecget		Perl_do_vecget
 #define do_vecset		Perl_do_vecset
 #define do_vop			Perl_do_vop
@@ -232,7 +234,6 @@
 #if defined(DUMP_FDS)
 #define dump_fds		Perl_dump_fds
 #endif
-#define dump_form		Perl_dump_form
 #define gv_dump			Perl_gv_dump
 #define op_dump			Perl_op_dump
 #define pmop_dump		Perl_pmop_dump
@@ -257,19 +258,19 @@
 #endif
 #endif
 #define gp_free			Perl_gp_free
+#define gp_tmprefcnt		Perl_gp_tmprefcnt
 #define gp_ref			Perl_gp_ref
 #define gv_AVadd		Perl_gv_AVadd
 #define gv_HVadd		Perl_gv_HVadd
 #define gv_IOadd		Perl_gv_IOadd
 #define gv_check		Perl_gv_check
-#define gv_efullname		Perl_gv_efullname
-#define gv_efullname4		Perl_gv_efullname4
+#define gv_efullname3		Perl_gv_efullname3
 #define gv_fetchfile		Perl_gv_fetchfile
 #define gv_fetchfile_flags	Perl_gv_fetchfile_flags
 #define gv_fetchmeth		Perl_gv_fetchmeth
 #define gv_fetchmethod		Perl_gv_fetchmethod
 #define gv_fetchpv		Perl_gv_fetchpv
-#define gv_fullname4		Perl_gv_fullname4
+#define gv_fullname3		Perl_gv_fullname3
 #define gv_init			Perl_gv_init
 #define gv_name_set		Perl_gv_name_set
 #define gv_stashpv		Perl_gv_stashpv
@@ -288,6 +289,7 @@
 #define hv_iterval		Perl_hv_iterval
 #define hv_ksplit		Perl_hv_ksplit
 #define hv_undef		Perl_hv_undef
+#define hv_tmprefcnt		Perl_hv_tmprefcnt
 #define ibcmp			Perl_ibcmp
 #define ibcmp_locale		Perl_ibcmp_locale
 #define ibcmp_utf8		Perl_ibcmp_utf8
@@ -446,12 +448,6 @@
 #define magicname		Perl_magicname
 #endif
 #define markstack_grow		Perl_markstack_grow
-#if defined(USE_LOCALE_COLLATE)
-#ifdef PERL_CORE
-#define magic_setcollxfrm	Perl_magic_setcollxfrm
-#define mem_collxfrm		Perl_mem_collxfrm
-#endif
-#endif
 #define mess			Perl_mess
 #define vmess			Perl_vmess
 #if defined(PERL_CORE) || defined(PERL_EXT)
@@ -466,6 +462,7 @@
 #endif
 #define mg_find			Perl_mg_find
 #define mg_free			Perl_mg_free
+#define mg_tmprefcnt		Perl_mg_tmprefcnt
 #define mg_get			Perl_mg_get
 #define mg_length		Perl_mg_length
 #define mg_magical		Perl_mg_magical
@@ -528,7 +525,6 @@
 #define newFORM			Perl_newFORM
 #endif
 #define newFOROP		Perl_newFOROP
-#define newGIVENOP		Perl_newGIVENOP
 #define newLOGOP		Perl_newLOGOP
 #define newLOOPEX		Perl_newLOOPEX
 #define newLOOPOP		Perl_newLOOPOP
@@ -549,6 +545,7 @@
 #define newGVREF		Perl_newGVREF
 #define newHVREF		Perl_newHVREF
 #define newHVhv			Perl_newHVhv
+#define hv_sethv		Perl_hv_sethv
 #define newIO			Perl_newIO
 #define newLISTOP		Perl_newLISTOP
 #ifdef USE_ITHREADS
@@ -575,7 +572,6 @@
 #define newSVsv			Perl_newSVsv
 #define newSV_type		Perl_newSV_type
 #define newUNOP			Perl_newUNOP
-#define newWHENOP		Perl_newWHENOP
 #define newWHILEOP		Perl_newWHILEOP
 #define new_stackinfo		Perl_new_stackinfo
 #define scan_vstring		Perl_scan_vstring
@@ -595,6 +591,7 @@
 #define oopsCV			Perl_oopsCV
 #endif
 #define op_free			Perl_op_free
+#define op_tmprefcnt		Perl_op_tmprefcnt
 #ifdef PERL_MAD
 #ifdef PERL_CORE
 #define package			Perl_package
@@ -611,8 +608,6 @@
 #endif
 #define find_rundefsvoffset	Perl_find_rundefsvoffset
 #ifdef PERL_CORE
-#define oopsAV			Perl_oopsAV
-#define oopsHV			Perl_oopsHV
 #define pad_leavemy		Perl_pad_leavemy
 #endif
 #define pad_sv			Perl_pad_sv
@@ -643,7 +638,6 @@
 #define get_cv			Perl_get_cv
 #define get_cvn_flags		Perl_get_cvn_flags
 #define init_i18nl10n		Perl_init_i18nl10n
-#define new_collate		Perl_new_collate
 #define new_ctype		Perl_new_ctype
 #define new_numeric		Perl_new_numeric
 #define set_numeric_local	Perl_set_numeric_local
@@ -674,6 +668,7 @@
 #define pregexec		Perl_pregexec
 #define pregfree		Perl_pregfree
 #define pregfree2		Perl_pregfree2
+#define preg_tmprefcnt		Perl_preg_tmprefcnt
 #if defined(PERL_CORE) || defined(PERL_EXT)
 #define reg_temp_copy		Perl_reg_temp_copy
 #endif
@@ -834,7 +829,6 @@
 #define sv_nv			Perl_sv_nv
 #define sv_pvn			Perl_sv_pvn
 #define sv_pvutf8n		Perl_sv_pvutf8n
-#define sv_pvbyten		Perl_sv_pvbyten
 #define sv_true			Perl_sv_true
 #ifdef PERL_CORE
 #define sv_add_arena		Perl_sv_add_arena
@@ -845,16 +839,11 @@
 #define sv_vcatpvf		Perl_sv_vcatpvf
 #define sv_catpv		Perl_sv_catpv
 #define sv_chop			Perl_sv_chop
-#ifdef PERL_CORE
-#define sv_clean_all		Perl_sv_clean_all
-#define sv_clean_objs		Perl_sv_clean_objs
-#endif
 #define sv_clear		Perl_sv_clear
-#define sv_cmp			Perl_sv_cmp
-#define sv_cmp_locale		Perl_sv_cmp_locale
-#if defined(USE_LOCALE_COLLATE)
-#define sv_collxfrm		Perl_sv_collxfrm
+#ifdef PERL_CORE
+#define sv_clear_body		Perl_sv_clear_body
 #endif
+#define sv_cmp			Perl_sv_cmp
 #define sv_compile_2op		Perl_sv_compile_2op
 #define getcwd_sv		Perl_getcwd_sv
 #define sv_dec			Perl_sv_dec
@@ -883,9 +872,7 @@
 #define sv_pos_u2b		Perl_sv_pos_u2b
 #define sv_pos_b2u		Perl_sv_pos_b2u
 #define sv_pvutf8n_force	Perl_sv_pvutf8n_force
-#define sv_pvbyten_force	Perl_sv_pvbyten_force
 #define sv_recode_to_utf8	Perl_sv_recode_to_utf8
-#define sv_cat_decode		Perl_sv_cat_decode
 #define sv_reftype		Perl_sv_reftype
 #define sv_replace		Perl_sv_replace
 #define sv_report_used		Perl_sv_report_used
@@ -1096,16 +1083,6 @@
 #define sv_nounlocking		Perl_sv_nounlocking
 #endif
 #define nothreadhook		Perl_nothreadhook
-#if defined(PERL_IN_DOOP_C) || defined(PERL_DECL_PROT)
-#ifdef PERL_CORE
-#define do_trans_simple		S_do_trans_simple
-#define do_trans_count		S_do_trans_count
-#define do_trans_complex	S_do_trans_complex
-#define do_trans_simple_utf8	S_do_trans_simple_utf8
-#define do_trans_count_utf8	S_do_trans_count_utf8
-#define do_trans_complex_utf8	S_do_trans_complex_utf8
-#endif
-#endif
 #if defined(PERL_IN_GV_C) || defined(PERL_DECL_PROT)
 #ifdef PERL_CORE
 #define gv_init_sv		S_gv_init_sv
@@ -1155,7 +1132,6 @@
 #define ck_glob			Perl_ck_glob
 #define ck_grep			Perl_ck_grep
 #define ck_index		Perl_ck_index
-#define ck_join			Perl_ck_join
 #define ck_lfun			Perl_ck_lfun
 #define ck_listiob		Perl_ck_listiob
 #define ck_match		Perl_ck_match
@@ -1188,7 +1164,6 @@
 #define new_logop		S_new_logop
 #define simplify_sort		S_simplify_sort
 #define gv_ename		S_gv_ename
-#define scalar_mod_type		S_scalar_mod_type
 #define my_kid			S_my_kid
 #define dup_attrlist		S_dup_attrlist
 #define apply_attrs		S_apply_attrs
@@ -1199,7 +1174,6 @@
 #define too_few_arguments	S_too_few_arguments
 #define too_many_arguments	S_too_many_arguments
 #define looks_like_bool		S_looks_like_bool
-#define newGIVWHENOP		S_newGIVWHENOP
 #define ref_array_or_hash	S_ref_array_or_hash
 #define process_special_blocks	S_process_special_blocks
 #endif
@@ -1255,8 +1229,6 @@
 #define refto			S_refto
 #endif
 #endif
-#if defined(PERL_IN_PP_C) || defined(PERL_IN_PP_HOT_C) || defined(PERL_DECL_PROT)
-#endif
 #if defined(PERL_IN_PP_PACK_C) || defined(PERL_DECL_PROT)
 #ifdef PERL_CORE
 #define unpack_rec		S_unpack_rec
@@ -1279,10 +1251,8 @@
 #define docatch			S_docatch
 #define dofindlabel		S_dofindlabel
 #define dopoptoeval		S_dopoptoeval
-#define dopoptogiven		S_dopoptogiven
 #define dopoptolabel		S_dopoptolabel
 #define dopoptoloop		S_dopoptoloop
-#define dopoptowhen		S_dopoptowhen
 #define save_lines		S_save_lines
 #define doeval			S_doeval
 #define check_type_and_open	S_check_type_and_open
@@ -1439,17 +1409,6 @@
 #define del_sv			S_del_sv
 #endif
 #  endif
-#  if !defined(NV_PRESERVES_UV)
-#    ifdef DEBUGGING
-#ifdef PERL_CORE
-#define sv_2iuv_non_preserve	S_sv_2iuv_non_preserve
-#endif
-#    else
-#ifdef PERL_CORE
-#define sv_2iuv_non_preserve	S_sv_2iuv_non_preserve
-#endif
-#    endif
-#  endif
 #ifdef PERL_CORE
 #define expect_number		S_expect_number
 #endif
@@ -1469,7 +1428,6 @@
 #ifdef PERL_CORE
 #define more_sv			S_more_sv
 #define more_bodies		S_more_bodies
-#define sv_2iuv_common		S_sv_2iuv_common
 #define glob_assign_glob	S_glob_assign_glob
 #define glob_assign_ref		S_glob_assign_ref
 #define ptr_table_find		S_ptr_table_find
@@ -1489,7 +1447,6 @@
 #define scan_pat		S_scan_pat
 #define scan_str		S_scan_str
 #define scan_subst		S_scan_subst
-#define scan_trans		S_scan_trans
 #define scan_word		S_scan_word
 #define update_debugger_info	S_update_debugger_info
 #define skipspace		S_skipspace
@@ -1607,6 +1564,7 @@
 #ifdef PERL_CORE
 #define pad_new			Perl_pad_new
 #define pad_undef		Perl_pad_undef
+#define pad_tmprefcnt		Perl_pad_tmprefcnt
 #define pad_add_name		Perl_pad_add_name
 #define pad_add_anon		Perl_pad_add_anon
 #define pad_check_dup		Perl_pad_check_dup
@@ -1786,16 +1744,14 @@
 #define gv_fetchpvn_flags	Perl_gv_fetchpvn_flags
 #define gv_fetchsv		Perl_gv_fetchsv
 #define stashpv_hvname_match	Perl_stashpv_hvname_match
-#ifdef DEBUG_LEAKING_SCALARS_FORK_DUMP
-#ifdef PERL_CORE
-#define dump_sv_child		Perl_dump_sv_child
-#endif
-#endif
 #ifdef PERL_DONT_CREATE_GVSV
 #define gv_SVadd		Perl_gv_SVadd
 #endif
 #ifdef PERL_CORE
 #define offer_nice_chunk	Perl_offer_nice_chunk
+#endif
+#ifdef PERL_CORE
+#define refcnt_check		Perl_refcnt_check
 #endif
 #ifndef SPRINTF_RETURNS_STRLEN
 #endif
@@ -1826,7 +1782,6 @@
 #define xmldump_all		Perl_xmldump_all
 #define xmldump_packsubs	Perl_xmldump_packsubs
 #define xmldump_sub		Perl_xmldump_sub
-#define xmldump_form		Perl_xmldump_form
 #define xmldump_eval		Perl_xmldump_eval
 #define sv_catxmlsv		Perl_sv_catxmlsv
 #define sv_catxmlpvn		Perl_sv_catxmlpvn
@@ -1944,6 +1899,7 @@
 #define ck_substr		Perl_ck_substr
 #define ck_svconst		Perl_ck_svconst
 #define ck_trunc		Perl_ck_trunc
+#define ck_try			Perl_ck_try
 #define ck_unpack		Perl_ck_unpack
 #define pp_aassign		Perl_pp_aassign
 #define pp_abs			Perl_pp_abs
@@ -1957,6 +1913,7 @@
 #define pp_anoncode		Perl_pp_anoncode
 #define pp_anonhash		Perl_pp_anonhash
 #define pp_anonlist		Perl_pp_anonlist
+#define pp_anonscalar		Perl_pp_anonscalar
 #define pp_aslice		Perl_pp_aslice
 #define pp_atan2		Perl_pp_atan2
 #define pp_backtick		Perl_pp_backtick
@@ -1966,7 +1923,6 @@
 #define pp_bit_or		Perl_pp_bit_or
 #define pp_bit_xor		Perl_pp_bit_xor
 #define pp_bless		Perl_pp_bless
-#define pp_break		Perl_pp_break
 #define pp_caller		Perl_pp_caller
 #define pp_chdir		Perl_pp_chdir
 #define pp_chmod		Perl_pp_chmod
@@ -1983,7 +1939,6 @@
 #define pp_cond_expr		Perl_pp_cond_expr
 #define pp_connect		Perl_pp_connect
 #define pp_const		Perl_pp_const
-#define pp_continue		Perl_pp_continue
 #define pp_cos			Perl_pp_cos
 #define pp_crypt		Perl_pp_crypt
 #define pp_dbstate		Perl_pp_dbstate
@@ -2001,12 +1956,10 @@
 #define pp_enetent		Perl_pp_enetent
 #define pp_enter		Perl_pp_enter
 #define pp_entereval		Perl_pp_entereval
-#define pp_entergiven		Perl_pp_entergiven
 #define pp_enteriter		Perl_pp_enteriter
 #define pp_enterloop		Perl_pp_enterloop
 #define pp_entersub		Perl_pp_entersub
 #define pp_entertry		Perl_pp_entertry
-#define pp_enterwhen		Perl_pp_enterwhen
 #define pp_eof			Perl_pp_eof
 #define pp_eprotoent		Perl_pp_eprotoent
 #define pp_epwent		Perl_pp_epwent
@@ -2016,6 +1969,7 @@
 #define pp_exists		Perl_pp_exists
 #define pp_exit			Perl_pp_exit
 #define pp_exp			Perl_pp_exp
+#define pp_expand		Perl_pp_expand
 #define pp_fcntl		Perl_pp_fcntl
 #define pp_fileno		Perl_pp_fileno
 #define pp_flip			Perl_pp_flip
@@ -2115,18 +2069,16 @@
 #define pp_le			Perl_pp_le
 #define pp_leave		Perl_pp_leave
 #define pp_leaveeval		Perl_pp_leaveeval
-#define pp_leavegiven		Perl_pp_leavegiven
 #define pp_leaveloop		Perl_pp_leaveloop
 #define pp_leavesub		Perl_pp_leavesub
-#define pp_leavesublv		Perl_pp_leavesublv
 #define pp_leavetry		Perl_pp_leavetry
-#define pp_leavewhen		Perl_pp_leavewhen
 #define pp_left_shift		Perl_pp_left_shift
 #define pp_length		Perl_pp_length
 #define pp_lineseq		Perl_pp_lineseq
 #define pp_link			Perl_pp_link
 #define pp_list			Perl_pp_list
 #define pp_listen		Perl_pp_listen
+#define pp_listlast		Perl_pp_listlast
 #define pp_localtime		Perl_pp_localtime
 #define pp_lock			Perl_pp_lock
 #define pp_log			Perl_pp_log
@@ -2148,8 +2100,10 @@
 #define pp_ncmp			Perl_pp_ncmp
 #define pp_ne			Perl_pp_ne
 #define pp_negate		Perl_pp_negate
+#define pp_nelems		Perl_pp_nelems
 #define pp_next			Perl_pp_next
 #define pp_nextstate		Perl_pp_nextstate
+#define pp_nkeys		Perl_pp_nkeys
 #define pp_not			Perl_pp_not
 #define pp_null			Perl_pp_null
 #define pp_oct			Perl_pp_oct
@@ -2160,8 +2114,6 @@
 #define pp_ord			Perl_pp_ord
 #define pp_pack			Perl_pp_pack
 #define pp_padany		Perl_pp_padany
-#define pp_padav		Perl_pp_padav
-#define pp_padhv		Perl_pp_padhv
 #define pp_padsv		Perl_pp_padsv
 #define pp_pipe_op		Perl_pp_pipe_op
 #define pp_pop			Perl_pp_pop
@@ -2191,7 +2143,6 @@
 #define pp_ref			Perl_pp_ref
 #define pp_ref_eq		Perl_pp_ref_eq
 #define pp_ref_ne		Perl_pp_ref_ne
-#define pp_refgen		Perl_pp_refgen
 #define pp_regcmaybe		Perl_pp_regcmaybe
 #define pp_regcomp		Perl_pp_regcomp
 #define pp_regcreset		Perl_pp_regcreset
@@ -2273,7 +2224,6 @@
 #define pp_tied			Perl_pp_tied
 #define pp_time			Perl_pp_time
 #define pp_tms			Perl_pp_tms
-#define pp_trans		Perl_pp_trans
 #define pp_truncate		Perl_pp_truncate
 #define pp_uc			Perl_pp_uc
 #define pp_ucfirst		Perl_pp_ucfirst
@@ -2338,6 +2288,7 @@
 #define av_shift(a)		Perl_av_shift(aTHX_ a)
 #define av_store(a,b,c)		Perl_av_store(aTHX_ a,b,c)
 #define av_undef(a)		Perl_av_undef(aTHX_ a)
+#define av_tmprefcnt(a)		Perl_av_tmprefcnt(aTHX_ a)
 #define av_unshift(a,b)		Perl_av_unshift(aTHX_ a,b)
 #ifdef PERL_CORE
 #define bind_match(a,b,c)	Perl_bind_match(aTHX_ a,b,c)
@@ -2372,12 +2323,12 @@
 #define cv_ckproto_len(a,b,c,d)	Perl_cv_ckproto_len(aTHX_ a,b,c,d)
 #define cv_clone(a)		Perl_cv_clone(aTHX_ a)
 #endif
-#define gv_const_sv(a)		Perl_gv_const_sv(aTHX_ a)
 #define cv_const_sv(a)		Perl_cv_const_sv(aTHX_ a)
 #ifdef PERL_CORE
 #define op_const_sv(a,b)	Perl_op_const_sv(aTHX_ a,b)
 #endif
 #define cv_undef(a)		Perl_cv_undef(aTHX_ a)
+#define cv_tmprefcnt(a)		Perl_cv_tmprefcnt(aTHX_ a)
 #define cx_dump(a)		Perl_cx_dump(aTHX_ a)
 #define filter_add(a,b)		Perl_filter_add(aTHX_ a,b)
 #define filter_del(a)		Perl_filter_del(aTHX_ a)
@@ -2458,12 +2409,14 @@
 #define do_join(a,b,c,d)	Perl_do_join(aTHX_ a,b,c,d)
 #ifdef PERL_CORE
 #define do_kv()			Perl_do_kv(aTHX)
+#define bad_arg(a,b,c,d)	Perl_bad_arg(aTHX_ a,b,c,d)
+#define do_arg_check(a)		Perl_do_arg_check(aTHX_ a)
 #endif
 #define do_open9(a,b,c,d,e,f,g,h,i)	Perl_do_open9(aTHX_ a,b,c,d,e,f,g,h,i)
 #define do_openn(a,b,c,d,e,f,g,h,i)	Perl_do_openn(aTHX_ a,b,c,d,e,f,g,h,i)
 #ifdef PERL_CORE
 #define do_print(a,b)		Perl_do_print(aTHX_ a,b)
-#define do_readline()		Perl_do_readline(aTHX)
+#define do_readline(a)		Perl_do_readline(aTHX_ a)
 #define do_chomp(a)		Perl_do_chomp(aTHX_ a)
 #define do_seek(a,b,c)		Perl_do_seek(aTHX_ a,b,c)
 #endif
@@ -2471,7 +2424,6 @@
 #ifdef PERL_CORE
 #define do_sysseek(a,b,c)	Perl_do_sysseek(aTHX_ a,b,c)
 #define do_tell(a)		Perl_do_tell(aTHX_ a)
-#define do_trans(a)		Perl_do_trans(aTHX_ a)
 #define do_vecget(a,b,c)	Perl_do_vecget(aTHX_ a,b,c)
 #define do_vecset(a)		Perl_do_vecset(aTHX_ a)
 #define do_vop(a,b,c,d)		Perl_do_vop(aTHX_ a,b,c,d)
@@ -2483,7 +2435,6 @@
 #if defined(DUMP_FDS)
 #define dump_fds(a)		Perl_dump_fds(aTHX_ a)
 #endif
-#define dump_form(a)		Perl_dump_form(aTHX_ a)
 #define gv_dump(a)		Perl_gv_dump(aTHX_ a)
 #define op_dump(a)		Perl_op_dump(aTHX_ a)
 #define pmop_dump(a)		Perl_pmop_dump(aTHX_ a)
@@ -2509,19 +2460,19 @@
 #ifdef PERL_CORE
 #endif
 #define gp_free(a)		Perl_gp_free(aTHX_ a)
+#define gp_tmprefcnt(a)		Perl_gp_tmprefcnt(aTHX_ a)
 #define gp_ref(a)		Perl_gp_ref(aTHX_ a)
 #define gv_AVadd(a)		Perl_gv_AVadd(aTHX_ a)
 #define gv_HVadd(a)		Perl_gv_HVadd(aTHX_ a)
 #define gv_IOadd(a)		Perl_gv_IOadd(aTHX_ a)
 #define gv_check(a)		Perl_gv_check(aTHX_ a)
-#define gv_efullname(a,b)	Perl_gv_efullname(aTHX_ a,b)
-#define gv_efullname4(a,b,c,d)	Perl_gv_efullname4(aTHX_ a,b,c,d)
+#define gv_efullname3(a,b,c)	Perl_gv_efullname3(aTHX_ a,b,c)
 #define gv_fetchfile(a)		Perl_gv_fetchfile(aTHX_ a)
 #define gv_fetchfile_flags(a,b,c)	Perl_gv_fetchfile_flags(aTHX_ a,b,c)
 #define gv_fetchmeth(a,b,c,d)	Perl_gv_fetchmeth(aTHX_ a,b,c,d)
 #define gv_fetchmethod(a,b)	Perl_gv_fetchmethod(aTHX_ a,b)
 #define gv_fetchpv(a,b,c)	Perl_gv_fetchpv(aTHX_ a,b,c)
-#define gv_fullname4(a,b,c,d)	Perl_gv_fullname4(aTHX_ a,b,c,d)
+#define gv_fullname3(a,b,c)	Perl_gv_fullname3(aTHX_ a,b,c)
 #ifdef PERL_CORE
 #endif
 #define gv_init(a,b,c,d,e)	Perl_gv_init(aTHX_ a,b,c,d,e)
@@ -2544,6 +2495,7 @@
 #define hv_iterval(a,b)		Perl_hv_iterval(aTHX_ a,b)
 #define hv_ksplit(a,b)		Perl_hv_ksplit(aTHX_ a,b)
 #define hv_undef(a)		Perl_hv_undef(aTHX_ a)
+#define hv_tmprefcnt(a)		Perl_hv_tmprefcnt(aTHX_ a)
 #define ibcmp(a,b,c)		Perl_ibcmp(aTHX_ a,b,c)
 #define ibcmp_locale(a,b,c)	Perl_ibcmp_locale(aTHX_ a,b,c)
 #define ibcmp_utf8(a,b,c,d,e,f)	Perl_ibcmp_utf8(aTHX_ a,b,c,d,e,f)
@@ -2701,12 +2653,6 @@
 #define magicname(a,b,c)	Perl_magicname(aTHX_ a,b,c)
 #endif
 #define markstack_grow()	Perl_markstack_grow(aTHX)
-#if defined(USE_LOCALE_COLLATE)
-#ifdef PERL_CORE
-#define magic_setcollxfrm(a,b)	Perl_magic_setcollxfrm(aTHX_ a,b)
-#define mem_collxfrm(a,b,c)	Perl_mem_collxfrm(aTHX_ a,b,c)
-#endif
-#endif
 #define vmess(a,b)		Perl_vmess(aTHX_ a,b)
 #if defined(PERL_CORE) || defined(PERL_EXT)
 #define qerror(a)		Perl_qerror(aTHX_ a)
@@ -2720,6 +2666,7 @@
 #endif
 #define mg_find(a,b)		Perl_mg_find(aTHX_ a,b)
 #define mg_free(a)		Perl_mg_free(aTHX_ a)
+#define mg_tmprefcnt(a)		Perl_mg_tmprefcnt(aTHX_ a)
 #define mg_get(a)		Perl_mg_get(aTHX_ a)
 #define mg_length(a)		Perl_mg_length(aTHX_ a)
 #define mg_magical(a)		Perl_mg_magical(aTHX_ a)
@@ -2775,14 +2722,13 @@
 #define newANONSUB(a,b,c)	Perl_newANONSUB(aTHX_ a,b,c)
 #define newASSIGNOP(a,b,c,d)	Perl_newASSIGNOP(aTHX_ a,b,c,d)
 #define newCONDOP(a,b,c,d)	Perl_newCONDOP(aTHX_ a,b,c,d)
-#define newCONSTSUB(a,b,c)	Perl_newCONSTSUB(aTHX_ a,b,c)
+#define newCONSTSUB(a,b)	Perl_newCONSTSUB(aTHX_ a,b)
 #ifdef PERL_MAD
 #define newFORM(a,b,c)		Perl_newFORM(aTHX_ a,b,c)
 #else
 #define newFORM(a,b,c)		Perl_newFORM(aTHX_ a,b,c)
 #endif
 #define newFOROP(a,b,c,d,e,f,g)	Perl_newFOROP(aTHX_ a,b,c,d,e,f,g)
-#define newGIVENOP(a,b,c)	Perl_newGIVENOP(aTHX_ a,b,c)
 #define newLOGOP(a,b,c,d)	Perl_newLOGOP(aTHX_ a,b,c,d)
 #define newLOOPEX(a,b)		Perl_newLOOPEX(aTHX_ a,b)
 #define newLOOPOP(a,b,c,d)	Perl_newLOOPOP(aTHX_ a,b,c,d)
@@ -2803,6 +2749,7 @@
 #define newGVREF(a,b)		Perl_newGVREF(aTHX_ a,b)
 #define newHVREF(a)		Perl_newHVREF(aTHX_ a)
 #define newHVhv(a)		Perl_newHVhv(aTHX_ a)
+#define hv_sethv(a,b)		Perl_hv_sethv(aTHX_ a,b)
 #define newIO()			Perl_newIO(aTHX)
 #define newLISTOP(a,b,c,d)	Perl_newLISTOP(aTHX_ a,b,c,d)
 #ifdef USE_ITHREADS
@@ -2828,7 +2775,6 @@
 #define newSVsv(a)		Perl_newSVsv(aTHX_ a)
 #define newSV_type(a)		Perl_newSV_type(aTHX_ a)
 #define newUNOP(a,b,c)		Perl_newUNOP(aTHX_ a,b,c)
-#define newWHENOP(a,b)		Perl_newWHENOP(aTHX_ a,b)
 #define newWHILEOP(a,b,c,d,e,f,g,h)	Perl_newWHILEOP(aTHX_ a,b,c,d,e,f,g,h)
 #define new_stackinfo(a,b)	Perl_new_stackinfo(aTHX_ a,b)
 #define scan_vstring(a,b,c)	Perl_scan_vstring(aTHX_ a,b,c)
@@ -2848,6 +2794,7 @@
 #define oopsCV(a)		Perl_oopsCV(aTHX_ a)
 #endif
 #define op_free(a)		Perl_op_free(aTHX_ a)
+#define op_tmprefcnt(a)		Perl_op_tmprefcnt(aTHX_ a)
 #ifdef PERL_MAD
 #ifdef PERL_CORE
 #define package(a)		Perl_package(aTHX_ a)
@@ -2864,8 +2811,6 @@
 #endif
 #define find_rundefsvoffset()	Perl_find_rundefsvoffset(aTHX)
 #ifdef PERL_CORE
-#define oopsAV(a)		Perl_oopsAV(aTHX_ a)
-#define oopsHV(a)		Perl_oopsHV(aTHX_ a)
 #define pad_leavemy()		Perl_pad_leavemy(aTHX)
 #endif
 #define pad_sv(a)		Perl_pad_sv(aTHX_ a)
@@ -2895,7 +2840,6 @@
 #define get_cv(a,b)		Perl_get_cv(aTHX_ a,b)
 #define get_cvn_flags(a,b,c)	Perl_get_cvn_flags(aTHX_ a,b,c)
 #define init_i18nl10n(a)	Perl_init_i18nl10n(aTHX_ a)
-#define new_collate(a)		Perl_new_collate(aTHX_ a)
 #define new_ctype(a)		Perl_new_ctype(aTHX_ a)
 #define new_numeric(a)		Perl_new_numeric(aTHX_ a)
 #define set_numeric_local()	Perl_set_numeric_local(aTHX)
@@ -2926,6 +2870,7 @@
 #define pregexec(a,b,c,d,e,f,g)	Perl_pregexec(aTHX_ a,b,c,d,e,f,g)
 #define pregfree(a)		Perl_pregfree(aTHX_ a)
 #define pregfree2(a)		Perl_pregfree2(aTHX_ a)
+#define preg_tmprefcnt(a)	Perl_preg_tmprefcnt(aTHX_ a)
 #if defined(PERL_CORE) || defined(PERL_EXT)
 #define reg_temp_copy(a)	Perl_reg_temp_copy(aTHX_ a)
 #endif
@@ -3068,7 +3013,7 @@
 #define sub_crush_depth(a)	Perl_sub_crush_depth(aTHX_ a)
 #endif
 #define sv_2bool(a)		Perl_sv_2bool(aTHX_ a)
-#define sv_2cv(a,b,c,d)		Perl_sv_2cv(aTHX_ a,b,c,d)
+#define sv_2cv(a,b,c)		Perl_sv_2cv(aTHX_ a,b,c)
 #define sv_2io(a)		Perl_sv_2io(aTHX_ a)
 #define sv_2iv_flags(a,b)	Perl_sv_2iv_flags(aTHX_ a,b)
 #define sv_2mortal(a)		Perl_sv_2mortal(aTHX_ a)
@@ -3086,7 +3031,6 @@
 #define sv_nv(a)		Perl_sv_nv(aTHX_ a)
 #define sv_pvn(a,b)		Perl_sv_pvn(aTHX_ a,b)
 #define sv_pvutf8n(a,b)		Perl_sv_pvutf8n(aTHX_ a,b)
-#define sv_pvbyten(a,b)		Perl_sv_pvbyten(aTHX_ a,b)
 #define sv_true(a)		Perl_sv_true(aTHX_ a)
 #ifdef PERL_CORE
 #define sv_add_arena(a,b,c)	Perl_sv_add_arena(aTHX_ a,b,c)
@@ -3096,16 +3040,11 @@
 #define sv_vcatpvf(a,b,c)	Perl_sv_vcatpvf(aTHX_ a,b,c)
 #define sv_catpv(a,b)		Perl_sv_catpv(aTHX_ a,b)
 #define sv_chop(a,b)		Perl_sv_chop(aTHX_ a,b)
-#ifdef PERL_CORE
-#define sv_clean_all()		Perl_sv_clean_all(aTHX)
-#define sv_clean_objs()		Perl_sv_clean_objs(aTHX)
-#endif
 #define sv_clear(a)		Perl_sv_clear(aTHX_ a)
-#define sv_cmp(a,b)		Perl_sv_cmp(aTHX_ a,b)
-#define sv_cmp_locale(a,b)	Perl_sv_cmp_locale(aTHX_ a,b)
-#if defined(USE_LOCALE_COLLATE)
-#define sv_collxfrm(a,b)	Perl_sv_collxfrm(aTHX_ a,b)
+#ifdef PERL_CORE
+#define sv_clear_body(a)	Perl_sv_clear_body(aTHX_ a)
 #endif
+#define sv_cmp(a,b)		Perl_sv_cmp(aTHX_ a,b)
 #define sv_compile_2op(a,b,c,d)	Perl_sv_compile_2op(aTHX_ a,b,c,d)
 #define getcwd_sv(a)		Perl_getcwd_sv(aTHX_ a)
 #define sv_dec(a)		Perl_sv_dec(aTHX_ a)
@@ -3134,9 +3073,7 @@
 #define sv_pos_u2b(a,b,c)	Perl_sv_pos_u2b(aTHX_ a,b,c)
 #define sv_pos_b2u(a,b)		Perl_sv_pos_b2u(aTHX_ a,b)
 #define sv_pvutf8n_force(a,b)	Perl_sv_pvutf8n_force(aTHX_ a,b)
-#define sv_pvbyten_force(a,b)	Perl_sv_pvbyten_force(aTHX_ a,b)
 #define sv_recode_to_utf8(a,b)	Perl_sv_recode_to_utf8(aTHX_ a,b)
-#define sv_cat_decode(a,b,c,d,e,f)	Perl_sv_cat_decode(aTHX_ a,b,c,d,e,f)
 #define sv_reftype(a,b)		Perl_sv_reftype(aTHX_ a,b)
 #define sv_replace(a,b)		Perl_sv_replace(aTHX_ a,b)
 #define sv_report_used()	Perl_sv_report_used(aTHX)
@@ -3341,16 +3278,6 @@
 #define sv_nounlocking(a)	Perl_sv_nounlocking(aTHX_ a)
 #endif
 #define nothreadhook()		Perl_nothreadhook(aTHX)
-#if defined(PERL_IN_DOOP_C) || defined(PERL_DECL_PROT)
-#ifdef PERL_CORE
-#define do_trans_simple(a)	S_do_trans_simple(aTHX_ a)
-#define do_trans_count(a)	S_do_trans_count(aTHX_ a)
-#define do_trans_complex(a)	S_do_trans_complex(aTHX_ a)
-#define do_trans_simple_utf8(a)	S_do_trans_simple_utf8(aTHX_ a)
-#define do_trans_count_utf8(a)	S_do_trans_count_utf8(aTHX_ a)
-#define do_trans_complex_utf8(a)	S_do_trans_complex_utf8(aTHX_ a)
-#endif
-#endif
 #if defined(PERL_IN_GV_C) || defined(PERL_DECL_PROT)
 #ifdef PERL_CORE
 #define gv_init_sv(a,b)		S_gv_init_sv(aTHX_ a,b)
@@ -3402,7 +3329,6 @@
 #define ck_glob(a)		Perl_ck_glob(aTHX_ a)
 #define ck_grep(a)		Perl_ck_grep(aTHX_ a)
 #define ck_index(a)		Perl_ck_index(aTHX_ a)
-#define ck_join(a)		Perl_ck_join(aTHX_ a)
 #define ck_lfun(a)		Perl_ck_lfun(aTHX_ a)
 #define ck_listiob(a)		Perl_ck_listiob(aTHX_ a)
 #define ck_match(a)		Perl_ck_match(aTHX_ a)
@@ -3435,7 +3361,6 @@
 #define new_logop(a,b,c,d)	S_new_logop(aTHX_ a,b,c,d)
 #define simplify_sort(a)	S_simplify_sort(aTHX_ a)
 #define gv_ename(a)		S_gv_ename(aTHX_ a)
-#define scalar_mod_type		S_scalar_mod_type
 #define my_kid(a,b,c)		S_my_kid(aTHX_ a,b,c)
 #define dup_attrlist(a)		S_dup_attrlist(aTHX_ a)
 #define apply_attrs(a,b,c,d)	S_apply_attrs(aTHX_ a,b,c,d)
@@ -3446,7 +3371,6 @@
 #define too_few_arguments(a,b)	S_too_few_arguments(aTHX_ a,b)
 #define too_many_arguments(a,b)	S_too_many_arguments(aTHX_ a,b)
 #define looks_like_bool(a)	S_looks_like_bool(aTHX_ a)
-#define newGIVWHENOP(a,b,c,d,e)	S_newGIVWHENOP(aTHX_ a,b,c,d,e)
 #define ref_array_or_hash(a)	S_ref_array_or_hash(aTHX_ a)
 #define process_special_blocks(a,b,c)	S_process_special_blocks(aTHX_ a,b,c)
 #endif
@@ -3510,10 +3434,6 @@
 #define refto(a)		S_refto(aTHX_ a)
 #endif
 #endif
-#if defined(PERL_IN_PP_C) || defined(PERL_IN_PP_HOT_C) || defined(PERL_DECL_PROT)
-#ifdef PERL_CORE
-#endif
-#endif
 #if defined(PERL_IN_PP_PACK_C) || defined(PERL_DECL_PROT)
 #ifdef PERL_CORE
 #define unpack_rec(a,b,c,d,e)	S_unpack_rec(aTHX_ a,b,c,d,e)
@@ -3536,10 +3456,8 @@
 #define docatch(a)		S_docatch(aTHX_ a)
 #define dofindlabel(a,b,c,d)	S_dofindlabel(aTHX_ a,b,c,d)
 #define dopoptoeval(a)		S_dopoptoeval(aTHX_ a)
-#define dopoptogiven(a)		S_dopoptogiven(aTHX_ a)
 #define dopoptolabel(a)		S_dopoptolabel(aTHX_ a)
 #define dopoptoloop(a)		S_dopoptoloop(aTHX_ a)
-#define dopoptowhen(a)		S_dopoptowhen(aTHX_ a)
 #define save_lines(a,b)		S_save_lines(aTHX_ a,b)
 #define doeval(a,b,c,d)		S_doeval(aTHX_ a,b,c,d)
 #define check_type_and_open(a)	S_check_type_and_open(aTHX_ a)
@@ -3699,17 +3617,6 @@
 #define del_sv(a)		S_del_sv(aTHX_ a)
 #endif
 #  endif
-#  if !defined(NV_PRESERVES_UV)
-#    ifdef DEBUGGING
-#ifdef PERL_CORE
-#define sv_2iuv_non_preserve(a,b)	S_sv_2iuv_non_preserve(aTHX_ a,b)
-#endif
-#    else
-#ifdef PERL_CORE
-#define sv_2iuv_non_preserve(a)	S_sv_2iuv_non_preserve(aTHX_ a)
-#endif
-#    endif
-#  endif
 #ifdef PERL_CORE
 #define expect_number(a)	S_expect_number(aTHX_ a)
 #endif
@@ -3729,7 +3636,6 @@
 #ifdef PERL_CORE
 #define more_sv()		S_more_sv(aTHX)
 #define more_bodies(a)		S_more_bodies(aTHX_ a)
-#define sv_2iuv_common(a)	S_sv_2iuv_common(aTHX_ a)
 #define glob_assign_glob(a,b,c)	S_glob_assign_glob(aTHX_ a,b,c)
 #define glob_assign_ref(a,b)	S_glob_assign_ref(aTHX_ a,b)
 #define ptr_table_find		S_ptr_table_find
@@ -3749,7 +3655,6 @@
 #define scan_pat(a,b)		S_scan_pat(aTHX_ a,b)
 #define scan_str(a,b,c,d)	S_scan_str(aTHX_ a,b,c,d)
 #define scan_subst(a)		S_scan_subst(aTHX_ a)
-#define scan_trans(a)		S_scan_trans(aTHX_ a)
 #define scan_word(a,b,c,d,e)	S_scan_word(aTHX_ a,b,c,d,e)
 #define update_debugger_info(a,b,c)	S_update_debugger_info(aTHX_ a,b,c)
 #define skipspace(a)		S_skipspace(aTHX_ a)
@@ -3865,6 +3770,7 @@
 #ifdef PERL_CORE
 #define pad_new(a)		Perl_pad_new(aTHX_ a)
 #define pad_undef(a)		Perl_pad_undef(aTHX_ a)
+#define pad_tmprefcnt(a)	Perl_pad_tmprefcnt(aTHX_ a)
 #define pad_add_name(a,b,c,d)	Perl_pad_add_name(aTHX_ a,b,c,d)
 #define pad_add_anon(a,b)	Perl_pad_add_anon(aTHX_ a,b)
 #define pad_check_dup(a,b,c)	Perl_pad_check_dup(aTHX_ a,b,c)
@@ -4048,11 +3954,6 @@
 #define gv_fetchpvn_flags(a,b,c,d)	Perl_gv_fetchpvn_flags(aTHX_ a,b,c,d)
 #define gv_fetchsv(a,b,c)	Perl_gv_fetchsv(aTHX_ a,b,c)
 #define stashpv_hvname_match(a,b)	Perl_stashpv_hvname_match(aTHX_ a,b)
-#ifdef DEBUG_LEAKING_SCALARS_FORK_DUMP
-#ifdef PERL_CORE
-#define dump_sv_child(a)	Perl_dump_sv_child(aTHX_ a)
-#endif
-#endif
 #ifdef PERL_DONT_CREATE_GVSV
 #define gv_SVadd(a)		Perl_gv_SVadd(aTHX_ a)
 #endif
@@ -4060,6 +3961,9 @@
 #endif
 #ifdef PERL_CORE
 #define offer_nice_chunk(a,b)	Perl_offer_nice_chunk(aTHX_ a,b)
+#endif
+#ifdef PERL_CORE
+#define refcnt_check()		Perl_refcnt_check(aTHX)
 #endif
 #ifndef SPRINTF_RETURNS_STRLEN
 #endif
@@ -4088,7 +3992,6 @@
 #define xmldump_all()		Perl_xmldump_all(aTHX)
 #define xmldump_packsubs(a)	Perl_xmldump_packsubs(aTHX_ a)
 #define xmldump_sub(a)		Perl_xmldump_sub(aTHX_ a)
-#define xmldump_form(a)		Perl_xmldump_form(aTHX_ a)
 #define xmldump_eval()		Perl_xmldump_eval(aTHX)
 #define sv_catxmlsv(a,b)	Perl_sv_catxmlsv(aTHX_ a,b)
 #define sv_catxmlpvn(a,b,c)	Perl_sv_catxmlpvn(aTHX_ a,b,c)
@@ -4208,6 +4111,7 @@
 #define ck_substr(a)		Perl_ck_substr(aTHX_ a)
 #define ck_svconst(a)		Perl_ck_svconst(aTHX_ a)
 #define ck_trunc(a)		Perl_ck_trunc(aTHX_ a)
+#define ck_try(a)		Perl_ck_try(aTHX_ a)
 #define ck_unpack(a)		Perl_ck_unpack(aTHX_ a)
 #define pp_aassign()		Perl_pp_aassign(aTHX)
 #define pp_abs()		Perl_pp_abs(aTHX)
@@ -4221,6 +4125,7 @@
 #define pp_anoncode()		Perl_pp_anoncode(aTHX)
 #define pp_anonhash()		Perl_pp_anonhash(aTHX)
 #define pp_anonlist()		Perl_pp_anonlist(aTHX)
+#define pp_anonscalar()		Perl_pp_anonscalar(aTHX)
 #define pp_aslice()		Perl_pp_aslice(aTHX)
 #define pp_atan2()		Perl_pp_atan2(aTHX)
 #define pp_backtick()		Perl_pp_backtick(aTHX)
@@ -4230,7 +4135,6 @@
 #define pp_bit_or()		Perl_pp_bit_or(aTHX)
 #define pp_bit_xor()		Perl_pp_bit_xor(aTHX)
 #define pp_bless()		Perl_pp_bless(aTHX)
-#define pp_break()		Perl_pp_break(aTHX)
 #define pp_caller()		Perl_pp_caller(aTHX)
 #define pp_chdir()		Perl_pp_chdir(aTHX)
 #define pp_chmod()		Perl_pp_chmod(aTHX)
@@ -4247,7 +4151,6 @@
 #define pp_cond_expr()		Perl_pp_cond_expr(aTHX)
 #define pp_connect()		Perl_pp_connect(aTHX)
 #define pp_const()		Perl_pp_const(aTHX)
-#define pp_continue()		Perl_pp_continue(aTHX)
 #define pp_cos()		Perl_pp_cos(aTHX)
 #define pp_crypt()		Perl_pp_crypt(aTHX)
 #define pp_dbstate()		Perl_pp_dbstate(aTHX)
@@ -4265,12 +4168,10 @@
 #define pp_enetent()		Perl_pp_enetent(aTHX)
 #define pp_enter()		Perl_pp_enter(aTHX)
 #define pp_entereval()		Perl_pp_entereval(aTHX)
-#define pp_entergiven()		Perl_pp_entergiven(aTHX)
 #define pp_enteriter()		Perl_pp_enteriter(aTHX)
 #define pp_enterloop()		Perl_pp_enterloop(aTHX)
 #define pp_entersub()		Perl_pp_entersub(aTHX)
 #define pp_entertry()		Perl_pp_entertry(aTHX)
-#define pp_enterwhen()		Perl_pp_enterwhen(aTHX)
 #define pp_eof()		Perl_pp_eof(aTHX)
 #define pp_eprotoent()		Perl_pp_eprotoent(aTHX)
 #define pp_epwent()		Perl_pp_epwent(aTHX)
@@ -4280,6 +4181,7 @@
 #define pp_exists()		Perl_pp_exists(aTHX)
 #define pp_exit()		Perl_pp_exit(aTHX)
 #define pp_exp()		Perl_pp_exp(aTHX)
+#define pp_expand()		Perl_pp_expand(aTHX)
 #define pp_fcntl()		Perl_pp_fcntl(aTHX)
 #define pp_fileno()		Perl_pp_fileno(aTHX)
 #define pp_flip()		Perl_pp_flip(aTHX)
@@ -4379,18 +4281,16 @@
 #define pp_le()			Perl_pp_le(aTHX)
 #define pp_leave()		Perl_pp_leave(aTHX)
 #define pp_leaveeval()		Perl_pp_leaveeval(aTHX)
-#define pp_leavegiven()		Perl_pp_leavegiven(aTHX)
 #define pp_leaveloop()		Perl_pp_leaveloop(aTHX)
 #define pp_leavesub()		Perl_pp_leavesub(aTHX)
-#define pp_leavesublv()		Perl_pp_leavesublv(aTHX)
 #define pp_leavetry()		Perl_pp_leavetry(aTHX)
-#define pp_leavewhen()		Perl_pp_leavewhen(aTHX)
 #define pp_left_shift()		Perl_pp_left_shift(aTHX)
 #define pp_length()		Perl_pp_length(aTHX)
 #define pp_lineseq()		Perl_pp_lineseq(aTHX)
 #define pp_link()		Perl_pp_link(aTHX)
 #define pp_list()		Perl_pp_list(aTHX)
 #define pp_listen()		Perl_pp_listen(aTHX)
+#define pp_listlast()		Perl_pp_listlast(aTHX)
 #define pp_localtime()		Perl_pp_localtime(aTHX)
 #define pp_lock()		Perl_pp_lock(aTHX)
 #define pp_log()		Perl_pp_log(aTHX)
@@ -4412,8 +4312,10 @@
 #define pp_ncmp()		Perl_pp_ncmp(aTHX)
 #define pp_ne()			Perl_pp_ne(aTHX)
 #define pp_negate()		Perl_pp_negate(aTHX)
+#define pp_nelems()		Perl_pp_nelems(aTHX)
 #define pp_next()		Perl_pp_next(aTHX)
 #define pp_nextstate()		Perl_pp_nextstate(aTHX)
+#define pp_nkeys()		Perl_pp_nkeys(aTHX)
 #define pp_not()		Perl_pp_not(aTHX)
 #define pp_null()		Perl_pp_null(aTHX)
 #define pp_oct()		Perl_pp_oct(aTHX)
@@ -4424,8 +4326,6 @@
 #define pp_ord()		Perl_pp_ord(aTHX)
 #define pp_pack()		Perl_pp_pack(aTHX)
 #define pp_padany()		Perl_pp_padany(aTHX)
-#define pp_padav()		Perl_pp_padav(aTHX)
-#define pp_padhv()		Perl_pp_padhv(aTHX)
 #define pp_padsv()		Perl_pp_padsv(aTHX)
 #define pp_pipe_op()		Perl_pp_pipe_op(aTHX)
 #define pp_pop()		Perl_pp_pop(aTHX)
@@ -4455,7 +4355,6 @@
 #define pp_ref()		Perl_pp_ref(aTHX)
 #define pp_ref_eq()		Perl_pp_ref_eq(aTHX)
 #define pp_ref_ne()		Perl_pp_ref_ne(aTHX)
-#define pp_refgen()		Perl_pp_refgen(aTHX)
 #define pp_regcmaybe()		Perl_pp_regcmaybe(aTHX)
 #define pp_regcomp()		Perl_pp_regcomp(aTHX)
 #define pp_regcreset()		Perl_pp_regcreset(aTHX)
@@ -4537,7 +4436,6 @@
 #define pp_tied()		Perl_pp_tied(aTHX)
 #define pp_time()		Perl_pp_time(aTHX)
 #define pp_tms()		Perl_pp_tms(aTHX)
-#define pp_trans()		Perl_pp_trans(aTHX)
 #define pp_truncate()		Perl_pp_truncate(aTHX)
 #define pp_uc()			Perl_pp_uc(aTHX)
 #define pp_ucfirst()		Perl_pp_ucfirst(aTHX)

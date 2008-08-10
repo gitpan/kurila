@@ -192,16 +192,6 @@ END_EXTERN_C
 #define PL_chopset		(*Perl_Ichopset_ptr(aTHX))
 #undef  PL_clocktick
 #define PL_clocktick		(*Perl_Iclocktick_ptr(aTHX))
-#undef  PL_collation_ix
-#define PL_collation_ix		(*Perl_Icollation_ix_ptr(aTHX))
-#undef  PL_collation_name
-#define PL_collation_name	(*Perl_Icollation_name_ptr(aTHX))
-#undef  PL_collation_standard
-#define PL_collation_standard	(*Perl_Icollation_standard_ptr(aTHX))
-#undef  PL_collxfrm_base
-#define PL_collxfrm_base	(*Perl_Icollxfrm_base_ptr(aTHX))
-#undef  PL_collxfrm_mult
-#define PL_collxfrm_mult	(*Perl_Icollxfrm_mult_ptr(aTHX))
 #undef  PL_colors
 #define PL_colors		(*Perl_Icolors_ptr(aTHX))
 #undef  PL_colorset
@@ -268,8 +258,6 @@ END_EXTERN_C
 #define PL_dirty		(*Perl_Idirty_ptr(aTHX))
 #undef  PL_doextract
 #define PL_doextract		(*Perl_Idoextract_ptr(aTHX))
-#undef  PL_doswitches
-#define PL_doswitches		(*Perl_Idoswitches_ptr(aTHX))
 #undef  PL_dowarn
 #define PL_dowarn		(*Perl_Idowarn_ptr(aTHX))
 #undef  PL_dumper_fd
@@ -352,8 +340,6 @@ END_EXTERN_C
 #define PL_isarev		(*Perl_Iisarev_ptr(aTHX))
 #undef  PL_known_layers
 #define PL_known_layers		(*Perl_Iknown_layers_ptr(aTHX))
-#undef  PL_last_in_gv
-#define PL_last_in_gv		(*Perl_Ilast_in_gv_ptr(aTHX))
 #undef  PL_lastfd
 #define PL_lastfd		(*Perl_Ilastfd_ptr(aTHX))
 #undef  PL_lastgotoprobe
@@ -536,8 +522,6 @@ END_EXTERN_C
 #define PL_savestack_ix		(*Perl_Isavestack_ix_ptr(aTHX))
 #undef  PL_savestack_max
 #define PL_savestack_max	(*Perl_Isavestack_max_ptr(aTHX))
-#undef  PL_sawampersand
-#define PL_sawampersand		(*Perl_Isawampersand_ptr(aTHX))
 #undef  PL_scopestack
 #define PL_scopestack		(*Perl_Iscopestack_ptr(aTHX))
 #undef  PL_scopestack_ix
@@ -566,8 +550,6 @@ END_EXTERN_C
 #define PL_sort_RealCmp		(*Perl_Isort_RealCmp_ptr(aTHX))
 #undef  PL_sortcop
 #define PL_sortcop		(*Perl_Isortcop_ptr(aTHX))
-#undef  PL_sortstash
-#define PL_sortstash		(*Perl_Isortstash_ptr(aTHX))
 #undef  PL_splitstr
 #define PL_splitstr		(*Perl_Isplitstr_ptr(aTHX))
 #undef  PL_srand_called

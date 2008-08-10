@@ -9,8 +9,7 @@
 
 BEGIN {
     if (%ENV{PERL_CORE}){
-	chdir('t') if -d 't';
-	@INC = ('.', '../lib', '../ext/B/t');
+	push @INC, '../ext/B/t';
     } else {
 	unshift @INC, 't';
 	push @INC, "../../t";
@@ -42,14 +41,14 @@ my $src = q[our ($beg, $chk, $init, $end, $uc) = qq{'foo'}; BEGIN { $beg++ } CHE
 
 
 my @warnings_todo;
-@warnings_todo = (todo =>
+@warnings_todo = @(todo =>
    "Change 23768 (Remove Carp from warnings.pm) alters expected output, not"
                   . "propagated to 5.8.x");
 
 checkOptree ( name	=> 'BEGIN',
 	      bcopts	=> 'BEGIN',
 	      prog	=> $src,
-	      @warnings_todo,
+	      < @warnings_todo,
 	      strip_open_hints => 1,
               todo      => "kurila changes",
 	      expect	=> <<'EOT_EOT', expect_nt => <<'EONT_EONT');
@@ -253,7 +252,7 @@ EONT_EONT
 checkOptree ( name	=> 'all of BEGIN END INIT CHECK UNITCHECK -exec',
 	      bcopts	=> \@(qw/ BEGIN END INIT CHECK UNITCHECK -exec /),
 	      prog	=> $src,
-	      @warnings_todo,
+	      < @warnings_todo,
               todo      => "kurila changes",
 	      strip_open_hints => 1,
 	      expect	=> <<'EOT_EOT', expect_nt => <<'EONT_EONT');
@@ -391,7 +390,7 @@ checkOptree ( name	=> 'regression test for patch 25352',
 	      bcopts	=> \@(qw/ BEGIN END INIT CHECK -exec /),
 	      prog	=> 'print q/foo/',
               todo      => "kurila changes",
-	      @warnings_todo,
+	      < @warnings_todo,
 	      expect	=> <<'EOT_EOT', expect_nt => <<'EONT_EONT');
 # BEGIN 1:
 # 1  <;> nextstate(B::Concise -275 Concise.pm:356) v:*,&,{,$

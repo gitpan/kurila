@@ -1,8 +1,6 @@
 #!./perl
 
 BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
     require Config;
     if ((%Config::Config{'extensions'} !~ m!\bList/Util\b!) ){
 	print "1..0 # Skip -- Perl configured without List::Util module\n";
@@ -11,16 +9,16 @@ BEGIN {
 }
 
 use Test;
-BEGIN { plan tests => 9; }
+BEGIN { plan tests => 8; }
 
 BEGIN {
     require autouse;
-    eval {
+    try {
         "autouse"->import('List::Util' => 'List::Util::first(&@)');
     };
     ok( !$@ );
 
-    eval {
+    try {
         "autouse"->import('List::Util' => 'Foo::min');
     };
     ok( $@->{description}, qr/^autouse into different package attempted/ );
@@ -28,12 +26,12 @@ BEGIN {
     "autouse"->import('List::Util' => qw(max first(&@)));
 }
 
-my @a = (1,2,3,4,5.5);
-ok( max(@a), 5.5);
+my @a = @(1,2,3,4,5.5);
+ok( max(<@a), 5.5);
 
 
 # first() has a prototype of &@.  Make sure that's preserved.
-ok( (first { $_ +> 3 } @a), 4);
+ok( (first { $_ +> 3 } <@a), 4);
 
 
 # Test that autouse's lazy module loading works.
@@ -44,13 +42,9 @@ ok( !exists %INC{$mod_file} );
 ok( EPERM ); # test if non-zero
 ok( exists %INC{$mod_file} );
 
-use autouse Env => "something";
-eval { something() };
-ok( $@->{description}, qr/^\Qautoused module Env has unique import() method/ );
-
 # Check that UNIVERSAL.pm doesn't interfere with modules that don't use
 # Exporter and have no import() of their own.
 require UNIVERSAL;
 autouse->import("Class::ISA" => 'self_and_super_versions');
-my %versions = self_and_super_versions("Class::ISA");
+my %versions = %( < self_and_super_versions("Class::ISA") );
 ok( %versions{"Class::ISA"}, $Class::ISA::VERSION );

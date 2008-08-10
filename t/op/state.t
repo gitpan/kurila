@@ -8,7 +8,7 @@ BEGIN {
 use strict;
 use feature "state";
 
-plan tests => 68;
+plan tests => 58;
 
 ok( ! defined state $uninit, q(state vars are undef by default) );
 
@@ -19,22 +19,22 @@ sub stateful {
     state $y //= 1;
     my $z = 2;
     state ($t) //= 3;
-    return ($x++, $y++, $z++, $t++);
+    return  @($x++, $y++, $z++, $t++);
 }
 
-my ($x, $y, $z, $t) = stateful();
+my ($x, $y, $z, $t) = < stateful();
 is( $x, 0, 'uninitialized state var' );
 is( $y, 1, 'initialized state var' );
 is( $z, 2, 'lexical' );
 is( $t, 3, 'initialized state var, list syntax' );
 
-($x, $y, $z, $t) = stateful();
+($x, $y, $z, $t) = < stateful();
 is( $x, 1, 'incremented state var' );
 is( $y, 2, 'incremented state var' );
 is( $z, 2, 'reinitialized lexical' );
 is( $t, 4, 'incremented state var, list syntax' );
 
-($x, $y, $z, $t) = stateful();
+($x, $y, $z, $t) = < stateful();
 is( $x, 2, 'incremented state var' );
 is( $y, 3, 'incremented state var' );
 is( $z, 2, 'reinitialized lexical' );
@@ -47,14 +47,14 @@ sub nesting {
     my $t;
     { state $bar //= 12; $t = ++$bar }
     ++$foo;
-    return ($foo, $t);
+    return  @($foo, $t);
 }
 
-($x, $y) = nesting();
+($x, $y) = < nesting();
 is( $x, 11, 'outer state var' );
 is( $y, 13, 'inner state var' );
 
-($x, $y) = nesting();
+($x, $y) = < nesting();
 is( $x, 12, 'outer state var' );
 is( $y, 14, 'inner state var' );
 
@@ -73,20 +73,6 @@ my $f2 = generator();
 is( $f2->(), 1, 'generator 2' );
 is( $f1->(), 3, 'generator 1 again' );
 is( $f2->(), 2, 'generator 2 once more' );
-
-# with ties
-{
-    package countfetches;
-    our $fetchcount = 0;
-    sub TIESCALAR {bless \%()};
-    sub FETCH { ++$fetchcount; 18 };
-    tie my $y, "countfetches";
-    sub foo { state $x //= $y; $x++ }
-    ::is( foo(), 18, "initialisation with tied variable" );
-    ::is( foo(), 19, "increments correctly" );
-    ::is( foo(), 20, "increments correctly, twice" );
-    ::is( $fetchcount, 1, "fetch only called once" );
-}
 
 # state variables are shared among closures
 
@@ -118,7 +104,7 @@ is( stateless(), 43, 'stateless function, second time' );
 sub stateful_array {
     state @x;
     push @x, 'x';
-    return (@x-1);
+    return  (nelems @x)-1;
 }
 
 my $xsize = stateful_array();
@@ -197,7 +183,6 @@ is( pugnax(), 42, 'scalar state assignment return value' );
 
 foreach my $forbidden (~< *DATA) {
     chomp $forbidden;
-    no strict 'vars';
     eval $forbidden;
     like $@->{description}, qr/Initialization of state variables in list context currently forbidden/, "Currently forbidden: $forbidden";
 }
@@ -226,20 +211,20 @@ foreach my $forbidden (~< *DATA) {
     };
     is $@, '', "eval f_49522";
     # shouldn't be any 'not available' or 'not stay shared' warnings
-    ok !@warnings, "suppress warnings part 1 [@warnings]";
+    ok !nelems @warnings, "suppress warnings part 1 [{join ' ', <@warnings}]";
 
-    @warnings = ();
+    @warnings = @( () );
     my $f = f_49522();
     is $f->(), 88, "state var closure 1";
     is g_49522(), 88, "state var closure 2";
-    ok !@warnings, "suppress warnings part 2 [@warnings]";
+    ok !nelems @warnings, "suppress warnings part 2 [{join ' ', <@warnings}]";
 
 
-    @warnings = ();
+    @warnings = @( () );
     $f = i_49522();
     h_49522(); # initialise $t
     is $f->(), 99, "state var closure 3";
-    ok !@warnings, "suppress warnings part 3 [@warnings]";
+    ok !nelems @warnings, "suppress warnings part 3 [{join ' ', <@warnings}]";
 
 
 }
@@ -248,12 +233,6 @@ foreach my $forbidden (~< *DATA) {
 __DATA__
 state ($a) = 1;
 (state $a) = 1;
-state @a = 1;
-state (@a) = 1;
-(state @a) = 1;
-state %a = ();
-state (%a) = ();
-(state %a) = ();
 state ($a, $b) = ();
 state ($a, @b) = ();
 (state $a, state $b) = ();

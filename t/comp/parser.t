@@ -3,16 +3,11 @@
 # Checks if the parser behaves correctly in edge cases
 # (including weird syntax errors)
 
-BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
-}
-
 BEGIN { require "./test.pl"; }
-plan( tests => 85 );
+plan( tests => 84 );
 
 eval '%@x=0;';
-like( $@->{description}, qr/^Can't modify hash dereference in repeat \(x\)/, '%@x=0' );
+like( $@->{description}, qr/^Can't coerce HASH to string in repeat/, '%@x=0' );
 
 # Bug 20010528.007
 eval q/"\x{"/;
@@ -63,7 +58,7 @@ like( $@->{description}, qr/Final \$ should be \\\$ or \$name/, q($ at end of ""
 
 is( "\Q\Q\Q\Q\Q\Q\Q\Q\Q\Q\Q\Q\Qa", "a", "PL_lex_casestack" );
 
-eval {
+try {
 {{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{
 {{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{
 {{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{\%(
@@ -81,18 +76,18 @@ is( $@, '', 'PL_lex_brackstack' );
     my $a="A";
     is("{$a}\{", "A\{", "interpolation, qq//");
     is("{$a}[", "A[", "interpolation, qq//");
-    my @b=("B");
-    is("{join ' ', @b}\{", "B\{", "interpolation, qq//");
+    my @b=@("B");
+    is("{join ' ', < @b}\{", "B\{", "interpolation, qq//");
     is(''.qr/$a(?:)\{/, '(?-uxism:A(?:)\{)', "interpolation, qr//");
     my $c = "A\{";
-    $c =~ m/$a(?:){/;
-    is($&, 'A{', "interpolation, m//");
+    $c =~ m/$a(?:){/p;
+    is($^MATCH, 'A{', "interpolation, m//");
     $c =~ s/$a\{/foo/;
     is($c, 'foo', "interpolation, s/...//");
     $c =~ s/foo/{$a}\{/;
     is($c, 'A{', "interpolation, s//.../");
     is(<<"{$a}{", "A\{ A[ B\{\n", "interpolation, here doc");
-{$a}\{ {$a}[ {join ' ', @b}\{
+{$a}\{ {$a}[ {join ' ', < @b}\{
 {$a}{
 }
 
@@ -102,7 +97,7 @@ is($@, '', "';&' sub prototype confuses the lexer");
 # Bug #21575
 # ensure that the second print statement works, by playing a bit
 # with the test output.
-my %data = ( foo => "\n" );
+my %data = %( foo => "\n" );
 print "#";
 print(
 %data{foo});
@@ -188,15 +183,6 @@ eval q[
 like($@->{description}, qr/Can't locate DieDieDie.pm/, 'croak cleanup 2' );
 
 
-eval q[
-    my @a;
-    my ($a,$b,$c,$d,$e,$f,$g,$h,$i,$j,$k,$l,$m,$n,$o,$p,$q,$r,$s,$r);
-    @a =~ s/a/b/; # compile-time error
-    use DieDieDie;
-];
-
-like($@->{description}, qr/Can't modify/, 'croak cleanup 3' );
-
 # these might leak, or have duplicate frees, depending on the bugginess of
 # the parser stack 'fail in reduce' cleanup code. They're here mainly as
 # something to be run under valgrind, with PERL_DESTRUCT_LEVEL=1.
@@ -228,7 +214,7 @@ like($@->message, qr/BEGIN failed--compilation aborted/, 'BEGIN 7' );
 # with sane line reporting for any other test failures
 
 sub check ($$$) {
-    my ($file, $line, $name) =  @_;
+    my ($file, $line, $name) =  < @_;
     my (undef, $got_file, $got_line) = caller;
     like ($got_file, $file, "file of $name");
     is ($got_line, $line, "line of $name");
@@ -298,10 +284,10 @@ check(qr/^Great hail!.*no more\.$/, 61, "Overflow both small buffer checks");
 EOSTANZA
 
 {
-    my @x = 'string';
+    my @x = @( 'string' );
     is(eval q{ "@x[0]->strung" }, 'string->strung',
 	'literal -> after an array subscript within ""');
-    @x = \@('string');
+    @x = @( \@('string') );
     # this used to give "string"
     dies_like( sub { "@x[0]-> [0]" }, qr/reference as string/ );
 }

@@ -1,4 +1,3 @@
-
 #!./perl -w
 #
 #  Copyright (c) 1995-2000, Raphael Manfredi
@@ -7,14 +6,15 @@
 #  in the README file that comes with the distribution.
 #
 
+use Config;
+
 sub BEGIN {
     if (%ENV{PERL_CORE}){
 	chdir('t') if -d 't';
-	@INC = ('.', '../lib', '../ext/Storable/t');
+	push @INC, '../ext/Storable/t';
     } else {
 	unshift @INC, 't';
     }
-    require Config; Config->import;
     if (%ENV{PERL_CORE} and %Config{'extensions'} !~ m/\bStorable\b/) {
         print "1..0 # Skip: Storable was not built\n";
         exit 0;
@@ -23,7 +23,6 @@ sub BEGIN {
 }
 
 use strict;
-sub ok;
 
 use utf8;
 

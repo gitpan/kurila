@@ -5,8 +5,7 @@
 
 BEGIN {
     if( %ENV{PERL_CORE} ) {
-        chdir 't' if -d 't';
-        @INC = ('../lib', 'lib');
+        push @INC, 'lib';
     }
     else {
         unshift @INC, 't/lib';
@@ -14,15 +13,12 @@ BEGIN {
 }
 
 use strict;
-use Test::More tests => 28;
+use Test::More tests => 26;
 
-use TieOut;
 use MakeMaker::Test::Utils;
 use MakeMaker::Test::Setup::BFD;
 
 use ExtUtils::MakeMaker;
-
-chdir 't';
 
 perl_lib();
 
@@ -36,7 +32,9 @@ ok( chdir 'Big-Dummy', "chdir'd to Big-Dummy" ) ||
   diag("chdir failed: $!");
 
 {
-    ok( my $stdout = tie *STDOUT, 'TieOut' );
+    my $stdout = \$( '' );
+    open my $stdout_fh, '>>', $stdout or die;
+    *STDOUT = *{$stdout_fh}{IO};
     my $warnings = '';
     local $^WARN_HOOK = sub {
         $warnings .= @_[0]->{description};
@@ -44,21 +42,8 @@ ok( chdir 'Big-Dummy', "chdir'd to Big-Dummy" ) ||
 
     my $mm;
 
-    eval {
-        $mm = WriteMakefile(
-            NAME            => 'Big::Dummy',
-            VERSION_FROM    => 'lib/Big/Dummy.pm',
-            MAN3PODS        => ' ', # common mistake
-        );
-    };
-
-    is( $warnings, <<VERIFY );
-WARNING: MAN3PODS takes a HASH reference not a string/number.
-         Please inform the author.
-VERIFY
-
     $warnings = '';
-    eval {
+    try {
         $mm = WriteMakefile(
             NAME            => 'Big::Dummy',
             VERSION_FROM    => 'lib/Big/Dummy.pm',
@@ -96,7 +81,7 @@ VERIFY
     is_deeply( $mm->{LIBS}, \@('-lwibble', '-lwobble') );
 
     $warnings = '';
-    eval {
+    try {
         $mm = WriteMakefile(
             NAME            => 'Big::Dummy',
             VERSION_FROM    => 'lib/Big/Dummy.pm',
@@ -124,7 +109,7 @@ VERIFY
 
     # Test VERSION
     $warnings = '';
-    eval {
+    try {
         $mm = WriteMakefile(
         NAME       => 'Big::Dummy',
         VERSION    => \@(1,2,3),
@@ -133,7 +118,7 @@ VERIFY
     like( $warnings, qr{^WARNING: VERSION takes a version object or string/number} );
 
     $warnings = '';
-    eval {
+    try {
         $mm = WriteMakefile(
         NAME       => 'Big::Dummy',
         VERSION    => 1.002_003,
@@ -143,7 +128,7 @@ VERIFY
     is( $mm->{VERSION}, '1.002003' );
 
     $warnings = '';
-    eval {
+    try {
         $mm = WriteMakefile(
         NAME       => 'Big::Dummy',
         VERSION    => '1.002_003',
@@ -154,7 +139,7 @@ VERIFY
 
 
     $warnings = '';
-    eval {
+    try {
         $mm = WriteMakefile(
         NAME       => 'Big::Dummy',
         VERSION    => bless \%(), "Some::Class",
@@ -164,12 +149,12 @@ VERIFY
 
 
     SKIP: {
-        skip("Can't test version objects",6) unless eval { require version };
+        skip("Can't test version objects",6) unless try { require version };
         version->import;
 
         my $version = version->new("1.2.3");
         $warnings = '';
-        eval {
+        try {
             $mm = WriteMakefile(
             NAME       => 'Big::Dummy',
             VERSION    => $version,
@@ -181,7 +166,7 @@ VERIFY
 
         $warnings = '';
         $version = qv('1.2.3');
-        eval {
+        try {
             $mm = WriteMakefile(
             NAME       => 'Big::Dummy',
             VERSION    => $version,
@@ -189,6 +174,6 @@ VERIFY
         };
         is( $warnings, '' );
         isa_ok( $mm->{VERSION}, 'version' );
-        is( $mm->{VERSION}, $version );
+        is( $mm->{VERSION}, $version, 'correct version' );
     }
 }

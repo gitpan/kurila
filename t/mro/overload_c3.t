@@ -2,12 +2,6 @@
 
 use strict;
 use warnings;
-BEGIN {
-    unless (-d 'blib') {
-        chdir 't' if -d 't';
-        @INC = '../lib';
-    }
-}
 
 require q(./test.pl); plan(tests => 7);
 
@@ -46,7 +40,7 @@ is("$y", 'OverloadingTest stringified', '... got the right value when stringifin
 ok(($y eq 'OverloadingTest stringified'), '... eq was handled correctly');
 
 my $result;
-eval { 
+try { 
     $result = $x eq 'InheritingFromOverloadedTest stringified' 
 };
 ok(!$@, '... this should not throw an exception');

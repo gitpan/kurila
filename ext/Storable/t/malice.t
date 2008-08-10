@@ -13,15 +13,16 @@
 # error traps in Storable as possible
 # It also acts as a test for read_header
 
+use Config;
+
 sub BEGIN {
     if (%ENV{PERL_CORE}){
 	chdir('t') if -d 't';
-	@INC = ('.', '../lib', '../ext/Storable/t');
+	@INC = @('.', '../lib', '../ext/Storable/t');
     } else {
 	# This lets us distribute Test::More in t/
 	unshift @INC, 't';
     }
-    require Config; Config->import;
     if (%ENV{PERL_CORE} and %Config{'extensions'} !~ m/\bStorable\b/) {
         print "1..0 # Skip: Storable was not built\n";
         exit 0;
@@ -58,18 +59,18 @@ use vars '$file';
 
 # There is no UTF8 flag anymore
 use bytes;
-my %hash = (perl => 'rules');
+my %hash = %(perl => 'rules');
 
 sub test_hash {
   my $clone = shift;
   is (ref $clone, "HASH", "Get hash back");
-  is (scalar keys %$clone, 1, "with 1 key");
+  is (nkeys %$clone, 1, "with 1 key");
   is ((keys %$clone)[[0]], "perl", "which is correct");
   is ($clone->{perl}, "rules");
 }
 
 sub test_header {
-  my ($header, $isfile, $isnetorder) = @_;
+  my ($header, $isfile, $isnetorder) = < @_;
   is (!!$header->{file}, !!$isfile, "is file");
   is ($header->{major}, $major, "major number");
   is ($header->{minor}, $minor_write, "minor number");
@@ -91,7 +92,7 @@ sub test_header {
 }
 
 sub test_truncated {
-  my ($data, $sub, $magic_len, $what) = @_;
+  my ($data, $sub, $magic_len, $what) = < @_;
   for my $i (0 .. length ($data) - 1) {
     my $short = substr $data, 0, $i;
 
@@ -108,7 +109,7 @@ sub test_truncated {
 }
 
 sub test_corrupt {
-  my ($data, $sub, $what, $name) = @_;
+  my ($data, $sub, $what, $name) = < @_;
 
   my $clone = &$sub($data);
   is (defined ($clone), '', "$name $what should fail");
@@ -116,7 +117,7 @@ sub test_corrupt {
 }
 
 sub test_things {
-  my ($contents, $sub, $what, $isnetwork) = @_;
+  my ($contents, $sub, $what, $isnetwork) = < @_;
   my $isfile = $what eq 'file';
   my $file_magic = $isfile ? length $file_magic_str : 0;
 
@@ -186,7 +187,7 @@ sub test_things {
     # All these are omitted from the network order header.
     # I'm not sure if it's correct to omit the byte size stuff.
     $copy = $contents;
-    substr ($copy, $file_magic + 3, length $header->{byteorder}, reverse $header->{byteorder});
+    substr ($copy, $file_magic + 3, length $header->{byteorder}, join '', reverse split m//, $header->{byteorder});
 
     test_corrupt ($copy, $sub, "/^Byte order is not compatible/",
                   "byte order");
@@ -195,7 +196,7 @@ sub test_things {
              \@('longsize', "Long integer"),
              \@('ptrsize', "Pointer"),
              \@('nvsize', "Double")) {
-      my ($key, $name) = @$_;
+      my ($key, $name) = < @$_;
       $copy = $contents;
       substr ($copy, $where++, 1, chr 0);
       test_corrupt ($copy, $sub, "/^$name size is not compatible/",
@@ -294,7 +295,7 @@ test_things($stored, \&freeze_and_thaw, 'string', 1);
 # Perl. AMS 20030901
 {
     chop(my $a = chr(0xDF).chr(256));
-    my %a = (chr(0xDF) => 1);
+    my %a = %(chr(0xDF) => 1);
     %a{$a}++;
     freeze \%a;
     # If we were built with -DDEBUGGING, the assert() should have killed

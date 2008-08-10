@@ -25,7 +25,7 @@ use vars qw(@ISA %ESCAPES $VERSION);
 
 # We inherit from Pod::Select instead of Pod::Parser so that we can be used
 # by Pod::Usage.
-@ISA = qw(Pod::Select);
+@ISA = @( qw(Pod::Select) );
 
 $VERSION = '2.02';
 
@@ -37,7 +37,7 @@ $VERSION = '2.02';
 # This table is taken near verbatim from Pod::PlainText in Pod::Parser,
 # which got it near verbatim from the original Pod::Text.  It is therefore
 # credited to Tom Christiansen, and I'm glad I didn't have to write it.  :)
-%ESCAPES = (
+%ESCAPES = %(
     'amp'       =>    '&',      # ampersand
     'lt'        =>    '<',      # left chevron, less-than
     'gt'        =>    '>',      # right chevron, greater-than
@@ -147,7 +147,7 @@ sub command {
     return if (%$self{EXCLUDE} && $command ne 'end');
     $self->item ("\n") if defined %$self{ITEM};
     $command = 'cmd_' . $command;
-    $self->?$command (@_);
+    $self->?$command (< @_);
 }
 
 # Called for a verbatim paragraph.  Gets the paragraph, the line number, and
@@ -199,13 +199,13 @@ sub textblock {
     } {{
         local $_ = $1;
         s%L</([^>]+)>%$1%g;
-        my @items = split m/(?:,?\s+(?:and\s+)?)/;
+        my @items = @( split m/(?:,?\s+(?:and\s+)?)/ );
         my $string = "the ";
         my $i;
-        for ($i = 0; $i +< @items; $i++) {
+        for ($i = 0; $i +< nelems @items; $i++) {
             $string .= @items[$i];
-            $string .= ", " if @items +> 2 && $i != @items-1;
-            $string .= " and " if ($i == @items - 2);
+            $string .= ", " if (nelems @items) +> 2 && $i != (nelems @items)-1;
+            $string .= " and " if ($i == (nelems @items) - 2);
         }
         $string .= " entries elsewhere in this document";
         $string;
@@ -218,7 +218,7 @@ sub textblock {
     if (defined %$self{ITEM}) {
         $self->item ($_ . "\n");
     } else {
-        $self->output ($self->reformat ($_ . "\n"));
+        $self->output ( $self->reformat ($_ . "\n"));
     }
 }
 
@@ -246,7 +246,7 @@ sub interior_sequence {
     # When we output the text, we'll map this back.
     if ($command eq 'S') {
         s/\s{2,}/ /g;
-        tr/ /\01/;
+        s/ /\01/g;
         return $_;
     }
 
@@ -385,9 +385,9 @@ sub cmd_for {
 
 # The simple formatting ones.  These are here mostly so that subclasses can
 # override them and do more complicated things.
-sub seq_b { return @_[0]{alt} ? "``@_[1]''" : @_[1] }
-sub seq_c { return @_[0]{alt} ? "``@_[1]''" : "`@_[1]'" }
-sub seq_f { return @_[0]{alt} ? "\"@_[1]\"" : @_[1] }
+sub seq_b { return @_[0]->{alt} ? "``@_[1]''" : @_[1] }
+sub seq_c { return @_[0]->{alt} ? "``@_[1]''" : "`@_[1]'" }
+sub seq_f { return @_[0]->{alt} ? "\"@_[1]\"" : @_[1] }
 sub seq_i { return '*' . @_[1] . '*' }
 
 # The complicated one.  Handle links.  Since this is plain text, we can't
@@ -461,7 +461,7 @@ sub item {
         return;
     }
     undef %$self{ITEM};
-    my $indent = %$self{INDENTS}[-1];
+    my $indent = %$self{INDENTS}->[-1];
     unless (defined $indent) { $indent = %$self{indent} }
     my $space = ' ' x $indent;
     $space =~ s/^ /:/ if %$self{alt};
@@ -472,7 +472,7 @@ sub item {
         $output =~ s/\n*$/\n/;
         $self->output ($output);
         %$self{MARGIN} = $margin;
-        $self->output ($self->reformat ($_)) if m/\S/;
+        $self->output ( $self->reformat ($_)) if m/\S/;
     } else {
         $_ = $self->reformat ($_);
         s/^ /:/ if (%$self{alt} && $indent +> 0);
@@ -529,7 +529,7 @@ sub reformat {
 }
 
 # Output text to the output device.
-sub output { @_[1] =~ tr/\01/ /; print { @_[0]->output_handle } @_[1] }
+sub output { @_[1] =~ s/\01/ /g; print { @_[0]->output_handle } @_[1] }
 
 
 ############################################################################
@@ -555,7 +555,7 @@ sub pod2text {
     }
 
     # Now that we know what arguments we're using, create the parser.
-    my $parser = Pod::PlainText->new (@args);
+    my $parser = Pod::PlainText->new (< @args);
 
     # If two arguments were given, the second argument is going to be a file
     # handle.  That means we want to call parse_from_filehandle(), which
@@ -568,9 +568,9 @@ sub pod2text {
             return;
         }
         @_[0] = \*IN;
-        return $parser->parse_from_filehandle (@_);
+        return $parser->parse_from_filehandle (< @_);
     } else {
-        return $parser->parse_from_file (@_);
+        return $parser->parse_from_file (< @_);
     }
 }
 

@@ -8,9 +8,9 @@ use File::Basename;
 use File::Spec;
 use FileHandle;
 
-@ISA = qw(Exporter);
-@EXPORT = qw(&testcmp);
-$MYPKG = eval { (caller)[[0]] };
+@ISA = @( qw(Exporter) );
+@EXPORT = @( qw(&testcmp) );
+$MYPKG = try { (caller)[[0]] };
 
 ##--------------------------------------------------------------------------
 
@@ -45,8 +45,8 @@ otherwise.
 ##--------------------------------------------------------------------------
 
 sub testcmp( $ $ ; $) {
-   my %opts = ref(@_[0]) eq 'HASH' ? %{shift()} : ();
-   my ($file1, $file2) = @_;
+   my %opts = %( ref(@_[0]) eq 'HASH' ? < %{shift()} : () );
+   my ($file1, $file2) = < @_;
    my ($fh1, $fh2) = ($file1, $file2);
    unless (ref $fh1) {
       $fh1 = FileHandle->new($file1, "r") or die "Can't open $file1: $!";

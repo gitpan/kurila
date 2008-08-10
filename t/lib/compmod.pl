@@ -1,17 +1,12 @@
 #!./perl
 
-BEGIN {
-    chdir 't';
-    @INC = '../lib';
-}
-
 my $module = shift;
 
 # 'require open' confuses Perl, so we use instead.
 eval "use $module ();";
 if( $@ ) {
     print "not ";
-    warn "# require failed with {dump::view($@->message)}\n";
+    warn "# require failed with {dump::view( <$@->message)}\n";
 }
 print "ok - $module\n";
 

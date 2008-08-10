@@ -1,28 +1,27 @@
 #!./perl
 
 BEGIN {
-    chdir 't' if -d 't';
-    @INC = '.';
-    push @INC, '../lib';
+    push @INC, '.';
 }
 
 # don't make this lexical
 our $i = 1;
 
-my @fjles_to_delete = qw (bleah.pm bleah.do bleah.flg urkkk.pm urkkk.pmc
-krunch.pm krunch.pmc whap.pm whap.pmc);
+my @fjles_to_delete = @( qw (bleah.pm bleah.do bleah.flg urkkk.pm urkkk.pmc
+krunch.pm krunch.pmc whap.pm whap.pmc) );
 
 
 my $Is_EBCDIC = (ord('A') == 193) ? 1 : 0;
 my $Is_UTF8   = ($^OPEN || "") =~ m/:utf8/;
-my $total_tests = 38;
+my $total_tests = 30;
+
 if ($Is_EBCDIC || $Is_UTF8) { $total_tests -= 3; }
 print "1..$total_tests\n";
 
 sub do_require {
-    %INC = ();
-    write_file('bleah.pm',@_);
-    eval { require "bleah.pm" };
+    %INC = %( () );
+    write_file('bleah.pm',< @_);
+    try { require "bleah.pm" };
     my @a; # magic guard for scope violations (must be first lexical in file)
 }
 
@@ -31,7 +30,7 @@ sub write_file {
     open(REQ, ">","$f") or die "Can't write '$f': $!";
     binmode REQ;
     use bytes;
-    print REQ @_;
+    print REQ < @_;
     close REQ or die "Could not close $f: $!";
 }
 
@@ -58,12 +57,9 @@ print "ok ",$i++,"\n";
 write_file('bleah.pm', "print 'ok $i\n'; 1;\n");
 require "bleah.pm";
 $i++;
+delete %INC{'bleah.pm'};
 
 # run-time failure in require
-do_require "0;\n";
-print "# $@\nnot " unless $@->message =~ m/did not return a true/;
-print "ok ",$i++,"\n";
-
 print "not " if exists %INC{'bleah.pm'};
 print "ok ",$i++,"\n";
 
@@ -74,7 +70,7 @@ for my $expected_compile (1,0) {
     print "not " unless -e $flag_file;
     print "ok ",$i++,"\n";
     write_file('bleah.pm', "unlink '$flag_file' or die; \$a=0; \$b=1/\$a; 1;\n");
-    print "# $@\nnot " if eval { require 'bleah.pm' };
+    print "# $@\nnot " if try { require 'bleah.pm' };
     print "ok ",$i++,"\n";
     print "not " unless -e $flag_file xor $expected_compile;
     print "ok ",$i++,"\n";
@@ -94,7 +90,7 @@ print "not " unless exists %INC{'bleah.pm'};
 print "ok ",$i++,"\n";
 write_file($flag_file, 1);
 write_file('bleah.pm', "unlink '$flag_file'; 1");
-print "# $@\nnot " if eval { require 'bleah.pm' };
+print "# $@\nnot " if try { require 'bleah.pm' };
 print "ok ",$i++,"\n";
 print "# $@\nnot " unless $@->message =~ m/Compilation failed/i;
 print "ok ",$i++,"\n";
@@ -111,35 +107,16 @@ print "ok ",$i++,"\n";
 # do FILE shouldn't see any outside lexicals
 my $x = "ok $i\n";
 write_file("bleah.do", <<EOT);
-no strict 'vars';
-\$x = "not ok $i\\n";
+our \$x = "not ok $i\\n";
 EOT
 do "bleah.do" or die $@;
 dofile();
 sub dofile { do "bleah.do" or die $@; };
 print $x;
 
-# Test that scalar context is forced for require
-
-write_file('bleah.pm', <<'**BLEAH**'
-print "not " if !defined wantarray || wantarray ne '';
-print "ok $i - require() context\n";
-1;
-**BLEAH**
-);
-our ($foo, @foo);
-                              delete %INC{"bleah.pm"}; ++$::i;
-$foo = eval q{require bleah}; delete %INC{"bleah.pm"}; ++$::i;
-@foo = eval q{require bleah}; delete %INC{"bleah.pm"}; ++$::i;
-       eval q{require bleah}; delete %INC{"bleah.pm"}; ++$::i;
-       eval q{$_=$_+2;require bleah}; delete %INC{"bleah.pm"}; ++$::i;
-$foo = eval  {require bleah}; delete %INC{"bleah.pm"}; ++$::i;
-@foo = eval  {require bleah}; delete %INC{"bleah.pm"}; ++$::i;
-       eval  {require bleah};
-
 # Test for fix of RT #24404 : "require $scalar" may load a directory
 my $r = "threads";
-eval { require $r };
+try { require $r };
 $i++;
 if($@->message =~ m/Can't locate threads in \@INC/) {
     print "ok $i\n";
@@ -148,8 +125,8 @@ if($@->message =~ m/Can't locate threads in \@INC/) {
 }
 
 write_file('bleah.pm', qq(die "This is an expected error";\n));
-delete %INC{"bleah.pm"}; ++$::i;
-eval { CORE::require bleah; };
+delete %INC{"bleah.pm"}; ++$main::i;
+try { CORE::require bleah; };
 if ($@->message =~ m/^This is an expected error/) {
     print "ok $i\n";
 } else {
@@ -157,7 +134,7 @@ if ($@->message =~ m/^This is an expected error/) {
 }
 
 sub write_file_not_thing {
-    my ($file, $thing, $test) = @_;
+    my ($file, $thing, $test) = < @_;
     write_file($file, <<"EOT");
     print "not ok $test\n";
     die "The $thing file should not be loaded";
@@ -202,7 +179,7 @@ EOT
     }
     require urkkk;
     require krunch;
-    eval {CORE::require whap; 1} and die;
+    try {CORE::require whap; 1} and die;
 
     if ($@->message =~ m/^This is an expected error/) {
 	print "ok $pmc_dies\n";
@@ -240,7 +217,7 @@ my $utf8 = utf8::chr(0xFEFF);
 $i++; do_require(qq({$utf8}print "ok $i\n"; 1;\n));
 
 END {
-    foreach my $file (@fjles_to_delete) {
+    foreach my $file (< @fjles_to_delete) {
 	1 while unlink $file;
     }
 }

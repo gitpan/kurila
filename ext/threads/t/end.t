@@ -2,10 +2,6 @@ use strict;
 use warnings;
 
 BEGIN {
-    if (%ENV{'PERL_CORE'}){
-        chdir 't';
-        unshift @INC, '../lib';
-    }
     use Config;
     if (! %Config{'useithreads'}) {
         print("1..0 # Skip: Perl not compiled with 'useithreads'\n");
@@ -18,7 +14,7 @@ use ExtUtils::testlib;
 use threads;
 
 BEGIN {
-    eval {
+    try {
         require threads::shared;
         threads::shared->import();
     };
@@ -40,7 +36,7 @@ BEGIN {
 ok(1, 'Loaded');
 
 sub ok {
-    my ($ok, $name) = @_;
+    my ($ok, $name) = < @_;
 
     lock($TEST);
     my $id = $TEST++;

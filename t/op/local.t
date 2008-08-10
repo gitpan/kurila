@@ -3,7 +3,7 @@
 BEGIN {
     require './test.pl';
 }
-plan tests => 121;
+plan tests => 106;
 
 our (@c, @b, @a, $a, $b, $c, $d, $e, $x, $y, %d, %h, $m);
 
@@ -14,14 +14,14 @@ $list_assignment_supported = 0 if ($^O eq 'VMS');
 
 
 sub foo {
-    local($a, $b) = @_;
+    local($a, $b) = < @_;
     local($c, $d);
     $c = "c 3";
     $d = "d 4";
     { local($a,$c) = ("a 9", "c 10"); ($x, $y) = ($a, $c); }
     is($a, "a 1");
     is($b, "b 2");
-    $c, $d;
+    return @($c, $d);
 }
 
 $a = "a 5";
@@ -30,7 +30,7 @@ $c = "c 7";
 $d = "d 8";
 
 my @res;
-@res =  &foo("a 1","b 2");
+@res = @( <  &foo("a 1","b 2") );
 is(@res[0], "c 3");
 is(@res[1], "d 4");
 
@@ -44,45 +44,48 @@ is($y, "c 10");
 # same thing, only with arrays and associative arrays
 
 sub foo2 {
-    local($a, @b) = @_;
+    local($a, @b) = (shift, @_);
     local(@c, %d);
-    @c = "c 3";
+    @c = @( "c 3" );
     %d{''} = "d 4";
-    { local($a,@c) = ("a 19", "c 20"); ($x, $y) = ($a, @c); }
+    { local($a, @c) = ("a 19", @("c 20")); ($x, $y) = ($a, < @c); }
     is($a, "a 1");
-    is("@b", "b 2");
-    @c[0], %d{''};
+    is("{join ' ', <@b}", "b 2");
+    return @(@c[0], %d{''});
 }
 
 $a = "a 5";
-@b = "b 6";
-@c = "c 7";
+@b = @( "b 6" );
+@c = @( "c 7" );
 %d{''} = "d 8";
 
-@res = &foo2("a 1","b 2");
+@res = @( < &foo2("a 1","b 2") );
 is(@res[0], "c 3");
 is(@res[1], "d 4");
 
 is($a, "a 5");
-is("@b", "b 6");
+is("{join ' ', <@b}", "b 6");
 is(@c[0], "c 7");
 is(%d{''}, "d 8");
 is($x, "a 19");
 is($y, "c 20");
 
 
+{
+local our $TODO = "fix localization through reference";
 eval 'local($$e)';
-like($@->{description}, qr/Can't localize through a reference/);
+like($@ && $@->{description}, qr/Can't localize through a reference/);
 
 eval '$e = \@(); local(@$e)';
-like($@->{description}, qr/Can't localize through a reference/);
+like($@ && $@->{description}, qr/Can't localize through a reference/);
 
 eval '$e = \%(); local(%$e)';
-like($@->{description}, qr/Can't localize through a reference/);
+like($@ && $@->{description}, qr/Can't localize through a reference/);
+}
 
 # Array and hash elements
 
-@a = ('a', 'b', 'c');
+@a = @('a', 'b', 'c');
 {
     local(@a[1]) = 'foo';
     local(@a[2]) = @a[2];
@@ -94,19 +97,19 @@ is(@a[1], 'b');
 is(@a[2], 'c');
 ok(!defined @a[0]);
 
-@a = ('a', 'b', 'c');
+@a = @('a', 'b', 'c');
 {
     local(@a[1]) = "X";
     shift @a;
 }
 is(@a[0].@a[1], "Xb");
 {
-    my $d = "@a";
-    local @a = @a;
-    is("@a", $d);
+    my $d = "{join ' ', <@a}";
+    local @a = @( < @a );
+    is("{join ' ', <@a}", $d);
 }
 
-%h = ('a' => 1, 'b' => 2, 'c' => 3);
+%h = %('a' => 1, 'b' => 2, 'c' => 3);
 {
     local(%h{'a'}) = 'foo';
     local(%h{'b'}) = %h{'b'};
@@ -119,7 +122,7 @@ is(%h{'a'}, 1);
 is(%h{'b'}, 2);
 {
     my $d = join("\n", map { "$_=>%h{$_}" } sort keys %h);
-    local %h = %h;
+    local %h = %( < %h );
     is(join("\n", map { "$_=>%h{$_}" } sort keys %h), $d);
 }
 is(%h{'c'}, 3);
@@ -131,43 +134,13 @@ is($a, 'outer');
 
 # see if localization works when scope unwinds
 local $m = 5;
-eval {
+try {
     for $m (6) {
 	local $m = 7;
 	die "bye";
     }
 };
 is($m, 5);
-
-# see if localization works on tied arrays
-{
-    package TA;
-    sub TIEARRAY { bless \@(), @_[0] }
-    sub STORE { print "# STORE [{dump::view(\@_)}]\n"; @_[0]->[@_[1]] = @_[2] }
-    sub FETCH { my $v = @_[0]->[@_[1]]; print "# FETCH [{dump::view(\@_)}=$v]\n"; $v }
-    sub CLEAR { print "# CLEAR [{dump::view(\@_)}]\n"; @{@_[0]} = (); }
-    sub FETCHSIZE { scalar(@{@_[0]}) }
-    sub SHIFT { shift (@{@_[0]}) }
-    sub EXTEND {}
-}
-
-tie @a, 'TA';
-@a = ('a', 'b', 'c');
-{
-    local(@a[1]) = 'foo';
-    local(@a[2]) = @a[2];
-    is(@a[1], 'foo');
-    is(@a[2], 'c');
-    @a = ();
-}
-is(@a[1], 'b');
-is(@a[2], 'c');
-ok(!defined @a[0]);
-{
-    my $d = "@a";
-    local @a = @a;
-    is("@a", $d);
-}
 
 {
     package TH;
@@ -176,14 +149,14 @@ ok(!defined @a[0]);
     sub FETCH { my $v = @_[0]->{@_[1]}; print "# FETCH [{dump::view(\@_)}=$v]\n"; $v }
     sub EXISTS { print "# EXISTS [{dump::view(\@_)}]\n"; exists @_[0]->{@_[1]}; }
     sub DELETE { print "# DELETE [{dump::view(\@_)}]\n"; delete @_[0]->{@_[1]}; }
-    sub CLEAR { print "# CLEAR [{dump::view(@_)}]\n"; %{@_[0]} = (); }
-    sub FIRSTKEY { print "# FIRSTKEY [@_]\n"; keys %{@_[0]}; each %{@_[0]} }
-    sub NEXTKEY { print "# NEXTKEY [@_]\n"; each %{@_[0]} }
+    sub CLEAR { print "# CLEAR [{dump::view(< @_)}]\n"; %{@_[0]} = %( () ); }
+    sub FIRSTKEY { print "# FIRSTKEY [{join ' ', <@_}]\n"; keys %{@_[0]}; each %{@_[0]} }
+    sub NEXTKEY { print "# NEXTKEY [{join ' ', <@_}]\n"; each %{@_[0]} }
 }
 
 # see if localization works on tied hashes
 tie %h, 'TH';
-%h = ('a' => 1, 'b' => 2, 'c' => 3);
+%h = %('a' => 1, 'b' => 2, 'c' => 3);
 
 {
     local(%h{'a'}) = 'foo';
@@ -191,24 +164,24 @@ tie %h, 'TH';
     local(%h{'y'});
     local(%h{'z'}) = 33;
     is(%h{'a'}, 'foo');
-    is(%h{'b'}, 2);
+    is(%h{'b'}, 2, " # TODO ");
     local(%h{'c'});
     delete %h{'c'};
 }
-is(%h{'a'}, 1);
-is(%h{'b'}, 2);
-is(%h{'c'}, 3);
+is(%h{'a'}, 1, " # TODO ");
+is(%h{'b'}, 2, " # TODO ");
+is(%h{'c'}, 3, " # TODO ");
 # local() should preserve the existenceness of tied hash elements
 ok(! exists %h{'y'});
 ok(! exists %h{'z'});
 TODO: {
     todo_skip("Localize entire tied hash");
     my $d = join("\n", map { "$_=>%h{$_}" } sort keys %h);
-    local %h = %h;
+    local %h = %( < %h );
     is(join("\n", map { "$_=>%h{$_}" } sort keys %h), $d);
 }
 
-@a = ('a', 'b', 'c');
+@a = @('a', 'b', 'c');
 {
     local(@a[1]) = "X";
     shift @a;
@@ -217,7 +190,7 @@ is(@a[0].@a[1], "Xb");
 
 # now try the same for %SIG
 
-eval { %SIG{TERM} = 'foo' };
+try { %SIG{TERM} = 'foo' };
 like $@->{description}, qr/signal handler should be glob or .../;
 %SIG{INT} = \&foo;
 $^WARN_HOOK = %SIG{INT};
@@ -236,7 +209,7 @@ cmp_ok(%SIG{INT}, '\==', \&foo);
 cmp_ok($^WARN_HOOK, '\==', \&foo);
 {
     my $d = join("\n", map { "$_=>{dump::view(%SIG{$_})}" } sort keys %SIG);
-    local %SIG = %SIG;
+    local %SIG = %( < %SIG );
     is(join("\n", map { "$_=>{dump::view(%SIG{$_})}" } sort keys %SIG), $d);
 }
 
@@ -266,7 +239,7 @@ SKIP: {
     skip("Can't make list assignment to \%ENV on this system")
 	unless $list_assignment_supported;
     my $d = join("\n", map { "$_=>%ENV{$_}" } sort keys %ENV);
-    local %ENV = %ENV;
+    local %ENV = %( < %ENV );
     is(join("\n", map { "$_=>%ENV{$_}" } sort keys %ENV), $d);
 }
 
@@ -281,56 +254,30 @@ while (m/(o.+?),/gc) {
 }
 
 {
-    package UnderScore;
-    sub TIESCALAR { bless \my $self, shift }
-    sub FETCH { die "read  \$_ forbidden" }
-    sub STORE { die "write \$_ forbidden" }
-    tie $_, __PACKAGE__;
-    my @tests = (
-	"Nesting"     => sub { print '#'; for (1..3) { print }
-			       print "\n" },			1,
-	"Reading"     => sub { print },				0,
-	"Matching"    => sub { $x = m/badness/ },		0,
-	"Concat"      => sub { $_ .= "a" },			0,
-	"Chop"        => sub { chop },				0,
-	"Filetest"    => sub { -x },				0,
-	"Assignment"  => sub { $_ = "Bad" },			0,
-	# XXX whether next one should fail is debatable
-	"Local \$_"   => sub { local $_  = 'ok?'; print },	0,
-	"for local"   => sub { for("#ok?\n"){ print } },	1,
-    );
-    while ( my ($name, $code, $ok) = splice(@tests, 0, 3) ) {
-	eval { &$code };
-        main::ok(($ok xor $@), "Underscore '$name'");
-    }
-    untie $_;
-}
-
-{
     # BUG 20001205.22
     no strict 'subs';
     my %x;
     %x{a} = 1;
     { local %x{b} = 1; }
     ok(! exists %x{b});
-    { local %x{['c','d','e']}; }
+    { local %x{['c','d','e']} = (); }
     ok(! exists %x{c});
 }
 
 # local() and readonly magic variables
 
-eval { local $1 = 1 };
+try { local $1 = 1 };
 like($@->{description}, qr/Modification of a read-only value attempted/);
 
-eval { for ($1) { local $_ = 1 } };
+try { for ($1) { local $_ = 1 } };
 like($@->{description}, qr/Modification of a read-only value attempted/);
 
 # make sure $1 is still read-only
-eval { for ($1) { local $_ = 1 } };
+try { for ($1) { local $_ = 1 } };
 like($@->{description}, qr/Modification of a read-only value attempted/);
 
 # The s/// adds 'g' magic to $_, but it should remain non-readonly
-eval { for("a") { for $x (1,2) { local $_="b"; s/(.*)/+$1/ } } };
+try { for("a") { for $x (1,2) { local $_="b"; s/(.*)/+$1/ } } };
 is($@, "");
 
 # sub localisation
@@ -343,21 +290,21 @@ is($@, "");
 	no warnings "redefine";
 	{
 		local *f1 = sub  { "g1" };
-		::ok(f1() eq "g1", "localised sub via glob");
+		main::ok(f1() eq "g1", "localised sub via glob");
 	}
-	::ok(f1() eq "f1", "localised sub restored");
+	main::ok(f1() eq "f1", "localised sub restored");
 	{
 		local %Other::{"f1"} = sub { "h1" };
-		::ok(f1() eq "h1", "localised sub via stash");
+		main::ok(f1() eq "h1", "localised sub via stash");
 	}
-	::ok(f1() eq "f1", "localised sub restored");
+	main::ok(f1() eq "f1", "localised sub restored");
 	{
 		local %Other::{[qw/ f1 f2 /]} = (sub { "j1" }, sub { "j2" });
-		::ok(f1() eq "j1", "localised sub via stash slice");
-		::ok(f2() eq "j2", "localised sub via stash slice");
+		main::ok(f1() eq "j1", "localised sub via stash slice");
+		main::ok(f2() eq "j2", "localised sub via stash slice");
 	}
-	::ok(f1() eq "f1", "localised sub restored");
-	::ok(f2() eq "f2", "localised sub restored");
+	main::ok(f1() eq "f1", "localised sub restored");
+	main::ok(f2() eq "f2", "localised sub restored");
 }
 
 # Localising unicode keys (bug #38815)
@@ -365,7 +312,7 @@ is($@, "");
     my %h;
     %h{"\243"} = "pound";
     %h{"\302\240"} = "octects";
-    is(scalar keys %h, 2);
+    is(nelems(@( keys %h)), 2);
     {
         use utf8;
 	my $unicode = chr 256;
@@ -374,13 +321,13 @@ is($@, "");
 	local %h{$unicode} = 256;
 	local %h{$ambigous} = 160;
 
-	is(scalar keys %h, 4);
+	is(nelems(@(keys %h)), 4);
 	is(%h{"\243"}, "pound");
 	is(%h{$unicode}, 256);
 	is(%h{$ambigous}, 160);
 	is(%h{"\302\240"}, "octects");
     }
-    is(scalar keys %h, 2);
+    is(nelems(@(keys %h)), 2);
     is(%h{"\243"}, "pound");
     is(%h{"\302\240"}, "octects");
 }
@@ -390,7 +337,7 @@ is($@, "");
     my %h;
     %h{"\243"} = "pound";
     %h{"\302\240"} = "octects";
-    is(scalar keys %h, 2);
+    is(nelems(@(keys %h)), 2);
     {
         use utf8;
 	my $unicode = chr 256;
@@ -398,13 +345,13 @@ is($@, "");
 	chop $ambigous;
 	local %h{[$unicode, $ambigous]} = (256, 160);
 
-	is(scalar keys %h, 4);
+	is(nkeys %h, 4);
 	is(%h{"\243"}, "pound");
 	is(%h{$unicode}, 256);
 	is(%h{$ambigous}, 160);
 	is(%h{"\302\240"}, "octects");
     }
-    is(scalar keys %h, 2);
+    is(nkeys %h, 2);
     is(%h{"\243"}, "pound");
     is(%h{"\302\240"}, "octects");
 }
@@ -423,7 +370,7 @@ is($@, "");
 # when localising a hash element, the key should be copied, not referenced
 
 {
-    my %h=('k1' => 111);
+    my %h=%('k1' => 111);
     my $k='k1';
     {
 	local %h{$k}=222;
@@ -435,7 +382,7 @@ is($@, "");
     is(%h{'k1'},111);
 }
 {
-    my %h=('k1' => 111);
+    my %h=%('k1' => 111);
     our $k = 'k1';  # try dynamic too
     {
 	local %h{$k}=222;
@@ -450,7 +397,7 @@ is($@, "");
 {
     local *@;
     pass("Localised *@");
-    eval {1};
+    try {1};
     pass("Can eval with *@ localised");
 }
 

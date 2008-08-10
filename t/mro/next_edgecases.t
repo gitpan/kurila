@@ -31,7 +31,7 @@ require q(./test.pl); plan(tests => 12);
         use strict;
         use warnings;
         use mro 'c3';
-        our @ISA = ('Foo');
+        our @ISA = @('Foo');
     }  
     
     my $bar = Bar->new();
@@ -51,7 +51,7 @@ require q(./test.pl); plan(tests => 12);
         }
 
         can_ok($bar, 'bar');
-        my $value = eval { $bar->bar() };
+        my $value = try { $bar->bar() };
         ok(!$@, '... calling bar() succedded') || diag($@);
         is($value, 'Foo::bar', '... got the right return value too');
     }
@@ -62,7 +62,7 @@ require q(./test.pl); plan(tests => 12);
         use strict;
         use warnings;
         use mro 'c3';
-        our @ISA = ('Foo');
+        our @ISA = @('Foo');
     }      
     
     my $baz = Baz->new();
@@ -76,7 +76,7 @@ require q(./test.pl); plan(tests => 12);
             *{Symbol::fetch_glob('Baz::bar')} = $m;
         }
 
-        eval { $baz->bar() };
+        try { $baz->bar() };
         ok($@, '... calling bar() with next::method failed') || diag($@);
     }
 
@@ -87,7 +87,7 @@ require q(./test.pl); plan(tests => 12);
         sub foo { No::Such::Class->next::can }
     }
 
-    eval { Qux->foo() };
+    try { Qux->foo() };
     is($@, '', "->next::can on non-existing package name");
 
 }

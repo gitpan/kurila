@@ -122,7 +122,7 @@ Deprecated.  Use C<GIMME_V> instead.
 				/*  On OP_ENTERSUB || OP_NULL, saw a "do". */
 				/*  On OP_EXISTS, treat av as av, not avhv.  */
 				/*  On OP_(ENTER|LEAVE)EVAL, don't clear $@ */
-				/*  On OP_ENTERITER, loop var is per-thread */
+				/*  On OP_ENTERITER, two items on the stack are the for loop range */
 				/*  On pushre, re is /\s+/ imp. by split " " */
 				/*  On regcomp, "use re 'eval'" was in scope */
 				/*  On OP_READLINE, was <$filehandle> */
@@ -132,11 +132,11 @@ Deprecated.  Use C<GIMME_V> instead.
 				 *    (runtime property) */
 				/*  On OP_AELEMFAST, indiciates pad var */
 				/*  On OP_REQUIRE, was seen as CORE::require */
-				/*  On OP_ENTERWHEN, there's no condition */
 				/*  On OP_BREAK, an implicit break */
 				/*  On OP_SMARTMATCH, an implicit smartmatch */
 				/*  On OP_ANONHASH and OP_ANONLIST, create a
 				    reference to the new anon hash or array */
+				/*  On OP_AASIGN last element of the assignment is an expanded array/hash */
 
 /* old names; don't use in new code, but don't break them, either */
 #define OPf_LIST	OPf_WANT_LIST
@@ -163,20 +163,9 @@ Deprecated.  Use C<GIMME_V> instead.
 
 /* Private for OP_SASSIGN */
 #define OPpASSIGN_BACKWARDS	64	/* Left & right switched. */
-#define OPpASSIGN_CV_TO_GV	128	/* Possible optimisation for constants. */
 
 /* Private for OP_MATCH and OP_SUBST{,CONST} */
 #define OPpRUNTIME		64	/* Pattern coming in on the stack */
-
-/* Private for OP_TRANS */
-#define OPpTRANS_UTF8	1
-#define OPpTRANS_IDENTICAL	4	/* right side is same as left */
-#define OPpTRANS_SQUASH		8
-    /* 16 is used for OPpTARGET_MY */
-#define OPpTRANS_COMPLEMENT	32
-#define OPpTRANS_GROWS		64
-#define OPpTRANS_DELETE		128
-#define OPpTRANS_ALL	(OPpTRANS_UTF8|OPpTRANS_IDENTICAL|OPpTRANS_SQUASH|OPpTRANS_COMPLEMENT|OPpTRANS_GROWS|OPpTRANS_DELETE)
 
 /* Private for OP_REPEAT */
 #define OPpREPEAT_DOLIST	64	/* List replication. */
@@ -200,19 +189,9 @@ Deprecated.  Use C<GIMME_V> instead.
 #define OPpLVAL_DEFER		16	/* Defer creation of array/hash elem */
   /* OP_RV2?V, OP_GVSV, OP_ENTERITER only */
 #define OPpOUR_INTRO		16	/* Variable was in an our() */
-  /* OP_RV2[AGH]V, OP_PAD[AH]V, OP_[AH]ELEM */
-#define OPpMAYBE_LVSUB		8	/* We might be an lvalue to return */
   /* OP_PADSV only */
 #define OPpPAD_STATE		16	/* is a "state" pad */
   /* for OP_RV2?V, lower bits carry hints (currently only HINT_STRICT_REFS) */
-
-  /* OP_RV2GV only */
-#define OPpDONT_INIT_GV		4	/* Call gv_fetchpv with GV_NOINIT */
-/* (Therefore will return whatever is currently in the symbol table, not
-   guaranteed to be a PVGV)  */
-
-  /* OP_RV2CV only */
-#define OPpMAY_RETURN_CONSTANT	1	/* If a constant sub, return the constant */
 
 /* Private for OPs with TARGLEX */
   /* (lower bits may carry MAXARG) */
@@ -494,7 +473,6 @@ struct loop {
 #define OA_PMOP (5 << OCSHIFT)
 #define OA_SVOP (6 << OCSHIFT)
 #define OA_PADOP (7 << OCSHIFT)
-#define OA_PVOP_OR_SVOP (8 << OCSHIFT)
 #define OA_LOOP (9 << OCSHIFT)
 #define OA_COP (10 << OCSHIFT)
 #define OA_BASEOP_OR_UNOP (11 << OCSHIFT)

@@ -12,26 +12,23 @@ use Exporter ();
 use XSLoader ();
 
 BEGIN {
-    @ISA = qw(Exporter);
-    @EXPORT_OK = qw(
+    @ISA = @( qw(Exporter) );
+    @EXPORT_OK = @( qw(
 	opset ops_to_opset
 	opset_to_ops opset_to_hex invert_opset
 	empty_opset full_opset
 	opdesc opcodes opmask define_optag
 	opmask_add verify_opset opdump
-    );
+    ) );
 }
 
-sub opset (;@);
-sub opset_to_hex ($);
-sub opdump (;$);
-use subs @EXPORT_OK;
+use subs < @EXPORT_OK;
 
 XSLoader::load 'Opcode', $VERSION;
 
 _init_optags();
 
-sub ops_to_opset { opset @_ }	# alias for old name
+sub ops_to_opset { opset < @_ }	# alias for old name
 
 sub opset_to_hex ($) {
     return "(invalid opset)" unless verify_opset(@_[0]);
@@ -41,8 +38,8 @@ sub opset_to_hex ($) {
 sub opdump (;$) {
 	my $pat = shift;
     # handy utility: perl -MOpcode=opdump -e 'opdump File'
-    foreach(opset_to_ops(full_opset)) {
-        my $op = sprintf "  \%12s  \%s\n", $_, opdesc($_);
+    foreach( <opset_to_ops( <full_opset)) {
+        my $op = sprintf "  \%12s  \%s\n", $_, < opdesc($_);
 		next if defined $pat and $op !~ m/$pat/i;
 		print $op;
     }
@@ -52,7 +49,7 @@ sub opdump (;$) {
 
 sub _init_optags {
     my(%all, %seen);
-    %all{[opset_to_ops(full_opset)]} = (); # keys only
+    %all{[ <opset_to_ops(full_opset)]} = (); # keys only
 
     local($_);
     local($/) = "\n=cut"; # skip to optags definition section
@@ -63,17 +60,17 @@ sub _init_optags {
 	my $tag = $1;
 
 	# Split into lines, keep only indented lines
-	my @lines = grep { m/^\s/    } split(m/\n/);
-	foreach (@lines) { s/--.*//  } # delete comments
-	my @ops   = map  { split ' ' } @lines; # get op words
+	my @lines = @( grep { m/^\s/    } split(m/\n/) );
+	foreach (< @lines) { s/--.*//  } # delete comments
+	my @ops   = @( map  { split ' ' } < @lines ); # get op words
 
-	foreach(@ops) {
+	foreach(< @ops) {
 	    warn "$tag - $_ already tagged in %seen{$_}\n" if %seen{$_};
 	    %seen{$_} = $tag;
 	    delete %all{$_};
 	}
 	# opset will croak on invalid names
-	define_optag($tag, opset(@ops));
+	define_optag($tag, opset(< @ops));
     }
     close(DATA);
     warn "Untagged opnames: ".join(' ',keys %all)."\n" if %all;
@@ -309,7 +306,7 @@ invert_opset function.
 
     rv2av aassign aelem aelemfast aslice
 
-    rv2hv helem hslice each values keys exists delete
+    rv2hv helem hslice each values keys exists delete nkeys
 
     preinc i_preinc predec i_predec postinc i_postinc postdec i_postdec
     int hex oct abs pow multiply i_multiply divide i_divide
@@ -323,11 +320,11 @@ invert_opset function.
 
     substr vec stringify study pos length index rindex ord chr
 
-    ucfirst lcfirst uc lc quotemeta trans chop schop chomp schomp
+    ucfirst lcfirst uc lc quotemeta chop schop chomp schomp
 
     match split qr
 
-    list lslice splice push pop shift unshift reverse
+    list listlast lslice splice push pop shift unshift reverse expand nelems
 
     cond_expr flip flop andassign orassign dorassign and or dor xor
 
@@ -335,7 +332,7 @@ invert_opset function.
 
     rv2cv anoncode prototype
 
-    entersub leavesub leavesublv return method method_named -- XXX loops via recursion?
+    entersub leavesub return method method_named -- XXX loops via recursion?
 
     leaveeval -- needed for Safe to operate, is safe without entereval
 
@@ -347,7 +344,7 @@ available memory).
 
     concat repeat join range
 
-    anonlist anonhash
+    anonlist anonhash anonscalar
 
 Note that despite the existence of this optag a memory resource attack
 may still be possible using only :base_core ops.
@@ -390,9 +387,9 @@ These are a hotchpotch of opcodes still waiting to be considered
 
     gvsv gv gelem
 
-    padsv padav padhv padany
+    padsv padany
 
-    rv2gv refgen srefgen ref
+    rv2gv srefgen ref
 
     bless -- could be used to change ownership of objects (reblessing)
 
@@ -411,9 +408,6 @@ These are a hotchpotch of opcodes still waiting to be considered
 
     entertry leavetry -- can be used to 'hide' fatal errors
 
-    entergiven leavegiven
-    enterwhen leavewhen
-    break continue
     smartmatch
 
     custom -- where should this go

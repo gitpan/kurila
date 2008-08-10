@@ -3,12 +3,12 @@
 our (%Config, $where);
 
 BEGIN {
-    eval {my @n = getpwuid 0; setpwent()};
+    try {my @n = @( getpwuid 0 ); setpwent()};
     if ($@ && $@->{description} =~ m/(The \w+ function is unimplemented)/) {
 	print "1..0 # Skip: $1\n";
 	exit 0;
     }
-    eval { require Config; Config->import; };
+    try { require Config; Config->import; };
     my $reason;
     if (%Config{'i_pwd'} ne 'define') {
 	$reason = '%Config{i_pwd} undefined';
@@ -87,19 +87,19 @@ setpwent();
 while ( ~< *PW) {
     chomp;
     # LIMIT -1 so that users with empty shells don't fall off
-    my @s = split m/:/, $_, -1;
+    my @s = @( split m/:/, $_, -1 );
     my ($name_s, $passwd_s, $uid_s, $gid_s, $gcos_s, $home_s, $shell_s);
     (my $v) = %Config{osvers} =~ m/^(\d+)/;
     if ($^O eq 'darwin' && $v +< 9) {
        ($name_s, $passwd_s, $uid_s, $gid_s, $gcos_s, $home_s, $shell_s) = @s[[0,1,2,3,7,8,9]];
     } else {
-       ($name_s, $passwd_s, $uid_s, $gid_s, $gcos_s, $home_s, $shell_s) = @s;
+       ($name_s, $passwd_s, $uid_s, $gid_s, $gcos_s, $home_s, $shell_s) = < @s;
     }
     next if m/^\+/; # ignore NIS includes
-    if (@s) {
-	push @{ %seen{$name_s} }, $.;
+    if ((nelems @s)) {
+	push @{ %seen{$name_s} }, iohandle::input_line_number(\*PW);
     } else {
-	warn "# Your $where line $. is empty.\n";
+	warn "# Your $where line {iohandle::input_line_number(\*PW)} is empty.\n";
 	next;
     }
     if ($n == $max) {
@@ -109,15 +109,15 @@ while ( ~< *PW) {
     }
     # In principle we could whine if @s != 7 but do we know enough
     # of passwd file formats everywhere?
-    if (@s == 7 || ($^O eq 'darwin' && @s == 10)) {
-	my @n = getpwuid($uid_s);
+    if ((nelems @s) == 7 || ($^O eq 'darwin' && (nelems @s) == 10)) {
+	my @n = @( getpwuid($uid_s) );
 	# 'nobody' et al.
-	next unless @n;
-	my ($name,$passwd,$uid,$gid,$quota,$comment,$gcos,$home,$shell) = @n;
+	next unless (nelems @n);
+	my ($name,$passwd,$uid,$gid,$quota,$comment,$gcos,$home,$shell) = < @n;
 	# Protect against one-to-many and many-to-one mappings.
 	if ($name_s ne $name) {
-	    @n = getpwnam($name_s);
-	    ($name,$passwd,$uid,$gid,$quota,$comment,$gcos,$home,$shell) = @n;
+	    @n = @( getpwnam($name_s) );
+	    ($name,$passwd,$uid,$gid,$quota,$comment,$gcos,$home,$shell) = < @n;
 	    next if $name_s ne $name;
 	}
 	%perfect{$name_s}++
@@ -134,10 +134,10 @@ while ( ~< *PW) {
 
 endpwent();
 
-print "# max = $max, n = $n, perfect = ", scalar keys %perfect, "\n";
+print "# max = $max, n = $n, perfect = ", nelems(@(keys %perfect)), "\n";
 
 my $not;
-if (keys %perfect == 0 && $n) {
+if ( ! %perfect && $n) {
     $max++;
     print <<EOEX;
 #
@@ -184,7 +184,7 @@ for (1..$max) {
 }
 endpwent();
 
-print "not " unless "@pw1" eq "@pw2";
+print "not " unless "{join ' ', <@pw1}" eq "{join ' ', <@pw2}";
 print "ok ", $tst++, "\n";
 
 close(PW);

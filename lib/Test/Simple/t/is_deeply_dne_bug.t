@@ -8,7 +8,7 @@
 BEGIN {
     if( %ENV{PERL_CORE} ) {
         chdir 't';
-        @INC = ('../lib', 'lib');
+        @INC = @('../lib', 'lib');
     }
     else {
         unshift @INC, 't/lib';
@@ -51,6 +51,6 @@ BEGIN {
 my $obj1 = Foo->new();
 my $obj2 = Foo->new();
 
-eval { is_deeply(\@($obj1, $obj2), \@($obj1, $obj2)); };
+try { is_deeply(\@($obj1, $obj2), \@($obj1, $obj2)); };
 is $@, '';
 

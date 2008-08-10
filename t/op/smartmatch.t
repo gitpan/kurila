@@ -5,7 +5,9 @@ BEGIN {
 }
 use strict;
 
-use Tie::Array;
+skip_all "remove smartmach from kurila";
+exit 0;
+
 use Tie::Hash;
 
 # The feature mechanism is tested in t/lib/feature/smartmatch:
@@ -18,27 +20,25 @@ my $deep2 = \@(); push @$deep2, \$deep2;
 
 {my $const = "a constant"; sub a_const () {$const}}
 
-my @nums = (1..10);
-tie my @tied_nums, 'Tie::StdArray';
-@tied_nums =  (1..10);
+my @nums = @(1..10);
 
-my %hash = (foo => 17, bar => 23);
+my %hash = %(foo => 17, bar => 23);
 tie my %tied_hash, 'Tie::StdHash';
-%tied_hash = %hash;
+%tied_hash = %( < %hash );
 
 # Load and run the tests
-my @tests = map \@(chomp and split m/\t+/, $_, 3), grep !m/^#/ && m/\S/, ~< *DATA;
-plan tests => 2 * @tests;
+my @tests = @( map \@(chomp and split m/\t+/, $_, 3), grep !m/^#/ && m/\S/, ~< *DATA );
+plan tests => 2 * nelems @tests;
 
-for my $test (@tests) {
-    my ($yn, $left, $right) = @$test;
+for my $test (< @tests) {
+    my ($yn, $left, $right) = < @$test;
 
     match_test($yn, $left, $right);
     match_test($yn, $right, $left);
 }
 
 sub match_test {
-    my ($yn, $left, $right) = @_;
+    my ($yn, $left, $right) = < @_;
 
     die "Bad test spec: ($yn, $left, $right)"
 	unless $yn eq "" || $yn eq "!";
@@ -49,7 +49,7 @@ sub match_test {
     $res = eval $tstr // "";	#/ <- fix syntax colouring
 
     die "{$@->message} in '$tstr'" if $@;
-    ok( ($yn =~ m/!/ xor $res), "$tstr: $res");
+    ok( ($yn =~ m/!/ xor $res), "$tstr: {dump::view($res)}");
 }
 
 
@@ -58,8 +58,8 @@ sub foo {}
 sub bar {2}
 sub fatal {die}
 
-sub a_const() {die if @_; "a constant"}
-sub b_const() {die if @_; "a constant"}
+sub a_const() {die if (nelems @_); "a constant"}
+sub b_const() {die if (nelems @_); "a constant"}
 
 __DATA__
 # CODE ref against argument

@@ -11,7 +11,6 @@
 typedef U16 cv_flags_t;
 
 #define _XPVCV_COMMON								\
-    HV *	xcv_stash;							\
     union {									\
 	OP *	xcv_start;							\
 	ANY	xcv_xsubany;							\
@@ -21,7 +20,7 @@ typedef U16 cv_flags_t;
 	void	(*xcv_xsub) (pTHX_ CV*);					\
     }		xcv_root_u;							\
     GV *	xcv_gv;								\
-    char *	xcv_file;							\
+    const char *	xcv_file;							\
     AV *	xcv_padlist;							\
     CV *	xcv_outside;							\
     U32		xcv_outside_seq; /* the COP sequence (at the point of our	\
@@ -51,9 +50,6 @@ Null CV pointer.
 
 =head1 CV Manipulation Functions
 
-=for apidoc Am|HV*|CvSTASH|CV* cv
-Returns the stash of the CV.
-
 =cut
 */
 
@@ -61,7 +57,6 @@ Returns the stash of the CV.
 #  define Nullcv Null(CV*)
 #endif
 
-#define CvSTASH(sv)	((XPVCV*)SvANY(sv))->xcv_stash
 #define CvSTART(sv)	((XPVCV*)SvANY(sv))->xcv_start_u.xcv_start
 #define CvROOT(sv)	((XPVCV*)SvANY(sv))->xcv_root_u.xcv_root
 #define CvXSUB(sv)	((XPVCV*)SvANY(sv))->xcv_root_u.xcv_xsub
@@ -90,7 +85,6 @@ Returns the stash of the CV.
 #define CVf_METHOD	0x0001	/* CV is explicitly marked as a method */
 #define CVf_LOCKED	0x0002	/* CV locks itself or first arg on entry */
 
-#define CVf_WEAKOUTSIDE	0x0010  /* CvOUTSIDE isn't ref counted */
 #define CVf_CLONE	0x0020	/* anon CV uses external lexicals */
 #define CVf_CLONED	0x0040	/* a clone of one of those */
 #define CVf_ANON	0x0080	/* CvGV() can't be trusted */
@@ -145,10 +139,6 @@ static __inline__ U32 CvSPECIAL(CV *cv) { return CvUNIQUE(cv) && SvFAKE(cv); }
 #define CvCONST_on(cv)		(CvFLAGS(cv) |= CVf_CONST)
 #define CvCONST_off(cv)		(CvFLAGS(cv) &= ~CVf_CONST)
 
-#define CvWEAKOUTSIDE(cv)	(CvFLAGS(cv) & CVf_WEAKOUTSIDE)
-#define CvWEAKOUTSIDE_on(cv)	(CvFLAGS(cv) |= CVf_WEAKOUTSIDE)
-#define CvWEAKOUTSIDE_off(cv)	(CvFLAGS(cv) &= ~CVf_WEAKOUTSIDE)
-
 #define CvISXSUB(cv)		(CvFLAGS(cv) & CVf_ISXSUB)
 #define CvISXSUB_on(cv)		(CvFLAGS(cv) |= CVf_ISXSUB)
 #define CvISXSUB_off(cv)	(CvFLAGS(cv) &= ~CVf_ISXSUB)
@@ -171,6 +161,8 @@ has a C<&> pad slot pointing back to us. In this case, we set the
 C<CvWEAKOUTSIDE> flag in the child. This allows us to determine under what
 circumstances we should decrement the refcount of the parent when freeing
 the child.
+
+CvWEAKOUTSIDE has been removed.
 
 There is a further complication with non-closure anonymous subs (i.e. those
 that do not refer to any lexicals outside that sub). In this case, the

@@ -1,12 +1,5 @@
 #!./perl
 
-BEGIN {
-    unless(grep m/blib/, @INC) {
-        chdir 't' if -d 't';
-        @INC = '../lib';
-    }
-}
-
 use Config;
 
 BEGIN {
@@ -20,7 +13,7 @@ BEGIN {
     elsif ($^O eq 'os2') {
 	require IO::Socket;
 
-	eval {IO::Socket::pack_sockaddr_un('/foo/bar') || 1}
+	try {IO::Socket::pack_sockaddr_un('/foo/bar') || 1}
 	  or $@->{description} !~ m/not implemented/ or
 	    $reason = 'compiled without TCP/IP stack v4';
     }
@@ -36,7 +29,7 @@ BEGIN {
     }
 }
 
-$PATH = "sock-$$";
+my $PATH = "sock-$$";
 
 if ($^O eq 'os2') {	# Can't create sockets with relative path...
   require Cwd;
@@ -59,14 +52,14 @@ print "1..5\n";
 
 use IO::Socket;
 
-$listen = IO::Socket::UNIX->new(Local => $PATH, Listen => 0);
+my $listen = IO::Socket::UNIX->new(Local => $PATH, Listen => 0);
 
 # Sometimes UNIX filesystems are mounted for security reasons
 # with "nodev" option which spells out "no" for creating UNIX
 # local sockets.  Therefore we will retry with a File::Temp
 # generated filename from a temp directory.
 unless (defined $listen) {
-    eval { require File::Temp };
+    try { require File::Temp };
     unless ($@) {
 	File::Temp->import( 'mktemp');
 	for my $TMPDIR (%ENV{TMPDIR}, "/tmp") {
@@ -81,9 +74,9 @@ unless (defined $listen) {
 }
 print "ok 1\n";
 
-if($pid = fork()) {
+if(my $pid = fork()) {
 
-    $sock = $listen->accept();
+    my $sock = $listen->accept();
 
     if (defined $sock) {
 	print "ok 2\n";
@@ -106,7 +99,7 @@ if($pid = fork()) {
     }
 } elsif(defined $pid) {
 
-    $sock = IO::Socket::UNIX->new(Peer => $PATH) or die "$!";
+    my $sock = IO::Socket::UNIX->new(Peer => $PATH) or die "$!";
 
     print $sock "ok 3\n";
 

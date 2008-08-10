@@ -342,8 +342,6 @@ Perl_hv_common(pTHX_ HV *hv, SV *keysv, const char *key, STRLEN klen,
 
     if (!hv)
 	return NULL;
-    if (SvTYPE(hv) == SVTYPEMASK)
-	return NULL;
 
     assert(SvTYPE(hv) == SVt_PVHV);
 
@@ -1251,6 +1249,84 @@ Perl_hv_ksplit(pTHX_ HV *hv, IV newmax)
     }
 }
 
+void
+Perl_hv_sethv(pTHX_ HV* dstr, HV* sstr)
+{
+    STRLEN hv_max, hv_fill;
+
+    hv_undef(dstr);
+
+    if (!sstr || (hv_fill = HvFILL(sstr)) == 0)
+	return;
+    hv_max = HvMAX(sstr);
+
+    if (! (SvMAGICAL((SV *)sstr) || SvMAGICAL((SV*)dstr)) ) {
+	/* It's an ordinary hash, so copy it fast. AMS 20010804 */
+	STRLEN i;
+	const bool shared = !!HvSHAREKEYS(sstr);
+	HE **ents, ** const oents = (HE **)HvARRAY(sstr);
+	char *a;
+	Newx(a, PERL_HV_ARRAY_ALLOC_BYTES(hv_max+1), char);
+	ents = (HE**)a;
+
+	/* In each bucket... */
+	for (i = 0; i <= hv_max; i++) {
+	    HE *prev = NULL;
+	    HE *oent = oents[i];
+
+	    if (!oent) {
+		ents[i] = NULL;
+		continue;
+	    }
+
+	    /* Copy the linked list of entries. */
+	    for (; oent; oent = HeNEXT(oent)) {
+		const U32 hash   = HeHASH(oent);
+		const char * const key = HeKEY(oent);
+		const STRLEN len = HeKLEN(oent);
+		const int flags  = HeKFLAGS(oent);
+		HE * const ent   = new_HE();
+
+		HeVAL(ent)     = newSVsv(HeVAL(oent));
+		HeKEY_hek(ent)
+                    = shared ? share_hek_flags(key, len, hash, flags)
+                             :  save_hek_flags(key, len, hash, flags);
+		if (prev)
+		    HeNEXT(prev) = ent;
+		else
+		    ents[i] = ent;
+		prev = ent;
+		HeNEXT(ent) = NULL;
+	    }
+	}
+
+	HvMAX(dstr)   = hv_max;
+	HvFILL(dstr)  = hv_fill;
+	HvTOTALKEYS(dstr)  = HvTOTALKEYS(sstr);
+	HvARRAY(dstr) = ents;
+    } /* not magical */
+    else {
+	/* Iterate over sstr, copying keys and values one at a time. */
+	HE *entry;
+	const I32 riter = HvRITER_get(sstr);
+	HE * const eiter = HvEITER_get(sstr);
+
+	/* Can we use fewer buckets? (hv_max is always 2^n-1) */
+	while (hv_max && hv_max + 1 >= hv_fill * 2)
+	    hv_max = hv_max / 2;
+	HvMAX(dstr) = hv_max;
+
+	hv_iterinit(sstr);
+	while ((entry = hv_iternext_flags(sstr, 0))) {
+	    (void)hv_store_flags(dstr, HeKEY(entry), HeKLEN(entry),
+			         newSVsv(HeVAL(entry)), HeHASH(entry),
+			         HeKFLAGS(entry));
+	}
+	HvRITER_set(sstr, riter);
+	HvEITER_set(sstr, eiter);
+    }
+}
+
 HV *
 Perl_newHVhv(pTHX_ HV *ohv)
 {
@@ -1718,6 +1794,66 @@ Perl_hv_undef(pTHX_ HV *hv)
 
     if (SvRMAGICAL(hv))
 	mg_clear((SV*)hv);
+}
+
+void
+Perl_hv_tmprefcnt(pTHX_ HV *hv)
+{
+    dVAR;
+    register XPVHV* xhv;
+
+    if (!hv)
+	return;
+
+    DEBUG_A(Perl_hv_assert(aTHX_ hv));
+    xhv = (XPVHV*)SvANY(hv);
+
+    if (SvOOK(hv)) {
+	HE *entry;
+	struct mro_meta *meta;
+	struct xpvhv_aux *iter = HvAUX(hv);
+	/* If there are weak references to this HV, we need to avoid
+	   freeing them up here.  In particular we need to keep the AV
+	   visible as what we're deleting might well have weak references
+	   back to this HV, so the for loop below may well trigger
+	   the removal of backreferences from this array.  */
+
+	SvTMPREFCNT_inc(iter->xhv_backreferences);
+
+	entry = iter->xhv_eiter; /* HvEITER(hv) */
+	if (entry && HvLAZYDEL(hv)) {	/* was deleted earlier? */
+	    SvTMPREFCNT_inc(HeVAL(entry));
+	    if (HeKLEN(entry) == HEf_SVKEY) {
+		SvTMPREFCNT_inc(HeKEY_sv(entry));
+	    }
+	}
+
+	if((meta = iter->xhv_mro_meta)) {
+	    SvTMPREFCNT_inc(meta->mro_linear_c3);
+	    SvTMPREFCNT_inc(meta->mro_nextmethod);
+	}
+    }
+
+    {
+	HE ** const array = HvARRAY(hv);
+	I32 i = HvMAX(hv);
+
+	if (array) {
+	    do {
+		/* Loop down the linked list heads  */
+		HE *entry = array[i];
+
+		while (entry) {
+		    SvTMPREFCNT_inc(HeVAL(entry));
+		    if (HeKLEN(entry) == HEf_SVKEY) {
+			SvTMPREFCNT_inc(HeKEY_sv(entry));
+		    }
+
+		    entry = HeNEXT(entry);
+		}
+	    } while (--i >= 0);
+	}
+    }
 }
 
 static struct xpvhv_aux*

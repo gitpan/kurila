@@ -2,10 +2,6 @@ use strict;
 use warnings;
 
 BEGIN {
-    if (%ENV{'PERL_CORE'}){
-        chdir 't';
-        unshift @INC, '../lib';
-    }
     use Config;
     if (! %Config{'useithreads'}) {
         print("1..0 # Skip: Perl not compiled with 'useithreads'\n");
@@ -18,7 +14,7 @@ use ExtUtils::testlib;
 use threads;
 
 BEGIN {
-    eval {
+    try {
         require threads::shared;
         threads::shared->import();
     };
@@ -46,7 +42,7 @@ my $test :shared = 2;
 # parts of Test::* may have already been freed by then
 sub is($$$)
 {
-    my ($got, $want, $desc) = @_;
+    my ($got, $want, $desc) = < @_;
     lock($test);
     if ($got ne $want) {
         print("# EXPECTED: $want\n");
@@ -86,7 +82,7 @@ sub is($$$)
 {
     lock($test);
     threads->create( sub {1} )->join;
-    my $not = eval { Config::myconfig() } ? '' : 'not ';
+    my $not = try { Config::myconfig() } ? '' : 'not ';
     print "{$not}ok $test - Are we able to call Config::myconfig after clone\n";
     $test++;
 }
@@ -101,16 +97,16 @@ our %unique_hash : unique;
 threads->create(sub {
         lock($test);
         my $TODO = ":unique needs to be re-implemented in a non-broken way";
-        eval { $unique_scalar = 1 };
+        try { $unique_scalar = 1 };
         print $@ && $@->{description} =~ m/read-only/
           ? '' : 'not ', "ok $test # TODO $TODO - unique_scalar\n";
         $test++;
-        eval { @unique_array[0] = 1 };
-        print $& && $@->{description} =~ m/read-only/
+        try { @unique_array[0] = 1 };
+        print $@ && $@->{description} =~ m/read-only/
           ? '' : 'not ', "ok $test # TODO $TODO - unique_array\n";
         $test++;
         if ($^O ne 'MSWin32') {
-            eval { %unique_hash{abc} = 1 };
+            try { %unique_hash{abc} = 1 };
             print $@ && $@->{description} =~ m/disallowed/
               ? '' : 'not ', "ok $test # TODO $TODO - unique_hash\n";
         } else {
@@ -151,8 +147,8 @@ for my $decl ('my $x : unique', 'sub foo : unique') {
 
 # Nothing is checking that total keys gets cloned correctly.
 
-my %h = (1,2,3,4);
-is(keys(%h), 2, "keys correct in parent");
+my %h = %(1,2,3,4);
+is(nelems @(keys(%h)), 2, "keys correct in parent");
 
 my $child = threads->create(sub { return (scalar(keys(%h))); })->join;
 is($child, 2, "keys correct in child");
@@ -160,7 +156,7 @@ is($child, 2, "keys correct in child");
 lock_keys(%h);
 delete(%h{1});
 
-is(keys(%h), 1, "keys correct in parent with restricted hash");
+is(nelems @(keys(%h)), 1, "keys correct in parent with restricted hash");
 
 $child = threads->create(sub { return (scalar(keys(%h))); })->join;
 is($child, 1, "keys correct in child with restricted hash");

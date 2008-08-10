@@ -6,11 +6,11 @@ package My::Test;
 BEGIN {
     if( %ENV{PERL_CORE} ) {
         chdir 't';
-        @INC = '../lib';
+        @INC = @( '../lib' );
     }
 }
 
-unless( eval { require File::Spec } ) {
+unless( try { require File::Spec } ) {
     print "1..0 # Skip Need File::Spec to run this test\n";
     exit 0;
 }
@@ -31,7 +31,7 @@ my $IsVMS = $^O eq 'VMS';
 
 print "# Ahh!  I see you're running VMS.\n" if $IsVMS;
 
-my %Tests = (
+my %Tests = %(
              #                      Everyone Else   VMS
              'success.plx'              => \@(0,      0),
              'one_fail.plx'             => \@(1,      4),
@@ -49,9 +49,9 @@ my %Tests = (
              'exit.plx'                 => \@(1,      4),
             );
 
-$TB->plan( tests => scalar keys(%Tests) );
+$TB->plan( tests => nkeys(%Tests) );
 
-eval { require POSIX; &POSIX::WEXITSTATUS(0) };
+try { require POSIX; &POSIX::WEXITSTATUS(0) };
 if( $@ ) {
     *exitstatus = sub { @_[0] >> 8 };
 }

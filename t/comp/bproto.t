@@ -3,12 +3,7 @@
 # check if builtins behave as prototyped
 #
 
-BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
-}
-
-print "1..10\n";
+print "1..7\n";
 
 my $i = 1;
 
@@ -34,11 +29,8 @@ q[	defined(&foo, $bar);
 ];
 
 test_no_error($_) for split m/\n/,
-q[	scalar(&foo,$bar);
-	defined &foo, &foo, &foo;
-	undef &foo, $bar;
+q[ defined &foo, &foo, &foo;
+   undef &foo, $bar;
 	uc $bar,$bar;
 	grep(not($bar), $bar);
-	grep(not($bar, $bar), $bar);
-	grep((not $bar, $bar, $bar), $bar);
 ];

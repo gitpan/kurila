@@ -3,7 +3,7 @@
 BEGIN {
     if( %ENV{PERL_CORE} ) {
         chdir 't';
-        @INC = '../lib';
+        @INC = @( '../lib' );
     }
     else {
         unshift @INC, 't/lib';
@@ -16,7 +16,7 @@ use ExtUtils::MakeMaker;
 
 my $Has_Version = eval 'require version; "version"->import; 1';
 
-my %versions = (q[$VERSION = '1.00']        => '1.00',
+my %versions = %(q[$VERSION = '1.00']        => '1.00',
                 q[*VERSION = \'1.01']       => '1.01',
                 q[($VERSION) = q$Revision: 32208 $ =~ m/(\d+)/g;] => 32208,
                 q[$FOO::VERSION = '1.10';]  => '1.10',
@@ -37,10 +37,10 @@ if( $Has_Version ) {
     %versions{q[$VERSION = v1.2.3]}               = v1.2.3;
 }
 
-plan tests => (2 * keys %versions) + 4;
+plan tests => (2 * nkeys %versions) + 4;
 
 while( my($code, $expect) = each %versions ) {
-    is( parse_version_string($code), $expect, $code );
+    is( ''.parse_version_string($code), $expect, $code );
 }
 
 
@@ -68,6 +68,6 @@ SKIP: {
     skip "need version.pm", 4 unless $Has_Version;
     is parse_version_string(q[ $VERSION = '1.00'; sub version { $VERSION } ]),
        '1.00';
-    is parse_version_string(q[ use version; $VERSION = version->new("1.2.3") ]),
+    is ''.parse_version_string(q[ use version; $VERSION = version->new("1.2.3") ]),
        qv("1.2.3");
 }

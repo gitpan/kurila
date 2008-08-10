@@ -1,15 +1,15 @@
 package MakeMaker::Test::Setup::Recurs;
 
-@ISA = qw(Exporter);
+our @ISA = @( qw(Exporter) );
 require Exporter;
-@EXPORT = qw(setup_recurs teardown_recurs);
+our @EXPORT = @( qw(setup_recurs teardown_recurs) );
 
 use strict;
 use File::Path;
 use File::Basename;
 use MakeMaker::Test::Utils;
 
-my %Files = (
+my %Files = %(
              'Recurs/Makefile.PL'          => <<'END',
 use ExtUtils::MakeMaker;
 

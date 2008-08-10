@@ -4,25 +4,20 @@
 # -0, -c, -l, -s, -m, -M, -V, -v, -h, -i, -E and all unknown
 # Some switches have their own tests, see MANIFEST.
 
-BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
-}
-
 BEGIN { require "./test.pl"; }
 
-plan(tests => 68);
+plan(tests => 64);
 
 use Config;
 
 # due to a bug in VMS's piping which makes it impossible for runperl()
 # to emulate echo -n (ie. stdin always winds up with a newline), these 
 # tests almost totally fail.
-$TODO = "runperl() unable to emulate echo -n due to pipe bug" if $^O eq 'VMS';
+our $TODO = "runperl() unable to emulate echo -n due to pipe bug" if $^O eq 'VMS';
 
 my $r;
-my @tmpfiles = ();
-END { unlink @tmpfiles }
+my @tmpfiles = @( () );
+END { unlink < @tmpfiles }
 
 $r = runperl(
     switches	=> \@(),
@@ -123,48 +118,6 @@ $r = runperl(
 );
 is( $r, 'fooxbarx', '-l with octal number' );
 
-# Tests for -s
-
-$r = runperl(
-    switches	=> \@( '-s' ),
-    prog	=> 'for (qw/abc def ghi/) {print defined ${*{Symbol::fetch_glob($_)}} ? ${*{Symbol::fetch_glob($_)}} : q(-)}',
-    args	=> \@( '--', '-abc=2', '-def', ),
-);
-is( $r, '21-', '-s switch parsing' );
-
-$filename = 'swstest.tmp';
-SKIP: {
-    open my $f, ">", "$filename" or skip( "Can't write temp file $filename: $!" );
-    print $f <<'SWTEST';
-#!perl -s
-BEGIN { print $x,$y; exit }
-SWTEST
-    close $f or die "Could not close: $!";
-    $r = runperl(
-	progfile    => $filename,
-	args	    => \@( '-x=foo -y' ),
-    );
-    is( $r, 'foo1', '-s on the shebang line' );
-    push @tmpfiles, $filename;
-}
-
-# Bug ID 20011106.084
-$filename = 'swsntest.tmp';
-SKIP: {
-    open my $f, ">", "$filename" or skip( "Can't write temp file $filename: $!" );
-    print $f <<'SWTEST';
-#!perl -sn
-BEGIN { print $x; exit }
-SWTEST
-    close $f or die "Could not close: $!";
-    $r = runperl(
-	progfile    => $filename,
-	args	    => \@( '-x=foo' ),
-    );
-    is( $r, 'foo', '-sn on the shebang line' );
-    push @tmpfiles, $filename;
-}
-
 # Tests for -m and -M
 
 $filename = 'swtest.pm';
@@ -172,7 +125,7 @@ SKIP: {
     open my $f, ">", "$filename" or skip( "Can't write temp file $filename: $!",4 );
     print $f <<'SWTESTPM';
 package swtest;
-sub import { print map "<$_>", @_ }
+sub import { print map "<$_>", <@_ }
 1;
 SWTESTPM
     close $f or die "Could not close: $!";
@@ -321,17 +274,17 @@ __EOF__
     runperl( switches => \@('-pi.bak'), prog => 's/foo/bar/', args => \@('file') );
 
     open(FILE, "<", "file") or die "$0: Failed to open 'file': $!";
-    chomp(my @file = ~< *FILE);
+    chomp(my @file = @( ~< *FILE ));
     close FILE;
 
     open(BAK, "<", "file.bak") or die "$0: Failed to open 'file': $!";
-    chomp(my @bak = ~< *BAK);
+    chomp(my @bak = @( ~< *BAK ));
     close BAK;
 
-    is(join(":", @file),
+    is(join(":", < @file),
        "bar yada dada:bada bar bing:king kong bar",
        "-i new file");
-    is(join(":", @bak),
+    is(join(":", < @bak),
        "foo yada dada:bada foo bing:king kong foo",
        "-i backup file");
 }
@@ -343,7 +296,3 @@ $r = runperl(
 );
 is( $r, "Hello, world!\n", "-E ~~" );
 
-$r = runperl(
-    switches	=> \@( '-E', '"given(undef) {when(undef) { print qq(Hello, world!\n)"}}')
-);
-is( $r, "Hello, world!\n", "-E given" );

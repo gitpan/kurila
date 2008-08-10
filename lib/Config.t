@@ -1,8 +1,6 @@
 #!./perl -w
 
 BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
     require "./test.pl";
 
     plan ('no_plan');
@@ -14,7 +12,7 @@ use strict;
 
 # Some (safe?) bets.
 
-ok(keys %Config +> 500, "Config has more than 500 entries");
+ok(nkeys %Config +> 500, "Config has more than 500 entries");
 
 my ($first) = Config::config_sh() =~ m/^(\S+)=/m;
 die "Can't find first entry in Config::config_sh()" unless defined $first;
@@ -61,10 +59,10 @@ ok(exists %Config{ccflags_nolargefiles}, "has ccflags_nolargefiles");
 {
     # make sure we can export what we say we can export.
     package Foo;
-    my @exports = qw(myconfig config_sh config_vars config_re);
-    Config->import(@exports);
-    foreach my $func (@exports) {
-	::ok( __PACKAGE__->can($func), "$func exported" );
+    my @exports = @( qw(myconfig config_sh config_vars config_re) );
+    Config->import(< @exports);
+    foreach my $func (< @exports) {
+	main::ok( __PACKAGE__->can($func), "$func exported" );
     }
 }
 
@@ -72,22 +70,24 @@ like(Config::myconfig(), qr/osname=\Q%Config{osname}\E/,   "myconfig");
 like(Config::config_sh(), qr/osname='\Q%Config{osname}\E'/, "config_sh");
 like(Config::config_sh(), qr/byteorder='[1-8]+'/,
      "config_sh has a valid byteorder");
-foreach my $line (Config::config_re('c.*')) {
+foreach my $line (< Config::config_re('c.*')) {
   like($line,                  qr/^c.*?=.*$/,                   'config_re' );
 }
 
-my $out = tie *STDOUT, 'FakeOut';
+my ($out1, $out2);
+{
+    my $out = \$("");
+    open my $fakeout, '>>', $out or die;
+    local *STDOUT = *$fakeout{IO};
 
-Config::config_vars('cc');	# non-regex test of essential cfg-var
-my $out1 = $$out;
-$out->clear;
+    Config::config_vars('cc');	# non-regex test of essential cfg-var
+    $out1 = $$out;
+    $$out = "";
 
-Config::config_vars('d_bork');	# non-regex, non-existent cfg-var
-my $out2 = $$out;
-$out->clear;
-
-undef $out;
-untie *STDOUT;
+    Config::config_vars('d_bork');	# non-regex, non-existent cfg-var
+    $out2 = $$out;
+    $$out = "";
+}
 
 like($out1, qr/^cc='\Q%Config{cc}\E';/, "found config_var cc");
 like($out2, qr/^d_bork='UNKNOWN';/, "config_var d_bork is UNKNOWN");
@@ -95,19 +95,19 @@ like($out2, qr/^d_bork='UNKNOWN';/, "config_var d_bork is UNKNOWN");
 # Read-only.
 
 undef $@;
-eval { %Config{d_bork} = 'borkbork' };
+try { %Config{d_bork} = 'borkbork' };
 like($@->{description}, qr/Config is read-only/, "no STORE");
 
 ok(!exists %Config{d_bork}, "still no d_bork");
 
 undef $@;
-eval { delete %Config{d_fork} };
+try { delete %Config{d_fork} };
 like($@->{description}, qr/Config is read-only/, "no DELETE");
 
 ok( exists %Config{d_fork}, "still d_fork");
 
 undef $@;
-eval { %Config = () };
+try { %Config = %() };
 like($@->{description}, qr/Config is read-only/, "no CLEAR");
 
 ok( exists %Config{d_fork}, "still d_fork");
@@ -125,32 +125,32 @@ ok( exists %Config{d_fork}, "still d_fork");
 
     sub PRINT {
 	my $self = shift;
-	$$self .= join('', @_);
+	$$self .= join('', < @_);
     }
 }
 
 # Signal-related variables
 # (this is actually a regression test for Configure.)
 
-is(%Config{sig_num_init}  =~ tr/,/,/, %Config{sig_size}, "sig_num_init size");
-is(%Config{sig_name_init} =~ tr/,/,/, %Config{sig_size}, "sig_name_init size");
+is(nelems @(%Config{sig_num_init}  =~ m/,/g), %Config{sig_size}, "sig_num_init size");
+is(nelems @(%Config{sig_name_init} =~ m/,/g), %Config{sig_size}, "sig_name_init size");
 
 # Test the troublesome virtual stuff
-my @virtual = qw(byteorder ccflags_nolargefiles ldflags_nolargefiles
-		 libs_nolargefiles libswanted_nolargefiles);
+my @virtual = @( qw(byteorder ccflags_nolargefiles ldflags_nolargefiles
+                    libs_nolargefiles libswanted_nolargefiles) );
 
 # Also test that the first entry in config.sh is found correctly. There was
 # special casing code for this
 
-foreach my $pain ($first, @virtual) {
+foreach my $pain ($first, < @virtual) {
   # No config var is named with anything that is a regexp metachar
   ok(exists %Config{$pain}, "\$config('$pain') exists");
 
-  my @result = %Config{$pain};
-  is (scalar @result, 1, "single result for \$config('$pain')");
+  my @result = @( %Config{$pain} );
+  is (nelems @result, 1, "single result for \$config('$pain')");
 
-  @result = Config::config_re($pain);
-  is (scalar @result, 1, "single result for config_re('$pain')");
+  @result = @( < Config::config_re($pain) );
+  is (nelems @result, 1, "single result for config_re('$pain')");
   like (@result[0], qr/^$pain=(['"])\Q%Config{$pain}\E\1$/, # grr '
 	"which is the expected result for $pain");
 }
@@ -159,7 +159,7 @@ foreach my $pain ($first, @virtual) {
 # TestInit.pm has probably already messed with our @INC
 # This little bit of evil is to avoid a @ in the program, in case it confuses
 # shell 1 liners. Perl 1 rules.
-my ($path, $ver, @orig_inc)
+my ($path, $ver, < @orig_inc)
   = split m/\n/,
     runperl (nolib=>1,
 	     prog=>'print qq{$^X\n$^V\n}; print qq{$_\n} while $_ = shift @INC');
@@ -168,7 +168,7 @@ die "This perl is $^V at $^X; other perl is $ver (at $path) "
   . '- failed to find this perl' unless $^V eq $ver;
 
 my %orig_inc;
-%orig_inc{[@orig_inc]} = ();
+%orig_inc{[ < @orig_inc]} = @();
 
 my $failed;
 # This is the order that directories are pushed onto @INC in perl.c:

@@ -9,8 +9,8 @@ use Locale::Currency;
 # If it evaluates to FALSE, then "not ok N" is printed for the test,
 # otherwise "ok N".
 #-----------------------------------------------------------------------
-@TESTS =
-(
+our @TESTS =
+@(
 	#================================================
 	# TESTS FOR code2currency
 	#================================================
@@ -67,10 +67,10 @@ use Locale::Currency;
  'currency2code("Canadian Dollar") eq "cad"',       # last in DATA segment
 );
 
-print "1..", int(@TESTS), "\n";
+print "1..", int(nelems @TESTS), "\n";
 
-$testid = 1;
-foreach $test (@TESTS)
+my $testid = 1;
+foreach my $test (< @TESTS)
 {
     eval "print (($test) ? \"ok $testid\\n\" : \"not ok $testid\\n\" )";
     print "not ok $testid\n" if $@;

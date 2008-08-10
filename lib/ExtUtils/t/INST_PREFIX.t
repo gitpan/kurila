@@ -8,7 +8,7 @@
 BEGIN {
     if( %ENV{PERL_CORE} ) {
         chdir 't' if -d 't';
-        @INC = ('../lib', 'lib');
+        @INC = @('../lib', 'lib');
     }
     else {
         unshift @INC, 't/lib';
@@ -21,7 +21,6 @@ use MakeMaker::Test::Utils;
 use MakeMaker::Test::Setup::BFD;
 use ExtUtils::MakeMaker;
 use File::Spec;
-use TieOut;
 use ExtUtils::MakeMaker::Config;
 
 my $Is_VMS = $^O eq 'VMS';
@@ -45,7 +44,9 @@ END {
 ok( chdir 'Big-Dummy', "chdir'd to Big-Dummy" ) ||
   diag("chdir failed: $!");
 
-my $stdout = tie *STDOUT, 'TieOut' or die;
+my $stdout = '';
+close STDOUT;
+open STDOUT, '>>', \$stdout or die;
 
 my $mm = WriteMakefile(
     NAME          => 'Big::Dummy',
@@ -54,13 +55,14 @@ my $mm = WriteMakefile(
     PERL_CORE     => %ENV{PERL_CORE},
 );
 
-like( $stdout->read, qr{
+like( $stdout, qr{
                         Writing\ $Makefile\ for\ Big::Liar\n
                         Big::Liar's\ vars\n
                         INST_LIB\ =\ \S+\n
                         INST_ARCHLIB\ =\ \S+\n
                         Writing\ $Makefile\ for\ Big::Dummy\n
 }x );
+$stdout = '';
 
 is( $mm->{PREFIX}, '$(SITEPREFIX)', 'PREFIX set based on INSTALLDIRS' );
 
@@ -82,15 +84,14 @@ $mm = WriteMakefile(
     PERL_CORE     => %ENV{PERL_CORE},
     PREFIX        => $PREFIX,
 );
-like( $stdout->read, qr{
+like( $stdout, qr{
                         Writing\ $Makefile\ for\ Big::Liar\n
                         Big::Liar's\ vars\n
                         INST_LIB\ =\ \S+\n
                         INST_ARCHLIB\ =\ \S+\n
                         Writing\ $Makefile\ for\ Big::Dummy\n
 }x );
-undef $stdout;
-untie *STDOUT;
+$stdout = '';
 
 is( $mm->{PREFIX}, $PREFIX,   'PREFIX' );
 
@@ -114,7 +115,7 @@ is( $mm_perl_src, $perl_src,     'PERL_SRC' );
 
 
 # Every INSTALL* variable must start with some PREFIX.
-my %Install_Vars = (
+my %Install_Vars = %(
  PERL   => \@(qw(archlib    privlib   bin       man1dir       man3dir   script)),
  SITE   => \@(qw(sitearch   sitelib   sitebin   siteman1dir   siteman3dir)),
  VENDOR => \@(qw(vendorarch vendorlib vendorbin vendorman1dir vendorman3dir))
@@ -122,12 +123,12 @@ my %Install_Vars = (
 
 while( my($type, $vars) = each %Install_Vars) {
     SKIP: {
-        skip "VMS must expand macros in INSTALL* vars", scalar @$vars 
+        skip "VMS must expand macros in INSTALL* vars", scalar nelems @$vars 
           if $Is_VMS;    
-        skip '$Config{usevendorprefix} not set', scalar @$vars
+        skip '$Config{usevendorprefix} not set', scalar nelems @$vars
           if $type eq 'VENDOR' and !%Config{usevendorprefix};
 
-        foreach my $var (@$vars) {
+        foreach my $var (< @$vars) {
             my $installvar = "install$var";
             my $prefix = '$('.$type.'PREFIX)';
 
@@ -153,7 +154,6 @@ while( my($type, $vars) = each %Install_Vars) {
     _set_config(installman3dir => '');
 
     my $wibble = File::Spec->catdir(qw(wibble and such));
-    my $stdout = tie *STDOUT, 'TieOut' or die;
     my $mm = WriteMakefile(
                            NAME          => 'Big::Dummy',
                            VERSION_FROM  => 'lib/Big/Dummy.pm',
@@ -175,7 +175,6 @@ while( my($type, $vars) = each %Install_Vars) {
     _set_config(usevendorprefix => 1 );
     _set_config(vendorprefixexp => 'something' );
 
-    my $stdout = tie *STDOUT, 'TieOut' or die;
     my $mm = WriteMakefile(
                    NAME          => 'Big::Dummy',
                    VERSION_FROM  => 'lib/Big/Dummy.pm',
@@ -206,7 +205,6 @@ while( my($type, $vars) = each %Install_Vars) {
     _set_config(vendorprefixexp => 'something' );
 
     my $wibble = File::Spec->catdir(qw(wibble and such));
-    my $stdout = tie *STDOUT, 'TieOut' or die;
     my $mm = WriteMakefile(
                            NAME          => 'Big::Dummy',
                            VERSION_FROM  => 'lib/Big/Dummy.pm',
@@ -239,7 +237,6 @@ while( my($type, $vars) = each %Install_Vars) {
     _set_config(vendorprefixexp => '' );
 
     my $wibble = File::Spec->catdir(qw(wibble and such));
-    my $stdout = tie *STDOUT, 'TieOut' or die;
     my $mm = WriteMakefile(
                            NAME          => 'Big::Dummy',
                            VERSION_FROM  => 'lib/Big/Dummy.pm',
@@ -259,7 +256,7 @@ while( my($type, $vars) = each %Install_Vars) {
 
 
 sub _set_config {
-    my($k,$v) = @_;
+    my($k,$v) = < @_;
     (my $k_no_install = $k) =~ s/^install//i;
     %Config{$k} = $v;
 

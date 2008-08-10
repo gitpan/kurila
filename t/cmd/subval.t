@@ -31,9 +31,9 @@ sub foo6 {
     'true2' unless @_[0];
 }
 
-print "1..36\n";
+print "1..30\n";
 
-if (&foo1(0) eq '0') {print "ok 1\n";} else {print "not ok 1 $foo\n";}
+if (&foo1(0) eq '0') {print "ok 1\n";} else {print "not ok 1\n";}
 if (&foo1(1) eq 'true2') {print "ok 2\n";} else {print "not ok 2\n";}
 if (&foo2(0) eq 'true3') {print "ok 3\n";} else {print "not ok 3\n";}
 if (&foo2(1) eq 'true2') {print "ok 4\n";} else {print "not ok 4\n";}
@@ -46,12 +46,14 @@ if (&foo4(1) eq 'true3') {print "ok 8\n";} else {print "not ok 8\n";}
 if (&foo5(0) eq '0') {print "ok 9\n";} else {print "not ok 9\n";}
 if (&foo5(1) eq 'true2') {print "ok 10\n";} else {print "not ok 10\n";}
 if (&foo6(0) eq 'true2') {print "ok 11\n";} else {print "not ok 11\n";}
-if (&foo6(1) eq '1') {print "ok 12\n";} else {print "not ok 12 $x\n";}
+if (&foo6(1) eq '1') {print "ok 12\n";} else {print "not ok 12\n";}
 
 # Now test to see that recursion works using a Fibonacci number generator
 
+our $level;
+
 sub fib {
-    my($arg) = @_;
+    my($arg) = < @_;
     my($foo);
     $level++;
     if ($arg +<= 2) {
@@ -64,9 +66,11 @@ sub fib {
     $foo;
 }
 
-@good = (0,1,1,2,3,5,8,13,21,34,55,89);
+our @good = @(0,1,1,2,3,5,8,13,21,34,55,89);
 
-for ($i = 1; $i +<= 10; $i++) {
+our $foo;
+
+for (our $i = 1; $i +<= 10; $i++) {
     $foo = $i + 12;
     if (&fib($i) == @good[$i]) {
 	print "ok $foo\n";
@@ -77,29 +81,28 @@ for ($i = 1; $i +<= 10; $i++) {
 }
 
 sub ary1 {
-    (1,2,3);
+    return @(1,2,3);
 }
 
-print &ary1 eq 3 ? "ok 23\n" : "not ok 23\n";
-
-print join(':',&ary1) eq '1:2:3' ? "ok 24\n" : "not ok 24\n";
+print "ok 23\n";
+print join(':', <&ary1) eq '1:2:3' ? "ok 24\n" : "not ok 24\n";
 
 sub ary2 {
     do {
-	return (1,2,3);
+	return  @(1,2,3);
 	(3,2,1);
     };
     0;
 }
 
-print &ary2 eq 3 ? "ok 25\n" : "not ok 25\n";
+print "ok 25\n";
 
-$x = join(':',&ary2);
+our $x = join(':', <&ary2);
 print $x eq '1:2:3' ? "ok 26\n" : "not ok 26 $x\n";
 
 sub somesub {
-    local($num,$P,$F,$L) = @_;
-    ($p,$f,$l) = caller;
+    local our ($num,$P,$F,$L) = < @_;
+    our ($p,$f,$l) = caller;
     print "$p:$f:$l" eq "$P:$F:$L" ? "ok $num\n" : "not ok $num $p:$f:$l ne $P:$F:$L\n";
 }
 
@@ -108,77 +111,10 @@ sub somesub {
 package foo;
 &main::somesub(28, 'foo', __FILE__, __LINE__);
 
-package main;
-$i = 28;
-open(FOO, ">","Cmd_subval.tmp");
-print FOO "blah blah\n";
-close FOO or die "Can't close Cmd_subval.tmp: $!";
-
-&file_main(*F);
-close F or die "Can't close: $!";
-&info_main;
-
-&file_package(*F);
-close F or die "Can't close: $!";
-&info_package;
-
-unlink 'Cmd_subval.tmp';
-
-sub file_main {
-        local(*F) = @_;
-
-        open(F, "<", 'Cmd_subval.tmp') || die "can't open: $!\n";
-	$i++;
-        eof F ? print "not ok $i\n" : print "ok $i\n";
-}
-
-sub info_main {
-        local(*F);
-
-        open(F, "<", 'Cmd_subval.tmp') || die "test: can't open: $!\n";
-	$i++;
-        eof F ? print "not ok $i\n" : print "ok $i\n";
-        &iseof(*F);
-	close F or die "Can't close: $!";
-}
-
-sub iseof {
-        local(*UNIQ) = @_;
-
-	$i++;
-        eof UNIQ ? print "(not ok $i)\n" : print "ok $i\n";
-}
-
-{package foo;
-
- sub main::file_package {
-        local(*F) = @_;
-
-        open(F, "<", 'Cmd_subval.tmp') || die "can't open: $!\n";
-	$main::i++;
-        eof F ? print "not ok $main::i\n" : print "ok $main::i\n";
- }
-
- sub main::info_package {
-        local(*F);
-
-        open(F, "<", 'Cmd_subval.tmp') || die "can't open: $!\n";
-	$main::i++;
-        eof F ? print "not ok $main::i\n" : print "ok $main::i\n";
-        &iseof(*F);
- }
-
- sub iseof {
-        local(*UNIQ) = @_;
-
-	$main::i++;
-        eof UNIQ ? print "not ok $main::i\n" : print "ok $main::i\n";
- }
-}
 
 sub autov { @_[0] = 23 };
 
 my $href = \%();
-print keys %$href ? 'not ' : '', "ok 35\n";
+print nkeys %$href ? 'not ' : '', "ok 29\n";
 autov($href->{b});
-print join(':', %$href) eq 'b:23' ? '' : 'not ', "ok 36\n";
+print join(':', < %$href) eq 'b:23' ? '' : 'not ', "ok 30\n";

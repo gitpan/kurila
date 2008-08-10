@@ -3,7 +3,7 @@
 BEGIN {
     if( %ENV{PERL_CORE} ) {
         chdir 't' if -d 't';
-        @INC = ('../lib', 'lib');
+        @INC = @('../lib', 'lib');
     }
     else {
         unshift @INC, 't/lib';
@@ -15,7 +15,7 @@ use Config;
 
 use Test::More;
 
-unless( eval { require Data::Dumper } ) {
+unless( try { require Data::Dumper } ) {
     plan skip_all => 'Data::Dumper not available';
 }
 
@@ -54,18 +54,18 @@ is( $?, 0,         '  exited normally' );
 {
     package _Prereq::Print;
     no strict;
-    $PREREQ_PM = undef;  # shut up "used only once" warning.
+    my $PREREQ_PM = undef;  # shut up "used only once" warning.
     eval $prereq_out;
     die if $@;
-    ::is_deeply( $PREREQ_PM, \%( strict => 0 ), 'prereqs dumped' );
-    ::is( $@, '',                             '  without error' );
+    main::is_deeply( $PREREQ_PM, \%( strict => 0 ), 'prereqs dumped' );
+    main::is( $@, '',                             '  without error' );
 }
 
 
 $prereq_out = run(qq{$Perl Makefile.PL "PRINT_PREREQ=1"});
 ok( !-r $Makefile, "PRINT_PREREQ produces no $Makefile" );
 is( $?, 0,         '  exited normally' );
-::like( $prereq_out, qr/^perl\(strict\) \s* >= \s* 0 \s*$/x, 
+main::like( $prereq_out, qr/^perl\(strict\) \s* >= \s* 0 \s*$/x, 
                                                       'prereqs dumped' );
 
 

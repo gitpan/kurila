@@ -1,17 +1,6 @@
 #!./perl
 
 BEGIN {
-    if (%ENV{PERL_CORE}){
-	chdir('t') if -d 't';
-	if ($^O eq 'MacOS') {
-	    @INC = qw(: ::lib ::macos:lib);
-	} else {
-	    @INC = '.';
-	    push @INC, '../lib';
-	}
-    } else {
-	unshift @INC, 't';
-    }
     require Config;
     if ((%Config::Config{'extensions'} !~ m/\bB\b/) ){
         print "1..0 # Skip -- Perl configured without B module\n";
@@ -22,7 +11,7 @@ BEGIN {
 use warnings;
 use strict;
 use feature ":5.10";
-use Test::More tests => 60;
+use Test::More tests => 62;
 
 use B::Deparse;
 my $deparse = B::Deparse->new();
@@ -42,7 +31,7 @@ $/ = "\n####\n";
 while ( ~< *DATA) {
     chomp;
     s/#\s*(.*)$//mg;
-    my ($num, $testname) = $1 =~ m/(\d+)\s*(.*)/;
+    my ($num, $todo, $testname) = $1 =~ m/(\d+)\s*(TODO)?\s*(.*)/;
     my ($input, $expected);
     if (m/(.*)\n>>>>\n(.*)/s) {
 	($input, $expected) = ($1, $2);
@@ -50,6 +39,8 @@ while ( ~< *DATA) {
     else {
 	($input, $expected) = ($_, $_);
     }
+
+    local our $TODO = $todo;
 
     my $coderef = eval "sub \{$input\}";
 
@@ -62,9 +53,9 @@ while ( ~< *DATA) {
 	my $deparsed = $deparse->coderef2text( $coderef );
 	my $regex = $expected;
 	$regex =~ s/(\S+)/\Q$1/g;
-	$regex =~ s/\s+/\\s+/g;
-	$regex = '^\{\s*' . $regex . '\s*\}$';
-        like($deparsed, qr/$regex/, $testname);
+	$regex =~ s/\s+/ \\s+ /g;
+	$regex = '^ \{ \s* ' . $regex . ' \s* \} $';
+        like($deparsed, qr/$regex/x, $testname);
     }
 }
 
@@ -85,7 +76,7 @@ is($val->[0], 'hello');
 my $Is_VMS = $^O eq 'VMS';
 my $Is_MacOS = $^O eq 'MacOS';
 
-my $path = join " ", map { qq["-I$_"] } @INC;
+my $path = join " ", map { qq["-I$_"] } < @INC;
 $path .= " -MMac::err=unix" if $Is_MacOS;
 my $redir = $Is_MacOS ? "" : "2>&1";
 
@@ -100,7 +91,7 @@ BEGIN { $^W = 1; }
 BEGIN { $/ = "\n"; $\ = "\n"; }
 LINE: while (defined($_ = ~< *ARGV)) {
     chomp $_;
-    our(@F) = split(' ', $_, 0);
+    our @F = @(split(' ', $_, 0));
     '???';
 }
 EOF
@@ -131,8 +122,11 @@ sub test {
    my $res = B::Deparse::Wrapper::getcode($val);
    like( $res, qr/use warnings/);
 }
+sub testsub {
+    42;
+}
 my ($q,$p);
-my $x=sub { ++$q,++$p };
+my $x=sub { @( ++$q,++$p ) };
 test($x);
 eval <<EOFCODE and test($x);
    package bar;
@@ -183,14 +177,6 @@ $test /= 2 if ++$test;
     ;
 }
 ####
-# 9
-{
-    234;
-}
-continue {
-    123;
-}
-####
 # 10
 my $x;
 print $main::x;
@@ -202,6 +188,11 @@ print @main::x[1];
 # 12
 my %x;
 %x{warn()};
+####
+my($x, $y) = < @('xx', 'yy');
+####
+# 0 TODO range
+my @x = @( 1..10 );
 ####
 # 13
 my $foo;
@@ -294,16 +285,13 @@ my @x;
 print((reverse sort {$b <+> $a} @x));
 ####
 # 32
-our @a;
-print $_ foreach (reverse @a);
+print $_ foreach (reverse @main::a);
 ####
-# 33
-our @a;
+# 33 TODO range
 print $_ foreach (reverse 1, 2..5);
 ####
 # 34  (bug #38684)
-our @ary;
-@ary = split(' ', 'foo', 0);
+@main::ary = @(split(' ', 'foo', 0));
 ####
 # 35 (bug #40055)
 do { () }; 
@@ -319,11 +307,8 @@ my $f = sub {
 # 38 (bug #43010)
 '!@$%'->();
 ####
-# 39 (ibid.)
-::();
-####
-# 40 (ibid.)
-'::::'->();
+#
+&'::'->();
 ####
 # 41 (ibid.)
 &::::;
@@ -354,7 +339,7 @@ state $x = 42;
 }
 ####
 # 48 state vars in anoymous subroutines
-$a = sub {
+$main::a = sub {
     state $x;
     return $x++;
 }
@@ -362,7 +347,7 @@ $a = sub {
 ####
 # 49 match
 {
-    $a =~ m/foo/;
+    $main::a =~ m/foo/;
 }
 ####
 # 51 Anonymous arrays and hashes, and references to them
@@ -371,13 +356,6 @@ my $b = \(\%());
 my $c = \@();
 my $d = \(\@());
 ####
-# 52 implicit smartmatch in given/when
-given ('foo') {
-    when ('bar') { continue; }
-    when ($_ ~~ 'quux') { continue; }
-    default { 0; }
-}
-####
 # array slice
 my @array;
 @array[[1, 2]];
@@ -385,3 +363,15 @@ my @array;
 # hash slice
 my %hash;
 %hash{['foo', 'bar']};
+####
+testsub();
+####
+my($x, $y);
+if ($x) {
+    $y;
+} else {
+    $y * $y;
+}
+####
+my($x, $y, $z);
+$x = $y || $y;

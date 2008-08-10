@@ -4,7 +4,7 @@ require Config;
 use File::Spec::Functions;
 
 sub convert_n_test {
-    my($podfile, $testname) = @_;
+    my($podfile, $testname) = < @_;
 
     my $cwd = Cwd::cwd();
     my $base_dir = catdir $cwd, updir(), "lib", "Pod";

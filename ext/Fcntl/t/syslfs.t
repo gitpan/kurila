@@ -2,10 +2,9 @@
 # stdio: open(), tell(), seek(), print(), read() is tested in t/op/lfs.t.
 # If you modify/add tests here, remember to update also t/op/lfs.t.
 
+use Config;
+
 BEGIN {
-	chdir 't' if -d 't';
-	@INC = '../lib';
-	require Config; Config->import;
 	# Don't bother if there are no quad offsets.
 	if (%Config{lseeksize} +< 8) {
 		print "1..0 # Skip: no 64-bit file offsets\n";
@@ -54,7 +53,7 @@ sub explain {
 #
 EOM
     }
-    print "1..0 # Skip: @_\n" if @_;
+    print "1..0 # Skip: {join ' ', <@_}\n" if (nelems @_);
 }
 
 print "# checking whether we have sparse files...\n";
@@ -88,9 +87,9 @@ syswrite(BIG, "big") or
 close(BIG) or
     do { warn "close big1 failed: $!\n"; bye };
 
-my @s1 = stat("big1");
+my @s1 = @( stat("big1") );
 
-print "# s1 = @s1\n";
+print "# s1 = {join ' ', <@s1}\n";
 
 sysopen(BIG, "big2", O_WRONLY^|^O_CREAT^|^O_TRUNC) or
     do { warn "sysopen big2 failed: $!\n"; bye };
@@ -101,9 +100,9 @@ syswrite(BIG, "big") or
 close(BIG) or
     do { warn "close big2 failed: $!\n"; bye };
 
-my @s2 = stat("big2");
+my @s2 = @( stat("big2") );
 
-print "# s2 = @s2\n";
+print "# s2 = {join ' ', <@s2}\n";
 
 zap();
 
@@ -123,7 +122,7 @@ print "# we seem to have sparse files...\n";
 
 my $r = system '../perl', '-I../lib', '-e', <<'EOF';
 use Fcntl qw(/^O_/ /^SEEK_/);
-sysopen(BIG, "big", O_WRONLY|O_CREAT|O_TRUNC) or die $!;
+sysopen(BIG, "big", O_WRONLY^|^O_CREAT^|^O_TRUNC) or die $!;
 my $sysseek = sysseek(BIG, 5_000_000_000, SEEK_SET);
 my $syswrite = syswrite(BIG, "big");
 exit 0;
@@ -157,9 +156,9 @@ unless($syswrite && $close) {
     bye();
 }
 
-@s = stat("big");
+@s = @( stat("big") );
 
-print "# @s\n";
+print "# {join ' ', <@s}\n";
 
 unless (@s[7] == 5_000_000_003) {
     explain("kernel/fs not configured to use large files?");
@@ -172,7 +171,7 @@ sub fail () {
 }
 
 sub offset ($$) {
-    my ($offset_will_be, $offset_want) = @_;
+    my ($offset_will_be, $offset_want) = < @_;
     my $offset_is = eval $offset_will_be;
     unless ($offset_is == $offset_want) {
         print "# bad offset $offset_is, want $offset_want\n";

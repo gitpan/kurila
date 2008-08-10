@@ -12,7 +12,7 @@ BEGIN {
     %ENV{PERL5LIB} = "../lib";
 
 # turn warnings into fatal errors
-    $^WARN_HOOK = sub { die "WARNING: @_" } ;
+    $^WARN_HOOK = sub { die "WARNING: {join ' ', <@_}" } ;
 
     foreach (qw(Fcntl XS::APItest)) {
 	eval "require $_"
@@ -20,6 +20,8 @@ BEGIN {
     }
 }
 print "1..11\n";
+
+our ($VALID, $value, $ret, $FNAME1, $FNAME2, $FREF);
 
 # We don't know what symbols are defined in platform X's system headers.
 # We don't even want to guess, because some platform out there will
@@ -106,7 +108,7 @@ sub goto_croak { goto &mycroak }
 {
     my $e;
     for (1..4) {
-	eval { goto_croak("boo$_\n") };
+	try { goto_croak("boo$_\n") };
 	$e .= $@->{description};
     }
     print $e eq "boo1\nboo2\nboo3\nboo4\n" ? "ok 11\n" : "not ok 11\n";

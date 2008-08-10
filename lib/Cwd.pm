@@ -173,10 +173,10 @@ use vars qw(@ISA @EXPORT @EXPORT_OK $VERSION);
 
 $VERSION = '3.2701';
 
-@ISA = qw/ Exporter /;
-@EXPORT = qw(cwd getcwd fastcwd fastgetcwd);
+@ISA = @( qw/ Exporter / );
+@EXPORT = @( qw(cwd getcwd fastcwd fastgetcwd) );
 push @EXPORT, qw(getdcwd) if $^O eq 'MSWin32';
-@EXPORT_OK = qw(chdir abs_path fast_abs_path realpath fast_realpath);
+@EXPORT_OK = @( qw(chdir abs_path fast_abs_path realpath fast_realpath) );
 
 # sys_cwd may keep the builtin command
 
@@ -201,7 +201,7 @@ if ($^O eq 'os2') {
 }
 
 # If loading the XS stuff doesn't work, we can fall back to pure perl
-eval {
+try {
     require XSLoader;
     XSLoader::load( __PACKAGE__, $VERSION );
 };
@@ -211,7 +211,7 @@ $VERSION = eval $VERSION;
 
 # Big nasty table of function aliases
 my %METHOD_MAP =
-  (
+  %(
    VMS =>
    \%(
     cwd			=> '_vms_cwd',
@@ -305,15 +305,11 @@ unless ($pwd_cmd) {
     $pwd_cmd = 'pwd';
 }
 
-# Lazy-load Carp
-sub _carp  { require Carp; Carp::carp(@_)  }
-sub _croak { require Carp; Carp::croak(@_) }
-
 # The 'natural and safe form' for UNIX (pwd may be setuid root)
 sub _backtick_pwd {
     # Localize %ENV entries in a way that won't create new hash keys
-    my @localize = grep exists %ENV{$_}, qw(PATH IFS CDPATH ENV BASH_ENV);
-    local %ENV{[@localize]};
+    my @localize = @( grep exists %ENV{$_}, qw(PATH IFS CDPATH ENV BASH_ENV) );
+    local %ENV{[< @localize]} = ();
     
     my $cwd = `$pwd_cmd`;
     # Belt-and-suspenders in case someone said "undef $/".
@@ -326,7 +322,7 @@ sub _backtick_pwd {
 # Since some ports may predefine cwd internally (e.g., NT)
 # we take care not to override an existing definition for cwd().
 
-unless (%METHOD_MAP{$^O}{cwd} or defined &cwd) {
+unless (%METHOD_MAP{$^O}->{cwd} or defined &cwd) {
     # The pwd command is not available in some chroot(2)'ed environments
     my $sep = %Config::Config{path_sep} || ':';
     my $os = $^O;  # Protect $^O from tainting
@@ -334,8 +330,8 @@ unless (%METHOD_MAP{$^O}{cwd} or defined &cwd) {
 
     # Try again to find a pwd, this time searching the whole PATH.
     if (defined %ENV{PATH} and $os ne 'MSWin32') {  # no pwd on Windows
-	my @candidates = split($sep, %ENV{PATH});
-	while (!$found_pwd_cmd and @candidates) {
+	my @candidates = @( split($sep, %ENV{PATH}) );
+	while (!$found_pwd_cmd and nelems @candidates) {
 	    my $candidate = shift @candidates;
 	    $found_pwd_cmd = 1 if -x "$candidate/pwd";
 	}
@@ -405,7 +401,7 @@ sub fastcwd_ {
 	return undef unless defined $direntry; # should never happen
 	unshift(@path, $direntry);
     }
-    $path = '/' . join('/', @path);
+    $path = '/' . join('/', < @path);
     if ($^O eq 'apollo') { $path = "/".$path; }
     # At this point $path may be tainted (if tainting) and chdir would fail.
     # Untaint it then check that we landed where we started.
@@ -451,7 +447,7 @@ sub chdir_init {
 }
 
 sub chdir {
-    my $newdir = @_ ? shift : '';	# allow for no arg (chdir to HOME dir)
+    my $newdir = (nelems @_) ? shift : '';	# allow for no arg (chdir to HOME dir)
     $newdir =~ s|///*|/|g unless $^O eq 'MSWin32';
     chdir_init() unless $chdir_init;
     my $newpwd;
@@ -478,15 +474,15 @@ sub chdir {
     } elsif ($newdir =~ m#^/#s) {
 	%ENV{'PWD'} = $newdir;
     } else {
-	my @curdir = split(m#/#,%ENV{'PWD'});
-	@curdir = ('') unless @curdir;
+	my @curdir = @( split(m#/#,%ENV{'PWD'}) );
+	@curdir = @('') unless (nelems @curdir);
 	my $component;
 	foreach $component (split(m#/#, $newdir)) {
 	    next if $component eq '.';
 	    pop(@curdir),next if $component eq '..';
 	    push(@curdir,$component);
 	}
-	%ENV{'PWD'} = join('/',@curdir) || '/';
+	%ENV{'PWD'} = join('/',< @curdir) || '/';
     }
     1;
 }
@@ -494,12 +490,12 @@ sub chdir {
 
 sub _perl_abs_path
 {
-    my $start = @_ ? shift : '.';
+    my $start = (nelems @_) ? shift : '.';
     my($dotdots, $cwd, @pst, @cst, $dir, @tst);
 
-    unless (@cst = stat( $start ))
+    unless (@cst = @( stat( $start ) ))
     {
-	_carp("stat($start): $!");
+	warn("stat($start): $!");
 	return '';
     }
 
@@ -530,16 +526,16 @@ sub _perl_abs_path
     do
     {
 	$dotdots .= '/..';
-	@pst = @cst;
+	@pst = @( < @cst );
         my $parent;
 	unless (opendir($parent, $dotdots))
 	{
 	    # probably a permissions issue.  Try the native command.
-	    return File::Spec->rel2abs( $start, _backtick_pwd() );
+	    return File::Spec->rel2abs( $start, < _backtick_pwd() );
 	}
-	unless (@cst = stat($dotdots))
+	unless (@cst = @( stat($dotdots) ))
 	{
-	    _carp("stat($dotdots): $!");
+	    war("stat($dotdots): $!");
 	    closedir($parent);
 	    return '';
 	}
@@ -553,11 +549,11 @@ sub _perl_abs_path
 	    {
 		unless (defined ($dir = readdir($parent)))
 	        {
-		    _carp("readdir($dotdots): $!");
+		    war("readdir($dotdots): $!");
 		    closedir($parent);
 		    return '';
 		}
-		@tst[0] = @pst[0]+1 unless (@tst = lstat("$dotdots/$dir"))
+		@tst[0] = @pst[0]+1 unless (@tst = @( lstat("$dotdots/$dir") ))
 	    }
 	    while ($dir eq '.' || $dir eq '..' || @tst[0] != @pst[0] ||
 		   @tst[1] != @pst[1]);
@@ -575,7 +571,7 @@ sub fast_abs_path {
     local %ENV{PWD} = %ENV{PWD} || ''; # Guard against clobberage
     my $cwd = getcwd();
     require File::Spec;
-    my $path = @_ ? shift : ($Curdir ||= File::Spec->curdir);
+    my $path = (nelems @_) ? shift : ($Curdir ||= File::Spec->curdir);
 
     # Detaint else we'll explode in taint mode.  This is safe because
     # we're not doing anything dangerous with it.
@@ -583,13 +579,13 @@ sub fast_abs_path {
     ($cwd)  = $cwd  =~ m/(.*)/;
 
     unless (-e $path) {
- 	_croak("$path: No such file or directory");
+ 	die("$path: No such file or directory");
     }
 
     unless (-d _) {
         # Make sure we can be invoked on plain files, not just directories.
 	
-	my ($vol, $dir, $file) = File::Spec->splitpath($path);
+	my ($vol, $dir, $file) = < File::Spec->splitpath($path);
 	return File::Spec->catfile($cwd, $path) unless length $dir;
 
 	if (-l $path) {
@@ -608,11 +604,11 @@ sub fast_abs_path {
     }
 
     if (!CORE::chdir($path)) {
- 	_croak("Cannot chdir to $path: $!");
+ 	die("Cannot chdir to $path: $!");
     }
     my $realpath = getcwd();
     if (! ((-d $cwd) && (CORE::chdir($cwd)))) {
- 	_croak("Cannot chdir back to $cwd: $!");
+ 	die("Cannot chdir back to $cwd: $!");
     }
     $realpath;
 }
@@ -637,7 +633,7 @@ sub _vms_cwd {
 }
 
 sub _vms_abs_path {
-    return %ENV{'DEFAULT'} unless @_;
+    return %ENV{'DEFAULT'} unless (nelems @_);
     my $path = shift;
 
     if (-l $path) {
@@ -717,7 +713,7 @@ sub _qnx_abs_path {
     local %ENV{PATH} = '';
     local %ENV{CDPATH} = '';
     local %ENV{ENV} = '';
-    my $path = @_ ? shift : '.';
+    my $path = (nelems @_) ? shift : '.';
 
     my $rpfh;
     defined( open($rpfh, "-|", '-') || exec '/usr/bin/fullpath', '-t', $path ) or

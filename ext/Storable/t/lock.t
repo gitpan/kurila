@@ -6,14 +6,15 @@
 #  in the README file that comes with the distribution.
 #
 
+use Config;
+
 sub BEGIN {
     if (%ENV{PERL_CORE}){
 	chdir('t') if -d 't';
-	@INC = ('.', '../lib', '../ext/Storable/t');
+	@INC = @('.', '../lib', '../ext/Storable/t');
     } else {
 	unshift @INC, 't';
     }
-    require Config; Config->import;
     if (%ENV{PERL_CORE} and %Config{'extensions'} !~ m/\bStorable\b/) {
         print "1..0 # Skip: Storable was not built\n";
         exit 0;
@@ -21,8 +22,6 @@ sub BEGIN {
 
     require 'st-dump.pl';
 }
-
-sub ok;
 
 use Storable qw(lock_store lock_retrieve);
 
@@ -33,18 +32,18 @@ unless (&Storable::CAN_FLOCK) {
 
 print "1..5\n";
 
-@a = ('first', undef, 3, -4, -3.14159, 456, 4.5);
+my @a = @('first', undef, 3, -4, -3.14159, 456, 4.5);
 
 #
 # We're just ensuring things work, we're not validating locking.
 #
 
 ok 1, defined lock_store(\@a, 'store');
-ok 2, $dumped = &dump(\@a);
+ok 2, my $dumped = &dump(\@a);
 
-$root = lock_retrieve('store');
+my $root = lock_retrieve('store');
 ok 3, ref $root eq 'ARRAY';
-ok 4, @a == @$root;
+ok 4, nelems(@a) == nelems(@$root);
 ok 5, &dump($root) eq $dumped; 
 
 unlink 't/store';

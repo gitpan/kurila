@@ -319,18 +319,11 @@ if ($PLATFORM eq 'wince') {
 		     PL_pending_ident
 		     PL_sublex_info
 		     PL_timesbuf
-		     PL_collation_ix
-		     PL_collation_name
-		     PL_collation_standard
-		     PL_collxfrm_base
-		     PL_collxfrm_mult
 		     PL_numeric_compat1
 		     PL_numeric_local
 		     PL_numeric_name
 		     PL_numeric_radix_sv
 		     PL_numeric_standard
-		     PL_vtbl_collxfrm
-		     Perl_sv_collxfrm
 		     setgid
 		     setuid
 		     win32_free_childdir
@@ -824,11 +817,6 @@ unless ($define{'PERL_NEED_TIMESBASE'}) {
 		    )];
 }
 
-unless ($define{'DEBUG_LEAKING_SCALARS_FORK_DUMP'}) {
-    skip_symbols [qw(
-		    PL_dumper_fd
-		    )];
-}
 unless ($define{'PERL_DONT_CREATE_GVSV'}) {
     skip_symbols [qw(
 		     Perl_gv_SVadd

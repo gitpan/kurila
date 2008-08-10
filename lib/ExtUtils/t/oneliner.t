@@ -3,7 +3,7 @@
 BEGIN {
     if( %ENV{PERL_CORE} ) {
         chdir 't' if -d 't';
-        @INC = ('../lib', 'lib');
+        @INC = @('../lib', 'lib');
     }
     else {
         unshift @INC, 't/lib';
@@ -26,7 +26,7 @@ isa_ok($mm, 'ExtUtils::MM_Any');
 
 
 sub try_oneliner {
-    my($code, $switches, $expect, $name) = @_;
+    my($code, $switches, $expect, $name) = < @_;
     my $cmd = $mm->oneliner($code, $switches);
     $cmd =~ s{\$\(ABSPERLRUN\)}{$^X};
 
@@ -41,7 +41,7 @@ sub try_oneliner {
 try_oneliner(q{print "foo'o", ' bar"ar'}, \@(),  q{foo'o bar"ar},  'quotes');
 
 # How about dollar signs?
-try_oneliner(q{$PATH = 'foo'; print $PATH},\@(), q{foo},   'dollar signs' );
+try_oneliner(q{our $PATH = 'foo'; print $PATH},\@(), q{foo},   'dollar signs' );
 
 # switches?
 try_oneliner(q{print 'foo'}, \@('-l'),           "foo\n",       'switches' );

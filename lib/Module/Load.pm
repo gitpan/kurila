@@ -1,6 +1,6 @@
 package Module::Load;
 
-$VERSION = '0.12';
+our $VERSION = '0.12';
 
 use strict;
 use File::Spec ();
@@ -8,9 +8,7 @@ use File::Spec ();
 sub import {
     my $who = _who();
 
-    {   no strict 'refs';
-        *{Symbol::fetch_glob("{$who}::load")} = *load;
-    }
+    *{Symbol::fetch_glob("{$who}::load")} = \&load;
 }
 
 sub load (*;@)  {
@@ -24,13 +22,13 @@ sub load (*;@)  {
             my $err;
             for my $flag ( qw[1 0] ) {
                 my $file = _to_file( $mod, $flag);
-                eval { require $file };
+                try { require $file };
                 $@ ? $err .= $@->message : last LOAD;
             }
             die $err if $err;
         }
     }
-    __PACKAGE__->_export_to_level(1, $mod, @_) if @_;
+    __PACKAGE__->_export_to_level(1, $mod, < @_) if (nelems @_);
 }
 
 ### 5.004's Exporter doesn't have export_to_level.
@@ -41,19 +39,19 @@ sub _export_to_level {
     my $mod     = shift;
     my $callpkg = caller($level);
 
-    $mod->export($callpkg, @_);
+    $mod->export($callpkg, < @_);
 }
 
 sub _to_file{
     local $_    = shift;
     my $pm      = shift || '';
 
-    my @parts = split m/::/;
+    my @parts = @( split m/::/ );
 
     ### because of [perl #19213], see caveats ###
     my $file = $^O eq 'MSWin32'
-                    ? join "/", @parts
-                    : File::Spec->catfile( @parts );
+                    ? join "/", < @parts
+                    : File::Spec->catfile( < @parts );
 
     $file   .= '.pm' if $pm;
     

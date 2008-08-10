@@ -2,10 +2,6 @@ use strict;
 use warnings;
 
 BEGIN {
-    if (%ENV{'PERL_CORE'}){
-        chdir 't';
-        unshift @INC, '../lib';
-    }
     use Config;
     if (! %Config{'useithreads'}) {
         print("1..0 # Skip: Perl not compiled with 'useithreads'\n");
@@ -18,7 +14,7 @@ use ExtUtils::testlib;
 use threads;
 
 BEGIN {
-    eval {
+    try {
         require threads::shared;
         threads::shared->import();
     };
@@ -69,7 +65,7 @@ sub skip {
 }
 {
     my ($thread) = threads->create(sub { return (1,2,3) });
-    my @retval = $thread->join();
+    my @retval = @($thread->join());
     ok(@retval[0] == 1 && @retval[1] == 2 && @retval[2] == 3,'');
 }
 {
@@ -156,9 +152,9 @@ if ($^O eq 'linux') {
     my $t = threads->create(sub {});
     $t->join();
     threads->create(sub {})->join();
-    eval { $t->join(); };
+    try { $t->join(); };
     ok(($@->{description} =~ m/Thread already joined/), "Double join works");
-    eval { $t->detach(); };
+    try { $t->detach(); };
     ok(($@->{description} =~ m/Cannot detach a joined thread/), "Detach joined thread");
 }
 
@@ -166,9 +162,9 @@ if ($^O eq 'linux') {
     my $t = threads->create(sub {});
     $t->detach();
     threads->create(sub {})->join();
-    eval { $t->detach(); };
+    try { $t->detach(); };
     ok(($@->{description} =~ m/Thread already detached/), "Double detach works");
-    eval { $t->join(); };
+    try { $t->join(); };
     ok(($@->{description} =~ m/Cannot join a detached thread/), "Join detached thread");
 }
 
@@ -193,7 +189,7 @@ if ($^O eq 'linux') {
 
     threads->yield();
     sleep 1;
-    eval { $t->join; };
+    try { $t->join; };
     ok(($@->{description} =~ m/^Thread already joined/)?1:0, "Join pending join");
 
     { lock($go); $go = 1; cond_signal($go); }
@@ -203,7 +199,7 @@ if ($^O eq 'linux') {
 {
     my $go : shared = 0;
     my $t = threads->create( sub {
-        eval { threads->self->join; };
+        try { threads->self->join; };
         ok(($@->{description} =~ m/^Cannot join self/), "Join self");
         lock($go); $go = 1; cond_signal($go);
     });
@@ -221,7 +217,7 @@ if ($^O eq 'linux') {
 
     threads->yield();
     sleep 1;
-    eval { $t->detach };
+    try { $t->detach };
     ok(($@->{description} =~ m/^Cannot detach a joined thread/)?1:0, "Detach pending join");
 
     { lock($go); $go = 1; cond_signal($go); }

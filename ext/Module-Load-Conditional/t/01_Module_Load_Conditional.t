@@ -1,7 +1,6 @@
 ### Module::Load::Conditional test suite ###
 
 BEGIN { use FindBin; }
-BEGIN { chdir 't' if -d 't' }
 
 use strict;
 use File::Spec ();
@@ -18,12 +17,9 @@ use_ok( 'Module::Load::Conditional' );
 {   $Module::Load::Conditional::VERBOSE =   
     $Module::Load::Conditional::VERBOSE = 0;
 
-    *can_load       = *Module::Load::Conditional::can_load
-                    = *Module::Load::Conditional::can_load;
-    *check_install  = *Module::Load::Conditional::check_install
-                    = *Module::Load::Conditional::check_install;
-    *requires       = *Module::Load::Conditional::requires
-                    = *Module::Load::Conditional::requires;
+    *can_load       = \&Module::Load::Conditional::can_load;
+    *check_install  = \&Module::Load::Conditional::check_install;
+    *requires       = \&Module::Load::Conditional::requires;
 }
 
 {
@@ -43,9 +39,9 @@ use_ok( 'Module::Load::Conditional' );
         ### converts the file spec back to VMS format.
         my $class = ON_VMS ? 'File::Spec::Unix' : 'File::Spec';
         
-        my($vol, $path, $file) = $class->splitpath( $rv->{'file'} );
+        my($vol, $path, $file) = < $class->splitpath( $rv->{'file'} );
 
-        my @path = ($vol, $class->splitdir( $path ), $file );
+        my @path = @($vol, < $class->splitdir( $path ), $file );
 
         ### First element could be blank for some system types like VMS
         shift @path if $vol eq '';
@@ -55,7 +51,7 @@ use_ok( 'Module::Load::Conditional' );
     };
     
     is( %INC{'Module/Load/Conditional.pm'},            
-            File::Spec::Unix->catfile(@rv_path),
+            File::Spec::Unix->catfile(< @rv_path),
                             q[  Found proper file]
     );
 
@@ -167,7 +163,7 @@ SKIP:{
     skip "Depends on \$^X, which doesn't work well when testing the Perl core", 
         1 if %ENV{PERL_CORE};
 
-    my %list = map { $_ => 1 } requires('Carp');
+    my %list = %( map { $_ => 1 } < requires('Carp') );
     
     my $flag;
     $flag++ unless delete %list{'Exporter'};

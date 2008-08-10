@@ -8,17 +8,17 @@ $^I = 'bak*';
 
 plan( tests => 2 );
 
-my @tfiles     = ('.a','.b','.c');
-my @tfiles_bak = ('bak.a', 'bak.b', 'bak.c');
+my @tfiles     = @('.a','.b','.c');
+my @tfiles_bak = @('bak.a', 'bak.b', 'bak.c');
 
 END { unlink_all('.a','.b','.c', 'bak.a', 'bak.b', 'bak.c'); }
 
-for my $file (@tfiles) {
+for my $file (< @tfiles) {
     runperl( prog => 'print qq(foo\n);', 
              args => \@('>', $file) );
 }
 
-@ARGV = @tfiles;
+@ARGV = @( < @tfiles );
 
 while ( ~< *ARGV) {
     s/foo/bar/;

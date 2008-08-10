@@ -46,6 +46,7 @@ Perl_ck_subr
 Perl_ck_substr
 Perl_ck_svconst
 Perl_ck_trunc
+Perl_ck_try
 Perl_ck_unpack
 Perl_pp_null
 Perl_pp_stub
@@ -57,8 +58,6 @@ Perl_pp_gvsv
 Perl_pp_gv
 Perl_pp_gelem
 Perl_pp_padsv
-Perl_pp_padav
-Perl_pp_padhv
 Perl_pp_padany
 Perl_pp_pushre
 Perl_pp_rv2gv
@@ -66,10 +65,10 @@ Perl_pp_rv2sv
 Perl_pp_rv2cv
 Perl_pp_anoncode
 Perl_pp_prototype
-Perl_pp_refgen
 Perl_pp_srefgen
 Perl_pp_ref
 Perl_pp_bless
+Perl_pp_anonscalar
 Perl_pp_backtick
 Perl_pp_glob
 Perl_pp_readline
@@ -81,7 +80,6 @@ Perl_pp_match
 Perl_pp_qr
 Perl_pp_subst
 Perl_pp_substcont
-Perl_pp_trans
 Perl_pp_sassign
 Perl_pp_aassign
 Perl_pp_chop
@@ -172,6 +170,7 @@ Perl_pp_aslice
 Perl_pp_each
 Perl_pp_values
 Perl_pp_keys
+Perl_pp_nkeys
 Perl_pp_delete
 Perl_pp_exists
 Perl_pp_rv2hv
@@ -185,6 +184,9 @@ Perl_pp_list
 Perl_pp_lslice
 Perl_pp_anonlist
 Perl_pp_anonhash
+Perl_pp_listlast
+Perl_pp_expand
+Perl_pp_nelems
 Perl_pp_splice
 Perl_pp_push
 Perl_pp_pop
@@ -210,7 +212,6 @@ Perl_pp_dorassign
 Perl_pp_method
 Perl_pp_entersub
 Perl_pp_leavesub
-Perl_pp_leavesublv
 Perl_pp_caller
 Perl_pp_warn
 Perl_pp_die
@@ -233,12 +234,6 @@ Perl_pp_dump
 Perl_pp_goto
 Perl_pp_exit
 Perl_pp_method_named
-Perl_pp_entergiven
-Perl_pp_leavegiven
-Perl_pp_enterwhen
-Perl_pp_leavewhen
-Perl_pp_break
-Perl_pp_continue
 Perl_pp_open
 Perl_pp_close
 Perl_pp_pipe_op

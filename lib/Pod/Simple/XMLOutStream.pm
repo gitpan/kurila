@@ -7,7 +7,7 @@ use Pod::Simple ();
 use vars qw( $ATTR_PAD @ISA $VERSION $SORT_ATTRS);
 $VERSION = '2.02';
 BEGIN {
-  @ISA = ('Pod::Simple');
+  @ISA = @('Pod::Simple');
   *DEBUG = \&Pod::Simple::DEBUG unless defined &DEBUG;
 }
 
@@ -18,7 +18,7 @@ $SORT_ATTRS = 0 unless defined $SORT_ATTRS;
 
 sub new {
   my $self = shift;
-  my $new = $self->SUPER::new(@_);
+  my $new = $self->SUPER::new(< @_);
   $new->{'output_fh'} ||= *STDOUT{IO};
   #$new->accept_codes('VerbatimFormatted');
   return $new;
@@ -28,22 +28,22 @@ sub new {
 
 sub _handle_element_start {
   # ($self, $element_name, $attr_hash_r)
-  my $fh = @_[0]{'output_fh'};
+  my $fh = @_[0]->{'output_fh'};
   my($key, $value);
   DEBUG and print "++ @_[1]\n";
   print $fh "<", @_[1];
   if($SORT_ATTRS) {
     foreach my $key (sort keys %{@_[2]}) {
       unless($key =~ m/^~/s) {
-        next if $key eq 'start_line' and @_[0]{'hide_line_numbers'};
-        _xml_escape($value = @_[2]{$key});
+        next if $key eq 'start_line' and @_[0]->{'hide_line_numbers'};
+        _xml_escape($value = @_[2]->{$key});
         print $fh $ATTR_PAD, $key, '="', $value, '"';
       }
     }
   } else { # faster
     while(($key,$value) = each %{@_[2]}) {
       unless($key =~ m/^~/s) {
-        next if $key eq 'start_line' and @_[0]{'hide_line_numbers'};
+        next if $key eq 'start_line' and @_[0]->{'hide_line_numbers'};
         _xml_escape($value);
         print $fh $ATTR_PAD, $key, '="', $value, '"';
       }
@@ -58,14 +58,14 @@ sub _handle_text {
   if(length @_[1]) {
     my $text = @_[1];
     _xml_escape($text);
-    print {@_[0]{'output_fh'}} $text;
+    print {@_[0]->{'output_fh'}} $text;
   }
   return;
 }
 
 sub _handle_element_end {
   DEBUG and print "-- @_[1]\n";
-  print {@_[0]{'output_fh'}} "</", @_[1], ">";
+  print {@_[0]->{'output_fh'}} "</", @_[1], ">";
   return;
 }
 
@@ -73,7 +73,7 @@ sub _handle_element_end {
 #@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 sub _xml_escape {
-  foreach my $x (@_) {
+  foreach my $x (< @_) {
     # Escape things very cautiously:
     $x =~ s/([^-\n\t !\#\$\%\(\)\*\+,\.\~\/\:\;=\?\@\[\\\]\^_\`\{\|\}abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789])/{'&#'.(ord($1)).';'
 }/g;

@@ -1,13 +1,8 @@
 #!./perl -w
 
-BEGIN {
-    chdir 't' if -d 't';
-    @INC = qw(. ../lib);
-}
-
 use Config;
 
-require "test.pl";
+require "./test.pl";
 
 my $file = "crlf$$.dat";
 END {
@@ -43,7 +38,7 @@ if ('PerlIO::Layer'->find( 'perlio')) {
 	my $pos = tell $fh; # pos must be behind "xxx", before "\nxxy\n"
 	seek $fh, $pos, 0;
 	$/ = "\n";
-	$s = ( ~< $fh ) . ~< $fh;
+	my $s = ( ~< $fh ) . ~< $fh;
 	ok($s eq "\nxxy\n");
     }
 
@@ -67,7 +62,7 @@ if ('PerlIO::Layer'->find( 'perlio')) {
 	    binmode(FOO);
 	    my $foo = scalar ~< *FOO;
 	    close FOO;
-	    print join(" ", "#", map { sprintf("%02x", $_) } unpack("C*", $foo)),
+	    print join(" ", "#", map { sprintf('%02x', $_) } unpack("C*", $foo)),
 	    "\n";
 	    ok($foo =~ m/\x0d\x0a$/);
 	    ok($foo !~ m/\x0d\x0d/);
@@ -79,7 +74,7 @@ else {
 }
 
 sub count_chars {
-    my($text, $chars) = @_;
+    my($text, $chars) = < @_;
     my $seen = 0;
     $seen++ while $text =~ m/$chars/g;
     return $seen;

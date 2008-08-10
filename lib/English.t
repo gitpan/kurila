@@ -1,12 +1,7 @@
 #!./perl -i.inplace
 # note the extra switch, for the test below
 
-BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
-}
-
-use Test::More tests => 47;
+use Test::More tests => 39;
 
 use English qw( -no_match_vars ) ;
 use Config;
@@ -14,19 +9,15 @@ use Errno;
 
 is( $PID, $$, '$PID' );
 
-$_ = 1;
-is( $ARG, $_, '$ARG' );
-
-sub foo {
-	is(@ARG[0], @_[0], '@ARG' );
-}
-foo(1);
-
 "abc" =~ m/b/;
+
+{
+our ($PREMATCH, $MATCH, $POSTMATCH);
 
 ok( !$PREMATCH, '$PREMATCH undefined' );
 ok( !$MATCH, '$MATCH undefined' );
 ok( !$POSTMATCH, '$POSTMATCH undefined' );
+}
 
 $OFS = " ";
 $ORS = "\n";
@@ -58,16 +49,14 @@ $ORS = "\n";
 
 undef $OUTPUT_FIELD_SEPARATOR;
 
+our $threads;
 if ($threads) { $" = "\n" } else { $LIST_SEPARATOR = "\n" };
-@foo = (8, 9);
-@foo = split(m/\n/, "@foo");
+my @foo = @(8, 9);
+@foo = @( split(m/\n/, join $", < @foo ) );
 is( @foo[0], 8, '$"' );
 is( @foo[1], 9, '$LIST_SEPARATOR' );
 
 undef $OUTPUT_RECORD_SEPARATOR;
-
-eval 'NO SUCH FUNCTION';
-like( $EVAL_ERROR->{description}, qr/syntax error/, '$EVAL_ERROR' );
 
 is( $UID, $<, '$UID' );
 is( $REAL_GROUP_ID, $^GID, '$GID' );
@@ -104,40 +93,22 @@ ok( !$PERLDB, '$PERLDB should be false' );
 }
 like( ~< *DATA, qr/second paragraph..\z/s, '$INPUT_RECORD_SEPARATOR' );
 
-is( $INPUT_LINE_NUMBER, 2, '$INPUT_LINE_NUMBER' );
-
 my %hash;
 $SUBSCRIPT_SEPARATOR = '|';
 %hash{'d','e','f'} = 1;
 $SUBSEP = ',';
 %hash{'a', 'b', 'c'} = 1;
-my @keys = sort keys %hash;
+my @keys = @( sort keys %hash );
 
 is( @keys[0], 'a,b,c', '$SUBSCRIPT_SEPARATOR' );
 is( @keys[1], 'd|e|f', '$SUBSCRIPT_SEPARATOR' );
 
-eval { is( $EXCEPTIONS_BEING_CAUGHT, 1, '$EXCEPTIONS_BEING_CAUGHT' ) };
+try { is( $EXCEPTIONS_BEING_CAUGHT, 1, '$EXCEPTIONS_BEING_CAUGHT' ) };
 ok( !$EXCEPTIONS_BEING_CAUGHT, '$EXCEPTIONS_BEING_CAUGHT should be false' );
 
-eval { local *F; my $f = 'asdasdasd'; ++$f while -e $f; open(F, "<", $f); };
+try { local *F; my $f = 'asdasdasd'; ++$f while -e $f; open(F, "<", $f); };
 is( $OS_ERROR, $ERRNO, '$OS_ERROR' );
-ok( %OS_ERROR{ENOENT}, '%OS_ERROR (ENOENT should be set)' );
-
-package B;
-
-use English;
-
-"abc" =~ m/b/;
-
-main::is( $PREMATCH, 'a', '$PREMATCH defined' );
-main::is( $MATCH, 'b', '$MATCH defined' );
-main::is( $POSTMATCH, 'c', '$POSTMATCH defined' );
-
-{
-    my $s = "xyz";
-    $s =~ s/y/t$MATCH/;
-    main::is( $s, "xtyz", '$MATCH defined in right side of s///' );
-}
+ok( %OS_ERROR_FLAGS{ENOENT}, '%OS_ERROR_FLAGS(ENOENT should be set)' );
 
 package C;
 
@@ -145,9 +116,12 @@ use English qw( -no_match_vars ) ;
 
 "abc" =~ m/b/;
 
-main::ok( !$PREMATCH, '$PREMATCH disabled' );
-main::ok( !$MATCH, '$MATCH disabled' );
-main::ok( !$POSTMATCH, '$POSTMATCH disabled' );
+{
+  our ($PREMATCH, $MATCH, $POSTMATCH);
+  main::ok( !$PREMATCH, '$PREMATCH disabled' );
+  main::ok( !$MATCH, '$MATCH disabled' );
+  main::ok( !$POSTMATCH, '$POSTMATCH disabled' );
+}
 
 __END__
 This is a line.

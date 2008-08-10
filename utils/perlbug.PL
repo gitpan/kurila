@@ -15,16 +15,16 @@ use File::Spec::Functions;
 
 # This forces PL files to create target in same directory as PL file.
 # This is so that make depend always knows where to find PL derivatives.
-$origdir = cwd;
+my $origdir = cwd;
 chdir dirname($0);
-$file = basename($0, '.PL');
+my $file = basename($0, '.PL');
 $file .= '.com' if $^O eq 'VMS';
 
 open OUT, ">", "$file" or die "Can't create $file: $!";
 
 # extract patchlevel.h information
 
-open PATCH_LEVEL, "<", catfile(updir, "patchlevel.h")
+open PATCH_LEVEL, "<", catfile( updir, "patchlevel.h")
     or die "Can't open patchlevel.h: $!";
 
 my $patchlevel_date = (stat *PATCH_LEVEL)[[9]];
@@ -46,8 +46,8 @@ while ( ~< *PATCH_LEVEL) {
     s/(['\\])/\\$1/g;
     push @patches, $_ unless $_ eq 'NULL';
 }
-my $patch_desc = "'" . join("',\n    '", @patches) . "'";
-my $patch_tags = join "", map m/(\S+)/ ? "+$1 " : (), @patches;
+my $patch_desc = "'" . join("',\n    '", < @patches) . "'";
+my $patch_tags = join "", map m/(\S+)/ ? "+$1 " : (), < @patches;
 
 close(PATCH_LEVEL) or die "Error closing patchlevel.h: $!";
 
@@ -97,7 +97,7 @@ BEGIN {
     # use secure tempfiles wherever possible
     eval "require File::Temp;";
     $::HaveTemp = ($@ eq "");
-    eval { require Module::CoreList; };
+    try { require Module::CoreList; };
     $::HaveCoreList = ($@ eq "");
 };
 
@@ -364,7 +364,7 @@ EOF
     $me = $Is_MSWin32 ? $ENV{'USERNAME'}
 	    : $^O eq 'os2' ? $ENV{'USER'} || $ENV{'LOGNAME'}
 	    : $Is_MacOS ? $ENV{'USER'}
-	    : eval { getpwuid($<) };	# May be missing
+	    : try { getpwuid($<) };	# May be missing
 
     $from = $::Config{'cf_email'}
        if !$from && $::Config{'cf_email'} && $::Config{'cf_by'} && $me &&

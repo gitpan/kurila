@@ -7,7 +7,7 @@ plan tests => 5;
    package Digest::Foo;
    require Digest::base;
    use vars qw(@ISA $VERSION);
-   @ISA = qw(Digest::base);
+   @ISA = @( qw(Digest::base) );
 
    sub new {
 	my $class = shift;
@@ -17,7 +17,7 @@ plan tests => 5;
 
    sub add {
 	my $self = shift;
-	$$self .= join("", @_);
+	$$self .= join("", < @_);
 	return $self;
    }
 
@@ -48,5 +48,5 @@ if (ord('A') == 193) { # EBCDIC.
 
 unlink($file) || warn "Can't unlink '$file': $!";
 
-ok(eval { digest_file("not-there.txt", "Foo") }, undef);
+ok(try { digest_file("not-there.txt", "Foo") }, undef);
 ok($@);

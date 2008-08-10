@@ -1,12 +1,5 @@
 #!./perl
 
-BEGIN {
-    unless(grep m/blib/, @INC) {
-	chdir 't' if -d 't';
-	@INC = '../lib';
-    }
-}
-
 use Config;
 
 BEGIN {
@@ -44,8 +37,8 @@ sub compare_addr {
 	}
 	return 0;
     }
-    my @a = unpack_sockaddr_in($a);
-    my @b = unpack_sockaddr_in($b);
+    my @a = @( < unpack_sockaddr_in($a) );
+    my @b = @( < unpack_sockaddr_in($b) );
     "@a[0]@a[1]" eq "@b[0]@b[1]";
 }
 
@@ -55,36 +48,36 @@ print "1..7\n";
 use Socket;
 use IO::Socket qw(AF_INET SOCK_DGRAM INADDR_ANY);
 
-$udpa = IO::Socket::INET->new(Proto => 'udp', LocalAddr => 'localhost')
+my $udpa = IO::Socket::INET->new(Proto => 'udp', LocalAddr => 'localhost')
      || IO::Socket::INET->new(Proto => 'udp', LocalAddr => '127.0.0.1')
     or die "$! (maybe your system does not have a localhost at all, 'localhost' or 127.0.0.1)";
 
 print "ok 1\n";
 
-$udpb = IO::Socket::INET->new(Proto => 'udp', LocalAddr => 'localhost')
+my $udpb = IO::Socket::INET->new(Proto => 'udp', LocalAddr => 'localhost')
      || IO::Socket::INET->new(Proto => 'udp', LocalAddr => '127.0.0.1')
     or die "$! (maybe your system does not have a localhost at all, 'localhost' or 127.0.0.1)";
 
 print "ok 2\n";
 
-$udpa->send("ok 4\n",0,$udpb->sockname);
+$udpa->send("ok 4\n",0, $udpb->sockname);
 
 print "not "
   unless compare_addr($udpa->peername,$udpb->sockname, 'peername', 'sockname');
 print "ok 3\n";
 
-my $where = $udpb->recv($buf="",5);
+my $where = $udpb->recv(my $buf="",5);
 print $buf;
 
-my @xtra = ();
+my @xtra = @( () );
 
 unless(compare_addr($where,$udpa->sockname, 'recv name', 'sockname')) {
     print "not ";
-    @xtra = (0,$udpa->sockname);
+    @xtra = @(0, <$udpa->sockname);
 }
 print "ok 5\n";
 
-$udpb->send("ok 6\n",@xtra);
+$udpb->send("ok 6\n",< @xtra);
 $udpa->recv($buf="",5);
 print $buf;
 

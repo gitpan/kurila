@@ -6,8 +6,8 @@ sigtrap - Perl pragma to enable simple signal handling
 
 =cut
 
-$VERSION = 1.04;
-$Verbose ||= 0;
+our $VERSION = 1.04;
+our $Verbose ||= 0;
 
 sub import {
     my $pkg = shift;
@@ -17,7 +17,7 @@ sub import {
     local $_;
 
   Arg_loop:
-    while (@_) {
+    while ((nelems @_)) {
 	$_ = shift;
 	if (m/^[A-Z][A-Z0-9]*$/) {
 	    $saw_sig++;
@@ -45,7 +45,7 @@ sub import {
 	    $handler = \&handler_die;
 	}
 	elsif ($_ eq 'handler') {
-	    @_ or die "No argument specified after 'handler'";
+	    (nelems @_) or die "No argument specified after 'handler'";
 	    $handler = shift;
 	    unless (ref $handler or $handler eq 'IGNORE'
 			or $handler eq 'DEFAULT') {
@@ -68,7 +68,7 @@ sub import {
 	}
     }
     unless ($saw_sig) {
-	@_ = qw(old-interface-signals);
+	@_ = @( qw(old-interface-signals) );
 	goto Arg_loop;
     }
 }
@@ -78,22 +78,22 @@ sub handler_die {
 }
 
 sub handler_traceback {
-    package DB;		# To get subroutine args.
+    our $panic;
     %SIG{'ABRT'} = 'DEFAULT';
     kill 'ABRT', $$ if $panic++;
     syswrite(STDERR, 'Caught a SIG', 12);
     syswrite(STDERR, @_[0], length(@_[0]));
     syswrite(STDERR, ' at ', 4);
-    ($pack,$file,$line) = caller;
+    our ($pack,$file,$line) = caller;
     syswrite(STDERR, $file, length($file));
     syswrite(STDERR, ' line ', 6);
     syswrite(STDERR, $line, length($line));
     syswrite(STDERR, "\n", 1);
 
     # Now go for broke.
-    for ($i = 1; ($p,$f,$l,$s,$h,$w,$e,$r) = caller($i); $i++) {
-        @a = ();
-	for (@args) {
+    for (my $i = 1; my ($p,$f,$l,$s,$h,$w,$e,$r) = caller($i); $i++) {
+        my @a = @( () );
+	for (< @DB::args) {
 	    s/([\'\\])/\\$1/g;
 	    s/([^\0]*)/'$1'/
 	      unless m/^(?: -?[\d.]+ | \*[\w:]* )$/x;
@@ -102,7 +102,7 @@ sub handler_traceback {
 	    push(@a, $_);
 	}
 	$w = $w ? '@ = ' : '$ = ';
-	$a = $h ? '(' . join(', ', @a) . ')' : '';
+	$a = $h ? '(' . join(', ', < @a) . ')' : '';
 	$e =~ s/\n\s*\;\s*\Z// if $e;
 	$e =~ s/[\\\']/\\$1/g if $e;
 	if ($r) {
@@ -113,7 +113,7 @@ sub handler_traceback {
 	    $s = "eval \{...\}";
 	}
 	$f = "file `$f'" unless $f eq '-e';
-	$mess = "$w$s$a called from $f line $l\n";
+	my $mess = "$w$s$a called from $f line $l\n";
 	syswrite(STDERR, $mess, length($mess));
     }
     kill 'ABRT', $$;

@@ -51,10 +51,6 @@ The following pragmas are defined (and have their own documentation).
 
 Get/set subroutine or variable attributes
 
-=item attrs
-
-Set/get attributes of a subroutine (deprecated)
-
 =item autouse
 
 Postpone load of modules until a function is used
@@ -82,10 +78,6 @@ Package for defining compilation subroutines
 =item constant
 
 Declare constants
-
-=item diagnostics
-
-Produce verbose warning diagnostics
 
 =item error
 
@@ -205,10 +197,6 @@ don't have the gdbm library.
 
 The Perl Compiler
 
-=item B-OP
-
-Inspect and manipulate op trees.
-
 =item B::Concise
 
 Walk Perl syntax tree, printing concise info about ops
@@ -220,6 +208,10 @@ Walk Perl syntax tree, printing debug info about ops
 =item B::Deparse
 
 Perl compiler backend to produce perl code
+
+=item B::OP
+
+Inspect and manipulate op trees.
 
 =item B::Showlex
 
@@ -289,14 +281,6 @@ Stringified perl data structures, suitable for both printing and C<eval>
 
 Modules that calculate message digests
 
-=item Digest::MD5
-
-Perl interface to the MD5 Algorithm
-
-=item Digest::SHA
-
-Perl extension for SHA-1/224/256/384/512
-
 =item Digest::base
 
 Digest base class
@@ -312,10 +296,6 @@ Dynamically load C libraries into Perl code
 =item English
 
 Use nice English (or awk) names for ugly punctuation variables
-
-=item Env
-
-Perl module that imports environment variables as scalars or arrays
 
 =item Errno
 
@@ -665,10 +645,6 @@ Supply object methods for filehandles
 
 Supply object methods for I/O handles
 
-=item IO::Pipe
-
-Supply object methods for pipes
-
 =item IO::Poll
 
 Object interface to system poll call
@@ -720,10 +696,6 @@ Read RFC 1951 files/buffers
 =item IO::Uncompress::Unzip
 
 Read zip files/buffers
-
-=item IO::Zlib
-
-IO:: style interface to L<Compress::Zlib>
 
 =item IPC::Cmd
 
@@ -785,22 +757,6 @@ Article about software localization
 
 ISO codes for script identification (ISO 15924)
 
-=item Log::Message
-
-A generic message storing mechanism;
-
-=item Log::Message::Config
-
-Configuration options for Log::Message
-
-=item Log::Message::Handlers
-
-Message handlers for Log::Message
-
-=item Log::Message::Item
-
-Message objects for Log::Message
-
 =item MIME::Base64
 
 Encoding and decoding of base64 strings
@@ -808,10 +764,6 @@ Encoding and decoding of base64 strings
 =item MIME::Base64::QuotedPrint
 
 Encoding and decoding of quoted-printable strings
-
-=item Math::Complex
-
-Complex numbers and associated mathematical functions
 
 =item Math::Trig
 
@@ -833,49 +785,9 @@ Looking up module information / loading at runtime
 
 Mark modules as loaded or unloaded
 
-=item Net::Cmd
-
-Network Command class (as used by FTP, SMTP etc)
-
-=item Net::Config
-
-Local configuration data for libnet
-
-=item Net::Domain
-
-Attempt to evaluate the current host's internet name and domain
-
-=item Net::FTP
-
-FTP Client class
-
-=item Net::NNTP
-
-NNTP Client class
-
-=item Net::Netrc
-
-OO interface to users netrc file
-
-=item Net::POP3
-
-Post Office Protocol 3 Client class (RFC1939)
-
-=item Net::SMTP
-
-Simple Mail Transfer Protocol Client
-
-=item Net::Time
-
-Time and daytime network client interface
-
 =item Net::hostent
 
 By-name interface to Perl's built-in gethost*() functions
-
-=item Net::libnetFAQ
-
-Libnet Frequently Asked Questions
 
 =item Net::netent
 
@@ -905,7 +817,7 @@ Perl interface to IEEE Std 1003.1
 
 A generic input parsing/checking mechanism.
 
-=item Perl6-Form
+=item Perl6::Form
 
 Implements the Perl 6 'form' built-in
 
@@ -1165,17 +1077,9 @@ Color screen output using ANSI escape sequences
 
 Perl termcap interface
 
-=item Term::Complete
-
-Perl word completion module
-
 =item Term::ReadLine
 
 Perl interface to various C<readline> packages.
-
-=item Term::UI
-
-Term::ReadLine UI made easy
 
 =item Test
 
@@ -1213,17 +1117,9 @@ A tutorial about writing really basic tests
 
 Create an abbreviation table from a list
 
-=item Text::Balanced
-
-Extract delimited text sequences from strings.
-
 =item Text::ParseWords
 
 Parse text into an array of tokens or array of arrays
-
-=item Text::Soundex
-
-Implementation of the soundex algorithm.
 
 =item Text::Tabs
 
@@ -1245,14 +1141,6 @@ Thread-safe queues
 
 Thread-safe semaphores
 
-=item Tie::Array
-
-Base class for tied arrays
-
-=item Tie::Handle
-
-Base class definitions for tied handles
-
 =item Tie::Hash
 
 Base class definitions for tied hashes
@@ -1260,10 +1148,6 @@ Base class definitions for tied hashes
 =item Tie::Hash::NamedCapture
 
 Named regexp capture buffers
-
-=item Tie::Scalar
-
-Base class definitions for tied scalars
 
 =item Tie::SubstrHash
 
@@ -1276,14 +1160,6 @@ High resolution alarm, sleep, gettimeofday, interval timers
 =item Time::Local
 
 Efficiently compute time from local and GMT time
-
-=item Time::Piece
-
-Object Oriented time objects
-
-=item Time::Piece::Seconds
-
-A simple API to convert seconds to other date values
 
 =item Time::gmtime
 

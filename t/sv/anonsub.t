@@ -18,14 +18,14 @@ our $i = 0;
 $|=1;
 
 undef $/;
-my @prgs = split "\n########\n", ~< *DATA;
-plan(6 + scalar @prgs);
+my @prgs = @( split "\n########\n", ~< *DATA );
+plan(6 + scalar nelems @prgs);
 
 my $tmpfile = "asubtmp000";
 1 while -f ++$tmpfile;
 END { if ($tmpfile) { 1 while unlink $tmpfile; } }
 
-for (@prgs){
+for (< @prgs){
     my $switch = "";
     if (s/^\s*(-\w+)//){
        $switch = $1;
@@ -56,7 +56,7 @@ for (@prgs){
 }
 
 sub test_invalid_decl {
-    my ($code,$todo) = @_;
+    my ($code,$todo) = < @_;
     local our $TODO = $todo;
     eval_dies_like( $code,
                     qr/^Illegal declaration of anonymous subroutine/);
@@ -104,17 +104,6 @@ my $x = X();
 die $@ if $@;
 undef &X;
 $x->();
-EXPECT
-ok 1
-########
-sub X;
-sub X {
-    my $n = "ok 1\n";
-    eval 'sub Y { my $p = shift; $p->() }';
-    die $@ if $@;
-    Y(sub { print $n });
-}
-X();
 EXPECT
 ok 1
 ########

@@ -3,7 +3,7 @@
 BEGIN {
     if( %ENV{PERL_CORE} ) {
         chdir 't';
-        @INC = ('../lib', 'lib');
+        @INC = @('../lib', 'lib');
     }
     else {
         unshift @INC, 't/lib';
@@ -14,7 +14,7 @@ use strict;
 
 use Test::Builder;
 require Test::Simple::Catch;
-my($out, $err) = Test::Simple::Catch::caught();
+my($out, $err) = < Test::Simple::Catch::caught();
 Test::Builder->new->no_header(1);
 Test::Builder->new->no_ending(1);
 local %ENV{HARNESS_ACTIVE} = 0;
@@ -25,15 +25,15 @@ package main;
 
 
 my $TB = Test::Builder->create;
-$TB->plan(tests => 73);
+$TB->plan(tests => 66);
 
 # Utility testing functions.
 sub ok ($;$) {
-    return $TB->ok(@_);
+    return $TB->ok(< @_);
 }
 
 sub is ($$;$) {
-    my($this, $that, $name) = @_;
+    my($this, $that, $name) = < @_;
 
     my $ok = $TB->is_eq($$this, $that, $name);
 
@@ -43,7 +43,7 @@ sub is ($$;$) {
 }
 
 sub like ($$;$) {
-    my($this, $regex, $name) = @_;
+    my($this, $regex, $name) = < @_;
     $regex = "/$regex/" if !ref $regex and $regex !~ m{^/.*/$}s;
 
     my $ok = $TB->like($$this, $regex, $name);
@@ -62,35 +62,39 @@ my $Filename = quotemeta $0;
 #line 68
 ok !is_deeply('foo', 'bar', 'plain strings');
 is( $out, "not ok 1 - plain strings\n",     'plain strings' );
-is( $err, <<ERR,                            '    right diagnostic' );
+is( $err, <<ERRHEAD . <<'ERR',                            '    right diagnostic' );
 #   Failed test 'plain strings'
 #   at $0 line 68.
-#          got: 'foo'
-#     expected: 'bar'
+ERRHEAD
+#     Structures begin differing at:
+#          $got = 'foo'
+#     $expected = 'bar'
 ERR
 
 
 #line 78
 ok !is_deeply(\%(), \@(), 'different types');
 is( $out, "not ok 2 - different types\n",   'different types' );
-like( $err, <<ERR,                          '   right diagnostic' );
+is( $err, <<ERRHEAD . <<'ERR',                          '   right diagnostic' );
 #   Failed test 'different types'
-#   at $Filename line 78.
+#   at $0 line 78.
+ERRHEAD
 #     Structures begin differing at:
-#          \\\$got = HASH\\(0x[0-9a-f]+\\)
-#     \\\$expected = ARRAY\\(0x[0-9a-f]+\\)
+#     ${     $got} = %(HASH (TODO))
+#     ${$expected} = @(ARRAY (TODO))
 ERR
 
 #line 88
 ok !is_deeply(\%( this => 42 ), \%( this => 43 ), 'hashes with different values');
 is( $out, "not ok 3 - hashes with different values\n", 
                                         'hashes with different values' );
-is( $err, <<ERR,                        '   right diagnostic' );
+is( $err, <<ERRHEAD . <<'ERR',                        '   right diagnostic' );
 #   Failed test 'hashes with different values'
 #   at $0 line 88.
+ERRHEAD
 #     Structures begin differing at:
-#          \$got->\{this\} = '42'
-#     \$expected->\{this\} = '43'
+#          $got->{this} = '42'
+#     $expected->{this} = '43'
 ERR
 
 #line 99
@@ -142,24 +146,26 @@ ERR
 #line 141
 ok !is_deeply(\42, \23,   'scalar refs');
 is( $out, "not ok 8 - scalar refs\n",   'scalar refs' );
-is( $err, <<ERR,                        '    right diagnostic' );
+is( $err, <<ERRHEAD . <<'ERR',                        '    right diagnostic' );
 #   Failed test 'scalar refs'
 #   at $0 line 141.
+ERRHEAD
 #     Structures begin differing at:
-#     \$\{     \$got\} = '42'
-#     \$\{\$expected\} = '23'
+#     ${     $got} = '42'
+#     ${$expected} = '23'
 ERR
 
 #line 151
 ok !is_deeply(\@(), \23,    'mixed scalar and array refs');
 is( $out, "not ok 9 - mixed scalar and array refs\n",
                                         'mixed scalar and array refs' );
-like( $err, <<ERR,                      '    right diagnostic' );
+is( $err, <<ERRHEAD . <<'ERR',                      '    right diagnostic' );
 #   Failed test 'mixed scalar and array refs'
-#   at $Filename line 151.
+#   at $0 line 151.
+ERRHEAD
 #     Structures begin differing at:
-#          \\\$got = ARRAY\\(0x[0-9a-f]+\\)
-#     \\\$expected = SCALAR\\(0x[0-9a-f]+\\)
+#     ${     $got} = @(ARRAY (TODO))
+#     ${$expected} = 23
 ERR
 
 
@@ -199,29 +205,29 @@ my $bar = \%(
 
 #line 198
 ok !is_deeply( $foo, $bar, 'deep structures' );
-ok( @Test::More::Data_Stack == 0, '@Data_Stack not holding onto things' );
+ok( (nelems @Test::More::Data_Stack) == 0, '@Data_Stack not holding onto things' );
 is( $out, "not ok 11 - deep structures\n",  'deep structures' );
 is( $err, <<ERR,                            '    right diagnostic' );
 #   Failed test 'deep structures'
 #   at $0 line 198.
 #     Structures begin differing at:
-#          \$got->\{that\}\{foo\} = Does not exist
-#     \$expected->\{that\}\{foo\} = 42
+#          \$got->\{that\}->\{foo\} = Does not exist
+#     \$expected->\{that\}->\{foo\} = 42
 ERR
 
 
 #line 221
-my @tests = (\@(),
+my @tests = @(\@(),
              \@(qw(42)),
              \@(qw(42 23), qw(42 23))
             );
 
-foreach my $test (@tests) {
-    my $num_args = @$test;
+foreach my $test (< @tests) {
+    my $num_args = (nelems @$test);
 
     my $warning;
     local $^WARN_HOOK = sub { $warning .= @_[0]->message; };
-    ok !is_deeply(@$test);
+    ok !is_deeply(< @$test);
 
     like \$warning, 
          "/^is_deeply\\(\\) takes two or three args, you gave $num_args\.\n/";
@@ -231,7 +237,7 @@ foreach my $test (@tests) {
 #line 240
 # [rt.cpan.org 6837]
 ok !is_deeply(\@(\%(Foo => undef)),\@(\%(Foo => ""))), 'undef != ""';
-ok( @Test::More::Data_Stack == 0, '@Data_Stack not holding onto things' );
+ok( (nelems @Test::More::Data_Stack) == 0, '@Data_Stack not holding onto things' );
 
 
 #line 258
@@ -243,7 +249,7 @@ ok !is_deeply(\@($a), \@(dump::view($a).'')),   "  even deep inside";
 
 #line 265
 # [rt.cpan.org 7030]
-ok !is_deeply( \%(), \%(key => \@()) ),  '[] could match non-existent values';
+ok !is_deeply( \%(), \%(key => \@()) ),  '\@() could match non-existent values';
 ok !is_deeply( \@(), \@(\@()) );
 
 
@@ -299,75 +305,61 @@ ERR
 #line 321
     ok !is_deeply( $array, $hash );
     is( $out, "not ok 24\n", 'is_deeply and different reference types' );
-    is( $err, <<ERR, 	     '  right diagnostic' );
+    is( $err, <<ERRHEAD.<<'ERR', 	     '  right diagnostic' );
 #   Failed test at $0 line 321.
 #     Structures begin differing at:
-#          \$got = {dump::view($array)}
-#     \$expected = {dump::view($hash)}
+ERRHEAD
+#     ${     $got} = @(ARRAY (TODO))
+#     ${$expected} = %(HASH (TODO))
 ERR
 
 #line 332
     ok !is_deeply( \@($array), \@($hash) );
     is( $out, "not ok 25\n", 'nested different ref types' );
-    is( $err, <<ERR,	     '  right diagnostic' );
+    is( $err, <<ERRHEAD.<<'ERR',	     '  right diagnostic' );
 #   Failed test at $0 line 332.
 #     Structures begin differing at:
-#          \$got->[0] = {dump::view($array)}
-#     \$expected->[0] = {dump::view($hash)}
+ERRHEAD
+#     ${     $got->[0]} = @(ARRAY (TODO))
+#     ${$expected->[0]} = %(HASH (TODO))
 ERR
 
-
-    if( eval { require overload } ) {
-	my $foo = bless \@(), "Foo";
-	my $bar = bless \%(), "Bar";
-
-	{
-	    package Bar;
-	    "overload"->import(q[""] => sub { "wibble" });
-	}
-
-#line 353
-	ok !is_deeply( \@($foo), \@($bar) );
-	is( $out, "not ok 26\n", 'string overloaded refs respected in diag' );
-	is( $err, <<ERR,	     '  right diagnostic' );
-#   Failed test at $0 line 353.
-#     Structures begin differing at:
-#          \$got->[0] = {dump::view($foo)}
-#     \$expected->[0] = 'wibble'
-ERR
-
-    }
-    else {
-	$TB->skip("Needs overload.pm") for 1..3;
-    }
 }
 
 
 # rt.cpan.org 14746
 {
+  TODO: {
+        $TB->todo_skip("different subs", 2);
+        last TODO;
+
 # line 349
-    ok !is_deeply( sub {"foo"}, sub {"bar"} ), 'function refs';
-    is( $out, "not ok 27\n" );
-    like( $err, <<ERR,	     '  right diagnostic' );
+        ok !is_deeply( sub {"foo"}, sub {"bar"} ), 'function refs';
+        is( $out, "not ok 27\n" );
+        like( $err, <<ERR,	     '  right diagnostic' );
 #   Failed test at $Filename line 349.
 #     Structures begin differing at:
 #          \\\$got = CODE\\(0x[0-9a-f]+\\)
 #     \\\$expected = CODE\\(0x[0-9a-f]+\\)
 ERR
-
+    }
 
     use Symbol;
     my $glob1 = gensym;
     my $glob2 = gensym;
 
+  TODO: {
+        $TB->todo_skip("different subs", 2);
+        last TODO;
 #line 357
-    ok !is_deeply( $glob1, $glob2 ), 'typeglobs';
-    is( $out, "not ok 28\n" );
-    like( $err, <<ERR,	     '  right diagnostic' );
+        ok !is_deeply( $glob1, $glob2 ), 'typeglobs';
+        is( $out, "not ok 28\n" );
+        like( $err, <<ERR,	     '  right diagnostic' );
 #   Failed test at $Filename line 357.
 #     Structures begin differing at:
 #          \\\$got = GLOB\\(0x[0-9a-f]+\\)
 #     \\\$expected = GLOB\\(0x[0-9a-f]+\\)
 ERR
 
+    }
 }

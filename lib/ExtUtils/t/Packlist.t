@@ -3,7 +3,7 @@
 BEGIN {
     if( %ENV{PERL_CORE} ) {
         chdir 't' if -d 't';
-        @INC = '../lib';
+        @INC = @( '../lib' );
     }
     else {
         unshift @INC, 't/lib';
@@ -20,7 +20,7 @@ is( ref(ExtUtils::Packlist::mkfh()), 'GLOB', 'mkfh() should return a FH' );
 # new calls tie()
 my $pl = ExtUtils::Packlist->new();
 isa_ok( $pl, 'ExtUtils::Packlist' );
-is( ref tied %$pl, 'ExtUtils::Packlist', 'obj should be tied underneath' );
+is( (ref tied %$pl), 'ExtUtils::Packlist', 'obj should be tied underneath' );
 
 
 $pl = ExtUtils::Packlist::TIEHASH( 'tieclass', 'packfile' );
@@ -29,18 +29,18 @@ is( $pl->{packfile}, 'packfile', 'TIEHASH() should store packfile name' );
 
 
 ExtUtils::Packlist::STORE($pl, 'key', 'value');
-is( $pl->{data}{key}, 'value', 'STORE() should stuff stuff in data member' );
+is( $pl->{data}->{key}, 'value', 'STORE() should stuff stuff in data member' );
 
 
-$pl->{data}{foo} = 'bar';
+$pl->{data}->{foo} = 'bar';
 is( ExtUtils::Packlist::FETCH($pl, 'foo'), 'bar', 'check FETCH()' );
 
 
 # test FIRSTKEY and NEXTKEY
 SKIP: {
-	$pl->{data}{bar} = 'baz';
+	$pl->{data}->{bar} = 'baz';
 	skip('not enough keys to test FIRSTKEY', 2)
-      unless keys %{ $pl->{data} } +> 2;
+      unless nkeys %{ $pl->{data} } +> 2;
 
 	# get the first and second key
 	my ($first, $second) = keys %{ $pl->{data} };
@@ -64,11 +64,11 @@ ok( ExtUtils::Packlist::EXISTS($pl, 'bar'), 'EXISTS() should find keys' );
 
 
 ExtUtils::Packlist::DELETE($pl, 'bar');
-ok( !(exists $pl->{data}{bar}), 'DELETE() should delete cleanly' );
+ok( !(exists $pl->{data}->{bar}), 'DELETE() should delete cleanly' );
 
 
 ExtUtils::Packlist::CLEAR($pl);
-is( keys %{ $pl->{data} }, 0, 'CLEAR() should wipe out data' );
+is( nkeys %{ $pl->{data} }, 0, 'CLEAR() should wipe out data' );
 
 
 # DESTROY does nothing...
@@ -76,10 +76,10 @@ can_ok( 'ExtUtils::Packlist', 'DESTROY' );
 
 
 # write is a little more complicated
-eval { ExtUtils::Packlist::write(\%()) };
+try { ExtUtils::Packlist::write(\%()) };
 like( $@->{description}, qr/No packlist filename/, 'write() should croak without packfile' );
 
-eval { ExtUtils::Packlist::write(\%(), 'eplist') };
+try { ExtUtils::Packlist::write(\%(), 'eplist') };
 my $file_is_ready = $@ ? 0 : 1;
 ok( $file_is_ready, 'write() can write a file' );
 
@@ -94,7 +94,7 @@ SKIP: {
 	SKIP: {
 	    skip("cannot write readonly files", 1) if -w 'eplist';
 
-	    eval { ExtUtils::Packlist::write(\%(), 'eplist') };
+	    try { ExtUtils::Packlist::write(\%(), 'eplist') };
 	    like( $@->{description}, qr/Can't open file/, 'write() should croak on open failure' );
 	}
 
@@ -110,7 +110,7 @@ SKIP: {
 		),
 		'/./abc' => '',
 	);
-	eval { ExtUtils::Packlist::write($pl, 'eplist') };
+	try { ExtUtils::Packlist::write($pl, 'eplist') };
 	is( $@, '', 'write() should normally succeed' );
 	is( $pl->{packfile}, 'eplist', 'write() should set packfile name' );
 
@@ -118,11 +118,11 @@ SKIP: {
 }
 
 
-eval { ExtUtils::Packlist::read(\%()) };
+try { ExtUtils::Packlist::read(\%()) };
 like( $@->{description}, qr/^No packlist filename/, 'read() should croak without packfile' );
 
 
-eval { ExtUtils::Packlist::read(\%(), 'abadfilename') };
+try { ExtUtils::Packlist::read(\%(), 'abadfilename') };
 like( $@->{description}, qr/^Can't open file/, 'read() should croak with bad packfile name' );
 #'open packfile for reading
 
@@ -138,13 +138,13 @@ SKIP: {
 	like( $file, qr/hash.+foo=bar/, 'second embedded hash value should appear');
 	close IN;
 
-	eval{ ExtUtils::Packlist::read($pl, 'eplist') };
+	try{ ExtUtils::Packlist::read($pl, 'eplist') };
 	is( $@, '', 'read() should normally succeed' );
-	is( $pl->{data}{single}, undef, 'single keys should have undef value' );
-	is( ref($pl->{data}{hash}), 'HASH', 'multivalue keys should become hashes');
+	is( $pl->{data}->{single}, undef, 'single keys should have undef value' );
+	is( ref($pl->{data}->{hash}), 'HASH', 'multivalue keys should become hashes');
 
-	is( $pl->{data}{hash}{foo}, 'bar', 'hash values should be set' );
-	ok( exists $pl->{data}{'/abc'}, 'read() should resolve /./ to / in keys' );
+	is( $pl->{data}->{hash}->{foo}, 'bar', 'hash values should be set' );
+	ok( exists $pl->{data}->{'/abc'}, 'read() should resolve /./ to / in keys' );
 
 	# give validate a valid and an invalid file to find
 	$pl->{data} = \%(
@@ -152,10 +152,10 @@ SKIP: {
 		fake => undef,
 	);
 
-	is( ExtUtils::Packlist::validate($pl), 1,
+	is( nelems @(ExtUtils::Packlist::validate($pl)), 1,
 		'validate() should find missing files' );
 	ExtUtils::Packlist::validate($pl, 1);
-	ok( !exists $pl->{data}{fake},
+	ok( !exists $pl->{data}->{fake},
 		'validate() should remove missing files when prompted' );
 
 	# one more new() test, to see if it calls read() successfully
@@ -164,9 +164,9 @@ SKIP: {
 
 
 # packlist_file, $pl should be set from write test
-is( ExtUtils::Packlist::packlist_file(\%( packfile => 'pl' )), 'pl',
+is( ExtUtils::Packlist::packlist_file(\%( packfile => 'pl' ))[0], 'pl',
 	'packlist_file() should fetch packlist from passed hash' );
-is( ExtUtils::Packlist::packlist_file($pl), 'eplist',
+is( ExtUtils::Packlist::packlist_file($pl)[0], 'eplist',
 	'packlist_file() should fetch packlist from ExtUtils::Packlist object' );
 
 END {

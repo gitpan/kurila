@@ -1,8 +1,6 @@
 #!./perl
 
 BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
     require './test.pl';
 }
 
@@ -14,7 +12,7 @@ my $Is_MacOS = $^O eq 'MacOS';
 
 our ($f);
 
-plan tests => 104;
+plan tests => 98;
 
 my $Perl = which_perl();
 
@@ -34,9 +32,6 @@ my $Perl = which_perl();
     is( $b, "SomeData\n",       '       readline' );
     ok( -f $f,                  '       still a file' );
 
-    eval  { die "Message" };
-    like( $@->message, qr/<\$f> line 1/, '       die message correct' );
-    
     ok( close($f),              '       close()' );
     ok( unlink("afile"),        '       unlink()' );
 }
@@ -57,8 +52,8 @@ my $Perl = which_perl();
 
 {
     ok( open(my $f, '<', 'afile'),      "open(my \$f, '<', 'afile')" );
-    my @rows = ~< $f;
-    is( scalar @rows, 2,                '       readline, list context' );
+    my @rows = @( ~< $f );
+    is( scalar nelems @rows, 2,                '       readline, list context' );
     is( @rows[0], "a row\n",            '       first line read' );
     is( @rows[1], "a row\n",            '       second line' );
     ok( close($f),                      '       close' );
@@ -68,8 +63,8 @@ my $Perl = which_perl();
     ok( -s 'afile' +< 20,                '-s' );
 
     ok( open(my $f, '+<', 'afile'),     'open +<' );
-    my @rows = ~< $f;
-    is( scalar @rows, 2,                '       readline, list context' );
+    my @rows = @( ~< $f );
+    is( scalar nelems @rows, 2,                '       readline, list context' );
     ok( seek($f, 0, 1),                 '       seek cur' );
     ok( (print $f "yet another row\n"), '       print' );
     ok( close($f),                      '       close' );
@@ -85,8 +80,8 @@ SKIP: {
     $Perl -e "print qq(a row\\n); print qq(another row\\n)"
 EOC
 
-    my @rows = ~< $f;
-    is( scalar @rows, 2,                '       readline, list context' );
+    my @rows = @( ~< $f );
+    is( scalar nelems @rows, 2,                '       readline, list context' );
     ok( close($f),                      '       close' );
 }
 
@@ -97,7 +92,7 @@ SKIP: {
     $Perl -pe "s/^not //"
 EOC
 
-    my @rows = ~< $f;
+    my @rows = @( ~< $f );
     my $test = curr_test;
     print $f "not ok $test - piped in\n";
     next_test;
@@ -111,7 +106,7 @@ EOC
 }
 
 
-ok( !eval { open my $f, '<&', 'afile'; 1; },    '<& on a non-filehandle' );
+ok( !try { open my $f, '<&', 'afile'; 1; },    '<& on a non-filehandle' );
 like( $@->message, qr/Bad filehandle:\s+afile/,          '       right error' );
 
 
@@ -131,8 +126,6 @@ like( $@->message, qr/Bad filehandle:\s+afile/,          '       right error' );
     is( $b, "SomeData\n",               '       readline' );
     ok( -f $f,                          '       still a file' );
 
-    eval  { die "Message" };
-    like( $@->message, qr/<\$f> line 1/,         '       proper die message' );
     ok( close($f),                      '       close' );
 
     unlink("afile");
@@ -154,8 +147,8 @@ like( $@->message, qr/Bad filehandle:\s+afile/,          '       right error' );
 
 {
     ok( open(local $f, '<', 'afile'),   'open local $f, "<", ...' );
-    my @rows = ~< $f;
-    is( scalar @rows, 2,                '       readline list context' );
+    my @rows = @( ~< $f );
+    is( scalar nelems @rows, 2,                '       readline list context' );
     ok( close($f),                      '       close' );
 }
 
@@ -163,8 +156,8 @@ ok( -s 'afile' +< 20,                '       -s' );
 
 {
     ok( open(local $f, '+<', 'afile'),  'open local $f, "+<", ...' );
-    my @rows = ~< $f;
-    is( scalar @rows, 2,                '       readline list context' );
+    my @rows = @( ~< $f );
+    is( scalar nelems @rows, 2,                '       readline list context' );
     ok( seek($f, 0, 1),                 '       seek cur' );
     ok( (print $f "yet another row\n"), '       print' );
     ok( close($f),                      '       close' );
@@ -179,9 +172,9 @@ SKIP: {
     ok( open(local $f, '-|', <<EOC),  'open local $f, "-|", ...' );
     $Perl -e "print qq(a row\\n); print qq(another row\\n)"
 EOC
-    my @rows = ~< $f;
+    my @rows = @( ~< $f );
 
-    is( scalar @rows, 2,                '       readline list context' );
+    is( scalar nelems @rows, 2,                '       readline list context' );
     ok( close($f),                      '       close' );
 }
 
@@ -192,7 +185,7 @@ SKIP: {
     $Perl -pe "s/^not //"
 EOC
 
-    my @rows = ~< $f;
+    my @rows = @( ~< $f );
     my $test = curr_test;
     print $f "not ok $test - piping\n";
     next_test;
@@ -206,7 +199,7 @@ EOC
 }
 
 
-ok( !eval { open local $f, '<&', 'afile'; 1 },  'local <& on non-filehandle');
+ok( !try { open local $f, '<&', 'afile'; 1 },  'local <& on non-filehandle');
 like( $@->message, qr/Bad filehandle:\s+afile/,          '       right error' );
 
 {
@@ -246,7 +239,7 @@ SKIP: {
 }
 
 {
-    ok( !eval { open F, "BAR", "QUUX" },       'Unknown open() mode' );
+    ok( !try { open F, "BAR", "QUUX" },       'Unknown open() mode' );
     like( $@->message, qr/\QUnknown open() mode 'BAR'/, '       right error' );
 }
 
@@ -259,26 +252,6 @@ SKIP: {
 	warn "gimme";
 	return $line;
     }
-
-    local $TODO = "fix variable name";
-
-    open(@fh0[0], "<", "TEST");
-    gimme(@fh0[0]);
-    like($@->message, qr/<\@fh0\[...\]> line 1/, "autoviv fh package aelem");
-
-    open(%fh1{k}, "<", "TEST");
-    gimme(%fh1{k});
-    like($@->message, qr/<\%fh1{...}> line 1/, "autoviv fh package helem");
-
-    my @fh2;
-    open(@fh2[0], "<", "TEST");
-    gimme(@fh2[0]);
-    like($@->message, qr/<\@fh2\[...\]> line 1/, "autoviv fh lexical aelem");
-
-    my %fh3;
-    open(%fh3{k}, "<", "TEST");
-    gimme(%fh3{k});
-    like($@->message, qr/<\%fh3{...}> line 1/, "autoviv fh lexical helem");
 }
     
 SKIP: {
@@ -287,21 +260,21 @@ SKIP: {
     use warnings 'layer';
     local $^WARN_HOOK = sub { $w = shift->message };
 
-    eval { open(F, ">>>", "afile") };
+    try { open(F, ">>>", "afile") };
     like($w, qr/Invalid separator character '>' in PerlIO layer spec/,
 	 "bad open (>>>) warning");
     like($@->message, qr/Unknown open\(\) mode '>>>'/,
 	 "bad open (>>>) failure");
 
-    eval { open(F, ">:u", "afile" ) };
+    try { open(F, ">:u", "afile" ) };
     ok( ! $@ );
     like($w, qr/Unknown PerlIO layer "u"/,
 	 'bad layer ">:u" warning');
-    eval { open(F, "<:u", "afile" ) };
+    try { open(F, "<:u", "afile" ) };
     ok( ! $@ );
     like($w, qr/Unknown PerlIO layer "u"/,
 	 'bad layer "<:u" warning');
-    eval { open(F, ":c", "afile" ) };
+    try { open(F, ":c", "afile" ) };
     like($@->message, qr/Unknown open\(\) mode ':c'/,
 	 'bad layer ":c" failure');
 }
@@ -319,5 +292,5 @@ fresh_perl_is(
 # [perl #31767] Using $1 as a filehandle via open $1, "file" doesn't raise
 # an exception
 
-eval { open $99, "<", "foo" };
+try { open $99, "<", "foo" };
 like($@->message, qr/Modification of a read-only value attempted/, "readonly fh");

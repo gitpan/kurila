@@ -25,439 +25,6 @@
 #include <signal.h>
 #endif
 
-STATIC I32
-S_do_trans_simple(pTHX_ SV * const sv)
-{
-    dVAR;
-    I32 matches = 0;
-    STRLEN len;
-    U8 *s = (U8*)SvPV(sv,len);
-    U8 * const send = s+len;
-    const short * const tbl = (short*)cPVOP->op_pv;
-
-    PERL_ARGS_ASSERT_DO_TRANS_SIMPLE;
-
-    if (!tbl)
-	Perl_croak(aTHX_ "panic: do_trans_simple line %d",__LINE__);
-
-    /* First, take care of non-UTF-8 input strings, because they're easy */
-    while (s < send) {
-	const I32 ch = tbl[*s];
-	if (ch >= 0) {
-	    matches++;
-	    *s = (U8)ch;
-	}
-	s++;
-    }
-    SvSETMAGIC(sv);
-    return matches;
-}
-
-STATIC I32
-S_do_trans_count(pTHX_ SV * const sv)
-{
-    dVAR;
-    STRLEN len;
-    const U8 *s = (const U8*)SvPV_const(sv, len);
-    const U8 * const send = s + len;
-    I32 matches = 0;
-    const short * const tbl = (short*)cPVOP->op_pv;
-
-    PERL_ARGS_ASSERT_DO_TRANS_COUNT;
-
-    if (!tbl)
-	Perl_croak(aTHX_ "panic: do_trans_count line %d",__LINE__);
-    
-    while (s < send) {
-	if (tbl[*s++] >= 0)
-	    matches++;
-    }
-
-    return matches;
-}
-
-STATIC I32
-S_do_trans_complex(pTHX_ SV * const sv)
-{
-    dVAR;
-    STRLEN len;
-    U8 *s = (U8*)SvPV(sv, len);
-    U8 * const send = s+len;
-    I32 matches = 0;
-    const short * const tbl = (short*)cPVOP->op_pv;
-
-    PERL_ARGS_ASSERT_DO_TRANS_COMPLEX;
-
-    if (!tbl)
-	Perl_croak(aTHX_ "panic: do_trans_complex line %d",__LINE__);
-
-    {
-	U8 *d = s;
-	U8 * const dstart = d;
-
-	if (PL_op->op_private & OPpTRANS_SQUASH) {
-	    const U8* p = send;
-	    while (s < send) {
-		const I32 ch = tbl[*s];
-		if (ch >= 0) {
-		    *d = (U8)ch;
-		    matches++;
-		    if (p != d - 1 || *p != *d)
-			p = d++;
-		}
-		else if (ch == -1)	/* -1 is unmapped character */
-		    *d++ = *s;	
-		else if (ch == -2)	/* -2 is delete character */
-		    matches++;
-		s++;
-	    }
-	}
-	else {
-	    while (s < send) {
-		const I32 ch = tbl[*s];
-		if (ch >= 0) {
-		    matches++;
-		    *d++ = (U8)ch;
-		}
-		else if (ch == -1)	/* -1 is unmapped character */
-		    *d++ = *s;
-		else if (ch == -2)      /* -2 is delete character */
-		    matches++;
-		s++;
-	    }
-	}
-	*d = '\0';
-	SvCUR_set(sv, d - dstart);
-    }
-    SvSETMAGIC(sv);
-    return matches;
-}
-
-STATIC I32
-S_do_trans_simple_utf8(pTHX_ SV * const sv)
-{
-    dVAR;
-    char *s;
-    char *send;
-    char *d;
-    char *start;
-    char *dstart, *dend;
-    I32 matches = 0;
-    const I32 grows = PL_op->op_private & OPpTRANS_GROWS;
-    STRLEN len;
-    SV* const  rv =
-#ifdef USE_ITHREADS
-		    PAD_SVl(cPADOP->op_padix);
-#else
-		    (SV*)cSVOP->op_sv;
-#endif
-    HV* const  hv = (HV*)SvRV(rv);
-    SV* const * svp = hv_fetchs(hv, "NONE", FALSE);
-    const UV none = svp ? SvUV(*svp) : 0x7fffffff;
-    const UV extra = none + 1;
-    UV final = 0;
-
-    PERL_ARGS_ASSERT_DO_TRANS_SIMPLE_UTF8;
-
-    s = SvPV(sv, len);
-    send = s + len;
-    start = s;
-
-    svp = hv_fetchs(hv, "FINAL", FALSE);
-    if (svp)
-	final = SvUV(*svp);
-
-    if (grows) {
-	/* d needs to be bigger than s, in case e.g. upgrading is required */
-	Newx(d, len * 3 + UTF8_MAXBYTES, char);
-	dend = d + len * 3;
-	dstart = d;
-    }
-    else {
-	dstart = d = s;
-	dend = d + len;
-    }
-
-    while (s < send) {
-	const UV uv = swash_fetch(rv, s, TRUE);
-	if (uv < none) {
-	    s += UTF8SKIP(s);
-	    matches++;
-	    d = uvuni_to_utf8(d, uv);
-	}
-	else if (uv == none) {
-	    const int i = UTF8SKIP(s);
-	    Move(s, d, i, char);
-	    d += i;
-	    s += i;
-	}
-	else if (uv == extra) {
-	    s += UTF8SKIP(s);
-	    matches++;
-	    d = uvuni_to_utf8(d, final);
-	}
-	else
-	    s += UTF8SKIP(s);
-
-	if (d > dend) {
-	    const STRLEN clen = d - dstart;
-	    const STRLEN nlen = dend - dstart + len + UTF8_MAXBYTES;
-	    if (!grows)
-		Perl_croak(aTHX_ "panic: do_trans_simple_utf8 line %d",__LINE__);
-	    Renew(dstart, nlen + UTF8_MAXBYTES, char);
-	    d = dstart + clen;
-	    dend = dstart + nlen;
-	}
-    }
-    if (grows) {
-	sv_setpvn(sv, dstart, d - dstart);
-	Safefree(dstart);
-    }
-    else {
-	*d = '\0';
-	SvCUR_set(sv, d - dstart);
-    }
-    SvSETMAGIC(sv);
-
-    return matches;
-}
-
-STATIC I32
-S_do_trans_count_utf8(pTHX_ SV * const sv)
-{
-    dVAR;
-    const char *s;
-    const char *send;
-    I32 matches = 0;
-    STRLEN len;
-    SV* const  rv =
-#ifdef USE_ITHREADS
-		    PAD_SVl(cPADOP->op_padix);
-#else
-		    (SV*)cSVOP->op_sv;
-#endif
-    HV* const hv = (HV*)SvRV(rv);
-    SV* const * const svp = hv_fetchs(hv, "NONE", FALSE);
-    const UV none = svp ? SvUV(*svp) : 0x7fffffff;
-    const UV extra = none + 1;
-
-    PERL_ARGS_ASSERT_DO_TRANS_COUNT_UTF8;
-
-    s = SvPV_const(sv, len);
-    send = s + len;
-
-    while (s < send) {
-	const UV uv = swash_fetch(rv, s, TRUE);
-	if (uv < none || uv == extra)
-	    matches++;
-	s += UTF8SKIP(s);
-    }
-
-    return matches;
-}
-
-STATIC I32
-S_do_trans_complex_utf8(pTHX_ SV * const sv)
-{
-    dVAR;
-    char *start, *send;
-    char *d;
-    I32 matches = 0;
-    const I32 squash   = PL_op->op_private & OPpTRANS_SQUASH;
-    const I32 del      = PL_op->op_private & OPpTRANS_DELETE;
-    const I32 grows    = PL_op->op_private & OPpTRANS_GROWS;
-    SV* const  rv =
-#ifdef USE_ITHREADS
-		    PAD_SVl(cPADOP->op_padix);
-#else
-		    (SV*)cSVOP->op_sv;
-#endif
-    HV * const hv = (HV*)SvRV(rv);
-    SV * const *svp = hv_fetchs(hv, "NONE", FALSE);
-    const UV none = svp ? SvUV(*svp) : 0x7fffffff;
-    const UV extra = none + 1;
-    UV final = 0;
-    bool havefinal = FALSE;
-    STRLEN len;
-    char *dstart, *dend;
-    char *s = SvPV(sv, len);
-
-    PERL_ARGS_ASSERT_DO_TRANS_COMPLEX_UTF8;
-
-    send = s + len;
-    start = s;
-
-    svp = hv_fetchs(hv, "FINAL", FALSE);
-    if (svp) {
-	final = SvUV(*svp);
-	havefinal = TRUE;
-    }
-
-    if (grows) {
-	/* d needs to be bigger than s, in case e.g. upgrading is required */
-	Newx(d, len * 3 + UTF8_MAXBYTES, char);
-	dend = d + len * 3;
-	dstart = d;
-    }
-    else {
-	dstart = d = s;
-	dend = d + len;
-    }
-
-    if (squash) {
-	UV puv = 0xfeedface;
-	while (s < send) {
-	    UV uv = swash_fetch(rv, s, TRUE);
-	
-	    if (d > dend) {
-		const STRLEN clen = d - dstart;
-		const STRLEN nlen = dend - dstart + len + UTF8_MAXBYTES;
-		if (!grows)
-		    Perl_croak(aTHX_ "panic: do_trans_complex_utf8 line %d",__LINE__);
-		Renew(dstart, nlen + UTF8_MAXBYTES, char);
-		d = dstart + clen;
-		dend = dstart + nlen;
-	    }
-	    if (uv < none) {
-		matches++;
-		s += UTF8SKIP(s);
-		if (uv != puv) {
-		    d = uvuni_to_utf8(d, uv);
-		    puv = uv;
-		}
-		continue;
-	    }
-	    else if (uv == none) {	/* "none" is unmapped character */
-		const int i = UTF8SKIP(s);
-		Move(s, d, i, char);
-		d += i;
-		s += i;
-		puv = 0xfeedface;
-		continue;
-	    }
-	    else if (uv == extra && !del) {
-		matches++;
-		if (havefinal) {
-		    s += UTF8SKIP(s);
-		    if (puv != final) {
-			d = uvuni_to_utf8(d, final);
-			puv = final;
-		    }
-		}
-		else {
-		    STRLEN len;
-		    uv = utf8n_to_uvuni(s, send - s, &len, UTF8_ALLOW_DEFAULT);
-		    if (uv != puv) {
-			Move(s, d, len, char);
-			d += len;
-			puv = uv;
-		    }
-		    s += len;
-		}
-		continue;
-	    }
-	    matches++;			/* "none+1" is delete character */
-	    s += UTF8SKIP(s);
-	}
-    }
-    else {
-	while (s < send) {
-	    const UV uv = swash_fetch(rv, s, TRUE);
-	    if (d > dend) {
-	        const STRLEN clen = d - dstart;
-		const STRLEN nlen = dend - dstart + len + UTF8_MAXBYTES;
-		if (!grows)
-		    Perl_croak(aTHX_ "panic: do_trans_complex_utf8 line %d",__LINE__);
-		Renew(dstart, nlen + UTF8_MAXBYTES, char);
-		d = dstart + clen;
-		dend = dstart + nlen;
-	    }
-	    if (uv < none) {
-		matches++;
-		s += UTF8SKIP(s);
-		d = uvuni_to_utf8(d, uv);
-		continue;
-	    }
-	    else if (uv == none) {	/* "none" is unmapped character */
-		const int i = UTF8SKIP(s);
-		Move(s, d, i, char);
-		d += i;
-		s += i;
-		continue;
-	    }
-	    else if (uv == extra && !del) {
-		matches++;
-		s += UTF8SKIP(s);
-		d = uvuni_to_utf8(d, final);
-		continue;
-	    }
-	    matches++;			/* "none+1" is delete character */
-	    s += UTF8SKIP(s);
-	}
-    }
-    if (grows) {
-	sv_setpvn(sv, (char*)dstart, d - dstart);
-	Safefree(dstart);
-    }
-    else {
-	*d = '\0';
-	SvCUR_set(sv, d - dstart);
-    }
-    SvSETMAGIC(sv);
-
-    return matches;
-}
-
-I32
-Perl_do_trans(pTHX_ SV *sv)
-{
-    dVAR;
-    STRLEN len;
-    const I32 doutf = PL_op->op_private & OPpTRANS_UTF8;
-
-    PERL_ARGS_ASSERT_DO_TRANS;
-
-    if (SvREADONLY(sv) && !(PL_op->op_private & OPpTRANS_IDENTICAL)) {
-        if (SvIsCOW(sv))
-            sv_force_normal_flags(sv, 0);
-        if (SvREADONLY(sv))
-            Perl_croak(aTHX_ PL_no_modify);
-    }
-    (void)SvPV_const(sv, len);
-    if (!len)
-	return 0;
-    if (!(PL_op->op_private & OPpTRANS_IDENTICAL)) {
-	if (!SvPOKp(sv))
-	    (void)SvPV_force(sv, len);
-	(void)SvPOK_only(sv);
-    }
-
-    DEBUG_t( Perl_deb(aTHX_ "2.TBL\n"));
-
-    switch (PL_op->op_private & (
-		OPpTRANS_IDENTICAL|
-		OPpTRANS_SQUASH|OPpTRANS_DELETE|OPpTRANS_COMPLEMENT)) {
-    case 0:
-	if (doutf)
-	    return do_trans_simple_utf8(sv);
-	else
-	    return do_trans_simple(sv);
-
-    case OPpTRANS_IDENTICAL:
-    case OPpTRANS_IDENTICAL|OPpTRANS_COMPLEMENT:
-	if (doutf)
-	    return do_trans_count_utf8(sv);
-	else
-	    return do_trans_count(sv);
-
-    default:
-	if (doutf)
-	    return do_trans_complex_utf8(sv);
-	else
-	    return do_trans_complex(sv);
-    }
-}
-
 void
 Perl_do_join(pTHX_ register SV *sv, SV *delim, register SV **mark, register SV **sp)
 {
@@ -969,7 +536,7 @@ Perl_do_vop(pTHX_ I32 optype, SV *sv, SV *left, SV *right)
 		    ? len : (leftlen > rightlen ? leftlen : rightlen);
 	Newxz(dc, needlen + 1, char);
 	sv_usepvn_flags(sv, dc, needlen, SV_HAS_TRAILING_NUL);
-	dc = SvPVX(sv);		/* sv_usepvn() calls Renew() */
+	dc = SvPVX_mutable(sv);		/* sv_usepvn() calls Renew() */
     }
 #ifdef LIBERAL
     if (len >= sizeof(long)*4 &&
@@ -1054,7 +621,7 @@ Perl_do_kv(pTHX)
     HV *keys;
     register HE *entry;
     const I32 gimme = GIMME_V;
-    const I32 dokv =     (PL_op->op_type == OP_RV2HV || PL_op->op_type == OP_PADHV || PL_op->op_type == OP_ANONHASH);
+    const I32 dokv =     (PL_op->op_type == OP_EXPAND);
     const I32 dokeys =   dokv || (PL_op->op_type == OP_KEYS);
     const I32 dovalues = dokv || (PL_op->op_type == OP_VALUES);
 
@@ -1069,6 +636,13 @@ Perl_do_kv(pTHX)
 	RETURN;
     }
 
+    if ( ! SvHVOK(hv) ) {
+	if ( ! SvOK(hv) ) {
+	    RETURN;
+	}
+	Perl_croak(aTHX_ "keys expected a hash but got %s", Ddesc((SV*)hv));
+    }
+
     keys = hv;
     (void)hv_iterinit(keys);	/* always reset iterator regardless */
 
@@ -1078,6 +652,7 @@ Perl_do_kv(pTHX)
     if (gimme == G_SCALAR) {
 	IV i;
 
+	Perl_croak(aTHX_ "keys in scalar context");
 	if (PL_op->op_flags & OPf_MOD) {	/* lvalue */
 	    SV * const sv = sv_newmortal();
 	    sv_upgrade(sv, SVt_PVLV);
@@ -1126,6 +701,76 @@ Perl_do_kv(pTHX)
 	PUTBACK;
     }
     return NORMAL;
+}
+
+void
+Perl_bad_arg(pTHX_ I32 n, const char *t, const char *name, SV *arg)
+{
+    PERL_ARGS_ASSERT_BAD_ARG;
+
+    Perl_croak(aTHX_ "Type of arg %d to %s must be %s (not %s)",
+	       (int)n, name, t, Ddesc(arg));
+}
+
+void
+Perl_do_arg_check(pTHX_ SV** base)
+{
+    dSP;
+    const int type = PL_op->op_type;
+    register I32 opargs = PL_opargs[type];
+    register I32 oa = opargs >> OASHIFT;
+    SV** arg = base;
+    I32 numargs = 0;
+
+/*     if (opargs & OA_MARK) { */
+/* 	arg = PL_stack_base + TOPMARK; */
+/*     } else { */
+/* 	I32 xoa = oa; */
+/* 	xoa >>= 4; */
+/* 	while (xoa) { */
+/* 	    arg--; */
+/* 	    xoa >>= 4; */
+/* 	} */
+/*     } */
+
+    while (oa) {
+	if ( (oa & 7) == OA_LIST) {
+	    assert(oa < 16);
+	    break;
+	}
+
+	if (arg > SP) {
+	    if ( ! (oa & OA_OPTIONAL) )
+		Perl_croak(aTHX_ "Not enough arguments for %s", PL_op_desc[type]);
+	    break;
+	}
+
+	numargs++;
+	switch (oa & 7) {
+	case OA_SCALAR:
+	    break;
+	case OA_AVREF:
+	    if ( ! SvAVOK(*arg) && SvOK(*arg) )
+		bad_arg(numargs, "array", PL_op_desc[type], *arg);
+	    break;
+	case OA_HVREF:
+		if ( ! SvHVOK(*arg) )
+		    bad_arg(numargs, "hash", PL_op_desc[type], *arg);
+		break;
+/* 	    case OA_CVREF: */
+/* 		break; */
+/* 	    case OA_FILEREF: */
+/* 		break; */
+/* 	    case OA_SCALARREF: */
+/* 		if ( ! SvROK(*arg) || ! SvAVOK(SvRV(*arg)) ) */
+/* 		    bad_arg(numargs, "array", SvDESC(arg)); */
+/* 		break; */
+	default:
+	    Perl_croak(aTHX_ "panic: unknown expeced arugment type");
+	}
+	oa >>= 4;
+	arg++;
+    }
 }
 
 /*

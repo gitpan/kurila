@@ -12,19 +12,7 @@
 # This test checks downgrade behaviour on pre-5.8 perls when new 5.8 features
 # are encountered.
 
-sub BEGIN {
-    if (%ENV{PERL_CORE}){
-	chdir('t') if -d 't';
-	@INC = ('.', '../lib');
-    } else {
-	unshift @INC, 't';
-    }
-    require Config; Config->import;
-    if (%ENV{PERL_CORE} and %Config{'extensions'} !~ m/\bStorable\b/) {
-        print "1..0 # Skip: Storable was not built\n";
-        exit 0;
-    }
-}
+use Config;
 
 use Test::More;
 use Storable qw (dclone store retrieve freeze thaw nstore nfreeze);
@@ -46,14 +34,14 @@ my $lots_of_9C = do {
 my $max_iv = ^~^0 >> 1;
 my $min_iv = do {use integer; -$max_iv-1}; # 2s complement assumption
 
-my @processes = (\@("dclone", \&do_clone),
+my @processes = @(\@("dclone", \&do_clone),
                  \@("freeze/thaw", \&freeze_and_thaw),
                  \@("nfreeze/thaw", \&nfreeze_and_thaw),
                  \@("store/retrieve", \&store_and_retrieve),
                  \@("nstore/retrieve", \&nstore_and_retrieve),
                 );
 my @numbers =
-  (# IV bounds of 8 bits
+  @(# IV bounds of 8 bits
    -1, 0, 1, -127, -128, -129, 42, 126, 127, 128, 129, 254, 255, 256, 257,
    # IV bounds of 32 bits
    -2147483647, -2147483648, -2147483649, 2147483646, 2147483647, 2147483648,
@@ -68,7 +56,7 @@ my @numbers =
    2559831922.0,
   );
 
-plan tests => @processes * @numbers * 5;
+plan tests => (nelems @processes) * (nelems @numbers) * 5;
 
 my $file = "integer.$$";
 die "Temporary file '$file' already exists" if -e $file;
@@ -77,7 +65,7 @@ END { while (-f $file) {unlink $file or die "Can't unlink '$file': $!" }}
 
 sub do_clone {
   my $data = shift;
-  my $copy = eval {dclone $data};
+  my $copy = try {dclone $data};
   is ($@, '', 'Should be no error dcloning');
   ok (1, "dlcone is only 1 process, not 2");
   return $copy;
@@ -85,43 +73,43 @@ sub do_clone {
 
 sub freeze_and_thaw {
   my $data = shift;
-  my $frozen = eval {freeze $data};
+  my $frozen = try {freeze $data};
   is ($@, '', 'Should be no error freezing');
-  my $copy = eval {thaw $frozen};
+  my $copy = try {thaw $frozen};
   is ($@, '', 'Should be no error thawing');
   return $copy;
 }
 
 sub nfreeze_and_thaw {
   my $data = shift;
-  my $frozen = eval {nfreeze $data};
+  my $frozen = try {nfreeze $data};
   is ($@, '', 'Should be no error nfreezing');
-  my $copy = eval {thaw $frozen};
+  my $copy = try {thaw $frozen};
   is ($@, '', 'Should be no error thawing');
   return $copy;
 }
 
 sub store_and_retrieve {
   my $data = shift;
-  my $frozen = eval {store $data, $file};
+  my $frozen = try {store $data, $file};
   is ($@, '', 'Should be no error storing');
-  my $copy = eval {retrieve $file};
+  my $copy = try {retrieve $file};
   is ($@, '', 'Should be no error retrieving');
   return $copy;
 }
 
 sub nstore_and_retrieve {
   my $data = shift;
-  my $frozen = eval {nstore $data, $file};
+  my $frozen = try {nstore $data, $file};
   is ($@, '', 'Should be no error storing');
-  my $copy = eval {retrieve $file};
+  my $copy = try {retrieve $file};
   is ($@, '', 'Should be no error retrieving');
   return $copy;
 }
 
-foreach (@processes) {
-  my ($process, $sub) = @$_;
-  foreach my $number (@numbers) {
+foreach (< @processes) {
+  my ($process, $sub) = < @$_;
+  foreach my $number (< @numbers) {
     # as $number is an alias into @numbers, we don't want any side effects of
     # conversion macros affecting later runs, so pass a copy to Storable:
     my $copy1 = my $copy2 = my $copy0 = $number;

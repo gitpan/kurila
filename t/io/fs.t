@@ -1,8 +1,6 @@
 #!./perl
 
 BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
     require "./test.pl";
 }
 
@@ -97,7 +95,7 @@ SKIP: {
     ok(link('a','b'), "link a b");
     ok(link('b','c'), "link b c");
 
-    $a_mode = (stat('a'))[2];
+    $a_mode = @(stat('a'))[2];
 
     ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,$atime,$mtime,$ctime,
      $blksize,$blocks) = stat('c');
@@ -115,8 +113,8 @@ SKIP: {
 #      if ($^O eq 'cygwin') { # new files on cygwin get rwx instead of rw-
 #          is($mode & 0777, 0777, "mode of triply-linked file");
 #      } else {
-            is(sprintf("0%o", $mode ^&^ 0777), 
-               sprintf("0%o", $a_mode ^&^ 0777), 
+            is(sprintf('0%o', $mode ^&^ 0777), 
+               sprintf('0%o', $a_mode ^&^ 0777), 
                "mode of triply-linked file");
 #      }
     }
@@ -179,13 +177,13 @@ SKIP: {
     skip "no fchmod", 5 unless (%Config{d_fchmod} || "") eq "define";
     ok(open(my $fh, "<", "a"), "open a");
     is(chmod(0, $fh), 1, "fchmod");
-    $mode = (stat "a")[2];
+    $mode = @(stat "a")[2];
     SKIP: {
         skip "no mode checks", 1 if $skip_mode_checks;
         is($mode ^&^ 0777, 0, "perm reset");
     }
     is(chmod($newmode, "a"), 1, "fchmod");
-    $mode = (stat $fh)[2];
+    $mode = @(stat $fh)[2];
     SKIP: { 
         skip "no mode checks", 1 if $skip_mode_checks;
         is($mode ^&^ 0777, $newmode, "perm restored");
@@ -201,14 +199,14 @@ SKIP: {
 SKIP: {
     skip "has fchmod", 1 if (%Config{d_fchmod} || "") eq "define";
     open(my $fh, "<", "a");
-    eval { chmod(0777, $fh); };
+    try { chmod(0777, $fh); };
     like($@->{description}, qr/^The fchmod function is unimplemented at/, "fchmod is unimplemented");
 }
 
 SKIP: {
     skip "has fchown", 1 if (%Config{d_fchown} || "") eq "define";
     open(my $fh, "<", "a");
-    eval { chown(0, 0, $fh); };
+    try { chown(0, 0, $fh); };
     like($@->{description}, qr/^The f?chown function is unimplemented at/, "fchown is unimplemented");
 }
 
@@ -227,7 +225,7 @@ is($foo, 1, "utime");
 check_utime_result();
 
 utime undef, undef, 'b';
-($atime,$mtime) = (stat 'b')[8,9];
+($atime,$mtime) = (stat 'b')[[8, 9]];
 print "# utime undef, undef --> $atime, $mtime\n";
 isnt($atime, 500000000, 'atime');
 isnt($mtime, 500000000 + $delta, 'mtime');
@@ -265,7 +263,7 @@ sub check_utime_result {
 		print "# Maybe stat() cannot get the correct atime, ".
 		    "as happens via NFS on linux?\n";
 		$foo = (utime 400000000,500000000 + 2*$delta,'b');
-		my ($new_atime, $new_mtime) = (stat('b'))[8,9];
+		my ($new_atime, $new_mtime) = (stat('b'))[[8,9]];
 		print "# newatime - $new_atime  nemtime - $new_mtime\n";
 		if ($new_atime == $atime && $new_mtime - $mtime == $delta) {
 		    pass("atime - accounted for possible NFS/glibc2.2 bug on linux");
@@ -298,7 +296,7 @@ sub check_utime_result {
 SKIP: {
     skip "has futimes", 1 if (%Config{d_futimes} || "") eq "define";
     open(my $fh, "<", "b") || die;
-    eval { utime(undef, undef, $fh); };
+    try { utime(undef, undef, $fh); };
     like($@->{description}, qr/^The futimes function is unimplemented at/, "futimes is unimplemented");
 }
 
@@ -342,7 +340,7 @@ close(IOFSCOM);
 
 SKIP: {
 # Check truncating a closed file.
-    eval { truncate "Iofs.tmp", 5; };
+    try { truncate "Iofs.tmp", 5; };
 
     skip("no truncate - $@", 8) if $@;
 

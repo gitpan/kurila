@@ -2,7 +2,7 @@ BEGIN {
     if( %ENV{PERL_CORE} ) {
         chdir 't';
         use File::Spec;
-        @INC = (File::Spec->rel2abs('../lib') );
+        @INC = @(File::Spec->rel2abs('../lib') );
     }
 }
 use strict;
@@ -11,7 +11,7 @@ use strict;
 
 use Pod::Simple::Search;
 use Test;
-BEGIN { plan tests => 7 }
+BEGIN { plan tests => 6 }
 
 print "#  Test the scanning of the whole of \@INC ...\n";
 
@@ -26,34 +26,27 @@ use Pod::Simple;
 
 my $found = 0;
 $x->callback(sub {
-  print "#  ", join("  ", map "\{$_\}", @_), "\n";
+  print "#  ", join("  ", map "\{$_\}", < @_), "\n";
   ++$found;
   return;
 });
 
-print "# \@INC == @INC\n";
+print "# \@INC == {join ' ', <@INC}\n";
 
-my $t = time();   my($name2where, $where2name) = $x->survey();
+my $t = time();   my $name2where = $x->survey();
 $t = time() - $t;
 ok $found;
 
 print "# Found $found items in $t seconds!\n# See...\n";
 
-my $p = pretty( $where2name, $name2where )."\n";
-$p =~ s/, +/,\n/g;
-$p =~ s/^/#  /mg;
-print $p;
-
 print "# OK, making sure strict and strict.pm were in there...\n";
 ok( ($name2where->{'strict'} || 'huh???'), '/strict\.(pod|pm)$/');
 
-ok grep( m/strict\.(pod|pm)/, keys %$where2name );
-
 my  $strictpath = $name2where->{'strict'};
 if( $strictpath ) {
-  my @x = ($x->find('strict')||'(nil)', $strictpath);
+  my @x = @($x->find('strict')||'(nil)', $strictpath);
   print "# Comparing \"@x[0]\" to \"@x[1]\"\n";
-  for(@x) { s{[/\\]}{/}g; }
+  for(< @x) { s{[/\\]}{/}g; }
   print "#        => \"@x[0]\" to \"@x[1]\"\n";
   ok @x[0], @x[1], " find('strict') should match survey's name2where\{strict\}";
 } else {
@@ -62,6 +55,6 @@ if( $strictpath ) {
 
 ok 1;
 print "# Byebye from ", __FILE__, "\n";
-print "# @INC\n";
+print "# {join ' ', <@INC}\n";
 __END__
 

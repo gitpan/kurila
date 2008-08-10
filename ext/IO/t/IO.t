@@ -1,10 +1,6 @@
 #!/usr/bin/perl -w
 
 BEGIN {
-    unless(grep m/blib/, @INC) {
-	chdir 't' if -d 't';
-	@INC = '../lib';
-    }
 	require Config;
 	if (%Config::Config{'extensions'} !~ m/\bSocket\b/) {
 		print "1..0 # Skip: Socket not built - IO.pm uses Socket";
@@ -16,7 +12,7 @@ use strict;
 use File::Path;
 use File::Spec;
 require(%ENV{PERL_CORE} ? "./test.pl" : "./t/test.pl");
-plan(tests => 18);
+plan(tests => 17);
 
 {
 	require XSLoader;
@@ -29,13 +25,13 @@ plan(tests => 18);
 
 	# use_ok() calls import, which we do not want to do
 	require_ok( 'IO' );
-	ok( @load, 'IO should call XSLoader::load()' );
-	is( @load[0][0], 'IO', '... loading the IO library' );
-	is( @load[0][1], $IO::VERSION, '... with the current .pm version' );
+	ok( < @load, 'IO should call XSLoader::load()' );
+	is( @load[0]->[0], 'IO', '... loading the IO library' );
+	is( @load[0]->[1], $IO::VERSION, '... with the current .pm version' );
 }
 
-my @default = map { "IO/$_.pm" } qw( Handle Seekable File Pipe Socket Dir );
-delete %INC{[@default ]};
+my @default = @( map { "IO/$_.pm" } qw( Handle Seekable File Socket Dir ) );
+delete %INC{[< @default ]};
 
 my $warn = '' ;
 local $^WARN_HOOK = sub { $warn = @_[0]->{description} } ;
@@ -78,12 +74,12 @@ local $^WARN_HOOK = sub { $warn = @_[0]->{description} } ;
     $warn = '' ;
 }
 
-foreach my $default (@default)
+foreach my $default (< @default)
 {
 	ok( exists %INC{ $default }, "... import should default load $default" );
 }
 
-eval { IO->import( 'nothere' ) };
+try { IO->import( 'nothere' ) };
 like( $@->{description}, qr/Can.t locate IO.nothere\.pm/, '... croaking on any error' );
 
 my $fakedir = File::Spec->catdir( 'lib', 'IO' );
@@ -94,7 +90,7 @@ if ( -d $fakedir or mkpath( $fakedir ))
 {
 	if (open( OUT, ">", "$fakemod"))
 	{
-		(my $package = <<'		END_HERE') =~ tr/\t//d;
+		(my $package = <<'		END_HERE') =~ s/\t//g;
 		package IO::fakemod;
 
 		sub import { die "Do not import!\n" }
@@ -117,7 +113,7 @@ if ( -d $fakedir or mkpath( $fakedir ))
 SKIP:
 {
 	skip("Could not write to disk", 2 ) unless $flag;
-	eval { IO->import( 'fakemod' ) };
+	try { IO->import( 'fakemod' ) };
 	ok( IO::fakemod::exists(), 'import() should import IO:: modules by name' );
 	is( $@, '', '... and should not call import() on imported modules' );
 }

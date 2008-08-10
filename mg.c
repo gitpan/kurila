@@ -153,9 +153,6 @@ S_is_container_magic(const MAGIC *mg)
     case PERL_MAGIC_fm:
     case PERL_MAGIC_regex_global:
     case PERL_MAGIC_nkeys:
-#ifdef USE_LOCALE_COLLATE
-    case PERL_MAGIC_collxfrm:
-#endif
     case PERL_MAGIC_qr:
     case PERL_MAGIC_taint:
     case PERL_MAGIC_vec:
@@ -532,6 +529,25 @@ Perl_mg_free(pTHX_ SV *sv)
     return 0;
 }
 
+void
+Perl_mg_tmprefcnt(pTHX_ SV *sv)
+{
+    MAGIC* mg;
+    MAGIC* moremagic;
+
+    PERL_ARGS_ASSERT_MG_TMPREFCNT;
+
+    for (mg = SvMAGIC(sv); mg; mg = moremagic) {
+	moremagic = mg->mg_moremagic;
+	if (mg->mg_ptr && mg->mg_type != PERL_MAGIC_regex_global) {
+	    if (mg->mg_len == HEf_SVKEY)
+		SvTMPREFCNT_inc((SV*)mg->mg_ptr);
+	}
+	if (mg->mg_flags & MGf_REFCOUNTED)
+	    SvTMPREFCNT_inc(mg->mg_obj);
+    }
+}
+
 #include <signal.h>
 
 U32
@@ -746,6 +762,7 @@ Perl_magic_get(pTHX_ SV *sv, MAGIC *mg)
 		break;
 	    case 'D':
 		if (strEQ(remaining, "DIE_HOOK")) { /* $^DIE_HOOK */
+		    sv_setsv(sv, PL_diehook);
 		    break;
 		}
 		break;
@@ -996,11 +1013,6 @@ Perl_magic_get(pTHX_ SV *sv, MAGIC *mg)
 	    break;
 	}
 	sv_setsv(sv,&PL_sv_undef);
-	break;
-    case '.':
-	if (GvIO(PL_last_in_gv)) {
-	    sv_setiv(sv, (IV)IoLINES(GvIOp(PL_last_in_gv)));
-	}
 	break;
     case '?':
 	{
@@ -2130,27 +2142,6 @@ Perl_magic_setregexp(pTHX_ SV *sv, MAGIC *mg)
     return sv_unmagic(sv, type);
 }
 
-#ifdef USE_LOCALE_COLLATE
-int
-Perl_magic_setcollxfrm(pTHX_ SV *sv, MAGIC *mg)
-{
-    PERL_ARGS_ASSERT_MAGIC_SETCOLLXFRM;
-
-    /*
-     * RenE<eacute> Descartes said "I think not."
-     * and vanished with a faint plop.
-     */
-    PERL_UNUSED_CONTEXT;
-    PERL_UNUSED_ARG(sv);
-    if (mg->mg_ptr) {
-        Safefree(mg->mg_ptr);
-        mg->mg_ptr = NULL;
-        mg->mg_len = -1;
-    }
-    return 0;
-}
-#endif /* USE_LOCALE_COLLATE */
-
 /* Just clear the UTF-8 cache data. */
 int
 Perl_magic_setutf8(pTHX_ SV *sv, MAGIC *mg)
@@ -2471,14 +2462,6 @@ Perl_magic_set(pTHX_ SV *sv, MAGIC *mg)
                 Perl_croak(aTHX_ PL_no_modify);
             }
         }
-    case '.':
-        if (PL_localizing) {
-            if (PL_localizing == 1)
-                SAVESPTR(PL_last_in_gv);
-        }
-        else if (SvOK(sv) && GvIO(PL_last_in_gv))
-            IoLINES(GvIOp(PL_last_in_gv)) = SvIV(sv);
-        break;
     case '|':
         {
             IO * const io = GvIOp(PL_defoutgv);
@@ -2497,8 +2480,7 @@ Perl_magic_set(pTHX_ SV *sv, MAGIC *mg)
         }
         break;
     case '/':
-        SvREFCNT_dec(PL_rs);
-        PL_rs = newSVsv(sv);
+        SVcpSTEAL(PL_rs, newSVsv(sv));
         break;
     case '\\':
         if (PL_ors_sv)
@@ -2748,8 +2730,7 @@ Perl_sighandler(int sig)
     /* sv_2cv is too complicated, try a simpler variant first: */
     if (!SvROK(PL_psig_ptr[sig]) || !(cv = (CV*)SvRV(PL_psig_ptr[sig]))
         || SvTYPE(cv) != SVt_PVCV) {
-        HV *st;
-        cv = sv_2cv(PL_psig_ptr[sig], &st, &gv, GV_ADD);
+        cv = sv_2cv(PL_psig_ptr[sig], &gv, GV_ADD);
     }
 
     if (!cv || !CvROOT(cv)) {

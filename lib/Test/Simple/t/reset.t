@@ -5,7 +5,7 @@
 BEGIN {
     if( %ENV{PERL_CORE} ) {
         chdir 't';
-        @INC = ('../lib', 'lib');
+        @INC = @('../lib', 'lib');
     }
     else {
         unshift @INC, 't/lib';
@@ -52,7 +52,7 @@ $tb->reset;
 my $test_num = 2;   # since we already printed 1
 # Utility testing functions.
 sub ok ($;$) {
-    my($test, $name) = @_;
+    my($test, $name) = < @_;
     my $ok = '';
     $ok .= "not " unless $test;
     $ok .= "ok $test_num";
@@ -78,8 +78,8 @@ ok( fileno $tb->failure_output == fileno %Original_Output{failure_output},
 ok( fileno $tb->todo_output    == fileno %Original_Output{todo_output},
                                         'todo_output' );
 ok( $tb->current_test   == 0,           'current_test' );
-ok( $tb->summary        == 0,           'summary' );
-ok( $tb->details        == 0,           'details' );
+ok( (nelems $tb->summary)        == 0,           'summary' );
+ok( (nelems $tb->details)        == 0,           'details' );
 
 $tb->no_ending(1);
 $tb->no_header(1);

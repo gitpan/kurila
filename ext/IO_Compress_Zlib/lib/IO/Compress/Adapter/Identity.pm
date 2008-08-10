@@ -14,12 +14,12 @@ sub mkCompObject
     my $level    = shift ;
     my $strategy = shift ;
 
-    return bless \%(
+    return @( bless \%(
                   'CompSize'   => 0,
                   'UnCompSize' => 0,
                   'Error'      => '',
                   'ErrorNo'    => 0,
-                 ) ;     
+                 ) ) ;     
 }
 
 sub compr
@@ -61,13 +61,6 @@ sub reset
     $self->{UnCompSize} = 0;
 
     return STATUS_OK;    
-}
-
-sub deflateParams 
-{
-    my $self = shift ;
-
-    return STATUS_OK;   
 }
 
 #sub total_out

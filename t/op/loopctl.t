@@ -964,13 +964,14 @@ cmp_ok($ok,'==',1,'dynamically scoped');
 
 }
 
-{
+TODO: {
+    todo_skip("modification of readonly value", 1);
     our @a37725;
     @a37725[3] = 1; # use package var
     our $i = 2;
-    for my $x (reverse @a37725) {
+    for my $x (reverse < @a37725) {
 	$x = $i++;
     }
-    cmp_ok("@a37725",'eq',"5 4 3 2",'bug 27725: reverse with empty slots bug');
+    cmp_ok("{join ' ', <@a37725}",'eq',"5 4 3 2",'bug 27725: reverse with empty slots bug');
 }
 

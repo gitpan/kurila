@@ -6,14 +6,15 @@
 #  in the README file that comes with the distribution.
 #
 
+use Config;
+
 sub BEGIN {
     if (%ENV{PERL_CORE}){
        chdir('t') if -d 't';
-       @INC = ('.', '../lib');
+       @INC = @('.', '../lib');
     } else {
        unshift @INC, 't';
     }
-    require Config; Config->import;
     if (%ENV{PERL_CORE} and %Config{'extensions'} !~ m/\bStorable\b/) {
         print "1..0 # Skip: Storable was not built\n";
         exit 0;
@@ -35,10 +36,10 @@ BEGIN { plan tests => 1 }
 
 my @warns;
 $^WARN_HOOK = sub { push @warns, shift };
-$^DIE_HOOK  = sub { require Carp; warn Carp::longmess(); warn "Evil die!" };
+$^DIE_HOOK  = sub { require Carp; warn < Carp::longmess(); warn "Evil die!" };
 
 require Storable;
 
 Storable::dclone(\%(foo => "bar"));
 
-is(join("", @warns), "", "__DIE__ is not evil here");
+is(join("", < @warns), "", "__DIE__ is not evil here");

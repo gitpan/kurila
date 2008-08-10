@@ -18,10 +18,10 @@ our ($VERSION, @ISA, @EXPORT_OK, %EXPORT_TAGS, $DeflateError);
 $VERSION = '2.006';
 $DeflateError = '';
 
-@ISA    = qw(IO::Compress::RawDeflate Exporter);
-@EXPORT_OK = qw( $DeflateError deflate ) ;
-%EXPORT_TAGS = %IO::Compress::RawDeflate::DEFLATE_CONSTANTS ;
-push @{ %EXPORT_TAGS{all} }, @EXPORT_OK ;
+@ISA    = @( qw(IO::Compress::RawDeflate Exporter) );
+@EXPORT_OK = @( qw( $DeflateError deflate ) ) ;
+%EXPORT_TAGS = %( < %IO::Compress::RawDeflate::DEFLATE_CONSTANTS ) ;
+push @{ %EXPORT_TAGS{all} }, < @EXPORT_OK ;
 Exporter::export_ok_tags('all');
 
 
@@ -30,13 +30,13 @@ sub new
     my $class = shift ;
 
     my $obj = createSelfTiedObject($class, \$DeflateError);
-    return $obj->_create(undef, @_);
+    return $obj->_create(undef, < @_);
 }
 
 sub deflate
 {
     my $obj = createSelfTiedObject(undef, \$DeflateError);
-    return $obj->_def(@_);
+    return $obj->_def(< @_);
 }
 
 
@@ -124,7 +124,7 @@ sub ckParams
 sub mkTrailer
 {
     my $self = shift ;
-    return pack("N", *$self->{Compress}->adler32()) ;
+    return pack("N", < *$self->{Compress}->adler32()) ;
 }
 
 sub mkFinalTrailer
@@ -146,7 +146,7 @@ sub getExtraParams
 
 sub getInverseClass
 {
-    return ('IO::Uncompress::Inflate',
+    return  @('IO::Uncompress::Inflate',
                 \$IO::Uncompress::Inflate::InflateError);
 }
 
@@ -197,8 +197,6 @@ IO::Compress::Deflate - Write RFC 1950 files/buffers
     $z->autoflush();
     $z->input_line_number();
     $z->newStream( [OPTS] );
-    
-    $z->deflateParams();
     
     $z->close() ;
 
@@ -865,14 +863,6 @@ the C<$z> object.
 
 See the L</"Constructor Options"> section for more details.
 
-
-=head2 deflateParams
-
-Usage is
-
-    $z->deflateParams
-
-TODO
 
 
 =head1 Importing 

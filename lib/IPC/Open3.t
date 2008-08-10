@@ -1,8 +1,6 @@
 #!./perl -w
 
 BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
     our %Config;
     require Config; Config->import;
     if (!%Config{'d_fork'}
@@ -13,7 +11,7 @@ BEGIN {
 	exit 0;
     }
     # make warnings fatal
-    $^WARN_HOOK = sub { die @_ };
+    $^WARN_HOOK = sub { die < @_ };
 }
 
 use strict;
@@ -23,7 +21,7 @@ use IPC::Open3;
 my $perl = $^X;
 
 sub ok {
-    my ($n, $result, $info) = @_;
+    my ($n, $result, $info) = < @_;
     if ($result) {
 	print "ok $n\n";
     }
@@ -36,7 +34,7 @@ sub ok {
 sub cmd_line {
 	if ($^O eq 'MSWin32' || $^O eq 'NetWare') {
 		my $cmd = shift;
-		$cmd =~ tr/\r\n//d;
+		$cmd =~ s/[\r\n]//g;
 		$cmd =~ s/"/\\"/g;
 		return qq/"$cmd"/;
 	}
@@ -46,13 +44,13 @@ sub cmd_line {
 }
 
 my ($pid, $reaped_pid);
-STDOUT->autoflush;
-STDERR->autoflush;
+(\*STDOUT)->autoflush;
+(\*STDERR)->autoflush;
 
 print "1..22\n";
 
 # basic
-ok 1, $pid = open3 *WRITE, *READ, *ERROR, $perl, '-e', cmd_line(<<'EOF');
+ok 1, $pid = open3 \*WRITE, \*READ, \*ERROR, $perl, '-e', cmd_line(<<'EOF');
     $| = 1;
     print scalar ~< *STDIN;
     print STDERR "hi error\n";
@@ -68,7 +66,7 @@ ok 8, $reaped_pid == $pid, $reaped_pid;
 ok 9, $? == 0, $?;
 
 # read and error together, both named
-$pid = open3 *WRITE, *READ, *READ, $perl, '-e', cmd_line(<<'EOF');
+$pid = open3 \*WRITE, \*READ, \*READ, $perl, '-e', cmd_line(<<'EOF');
     $| = 1;
     print scalar ~< *STDIN;
     print STDERR scalar ~< *STDIN;
@@ -80,7 +78,7 @@ print scalar ~< *READ;
 waitpid $pid, 0;
 
 # read and error together, error empty
-$pid = open3 *WRITE, *READ, '', $perl, '-e', cmd_line(<<'EOF');
+$pid = open3 \*WRITE, \*READ, '', $perl, '-e', cmd_line(<<'EOF');
     $| = 1;
     print scalar ~< *STDIN;
     print STDERR scalar ~< *STDIN;
@@ -93,7 +91,7 @@ waitpid $pid, 0;
 
 # dup writer
 ok 14, pipe *PIPE_READ, *PIPE_WRITE;
-$pid = open3 '<&PIPE_READ', *READ, undef,
+$pid = open3 '<&PIPE_READ', \*READ, undef,
 		    $perl, '-e', cmd_line('print scalar ~< *STDIN');
 close PIPE_READ;
 print PIPE_WRITE "ok 15\n";
@@ -139,9 +137,9 @@ waitpid $pid, 0;
 # for understanding of Config{'sh'} test see exec description in camel book
 my $cmd = 'print(scalar(~< *STDIN))';
 $cmd = %Config{'sh'} =~ m/sh/ ? "'$cmd'" : cmd_line($cmd);
-eval{$pid = open3 'WRITE', '>&STDOUT', 'ERROR', "$perl -e " . $cmd; };
+try{$pid = open3 'WRITE', '>&STDOUT', 'ERROR', "$perl -e " . $cmd; };
 if ($@) {
-	print "error $@\n";
+	print "error {$@->message}\n";
 	print "not ok 22\n";
 }
 else {

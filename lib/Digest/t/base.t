@@ -7,7 +7,7 @@ plan tests => 12;
    package LenDigest;
    require Digest::base;
    use vars qw(@ISA);
-   @ISA = qw(Digest::base);
+   @ISA = @( qw(Digest::base) );
 
    sub new {
 	my $class = shift;
@@ -17,7 +17,7 @@ plan tests => 12;
 
    sub add {
 	my $self = shift;
-	$$self .= join("", @_);
+	$$self .= join("", < @_);
 	return $self;
    }
 
@@ -58,13 +58,13 @@ print F "abc" x 100, "\n";
 close(F) || die;
 
 open(F, "<", "xxtest$$") || die;
-$ctx->addfile(*F);
+$ctx->addfile(\*F);
 close(F);
 unlink("xxtest$$") || warn;
 
 ok($ctx->digest, "a0301");
 
-eval {
+try {
     $ctx->add_bits("1010");
 };
 ok($@->{description} =~ m/^Number of bits must be multiple of 8/);
@@ -72,7 +72,7 @@ ok($@->{description} =~ m/^Number of bits must be multiple of 8/);
 $ctx->add_bits($EBCDIC ? "11100100" : "01010101");
 ok($ctx->digest, "U0001");
 
-eval {
+try {
     $ctx->add_bits("abc", 12);
 };
 ok($@->{description} =~ m/^Number of bits must be multiple of 8/);

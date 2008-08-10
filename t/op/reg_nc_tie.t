@@ -1,8 +1,6 @@
 #!./perl
 
 BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
     require './test.pl';
 }
 
@@ -12,7 +10,7 @@ print "1..13\n";
 
 # PL_curpm->paren_names can be a null pointer. See that this succeeds anyway.
 'x' =~ m/(.)/;
-() = %+;
+() = < %+;
 pass( 'still alive' );
 
 "hlagh" =~ m/
@@ -26,19 +24,19 @@ pass( 'still alive' );
 # FETCH
 is(%+{a}, "h", "FETCH");
 is(%+{b}, "l", "FETCH");
-is(%-{a}[0], "h", "FETCH");
-is(%-{a}[1], "a", "FETCH");
+is(%-{a}->[0], "h", "FETCH");
+is(%-{a}->[1], "a", "FETCH");
 
 # STORE
-eval { %+{a} = "yon" };
+try { %+{a} = "yon" };
 ok(index($@->{description}, "read-only") != -1, "STORE");
 
 # DELETE
-eval { delete %+{a} };
+try { delete %+{a} };
 ok(index($@->{description}, "read-only") != -1, "DELETE");
 
 # CLEAR
-eval { %+ = () };
+try { %+ = %( () ) };
 ok(index($@->{description}, "read-only") != -1, "CLEAR");
 
 # EXISTS
@@ -49,5 +47,5 @@ ok(!exists %+{d}, "EXISTS");
 is(join('|', sort keys %+), "a|b|e", "FIRSTKEY/NEXTKEY");
 
 # SCALAR
-is(scalar(%+), 3, "SCALAR");
-is(scalar(%-), 3, "SCALAR");
+is(nelems(@(keys %+)), 3, "SCALAR");
+is(nelems(@(keys %-)), 3, "SCALAR");

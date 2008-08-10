@@ -5,7 +5,7 @@ $VERSION = "1.80";
 
 =head1 NAME
 
-Socket, sockaddr_in, sockaddr_un, inet_aton, inet_ntoa - load the C socket.h defines and structure manipulators 
+Socket, sockaddr_in, inet_aton, inet_ntoa - load the C socket.h defines and structure manipulators 
 
 =head1 SYNOPSIS
 
@@ -147,16 +147,6 @@ representing the IP address (you can use inet_ntoa() to convert the
 address to the four-dotted numeric format).  Will croak if the
 structure does not have AF_INET in the right place.
 
-=item sockaddr_un PATHNAME
-
-=item sockaddr_un SOCKADDR_UN
-
-In a list context, unpacks its SOCKADDR_UN argument and returns an array
-consisting of (PATHNAME).  In a scalar context, packs its PATHNAME
-arguments as a SOCKADDR_UN and returns it.  If this is confusing, use
-pack_sockaddr_un() and unpack_sockaddr_un() explicitly.
-These are only supported if your system has E<lt>F<sys/un.h>E<gt>.
-
 =item pack_sockaddr_un PATH
 
 Takes one argument, a pathname. Returns the sockaddr_un structure with
@@ -180,13 +170,13 @@ use warnings::register;
 
 require Exporter;
 use XSLoader ();
-@ISA = qw(Exporter);
-@EXPORT = qw(
+@ISA = @( qw(Exporter) );
+@EXPORT = @( qw(
 	inet_aton inet_ntoa
 	sockaddr_family
 	pack_sockaddr_in unpack_sockaddr_in
 	pack_sockaddr_un unpack_sockaddr_un
-	sockaddr_in sockaddr_un
+	sockaddr_in
 	INADDR_ANY INADDR_BROADCAST INADDR_LOOPBACK INADDR_NONE
 	AF_802
 	AF_AAL
@@ -340,9 +330,9 @@ use XSLoader ();
 	SO_XOPEN
 	SO_XSE
 	UIO_MAXIOV
-);
+) );
 
-@EXPORT_OK = qw(CR LF CRLF $CR $LF $CRLF
+@EXPORT_OK = @( qw(CR LF CRLF $CR $LF $CRLF
 
 	       IPPROTO_IP
 	       IPPROTO_IPV6
@@ -355,11 +345,11 @@ use XSLoader ();
 	       TCP_MAXRT
 	       TCP_MAXSEG
 	       TCP_NODELAY
-	       TCP_STDURG);
+	       TCP_STDURG) );
 
-%EXPORT_TAGS = (
+%EXPORT_TAGS = %(
     crlf    => \@(qw(CR LF CRLF $CR $LF $CRLF)),
-    all     => \@(@EXPORT, @EXPORT_OK),
+    all     => \@(< @EXPORT, < @EXPORT_OK),
 );
 
 BEGIN {
@@ -373,27 +363,11 @@ BEGIN {
 *CRLF = \CRLF();
 
 sub sockaddr_in {
-    if (@_ == 6 && !wantarray) { # perl5.001m compat; use this && die
-	my($af, $port, @quad) = @_;
-	warnings::warn "6-ARG sockaddr_in call is deprecated" 
-	    if warnings::enabled();
-	pack_sockaddr_in($port, inet_aton(join('.', @quad)));
-    } elsif (wantarray) {
-	croak "usage:   (port,iaddr) = sockaddr_in(sin_sv)" unless @_ == 1;
-        unpack_sockaddr_in(@_);
+    if (nelems @_ == 1) {
+        return unpack_sockaddr_in(< @_);
     } else {
-	croak "usage:   sin_sv = sockaddr_in(port,iaddr))" unless @_ == 2;
-        pack_sockaddr_in(@_);
-    }
-}
-
-sub sockaddr_un {
-    if (wantarray) {
-	croak "usage:   (filename) = sockaddr_un(sun_sv)" unless @_ == 1;
-        unpack_sockaddr_un(@_);
-    } else {
-	croak "usage:   sun_sv = sockaddr_un(filename)" unless @_ == 1;
-        pack_sockaddr_un(@_);
+	die "usage:   sin_sv = sockaddr_in(port,iaddr))" unless (nelems @_) == 2;
+        return pack_sockaddr_in(< @_);
     }
 }
 

@@ -918,9 +918,14 @@ PP(pp_bit_xor)
     return pp_bit_or();
 }
 
+PP(pp_rv2av)
+{
+    return Perl_pp_rv2sv(aTHX);
+}
+
 PP(pp_rv2hv)
 {
-    return Perl_pp_rv2av(aTHX);
+    return Perl_pp_rv2sv(aTHX);
 }
 
 char *
@@ -1219,6 +1224,8 @@ Perl_hv_delete(pTHX_ HV *hv, const char *key, I32 klen_i32, I32 flags)
 int
 Perl_magic_setglob(pTHX_ SV *sv, MAGIC *mg)
 {
+    PERL_ARGS_ASSERT_MAGIC_SETGLOB;
+
     PERL_UNUSED_ARG(mg);
     PERL_UNUSED_ARG(sv);
 

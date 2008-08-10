@@ -14,8 +14,8 @@ BEGIN {
                         $SANITY_CHECK_TEMPLATE $CALLER_DEPTH $_ERROR_STRING
                     ];
 
-    @ISA        =   qw[ Exporter ];
-    @EXPORT_OK  =   qw[check allow last_error];
+    @ISA        = @(   qw[ Exporter ] );
+    @EXPORT_OK  = @(   qw[check allow last_error] );
 
     $VERSION                = '0.26';
     $VERBOSE                = $^W ? 1 : 0;
@@ -30,9 +30,9 @@ BEGIN {
     $CALLER_DEPTH           = 0;
 }
 
-my %known_keys = map { $_ => 1 }
+my %known_keys = %( map { $_ => 1 }
                     qw| required allow default strict_type no_override
-                        store defined |;
+                        store defined | );
 
 =pod
 
@@ -244,7 +244,7 @@ on this.
 =cut
 
 sub check {
-    my ($utmpl, $href, $verbose) = @_;
+    my ($utmpl, $href, $verbose) = < @_;
 
     ### did we get the arguments we need? ###
     return if !$utmpl or !$href;
@@ -269,9 +269,9 @@ sub check {
                     or return;
 
     ### deref only once ###
-    my %utmpl   = %$utmpl;
-    my %args    = %$args;
-    my %defs    = %$defs;
+    my %utmpl   = %( < %$utmpl );
+    my %args    = %( < %$args );
+    my %defs    = %( < %$defs );
 
     ### flag to see if anything went wrong ###
     my $wrong; 
@@ -310,7 +310,7 @@ sub check {
         }
 
         ### copy of this keys template instructions, to save derefs ###
-        my %tmpl = %{%utmpl{$key}};
+        my %tmpl = %( < %{%utmpl{$key}} );
 
         ### check if you were supposed to provide defined() values ###
         if( (%tmpl{'defined'} || $ONLY_ALLOW_DEFINED) and
@@ -435,7 +435,7 @@ sub allow {
         ### loop over the elements, see if one of them says the
         ### value is OK
         ### also, short-cicruit when possible
-        for ( @{@_[1]} ) {
+        for ( < @{@_[1]} ) {
             return 1 if allow( @_[0], $_ );
         }
         
@@ -457,7 +457,7 @@ sub _clean_up_args {
     ### don't even bother to loop, if there's nothing to clean up ###
     return @_[0] if $PRESERVE_CASE and !$STRIP_LEADING_DASHES;
 
-    my %args = %{@_[0]};
+    my %args = %( < %{@_[0]} );
 
     ### keys are note aliased ###
     for my $key (keys %args) {
@@ -473,8 +473,8 @@ sub _clean_up_args {
 }
 
 sub _sanity_check_and_defaults {
-    my %utmpl   = %{@_[0]};
-    my %args    = %{@_[1]};
+    my %utmpl   = %( < %{@_[0]} );
+    my %args    = %( < %{@_[1]} );
     my $verbose = @_[2];
 
     my %defs; my $fail;

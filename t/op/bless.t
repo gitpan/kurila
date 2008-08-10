@@ -4,12 +4,12 @@ BEGIN {
     require './test.pl';
 }
 
-plan (108);
+plan (100);
 
 our ($a1, $b1, $c1, $d1, $e1, $f1, $g1, @w);
 
 sub expected {
-    my($object, $package, $type) = @_;
+    my($object, $package, $type) = < @_;
     print "# {dump::view($object)} $package $type\n";
     is(ref($object), $package);
     my $r = qr/^\Q$package\E=(\w+)\(0x([0-9a-f]+)\)$/;
@@ -17,7 +17,7 @@ sub expected {
     if (dump::view($object) =~ $r) {
 	is($1, $type);
 	# in 64-bit platforms hex warns for 32+ -bit values
-	cmp_ok(do {no warnings 'portable'; hex($2)}, '==', $object);
+	cmp_ok(do {no warnings 'portable'; hex($2)}, '==', ref::address($object));
     }
     else {
 	fail(); fail();
@@ -30,7 +30,7 @@ $a1 = bless \%(), "A";
 expected($a1, "A", "HASH");
 $b1 = bless \@(), "B";
 expected($b1, "B", "ARRAY");
-$c1 = bless \(map "$_", "test"), "C";
+$c1 = bless \$("test"), "C";
 expected($c1, "C", "SCALAR");
 our $test = "foo"; $d1 = bless \*test, "D";
 expected($d1, "D", "GLOB");
@@ -101,22 +101,18 @@ expected(bless(\@()), 'main', "ARRAY");
 
     my $m = bless \@();
     expected($m, 'main', "ARRAY");
-    is (scalar @w, 0);
+    is (scalar nelems @w, 0);
 
-    @w = ();
-    $m = bless \@(), '';
-    expected($m, 'main', "ARRAY");
-    is (scalar @w, 1);
+    dies_like( sub { $m = bless \@(), '' },
+               qr/Attempt to bless to ''/ );
 
-    @w = ();
-    $m = bless \@(), undef;
-    expected($m, 'main', "ARRAY");
-    is (scalar @w, 2);
+    dies_like( sub { $m = bless \@(), undef },
+               qr/Attempt to bless to ''/ );
 }
 
 # class is a ref
 $a1 = bless \%(), "A4";
-$b1 = eval { bless \%(), $a1 };
+$b1 = try { bless \%(), $a1 };
 like($@->message, qr/Attempt to bless into a reference/, "class is a ref");
 
 # class is an overloaded ref
@@ -125,17 +121,17 @@ like($@->message, qr/Attempt to bless into a reference/, "class is a ref");
     use overload '""' => sub { "C4" };
 }
 my $h1 = bless \%(), "H4";
-my $c4 = eval { bless \$test, $h1 };
+my $c4 = try { bless \$test, $h1 };
 is ($@, '', "class is an overloaded ref");
 expected($c4, 'C4', "SCALAR");
 
 {
-    my %h = 1..2;
+    my %h = %( 1..2 );
     my($k) = keys %h; 
     my $x=\$k;
     bless $x, 'pam';
     is(ref $x, 'pam');
 
-    my $a = bless \(keys %h), 'zap';
+    my $a = bless \(nkeys %h), 'zap';
     is(ref $a, 'zap');
 }

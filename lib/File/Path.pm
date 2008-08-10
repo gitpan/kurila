@@ -189,7 +189,7 @@ If a system error prevents a directory from being created, then the
 C<mkpath> function throws a fatal error with C<Carp::croak>. This error
 can be trapped with an C<eval> block:
 
-  eval { mkpath($dir) };
+  try { mkpath($dir) };
   if ($@) {
     print "Couldn't create $dir: $@";
   }
@@ -517,8 +517,8 @@ use File::Spec     ();
 use Exporter ();
 use vars qw($VERSION @ISA @EXPORT);
 $VERSION = '2.01';
-@ISA     = qw(Exporter);
-@EXPORT  = qw(mkpath rmtree);
+@ISA     = @( qw(Exporter) );
+@EXPORT  = @( qw(mkpath rmtree) );
 
 my $Is_VMS = $^O eq 'VMS';
 my $Is_MacOS = $^O eq 'MacOS';
@@ -527,16 +527,6 @@ my $Is_MacOS = $^O eq 'MacOS';
 # write permission to:
 my $Force_Writeable = ($^O eq 'os2' || $^O eq 'dos' || $^O eq 'MSWin32' ||
 		       $^O eq 'amigaos' || $^O eq 'MacOS' || $^O eq 'epoc');
-
-sub _carp {
-    require Carp;
-    goto &Carp::carp;
-}
-
-sub _croak {
-    require Carp;
-    goto &Carp::croak;
-}
 
 sub _error {
     my $arg     = shift;
@@ -548,15 +538,15 @@ sub _error {
         push @{${$arg->{error}}}, \%($object => "$message: $!");
     }
     else {
-        _carp(defined($object) ? "$message for $object: $!" : "$message: $!");
+        warn(defined($object) ? "$message for $object: $!" : "$message: $!");
     }
 }
 
 sub mkpath {
     my $old_style = (
         UNIVERSAL::isa(@_[0],'ARRAY')
-        or (@_ == 2 and ((defined @_[1] && ! ref @_[1]) ? @_[1] =~ m/\A\d+\z/ : 1))
-        or (@_ == 3
+        or ((nelems @_) == 2 and ((defined @_[1] && ! ref @_[1]) ? @_[1] =~ m/\A\d+\z/ : 1))
+        or ((nelems @_) == 3
             and ((defined @_[1] && ! ref @_[1]) ? @_[1] =~ m/\A\d+\z/ : 1)
             and ((defined @_[2] && ! ref @_[2]) ? @_[2] =~ m/\A\d+\z/ : 1)
         )
@@ -567,13 +557,13 @@ sub mkpath {
 
     if ($old_style) {
         my ($verbose, $mode);
-        ($paths, $verbose, $mode) = @_;
+        ($paths, $verbose, $mode) = < @_;
         $paths = \@($paths) unless UNIVERSAL::isa($paths,'ARRAY');
         $arg->{verbose} = defined $verbose ? $verbose : 0;
         $arg->{mode}    = defined $mode    ? $mode    : 0777;
     }
     else {
-        if (@_ +> 0 and UNIVERSAL::isa(@_[-1], 'HASH')) {
+        if ((nelems @_) +> 0 and UNIVERSAL::isa(@_[-1], 'HASH')) {
             $arg = pop @_;
             exists $arg->{mask} and $arg->{mode} = delete $arg->{mask};
             $arg->{mode} = 0777 unless exists $arg->{mode};
@@ -582,7 +572,7 @@ sub mkpath {
         else {
             %{$arg}{[qw(verbose mode)]} = (0, 0777);
         }
-        $paths = \@(@_);
+        $paths = \@(< @_);
     }
     return _mkpath($arg, $paths);
 }
@@ -593,7 +583,7 @@ sub _mkpath {
 
     local($")=$Is_MacOS ? ":" : "/";
     my(@created,$path);
-    foreach $path (@$paths) {
+    foreach $path (< @$paths) {
         next unless length($path);
 	$path .= '/' if $^O eq 'os2' and $path =~ m/^\w:\z/s; # feature of CRT 
 	# Logic wants Unix paths, so go with the flow.
@@ -604,7 +594,7 @@ sub _mkpath {
 	next if -d $path;
 	my $parent = File::Basename::dirname($path);
 	unless (-d $parent or $path eq $parent) {
-            push(@created,_mkpath($arg, \@($parent)));
+            push(@created, <_mkpath($arg, \@($parent)));
         }
         print "mkdir $path\n" if $arg->{verbose};
         if (mkdir($path,$arg->{mode})) {
@@ -621,7 +611,7 @@ sub _mkpath {
                     push @{${$arg->{error}}}, \%($path => $e);
                 }
                 else {
-                    _croak("mkdir $path: $e");
+                    die("mkdir $path: $e");
                 }
 	}
     }
@@ -637,7 +627,7 @@ sub rmtree {
 
     if ($old_style) {
         my ($verbose, $safe);
-        ($paths, $verbose, $safe) = @_;
+        ($paths, $verbose, $safe) = < @_;
         $arg->{verbose} = defined $verbose ? $verbose : 0;
         $arg->{safe}    = defined $safe    ? $safe    : 0;
 
@@ -650,7 +640,7 @@ sub rmtree {
         }
     }
     else {
-        if (@_ +> 0 and UNIVERSAL::isa(@_[-1],'HASH')) {
+        if ((nelems @_) +> 0 and UNIVERSAL::isa(@_[-1],'HASH')) {
             $arg = pop @_;
             ${$arg->{error}}  = \@() if exists $arg->{error};
             ${$arg->{result}} = \@() if exists $arg->{result};
@@ -658,7 +648,7 @@ sub rmtree {
         else {
             %{$arg}{[qw(verbose safe)]} = (0, 0);
     }
-        $paths = \@(@_);
+        $paths = \@(< @_);
     }
 
     $arg->{prefix} = '';
@@ -670,7 +660,7 @@ sub rmtree {
     };
     for ($arg->{cwd}) { m/\A(.*)\Z/; $_ = $1 } # untaint
 
-    %{$arg}{[qw(device inode)]} = (stat $arg->{cwd})[[0,1]] or do {
+    %{$arg}{[qw(device inode)]} = @(stat $arg->{cwd})[[0,1]] or do {
         _error($arg, "cannot stat initial working directory", $arg->{cwd});
         return 0;
     };
@@ -688,7 +678,7 @@ sub _rmtree {
 
     my (@files, $root);
     ROOT_DIR:
-    foreach $root (@$paths) {
+    foreach $root (< @$paths) {
     	if ($Is_MacOS) {
             $root  = ":$root" unless $root =~ m/:/;
             $root .= ":"      unless $root =~ m/:\z/;
@@ -733,7 +723,7 @@ sub _rmtree {
             };
 
             ($ldev eq $device and $lino eq $inode)
-                or _croak("directory $canon changed before chdir, expected dev=$ldev inode=$lino, actual dev=$device ino=$inode, aborting.");
+                or die("directory $canon changed before chdir, expected dev=$ldev inode=$lino, actual dev=$device ino=$inode, aborting.");
 
             $perm ^&^= 07777; # don't forget setuid, setgid, sticky bits
             my $nperm = $perm ^|^ 0700;
@@ -751,17 +741,17 @@ sub _rmtree {
             my $d;
             if (!opendir $d, $curdir) {
                 _error($arg, "cannot opendir", $canon);
-                @files = ();
+                @files = @( () );
             }
             else {
 		no strict 'refs';
-		if (!defined ${*{Symbol::fetch_glob("\cTAINT")}} or ${*{Symbol::fetch_glob("\cTAINT")}}) {
+		if (!defined ${*{Symbol::fetch_glob("^TAINT")}} or ${*{Symbol::fetch_glob("^TAINT")}}) {
                     # Blindly untaint dir names if taint mode is
                     # active, or any perl < 5.006
-                    @files = map { m/\A(.*)\z/s; $1 } readdir $d;
+                    @files = @( map { m/\A(.*)\z/s; $1 } < readdir $d );
                 }
                 else {
-		    @files = readdir $d;
+		    @files = @( readdir $d );
 		}
 		closedir $d;
 	    }
@@ -770,14 +760,14 @@ sub _rmtree {
                 # Deleting large numbers of files from VMS Files-11
                 # filesystems is faster if done in reverse ASCIIbetical order.
                 # include '.' to '.;' from blead patch #31775
-                @files = map {$_ eq '.' ? '.;' : $_} reverse @files;
+                @files = @( map {$_ eq '.' ? '.;' : $_} reverse < @files );
                 ($root = VMS::Filespec::unixify($root)) =~ s/\.dir\z//;
             }
-            @files = grep {$_ ne $updir and $_ ne $curdir} @files;
+            @files = @( grep {$_ ne $updir and $_ ne $curdir} < @files );
 
-            if (@files) {
+            if ((nelems @files)) {
                 # remove the contained files before the directory itself
-                my $narg = \%(%$arg);
+                my $narg = \%(< %$arg);
                 %{$narg}{[qw(device inode cwd prefix depth)]}
                     = ($device, $inode, $updir, $canon, $arg->{depth}+1);
                 $count += _rmtree($narg, \@files);
@@ -792,15 +782,15 @@ sub _rmtree {
 
             # don't leave the client code in an unexpected directory
             chdir($arg->{cwd})
-                or _croak("cannot chdir to $arg->{cwd} from $canon: $!, aborting.");
+                or die("cannot chdir to $arg->{cwd} from $canon: $!, aborting.");
 
             # ensure that a chdir upwards didn't take us somewhere other
             # than we expected (see CVE-2002-0435)
-            ($device, $inode) = (stat $curdir)[[0,1]]
-                or _croak("cannot stat prior working directory $arg->{cwd}: $!, aborting.");
+            ($device, $inode) = @(stat $curdir)[[0,1]]
+                or die("cannot stat prior working directory $arg->{cwd}: $!, aborting.");
 
             ($arg->{device} eq $device and $arg->{inode} eq $inode)
-                or _croak("previous directory $arg->{cwd} changed before entering $canon, expected dev=$ldev inode=$lino, actual dev=$device ino=$inode, aborting.");
+                or die("previous directory $arg->{cwd} changed before entering $canon, expected dev=$ldev inode=$lino, actual dev=$device ino=$inode, aborting.");
 
             if ($arg->{depth} or !$arg->{keep_root}) {
                 if ($arg->{safe} &&
@@ -820,7 +810,7 @@ sub _rmtree {
 	    }
 	    else {
                     _error($arg, "cannot remove directory", $canon);
-                    if (!chmod($perm, ($Is_VMS ? VMS::Filespec::fileify($root) : $root))
+                    if (!chmod($perm, ($Is_VMS ? < VMS::Filespec::fileify($root) : $root))
                     ) {
                         _error($arg, sprintf("cannot restore permissions to 0\%o",$perm), $canon);
                     }

@@ -9,7 +9,7 @@ our $VERSION = '1.04';
 # Exporter.  It's bad enough that all classes have a import() method
 # whenever UNIVERSAL.pm is loaded.
 require Exporter;
-our @EXPORT_OK = qw(isa can VERSION);
+our @EXPORT_OK = @( qw(isa can VERSION) );
 
 # Make sure that even though the import method is called, it doesn't do
 # anything unless called on UNIVERSAL.
@@ -36,7 +36,7 @@ UNIVERSAL - base class for ALL classes (blessed references)
     $sub      = $obj->can("print");
     $sub      = Class->can("print");
 
-    $sub      = eval { $ref->can("fandango") };
+    $sub      = try { $ref->can("fandango") };
     $ver      = $obj->VERSION;
 
     # but never do this!
@@ -56,7 +56,7 @@ C<UNIVERSAL> provides the following methods:
 
 =item C<< CLASS->isa( TYPE ) >>
 
-=item C<< eval { VAL->isa( TYPE ) } >>
+=item C<< try { VAL->isa( TYPE ) } >>
 
 Where
 
@@ -132,7 +132,7 @@ appropriately).
 
 =item C<< CLASS->can( METHOD ) >>
 
-=item C<< eval { VAL->can( METHOD ) } >>
+=item C<< try { VAL->can( METHOD ) } >>
 
 C<can> checks if the object or class has a method called C<METHOD>. If it does,
 then it returns a reference to the sub.  If it does not, then it returns

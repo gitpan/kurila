@@ -23,7 +23,7 @@ is ($buf, "");
 
 # This is true if Config is not built, or if PerlIO is enabled
 # ie assume that PerlIO is present, unless we know for sure otherwise.
-my $has_perlio = !eval {
+my $has_perlio = !try {
     no warnings;
     require Config;
     !%Config::Config{useperlio}
@@ -47,7 +47,7 @@ my $tmpfile = 'Op_read.tmp';
          \@(9+8, 3, '', 9, "\0" x 3 . $value)
         )
     {
-        my ($length, $offset, $buffer, $expect_length, $expect) = @$_;
+        my ($length, $offset, $buffer, $expect_length, $expect) = < @$_;
         my $buffer = "";
         open FH, "<", $tmpfile or die "Can't open $tmpfile: $!";
         $got = read (FH, $buffer, $length, $offset);
@@ -64,7 +64,7 @@ my $tmpfile = 'Op_read.tmp';
          \@(3+8, 3, '', 3, "\0" x 3 . $value)
         )
     {
-        my ($length, $offset, $buffer, $expect_length, $expect) = @$_;
+        my ($length, $offset, $buffer, $expect_length, $expect) = < @$_;
         my $buffer = "";
         open FH, "<", $tmpfile or die "Can't open $tmpfile: $!";
         $got = read (FH, $buffer, $length, $offset);

@@ -1,22 +1,15 @@
 #!./perl -T
 
-BEGIN {
-    if (%ENV{PERL_CORE}) {
-        chdir 't' if -d 't';
-        @INC = '../lib';
-    }
-}
-
 use warnings;
 use vars qw{ @warnings $fagwoosh $putt $kloong};
 BEGIN {				# ...and save 'em for later
     $^WARN_HOOK = sub { push @warnings, @_[0]->{description} }
 }
-END { print STDERR @warnings }
+END { print STDERR < @warnings }
 
 
 use strict;
-use Test::More tests => 96;
+use Test::More tests => 89;
 my $TB = Test::More->builder;
 
 BEGIN { use_ok('constant'); }
@@ -42,33 +35,33 @@ is UNDEF2, undef,       '    weird way';
 is UNDEF3, undef,       '    short way';
 
 # XXX Why is this way different than the other ones?
-my @undef = UNDEF1;
-is @undef, 1;
+my @undef = @( UNDEF1 );
+is( nelems(@undef), 1);
 is @undef[0], undef;
 
-@undef = UNDEF2;
-is @undef, 0;
-@undef = UNDEF3;
-is @undef, 0;
-@undef = EMPTY;
-is @undef, 0;
+@undef = @( < UNDEF2 );
+is( (nelems @undef), 0);
+@undef = @( < UNDEF3 );
+is( (nelems @undef), 0);
+@undef = @( < EMPTY );
+is( (nelems @undef), 0);
 
-use constant COUNTDOWN	=> scalar reverse 1, 2, 3, 4, 5;
+use constant COUNTDOWN	=> '54321';
 use constant COUNTLIST	=> reverse 1, 2, 3, 4, 5;
-use constant COUNTLAST	=> (COUNTLIST)[[-1]];
+use constant COUNTLAST	=> ( <COUNTLIST)[[-1]];
 
 is COUNTDOWN, '54321';
-my @cl = COUNTLIST;
-is @cl, 5;
-is COUNTDOWN, join '', @cl;
+my @cl = @( < COUNTLIST );
+is nelems(@cl), 5;
+is COUNTDOWN, join '', < @cl;
 is COUNTLAST, 1;
-is((COUNTLIST)[[1]], 4);
+is(( <COUNTLIST)[[1]], 4);
 
 use constant ABC	=> 'ABC';
 is "abc${\( ABC )}abc", "abcABCabc";
 
 use constant DEF	=> 'D', 'E', chr ord 'F';
-is "d e f @{\@( DEF )} d e f", "d e f D E F d e f";
+is "d e f {join ' ', <@{\@( < DEF )}} d e f", "d e f D E F d e f";
 
 use constant SINGLE	=> "'";
 use constant DOUBLE	=> '"';
@@ -112,14 +105,14 @@ cmp_ok E2BIG, '==', 7;
 # text may vary, so we can't test much better than this.
 cmp_ok length(E2BIG), '+>', 6;
 
-is @warnings, 0 or diag join "\n", "unexpected warning", @warnings;
-@warnings = ();		# just in case
+is nelems(@warnings), 0 or diag join "\n", "unexpected warning", < @warnings;
+@warnings = @( () );		# just in case
 undef &PI;
-ok @warnings && (@warnings[0] =~ m/Constant sub.* undefined/) or
-  diag join "\n", "unexpected warning", @warnings;
+ok nelems(@warnings) && (@warnings[0] =~ m/Constant sub.* undefined/) or
+  diag join "\n", "unexpected warning", < @warnings;
 shift @warnings;
 
-is @warnings, 0, "unexpected warning";
+is nelems(@warnings), 0, "unexpected warning";
 
 my $curr_test = $TB->current_test;
 use constant CSCALAR	=> \"ok 37\n";
@@ -169,16 +162,16 @@ ok !%constant::declared{'main::PIE'};
 {
     package Other;
     use constant IN_OTHER_PACK => 42;
-    ::ok ::declared 'IN_OTHER_PACK';
-    ::ok %constant::declared{'Other::IN_OTHER_PACK'};
-    ::ok ::declared 'main::PI';
-    ::ok %constant::declared{'main::PI'};
+    main::ok main::declared 'IN_OTHER_PACK';
+    main::ok %constant::declared{'Other::IN_OTHER_PACK'};
+    main::ok main::declared 'main::PI';
+    main::ok %constant::declared{'main::PI'};
 }
 
 ok declared 'Other::IN_OTHER_PACK';
 ok %constant::declared{'Other::IN_OTHER_PACK'};
 
-@warnings = ();
+@warnings = @( () );
 eval q{
     no warnings;
     use warnings 'constant';
@@ -200,7 +193,7 @@ eval q{
 };
 
 my @Expected_Warnings = 
-  (
+  @(
    qr/^Constant name 'BEGIN' is a Perl keyword/,
    qr/^Constant subroutine BEGIN redefined/,
    qr/^Constant name 'INIT' is a Perl keyword/,
@@ -219,29 +212,29 @@ my @Expected_Warnings =
 );
 
 # when run under "make test"
-if (0+@warnings == 0+@Expected_Warnings) {
+if (0+nelems @warnings == 0+nelems @Expected_Warnings) {
     push @warnings, "";
     push @Expected_Warnings, qr/^$/;
 }
 # when run directly: perl -wT -Ilib t/constant.t
-elsif (@warnings == @Expected_Warnings + 1) {
+elsif ((nelems @warnings) == (nelems @Expected_Warnings) + 1) {
     splice @Expected_Warnings, 1, 0, 
         qr/^Prototype mismatch: sub main::BEGIN \(\) vs none/;
 }
 else {
     my $rule = " -" x 20;
-    diag "/!\\ unexpected case: ", scalar @warnings, " warnings\n$rule\n";
-    diag map { "  $_" } @warnings;
+    diag "/!\\ unexpected case: ", scalar nelems @warnings, " warnings\n$rule\n";
+    diag map { "  $_" } < @warnings;
     diag $rule, $/;
 }
 
-is @warnings, 0+@Expected_Warnings;
+is nelems(@warnings), 0+nelems @Expected_Warnings;
 
-for my $idx (0..(@warnings-1)) {
+for my $idx (0..((nelems @warnings)-1)) {
     like @warnings[$idx], @Expected_Warnings[$idx];
 }
 
-@warnings = ();
+@warnings = @( () );
 
 
 use constant \%(
@@ -252,11 +245,11 @@ use constant \%(
 	SPIT   => sub { shift },
 );
 
-is @{+FAMILY}, THREE;
-is @{+FAMILY}, @{RFAM->[0]};
+is nelems(@{+FAMILY}), THREE;
+is nelems(@{+FAMILY}), nelems @{RFAM->[0]};
 is FAMILY->[2], RFAM->[0]->[2];
 is AGES->{FAMILY->[1]}, 28;
-is THREE**3, SPIT->(@{+FAMILY}**3);
+is THREE**3, SPIT->((nelems @{+FAMILY})**3);
 
 # Allow name of digits/underscores only if it begins with underscore
 {
@@ -267,61 +260,28 @@ is THREE**3, SPIT->(@{+FAMILY}**3);
     ok( $@ eq '' );
 }
 
-sub slotch ();
-
-{
-    my @warnings;
-    local $^WARN_HOOK = sub { push @warnings, @_ };
-    eval 'use constant slotch => 3; 1' or die $@;
-
-    is ("@warnings", "", "No warnings if a prototype exists");
-
-    my $value = eval 'slotch';
-    is ($@, '');
-    is ($value, 3);
-}
-
-sub zit;
-
-{
-    my @warnings;
-    local $^WARN_HOOK = sub { push @warnings, @_[0]->{description} };
-    eval 'use constant zit => 4; 1' or die $@;
-
-    # empty prototypes are reported differently in different versions
-    my $no_proto = ": none";
-
-    is(scalar @warnings, 1, "1 warning");
-    like (@warnings[0], qr/^Prototype mismatch: sub main::zit$no_proto vs \(\)/,
-	  "about the prototype mismatch");
-
-    my $value = eval 'zit';
-    is ($@, '');
-    is ($value, 4);
-}
-
 $fagwoosh = 'geronimo';
 $putt = 'leutwein';
 $kloong = 'schlozhauer';
 
 {
     my @warnings;
-    local $^WARN_HOOK = sub { push @warnings, @_ };
+    local $^WARN_HOOK = sub { push @warnings, < @_ };
     eval 'use constant fagwoosh => 5; 1' or die $@;
 
-    is ("@warnings", "", "No warnings if the typeglob exists already");
+    is ("{join ' ', <@warnings}", "", "No warnings if the typeglob exists already");
 
     my $value = eval 'fagwoosh';
     is ($@, '');
     is ($value, 5);
 
-    my @value = eval 'fagwoosh';
+    my @value = @( eval 'fagwoosh' );
     is ($@, '');
     is_deeply (\@value, \@(5));
 
     eval 'use constant putt => 6, 7; 1' or die $@;
 
-    is ("@warnings", "", "No warnings if the typeglob exists already");
+    is ("{join ' ', <@warnings}", "", "No warnings if the typeglob exists already");
 
     @value = eval 'putt';
     is ($@, '');
@@ -329,7 +289,7 @@ $kloong = 'schlozhauer';
 
     eval 'use constant "klong"; 1' or die $@;
 
-    is ("@warnings", "", "No warnings if the typeglob exists already");
+    is ("{join ' ', <@warnings}", "", "No warnings if the typeglob exists already");
 
     $value = eval 'klong';
     is ($@, '');
@@ -337,5 +297,5 @@ $kloong = 'schlozhauer';
 
     @value = eval 'klong';
     is ($@, '');
-    is_deeply (\@value, \@());
+    is_deeply (\@value, \undef);
 }

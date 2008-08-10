@@ -10,7 +10,7 @@ which have a stable API, and which have functions of all 3 types.
 
 =head1 WHAT IS TESTED
 
-5 core packages are tested; Digest::MD5, B, B::Deparse, Data::Dumper,
+5 core packages are tested; B, B::Deparse, Data::Dumper,
 and POSIX.  These have a mix of the 3 expected implementation types;
 perl, XS, and constant (optimized constant subs).
 
@@ -95,13 +95,6 @@ Looking at ../foo2, you'll see 34 occurrences of the following error:
 =cut
 
 BEGIN {
-    if (%ENV{PERL_CORE}) {
-	chdir('t') if -d 't';
-	@INC = ('.', '../lib');
-    } else {
-	unshift @INC, 't';
-	push @INC, "../../t";
-    }
     require Config;
     if ((%Config::Config{'extensions'} !~ m/\bB\b/) ){
         print "1..0 # Skip -- Perl configured without B module\n";
@@ -120,7 +113,7 @@ use Test::More 'no_plan';
 require_ok("B::Concise");
 
 my %matchers = 
-    ( constant	=> qr{ (?-x: is a constant sub, optimized to a \w+)
+    %( constant	=> qr{ (?-x: is a constant sub, optimized to a \w+)
 		      |(?-x:coderef .* has no START) }x,
       XS	=> qr/ is XS code/,
       perl	=> qr/ (next|db)state/,
@@ -130,11 +123,7 @@ my %matchers =
 my $testpkgs = \%(
     # packages to test, with expected types for named funcs
 
-    'Digest::MD5' => \%( perl => \@(qw/ import /),
-		     dflt => 'XS' ),
-
-    'Data::Dumper' => \%( XS => \@(qw/ bootstrap Dumpxs /),
-		      dflt => 'perl' ),
+    'Data::Dumper' => \%( dflt => 'perl' ),
     B => \%( 
 	dflt => 'constant',		# all but 47/297
 	skip => \@( 'regex_padav' ),	# threaded only
@@ -167,8 +156,8 @@ my $testpkgs = \%(
 		     OPpENTERSUB_AMPER OPpEXISTS_SUB OPpITER_REVERSED
 		     OPpLVAL_INTRO OPpOUR_INTRO OPpSLICE OPpSORT_DESCEND
 		     OPpSORT_INPLACE OPpSORT_INTEGER OPpSORT_NUMERIC
-		     OPpSORT_REVERSE OPpTARGET_MY OPpTRANS_COMPLEMENT
-		     OPpTRANS_DELETE OPpTRANS_SQUASH PMf_CONTINUE
+		     OPpSORT_REVERSE OPpTARGET_MY 
+		     PMf_CONTINUE
 		     PMf_EVAL PMf_EXTENDED PMf_FOLD PMf_GLOBAL PMf_KEEP
 		     PMf_MULTILINE PMf_SINGLELINE
 		     POSTFIX SVf_FAKE SVf_IOK SVf_NOK SVf_POK SVf_ROK
@@ -223,7 +212,7 @@ my $testpkgs = \%(
     'IO::Socket' => \%( dflt => 'constant',		# 157/190
 
 		    perl => \@(qw/ timeout socktype sockopt sockname
-			     socketpair socket sockdomain sockaddr_un
+			     socketpair socket sockdomain
 			     sockaddr_in shutdown setsockopt send
 			     register_domain recv protocol peername
 			     new listen import getsockopt croak
@@ -262,7 +251,7 @@ if (%opts) {
     Data::Dumper->import('Dumper');
     $Data::Dumper::Sortkeys = 1;
 }
-my @argpkgs = @ARGV;
+my @argpkgs = @( < @ARGV );
 my %report;
 
 if (%opts{r}) {
@@ -271,12 +260,12 @@ if (%opts{r}) {
 }
 
 unless (%opts{a}) {
-    unless (@argpkgs) {
+    unless (nelems @argpkgs) {
 	foreach my $pkg (sort keys %$testpkgs) {
 	    test_pkg($pkg, $testpkgs->{$pkg});
 	}
     } else {
-	foreach my $pkg (@argpkgs) {
+	foreach my $pkg (< @argpkgs) {
 	    test_pkg($pkg, $testpkgs->{$pkg});
 	}
     }
@@ -286,19 +275,19 @@ unless (%opts{a}) {
 ############
 
 sub test_pkg {
-    my ($pkg, $fntypes) = @_;
+    my ($pkg, $fntypes) = < @_;
     require_ok($pkg);
 
     # build %stash: keys are func-names, vals filled in below
-    my (%stash) = map
+    my (%stash) = %( map
 	( ($_ => 0)
 	  => ( grep exists &{*{Symbol::fetch_glob("$pkg\::$_")}}	# grab CODE symbols
 	       => grep !m/__ANON__/		# but not anon subs
 	       => keys %{*{Symbol::fetch_glob($pkg.'::')}}		# from symbol table
-	       ));
+	       )) );
 
     for my $type (keys %matchers) {
-	foreach my $fn (@{$fntypes->{$type}}) {
+	foreach my $fn (< @{$fntypes->{$type}}) {
 	    carp "$fn can only be one of $type, %stash{$fn}\n"
 		if %stash{$fn};
 	    %stash{$fn} = $type;
@@ -309,28 +298,28 @@ sub test_pkg {
     for my $k (keys %stash) {
 	%stash{$k} = $dflt unless %stash{$k};
     }
-    %stash{$_} = 'skip' foreach @{$fntypes->{skip}};
+    %stash{$_} = 'skip' foreach < @{$fntypes->{skip}};
 
     if (%opts{v}) {
-	diag("fntypes: " => Dumper($fntypes));
-	diag("$pkg stash: " => Dumper(\%stash));
+	diag("fntypes: " => < Dumper($fntypes));
+	diag("$pkg stash: " => < Dumper(\%stash));
     }
     foreach my $fn (reverse sort keys %stash) {
 	next if %stash{$fn} eq 'skip';
 	my $res = checkXS("{$pkg}::$fn", %stash{$fn});
 	if ($res ne '1') {
-	    push @{%report{$pkg}{$res}}, $fn;
+	    push @{%report{$pkg}->{$res}}, $fn;
 	}
     }
 }
 
 sub checkXS {
-    my ($func_name, $want) = @_;
+    my ($func_name, $want) = < @_;
 
     croak "unknown type $want: $func_name\n"
 	unless defined %matchers{$want};
 
-    my ($buf, $err) = render($func_name);
+    my ($buf, $err) = < render($func_name);
     my $res = like($buf, %matchers{$want}, "$want sub:\t $func_name");
 
     unless ($res) {
@@ -343,30 +332,30 @@ sub checkXS {
 }
 
 sub render {
-    my ($func_name) = @_;
+    my ($func_name) = < @_;
 
     B::Concise::reset_sequence();
     B::Concise::walk_output(\my $buf);
 
     my $walker = B::Concise::compile($func_name);
-    eval { $walker->() };
+    try { $walker->() };
     diag("err: $@ $buf") if $@;
     diag("verbose: $buf") if %opts{V};
 
-    return ($buf, $@);
+    return  @($buf, $@);
 }
 
 sub corecheck {
-    eval { require Module::CoreList };
+    try { require Module::CoreList };
     if ($@) {
 	warn "Module::CoreList not available on $^V\n";
 	return;
     }
     my $mods = %Module::CoreList::version{'5.009002'};
     $mods = \@( sort keys %$mods );
-    print Dumper($mods);
+    print < Dumper($mods);
 
-    foreach my $pkgnm (@$mods) {
+    foreach my $pkgnm (< @$mods) {
 	test_pkg($pkgnm);
     }
 }
@@ -374,12 +363,12 @@ sub corecheck {
 END {
     if (%opts{c}) {
 	$Data::Dumper::Indent = 1;
-	print "Corrections: ", Dumper(\%report);
+	print "Corrections: ", < Dumper(\%report);
 
 	foreach my $pkg (sort keys %report) {
 	    for my $type (keys %matchers) {
-		print "$pkg: $type: @{%report{$pkg}{$type}}\n"
-		    if @{%report{$pkg}{$type}};
+		print "$pkg: $type: {join ' ', <@{%report{$pkg}->{$type}}}\n"
+		    if (nelems @{%report{$pkg}->{$type}});
 	    }
 	}
     }

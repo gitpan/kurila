@@ -9,20 +9,20 @@ use mro;
 
 {
     package Proxy;
-    our @ISA = qw//;
+    our @ISA = @( qw// );
     sub next_proxy { goto &next::method }
     sub maybe_proxy { goto &maybe::next::method }
     sub can_proxy { goto &next::can }
 
     package TBase;
-    our @ISA = qw//;
+    our @ISA = @( qw// );
     sub foo { 42 }
     sub bar { 24 }
     # baz doesn't exist intentionally
     sub quux { 242 }
 
     package TTop;
-    our @ISA = qw/TBase/;
+    our @ISA = @( qw/TBase/ );
     sub foo { shift->Proxy::next_proxy() }
     sub bar { shift->Proxy::maybe_proxy() }
     sub baz { shift->Proxy::maybe_proxy() }

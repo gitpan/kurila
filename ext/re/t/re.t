@@ -1,8 +1,6 @@
 #!./perl
 
 BEGIN {
-	chdir 't' if -d 't';
-	@INC = '../lib';
 	require Config;
 	if ((%Config::Config{'extensions'} !~ m/\bre\b/) ){
         	print "1..0 # Skip -- Perl configured without re module\n";
@@ -31,7 +29,7 @@ my $warn;
 local $^WARN_HOOK = sub {
 	$warn = @_[0]->{description};
 };
-#eval { re::bits(1) };
+#try { re::bits(1) };
 #like( $warn, qr/Useless use/, 'bits() should warn with no args' );
 
 delete %ENV{PERL_RE_COLORS};

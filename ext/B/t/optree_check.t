@@ -1,14 +1,6 @@
 #!perl
 
 BEGIN {
-    if (%ENV{PERL_CORE}){
-	chdir('t') if -d 't';
-	@INC = ('.', '../lib', '../ext/B/t');
-    } else {
-	unshift @INC, 't';
-	push @INC, "../../t";
-    }
-    require Config;
     if ((%Config::Config{'extensions'} !~ m/\bB\b/) ){
         print "1..0 # Skip -- Perl configured without B module\n";
         exit 0;
@@ -86,7 +78,7 @@ if (1) {
     # calling fail isnt good enough by itself.
 
     $@='';
-    eval {
+    try {
 	checkOptree ( name	=> 'test against empty expectations',
 		      bcopts	=> '-exec',
 		      code	=> sub {print 1},
@@ -96,7 +88,7 @@ if (1) {
     like($@->{description}, m/no '\w+' golden-sample found/, "empty expectations prevented");
     
     $@='';
-    eval {
+    try {
 	checkOptree ( name	=> 'prevent whitespace only expectations',
 		      bcopts	=> '-exec',
 		      code	=> sub {my $a},

@@ -1,9 +1,8 @@
 #!./perl -w
 
+use Config;
+
 BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
-    require Config; Config->import;
     if ($^O ne 'VMS' and %Config{'extensions'} !~ m/\bPOSIX\b/) {
 	print "1..0\n";
 	exit 0;
@@ -26,7 +25,7 @@ $| = 1;
 # this string belongs.  This is a *complete* list: any classes not
 # listed, are expected to return '0' for the given string.
 my %classes =
-  (
+  %(
    'a'    => \@( qw(print graph alnum alpha lower xdigit) ),
    'A'    => \@( qw(print graph alnum alpha upper xdigit) ),
    'z'    => \@( qw(print graph alnum alpha lower) ),
@@ -67,13 +66,13 @@ foreach my $s (keys %classes) {
     %classes{$s} = \%( map {
 	%functions{"is$_"}++;	# Keep track of all the 'is<xxx>' functions
 	"is$_" => 1;		# Our return value: is<xxx>($s) should pass.
-    } @{%classes{$s}} );
+    } < @{%classes{$s}} );
 }
 
 # Expected number of tests is one each for every combination of a
 # known is<xxx> function and string listed above.
 require './test.pl';
-plan(tests => keys(%classes) * keys(%functions));
+plan(tests => nkeys(%classes) * nkeys(%functions));
 
 
 #

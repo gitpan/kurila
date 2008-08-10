@@ -15,11 +15,6 @@
 # The Art of Computer Programming, Donald E. Knuth, volume 2,
 # chapter 3. ISBN 0-201-03822-6 (v. 2)
 
-BEGIN {
-    chdir "t" if -d "t";
-    @INC = qw(. ../lib);
-}
-
 use strict;
 use Config;
 
@@ -36,7 +31,7 @@ sub bits ($) {
     my $total;
     my $bits = sprintf '%o', @_[0];
     while (length $bits) {
-	$total += (0,1,1,2,1,2,2,3)[chop $bits];	# Oct to bits
+	$total += @(0,1,1,2,1,2,2,3)[chop $bits];	# Oct to bits
     }
     $total;
 }

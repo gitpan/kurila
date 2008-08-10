@@ -3,8 +3,6 @@
 my $PERLIO;
 
 BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
     require './test.pl';
     unless ('PerlIO::Layer'->find('perlio')) {
 	print "1..0 # Skip: not perlio\n";
@@ -115,7 +113,7 @@ SKIP: {
 		ok($j->($result->[$i]), "$id - $i is ok");
 	    } else {
 		is($result->[$i], $j,
-		   sprintf("$id - $i is %s",
+		   sprintf("$id - $i is \%s",
 			   defined $j ? $j : "undef"));
 	    }
 	}

@@ -47,7 +47,7 @@
 __END__
 # pp_hot.c [pp_print]
 use warnings 'unopened' ;
-$f = $a = "abc" ; 
+our $f = $a = "abc" ; 
 print $f $a;
 no warnings 'unopened' ;
 print $f $a;
@@ -121,7 +121,7 @@ package foo;
 use warnings 'closed';
 open my $fh1, "<", "nonexistent";
 print $fh1 42;
-open $fh2, "<", "nonexistent";
+open my $fh2, "<", "nonexistent";
 print $fh2 42;
 open $bar::fh3, "<", "nonexistent";
 print $bar::fh3 42;
@@ -132,32 +132,6 @@ print() on closed filehandle $fh1 at - line 5.
 print() on closed filehandle $fh2 at - line 7.
 print() on closed filehandle $fh3 at - line 9.
 print() on closed filehandle FH4 at - line 11.
-########
-# pp_hot.c [pp_rv2av]
-use warnings 'uninitialized' ;
-my $a = undef ;
-my @b = @$a;
-no warnings 'uninitialized' ;
-my @c = @$a;
-EXPECT
-Can't use an undefined value as an ARRAY reference at - line 4.
-########
-# pp_hot.c [pp_rv2hv]
-use warnings 'uninitialized' ;
-my $a = undef ;
-my %b = %$a;
-no warnings 'uninitialized' ;
-my %c = %$a;
-EXPECT
-Can't use an undefined value as a HASH reference at - line 4.
-########
-# pp_hot.c [pp_aassign]
-use warnings 'misc' ;
-my %X ; %X = (1,2,3) ;
-no warnings 'misc' ;
-my %Y ; %Y = (1,2,3) ;
-EXPECT
-Odd number of elements in hash assignment at - line 3.
 ########
 # pp_hot.c [Perl_do_readline]
 use warnings 'closed' ;

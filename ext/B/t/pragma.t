@@ -2,8 +2,7 @@
 
 BEGIN {    ## no critic strict
     if ( %ENV{PERL_CORE} ) {
-        chdir('t') if -d 't';
-	@INC = qw(../lib . lib);
+	push @INC, qw(lib);
     }
     else {
         unshift @INC, 't';
@@ -77,7 +76,7 @@ exit;
 our $COP;
 
 sub find_op_cop {
-    my ( $sub, $op ) = @_;
+    my ( $sub, $op ) = < @_;
     my $cv = svref_2object($sub);
     local $COP;
 
@@ -96,7 +95,7 @@ sub find_op_cop {
 }
 
 sub _find_op_cop {
-    my ( $op, $name ) = @_;
+    my ( $op, $name ) = < @_;
 
     # Fail on B::NULL or whatever.
     return 0 if not $op;

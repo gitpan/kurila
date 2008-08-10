@@ -1,13 +1,8 @@
 #!./perl
 
 BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
-}
-
-BEGIN {
     our $hasne;
-    eval { my @n = getnetbyname "loopback" };
+    try { my @n = @( getnetbyname "loopback" ) };
     $hasne = 1 unless $@ && $@->{description} =~ m/unimplemented|unsupported/i;
     unless ($hasne) { print "1..0 # Skip: no getnetbyname\n"; exit 0 }
     use Config;
@@ -15,9 +10,11 @@ BEGIN {
     unless ($hasne) { print "1..0 # Skip: no netdb.h\n"; exit 0 }
 }
 
+our @netent;
+
 BEGIN {
-    our @netent = getnetbyname "loopback"; # This is the function getnetbyname.
-    unless (@netent) { print "1..0 # Skip: no loopback net\n"; exit 0 }
+    @netent = @( getnetbyname "loopback" ); # This is the function getnetbyname.
+    unless (nelems @netent) { print "1..0 # Skip: no loopback net\n"; exit 0 }
 }
 
 print "1..2\n";

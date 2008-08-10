@@ -8,52 +8,26 @@ use warnings::register;
 our(@ISA, @EXPORT, $VERSION);
 
 require Exporter;
-@ISA = qw(Exporter);
-@EXPORT = qw(struct);
+@ISA = @( qw(Exporter) );
+@EXPORT = @( qw(struct) );
 
 $VERSION = '0.63';
 
 my $print = 0;
 sub printem {
-    if (@_) { $print = shift }
+    if ((nelems @_)) { $print = shift }
     else    { $print++ }
-}
-
-{
-    package Class::Struct::Tie_ISA;
-
-    sub TIEARRAY {
-        my $class = shift;
-        return bless \@(), $class;
-    }
-
-    sub STORE {
-        my ($self, $index, $value) = @_;
-        Class::Struct::_subclass_error();
-    }
-
-    sub FETCH {
-        my ($self, $index) = @_;
-        $self->[$index];
-    }
-
-    sub FETCHSIZE {
-        my $self = shift;
-        return scalar(@$self);
-    }
-
-    sub DESTROY { }
 }
 
 sub import {
     my $self = shift;
 
-    if ( @_ == 0 ) {
-      $self->export_to_level( 1, $self, @EXPORT );
-    } elsif ( @_ == 1 ) {
+    if ( (nelems @_) == 0 ) {
+      $self->export_to_level( 1, $self, < @EXPORT );
+    } elsif ( (nelems @_) == 1 ) {
 	# This is admittedly a little bit silly:
 	# do we ever export anything else than 'struct'...?
-      $self->export_to_level( 1, $self, @_ );
+      $self->export_to_level( 1, $self, < @_ );
     } else {
       goto &struct;
     }
@@ -71,46 +45,37 @@ sub struct {
     my $base_type = ref @_[1];
     if ( $base_type eq 'HASH' ) {
         $class = shift;
-        @decls = %{shift()};
-        _usage_error() if @_;
+        @decls = @( < %{shift()} );
+        _usage_error() if (nelems @_);
     }
     elsif ( $base_type eq 'ARRAY' ) {
         $class = shift;
-        @decls = @{shift()};
-        _usage_error() if @_;
+        @decls = @( < @{shift()} );
+        _usage_error() if (nelems @_);
     }
     else {
         $base_type = 'ARRAY';
         $class = (caller())[[0]];
-        @decls = @_;
+        @decls = @( < @_ );
     }
 
-    _usage_error() if @decls % 2 == 1;
-
-    # Ensure we are not, and will not be, a subclass.
-
-    my $isa = do {
-        no strict 'refs';
-        \@{*{Symbol::fetch_glob($class . '::ISA')}};
-    };
-    _subclass_error() if @$isa;
-    tie @$isa, 'Class::Struct::Tie_ISA';
+    _usage_error() if (nelems @decls) % 2 == 1;
 
     # Create constructor.
 
     die "function 'new' already defined in package $class"
         if do { no strict 'refs'; defined &{Symbol::fetch_glob($class . "::new")} };
 
-    my @methods = ();
-    my %refs = ();
-    my %arrays = ();
-    my %hashes = ();
-    my %classes = ();
+    my @methods = @( () );
+    my %refs = %( () );
+    my %arrays = %( () );
+    my %hashes = %( () );
+    my %classes = %( () );
     my $got_class = 0;
     my $out = '';
 
     $out = "\{\n  package $class;\n  sub new \{\n";
-    $out .= "    my (\$class, \%init) = \@_;\n";
+    $out .= "    my (\$class, < \%init) = < \@_;\n";
     $out .= "    \$class = __PACKAGE__ unless \@_;\n";
 
     my $cnt = 0;
@@ -124,7 +89,7 @@ sub struct {
     elsif( $base_type eq 'ARRAY' ){
         $out .= '    my($r) = \@();'."\n";
     }
-    while( $idx +< @decls ){
+    while( $idx +< nelems @decls ){
         $name = @decls[$idx];
         $type = @decls[$idx+1];
         push( @methods, $name );
@@ -178,7 +143,7 @@ sub struct {
 
     my( $pre, $pst, $sel );
     $cnt = 0;
-    foreach $name (@methods){
+    foreach $name (< @methods){
         if ( do { no strict 'refs'; defined &{Symbol::fetch_glob($class . "::$name")} } ) {
             warnings::warnif("function '$name' already defined, overrides struct accessor method");
         }

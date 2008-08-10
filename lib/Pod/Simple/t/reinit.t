@@ -1,11 +1,3 @@
-BEGIN {
-    chdir 't' if -d 't';
-    if(%ENV{PERL_CORE}) {
-        @INC = '../lib';
-    }
-}
-
-use lib '../lib';
 
 use strict;
 use Test;
@@ -48,7 +40,7 @@ foreach my $file (
     $precooked =~ s<\.pod><o.txt>s;
     $parser->reinit;
     $parser->output_string(\$outstring);
-    $parser->parse_file(source_path($file));
+    $parser->parse_file( source_path($file));
 
     open(IN, "<", $precooked) or die "Can't read-open $precooked: $!";
     {
@@ -63,7 +55,7 @@ foreach my $file (
       ok 1;
       next;
     } elsif( do{
-      for ($outstring, $compstring) { tr/ //d; };
+      for ($outstring, $compstring) { s/[ ]//g; };
       $outstring eq $compstring;
     }){
       print "# Differ only in whitespace.\n";

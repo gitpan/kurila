@@ -107,9 +107,9 @@ my $file;			# shadows current filename
 my $line;			# shadows current line number
 my $subname;			# shadows current sub name
 my %table;			# Multi-level hash to record all uses etc.
-my @todo = ();			# List of CVs that need processing
+my @todo = @( () );			# List of CVs that need processing
 
-my %code = (intro => "i", used => "",
+my %code = %(intro => "i", used => "",
 	    subdef => "s", subused => "&",
 	    formdef => "f", meth => "->");
 
@@ -118,8 +118,8 @@ my %code = (intro => "i", used => "",
 my ($debug_op, $debug_top, $nodefs, $raw);
 
 sub process {
-    my ($var, $event) = @_;
-    my ($pack, $type, $name) = @$var;
+    my ($var, $event) = < @_;
+    my ($pack, $type, $name) = < @$var;
     if ($type eq "*") {
 	if ($event eq "used") {
 	    return;
@@ -141,11 +141,11 @@ sub process {
 sub load_pad {
     my $padlist = shift;
     my ($namelistav, $vallistav, @namelist, $ix);
-    @pad = ();
+    @pad = @( () );
     return if class($padlist) eq "SPECIAL";
-    ($namelistav,$vallistav) = $padlist->ARRAY;
-    @namelist = $namelistav->ARRAY;
-    for ($ix = 1; $ix +< @namelist; $ix++) {
+    ($namelistav,$vallistav) = < $padlist->ARRAY;
+    @namelist = @( < $namelistav->ARRAY );
+    for ($ix = 1; $ix +< nelems @namelist; $ix++) {
 	my $namesv = @namelist[$ix];
 	next if class($namesv) eq "SPECIAL";
 	my ($type, $name) = $namesv->PV =~ m/^(.)([^\0]*)(\0.*)?$/;
@@ -153,13 +153,13 @@ sub load_pad {
     }
     if (%Config{useithreads}) {
 	my (@vallist);
-	@vallist = $vallistav->ARRAY;
-	for ($ix = 1; $ix +< @vallist; $ix++) {
+	@vallist = @( < $vallistav->ARRAY );
+	for ($ix = 1; $ix +< nelems @vallist; $ix++) {
 	    my $valsv = @vallist[$ix];
 	    next unless class($valsv) eq "GV";
 	    # these pad GVs don't have corresponding names, so same @pad
 	    # array can be used without collisions
-	    @pad[$ix] = \@($valsv->STASH->NAME, "*", $valsv->NAME);
+	    @pad[$ix] = \@( <$valsv->STASH->NAME, "*", < $valsv->NAME);
 	}
     }
 }
@@ -169,8 +169,8 @@ sub xref {
     my $op;
     for ($op = $start; $$op; $op = $op->next) {
 	last if %done{$$op}++;
-	warn sprintf('top = [%s, %s, %s]', @$top) if $debug_top;
-	warn peekop($op), "\n" if $debug_op;
+	warn sprintf('top = [%s, %s, %s]', < @$top) if $debug_top;
+	warn < peekop($op), "\n" if $debug_op;
 	my $opname = $op->name;
 	if ($opname =~ m/^(or|and|mapwhile|grepwhile|range|cond_expr)$/) {
 	    xref($op->other);
@@ -188,7 +188,7 @@ sub xref {
 	    xref($op->pmreplstart);
 	} else {
 	    no strict 'refs';
-	    my $ppname = *{Symbol::fetch_glob("pp_$opname")};
+	    my $ppname = \&{*{Symbol::fetch_glob("pp_$opname")}};
 	    &$ppname($op) if defined(&$ppname);
 	}
     }
@@ -212,7 +212,7 @@ sub xref_main {
     $subname = "(main)";
     load_pad(comppadlist);
     xref(main_start);
-    while (@todo) {
+    while ((nelems @todo)) {
 	xref_cv(shift @todo);
     }
 }
@@ -230,11 +230,11 @@ sub pp_padsv {
     process($top, $op->private ^&^ OPpLVAL_INTRO ? "intro" : "used");
 }
 
-sub pp_padav { pp_padsv(@_) }
-sub pp_padhv { pp_padsv(@_) }
+sub pp_padav { pp_padsv(< @_) }
+sub pp_padhv { pp_padsv(< @_) }
 
 sub deref {
-    my ($op, $var, $as) = @_;
+    my ($op, $var, $as) = < @_;
     $var->[1] = $as . $var->[1];
     process($var, $op->private ^&^ OPpOUR_INTRO ? "intro" : "used");
 }
@@ -353,12 +353,12 @@ sub output {
 		    my @lines;
 		    foreach $ev (qw(intro formdef subdef meth subused used)) {
 			$perev = $pername->{$ev};
-			if (defined($perev) && @$perev) {
+			if (defined($perev) && nelems @$perev) {
 			    my $code = %code{$ev};
-			    push(@lines, map("$code$_", @$perev));
+			    push(@lines, map("$code$_", < @$perev));
 			}
 		    }
-		    printf "      \%-16s  \%s\n", $name, join(", ", @lines);
+		    printf "      \%-16s  \%s\n", $name, join(", ", < @lines);
 		}
 	    }
 	}
@@ -366,7 +366,7 @@ sub output {
 }
 
 sub compile {
-    my @options = @_;
+    my @options = @( < @_ );
     my ($option, $opt, $arg);
   OPTION:
     while ($option = shift @options) {
@@ -400,11 +400,11 @@ sub compile {
 	    }
 	}
     }
-    if (@options) {
+    if ((nelems @options)) {
 	return sub {
 	    my $objname;
 	    xref_definitions();
-	    foreach $objname (@options) {
+	    foreach $objname (< @options) {
 		$objname = "main::$objname" unless $objname =~ m/::/;
 		eval "xref_object(\\&$objname)";
 		die "xref_object(\\&$objname) failed: $@" if $@;

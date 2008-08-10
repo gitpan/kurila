@@ -3,14 +3,14 @@
 BEGIN {
     if( %ENV{PERL_CORE} ) {
         chdir 't';
-        @INC = '../lib';
+        @INC = @( '../lib' );
     }
 }
 
 my $test_num = 1;
 # Utility testing functions.
 sub ok ($;$) {
-    my($test, $name) = @_;
+    my($test, $name) = < @_;
     my $ok = '';
     $ok .= "not " unless $test;
     $ok .= "ok $test_num";
@@ -28,11 +28,11 @@ my $Test = Test::Builder->new;
 
 print "1..2\n";
 
-eval { $Test->plan(7); };
+try { $Test->plan(7); };
 ok( $@->{description} =~ m/^plan\(\) doesn't understand 7/, 'bad plan()' ) ||
     print STDERR "# $@";
 
-eval { $Test->plan(wibble => 7); };
+try { $Test->plan(wibble => 7); };
 ok( $@->{description} =~ m/^plan\(\) doesn't understand wibble 7/, 'bad plan()' ) ||
     print STDERR "# $@";
 

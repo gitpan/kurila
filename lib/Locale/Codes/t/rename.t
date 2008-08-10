@@ -14,8 +14,8 @@ Locale::Country::rename_country('gb' => 'Great Britain');
 # If it evaluates to FALSE, then "not ok N" is printed for the test,
 # otherwise "ok N".
 #-----------------------------------------------------------------------
-@TESTS =
-(
+our @TESTS =
+@(
 	#================================================
 	# TESTS FOR code2country
 	#================================================
@@ -66,14 +66,15 @@ Locale::Country::rename_country('gb' => 'Great Britain');
  'country2code("Zimbabwe")       eq "zw"',    # last in DATA segment
 );
 
-print "1..", int(@TESTS), "\n";
+use Test::More;
 
-$testid = 1;
-foreach $test (@TESTS)
+plan tests => (nelems @TESTS);
+
+foreach my $test (< @TESTS)
 {
-    eval "print (($test) ? \"ok $testid\\n\" : \"not ok $testid\\n\" )";
-    print "not ok $testid\n" if $@;
-    ++$testid;
+    my $ok = eval "$test";
+    die if $@;
+    ok $ok;
 }
 
 exit 0;

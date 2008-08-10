@@ -3,7 +3,7 @@
 BEGIN {
     if( %ENV{PERL_CORE} ) {
         chdir 't';
-        @INC = ('../lib', 'lib/');
+        @INC = @('../lib', 'lib/');
     }
     else {
         unshift @INC, 't/lib/';
@@ -15,7 +15,6 @@ use File::Spec;
 
 use Test::More tests => 6;
 
-use TieOut;
 use MakeMaker::Test::Utils;
 use MakeMaker::Test::Setup::BFD;
 

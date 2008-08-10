@@ -13,25 +13,25 @@ $| = 1;
 umask 0;
 $xref = \ "";
 $runme = $^X;
-@a = (1..5);
-%h = (1..6);
+@a = @(1..5);
+%h = %(1..6);
 $aref = \@a;
 $href = \%h;
 open OP, '-|', qq{$runme -le "print 'aaa Ok ok' for 1..100"};
 $chopit = 'aaaaaa';
-@chopar = (113 .. 119);
+@chopar = @(113 .. 119);
 $posstr = '123456';
 $cstr = 'aBcD.eF';
 pos $posstr = 3;
 $nn = $n = 2;
 sub subb {"in s"}
 
-@INPUT = ~< *DATA;
-@simple_input = grep m/^\s*\w+\s*\$\w+\s*[#\n]/, @INPUT;
+@INPUT = @( ~< *DATA );
+@simple_input = @( grep m/^\s*\w+\s*\$\w+\s*[#\n]/, < @INPUT );
 
-plan 11 + @INPUT + @simple_input;
+plan 6 + (nelems @INPUT) + nelems @simple_input;
 
-sub wrn {"@_"}
+sub wrn {"{join ' ', <@_}"}
 
 # Check correct optimization of ucfirst etc
 my $a = "AB";
@@ -55,41 +55,16 @@ my $xxx = 'b';
 $xxx = 'c' . ($xxx || 'e');
 ok $xxx eq 'cb';
 
-{				# Check calling STORE
-  my $sc = 0;
-  sub B::TIESCALAR {bless \@(11), 'B'}
-  sub B::FETCH { -(shift->[0]) }
-  sub B::STORE { $sc++; my $o = shift; $o->[0] = 17 + shift }
-
-  my $m;
-  tie $m, 'B';
-  $m = 100;
-
-  ok $sc == 1;
-
-  my $t = 11;
-  $m = $t + 89;
-  
-  ok $sc == 2;
-  ok $m == -117;
-
-  $m += $t;
-
-  ok $sc == 3;
-  ok $m == 89;
-
-}
-
 # Chains of assignments
 
 my ($l1, $l2, $l3, $l4);
 my $zzzz = 12;
 $zzz1 = $l1 = $l2 = $zzz2 = $l3 = $l4 = 1 + $zzzz;
 
-ok( $zzz1 == 13 and $zzz2 == 13 and $l1 == 13,
+ok( ($zzz1 == 13 and $zzz2 == 13 and $l1 == 13),
     "$zzz1 = $l1 = $l2 = $zzz2 = $l3 = $l4 = 13" );
 
-for (@INPUT) {
+for (< @INPUT) {
  SKIP: {
     ($op, undef, $comment) = m/^([^\#]+)(\#\s+(.*))?/;
     $comment = $op unless defined $comment;
@@ -121,7 +96,7 @@ EOE
   }
 }
 
-for (@simple_input) {
+for (< @simple_input) {
  SKIP:
  {
   ($op, undef, $comment) = m/^([^\#]+)(\#\s+(.*))?/;
@@ -149,7 +124,7 @@ EOE
  }
 }
 
-eval {
+try {
     sub PVBM () { 'foo' }
     index 'foo', PVBM;
     my $x = PVBM;
@@ -170,7 +145,7 @@ ref $cstr			# ref nonref
 `$undefed`			# backtick undef skip(MSWin32)
 ~< *OP				# readline
 'faked'				# rcatline
-(@z = (1 .. 3))			# aassign
+(<@z) = (1 .. 3)			# aassign
 chop $chopit			# chop
 (chop (@x=@chopar))		# schop
 chomp $chopit			# chomp
@@ -224,7 +199,7 @@ substr $posstr, 2, 2		# substr
 vec("abc",2,8)			# vec
 index $posstr, 2		# index
 rindex $posstr, 2		# rindex
-sprintf "%i%i", $n, $n		# sprintf
+sprintf '%i%i', $n, $n		# sprintf
 ord $n				# ord
 chr $n				# chr
 crypt $n, $n			# crypt
@@ -234,20 +209,13 @@ lcfirst $cstr			# lcfirst
 uc $cstr			# uc
 lc $cstr			# lc
 quotemeta $cstr			# quotemeta
-@$aref				# rv2av
 (each %h) % 2 == 1		# each
-values %h			# values
-keys %h				# keys
-%$href				# rv2hv
+nkeys %h				# nkeys
 pack "C2", $n,$n		# pack
-split m/a/, "abad"		# split
 join "a"; @a			# join
 push @a,3==6			# push
 unshift @aaa			# unshift
-reverse	@a			# reverse
-reverse	$cstr			# reverse - scal
 grep $_, 1,0,2,0,3		# grepwhile
-map "x$_", 1,0,2,0,3		# mapwhile
 subb()				# entersub
 caller				# caller
 '???'                           # warn

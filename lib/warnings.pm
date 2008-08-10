@@ -139,7 +139,7 @@ See L<perlmodlib/Pragmatic Modules> and L<perllexwarn>.
 
 =cut
 
-our %Offsets = (
+our %Offsets = %(
 
     # Warnings Categories added in Perl 5.008
 
@@ -195,7 +195,7 @@ our %Offsets = (
     'imprecision'	=> 92,
   );
 
-our %Bits = (
+our %Bits = %(
     'all'		=> "\x[555555555555555555555515]", # [0..46]
     'ambiguous'		=> "\x[000000000000000400000000]", # [29]
     'bareword'		=> "\x[000000000000001000000000]", # [30]
@@ -245,7 +245,7 @@ our %Bits = (
     'void'		=> "\x[000000000000000000000004]", # [45]
   );
 
-our %DeadBits = (
+our %DeadBits = %(
     'all'		=> "\x[aaaaaaaaaaaaaaaaaaaaaa2a]", # [0..46]
     'ambiguous'		=> "\x[000000000000000800000000]", # [29]
     'bareword'		=> "\x[000000000000002000000000]", # [30]
@@ -312,7 +312,7 @@ sub bits
     my $fatal = 0 ;
     my $no_fatal = 0 ;
 
-    foreach my $word ( @_ ) {
+    foreach my $word ( < @_ ) {
 	if ($word eq 'FATAL') {
 	    $fatal = 1;
 	    $no_fatal = 0;
@@ -350,7 +350,7 @@ sub import
     
     push @_, 'all' unless @_;
 
-    foreach my $word ( @_ ) {
+    foreach my $word ( < @_ ) {
 	if ($word eq 'FATAL') {
 	    $fatal = 1;
 	    $no_fatal = 0;
@@ -385,7 +385,7 @@ sub unimport
 
     push @_, 'all' unless @_;
 
-    foreach my $word ( @_ ) {
+    foreach my $word ( < @_ ) {
 	if ($word eq 'FATAL') {
 	    next; 
 	}
@@ -421,18 +421,18 @@ sub __chk
 	    unless defined $offset;
     }
     else {
-        $category = (caller(1))[0] ;
+        $category = @(caller(1))[0] ;
         $offset = %Offsets{$category};
         die("package '$category' not registered for warnings")
 	    unless defined $offset ;
     }
 
-    my $this_pkg = (caller(1))[0] ;
+    my $this_pkg = @(caller(1))[0] ;
     my $i = 2 ;
     my $pkg ;
 
     if ($isobj) {
-        while (do { { package DB; $pkg = (caller($i++))[0] } } ) {
+        while (do { { package DB; $pkg = @(caller($i++))[0] } } ) {
             last unless @DB::args && @DB::args[0] =~ m/^$category=/ ;
         }
 	$i -= 2 ;
@@ -441,16 +441,16 @@ sub __chk
         $i = 2;
     }
 
-    my $callers_bitmask = (caller($i))[9] ;
-    return ($callers_bitmask, $offset, $i) ;
+    my $callers_bitmask = @(caller($i))[9] ;
+    return @($callers_bitmask, $offset, $i) ;
 }
 
 sub enabled
 {
     die("Usage: warnings::enabled([category])")
-	unless @_ == 1 || @_ == 0 ;
+	unless nelems(@_) == 1 || nelems(@_) == 0 ;
 
-    my ($callers_bitmask, $offset, $i) = __chk(@_) ;
+    my ($callers_bitmask, $offset, $i) = < __chk(< @_) ;
 
     return 0 unless defined $callers_bitmask ;
     return vec($callers_bitmask, $offset, 1) ||
@@ -461,10 +461,10 @@ sub enabled
 sub warn
 {
     die("Usage: warnings::warn([category,] 'message')")
-	unless @_ == 2 || @_ == 1 ;
+	unless nelems(@_) == 2 || nelems(@_) == 1 ;
 
     my $message = pop ;
-    my ($callers_bitmask, $offset, $i) = __chk(@_) ;
+    my ($callers_bitmask, $offset, $i) = < __chk(<@_) ;
     die($message)
 	if vec($callers_bitmask, $offset+1, 1) ||
 	   vec($callers_bitmask, %Offsets{'all'}+1, 1) ;
@@ -474,10 +474,10 @@ sub warn
 sub warnif
 {
     die("Usage: warnings::warnif([category,] 'message')")
-	unless @_ == 2 || @_ == 1 ;
+	unless nelems(@_) == 2 || nelems(@_) == 1 ;
 
     my $message = pop ;
-    my ($callers_bitmask, $offset, $i) = __chk(@_) ;
+    my ($callers_bitmask, $offset, $i) = <__chk(<@_) ;
 
     return
         unless defined $callers_bitmask &&

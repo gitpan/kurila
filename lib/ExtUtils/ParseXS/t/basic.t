@@ -5,7 +5,7 @@ BEGIN {
     chdir 't' if -d 't';
     chdir '../lib/ExtUtils/ParseXS'
       or die "Can't chdir to lib/ExtUtils/ParseXS: $!";
-    @INC = qw(../.. ../../.. .);
+    @INC = @( qw(../.. ../../.. .) );
   }
 }
 use strict;
@@ -23,9 +23,10 @@ use Carp; $^WARN_HOOK = \&Carp::cluck;
 #########################
 
 # Try sending to filehandle
-tie *FH, 'Foo';
-process_file( filename => 'XSTest.xs', output => \*FH, prototypes => 1 );
-ok tied(*FH)->content, '/is_even/', "Test that output contains some text";
+my $out = "";
+open my $fh, '>', \$out or die;
+process_file( filename => 'XSTest.xs', output => $fh, prototypes => 1 );
+ok $out, '/is_even/', "Test that output contains some text";
 
 my $source_file = 'XSTest.c';
 
@@ -45,11 +46,11 @@ if ($b->have_compiler) {
   ok $obj_file;
   ok -e $obj_file, 1, "Make sure $obj_file exists";
 
-  my $lib_file = $b->link( objects => $obj_file, module_name => $module );
+  my ($lib_file) = < $b->link( objects => $obj_file, module_name => $module );
   ok $lib_file;
   ok -e $lib_file, 1, "Make sure $lib_file exists";
 
-  eval {require XSTest};
+  try {require XSTest}; die if $@;
   ok $@, '';
   ok  XSTest::is_even(8);
   ok !XSTest::is_even(9);
@@ -57,7 +58,7 @@ if ($b->have_compiler) {
   # Win32 needs to close the DLL before it can unlink it, but unfortunately
   # dl_unload_file was missing on Win32 prior to perl change #24679!
   if ($^O eq 'MSWin32' and defined &DynaLoader::dl_unload_file) {
-    for (my $i = 0; $i +< @DynaLoader::dl_modules; $i++) {
+    for (my $i = 0; $i +< nelems @DynaLoader::dl_modules; $i++) {
       if (@DynaLoader::dl_modules[$i] eq $module) {
         DynaLoader::dl_unload_file(@DynaLoader::dl_librefs[$i]);
         last;
@@ -72,8 +73,3 @@ if ($b->have_compiler) {
 
 1 while unlink $source_file;
 
-#####################################################################
-
-sub Foo::TIEHANDLE { bless \%(), 'Foo' }
-sub Foo::PRINT { shift->{buf} .= join '', @_ }
-sub Foo::content { shift->{buf} }

@@ -41,8 +41,7 @@ Perl_gv_SVadd(pTHX_ GV *gv)
 {
     PERL_ARGS_ASSERT_GV_SVADD;
 
-    if (!gv || SvTYPE((SV*)gv) != SVt_PVGV)
-	Perl_croak(aTHX_ "Bad symbol for scalar");
+    assert( SvTYPE((SV*)gv) == SVt_PVGV );
     if (!GvSV(gv))
 	GvSV(gv) = newSV(0);
     return gv;
@@ -54,8 +53,7 @@ Perl_gv_AVadd(pTHX_ register GV *gv)
 {
     PERL_ARGS_ASSERT_GV_AVADD;
 
-    if (!gv || SvTYPE((SV*)gv) != SVt_PVGV)
-	Perl_croak(aTHX_ "Bad symbol for array");
+    assert( SvTYPE((SV*)gv) == SVt_PVGV );
     if (!GvAV(gv))
 	GvAV(gv) = newAV();
     return gv;
@@ -66,8 +64,7 @@ Perl_gv_HVadd(pTHX_ register GV *gv)
 {
     PERL_ARGS_ASSERT_GV_HVADD;
 
-    if (!gv || SvTYPE((SV*)gv) != SVt_PVGV)
-	Perl_croak(aTHX_ "Bad symbol for hash");
+    assert( SvTYPE((SV*)gv) == SVt_PVGV );
     if (!GvHV(gv))
 	GvHV(gv) = newHV();
     return gv;
@@ -154,27 +151,6 @@ Perl_gv_fetchfile_flags(pTHX_ const char *const name, const STRLEN namelen,
     return gv;
 }
 
-/*
-=for apidoc gv_const_sv
-
-If C<gv> is a typeglob whose subroutine entry is a constant sub eligible for
-inlining, or C<gv> is a placeholder reference that would be promoted to such
-a typeglob, then returns the value returned by the sub.  Otherwise, returns
-NULL.
-
-=cut
-*/
-
-SV *
-Perl_gv_const_sv(pTHX_ GV *gv)
-{
-    PERL_ARGS_ASSERT_GV_CONST_SV;
-
-    if (SvTYPE(gv) == SVt_PVGV)
-	return cv_const_sv(GvCVu(gv));
-    return SvROK(gv) ? SvRV(gv) : NULL;
-}
-
 GP *
 Perl_newGP(pTHX_ GV *const gv)
 {
@@ -192,7 +168,7 @@ Perl_newGP(pTHX_ GV *const gv)
     PERL_ARGS_ASSERT_NEWGP;
 
     if (temp_sv) {
-	file = SvPVX(temp_sv);
+	file = SvPVX_const(temp_sv);
 	len = SvCUR(temp_sv);
     } else {
 	file = "";
@@ -209,8 +185,6 @@ Perl_newGP(pTHX_ GV *const gv)
 #endif
 
     gp->gp_line = PL_curcop ? CopLINE(PL_curcop) : 0;
-    /* XXX Ideally this cast would be replaced with a change to const char*
-       in the struct.  */
     gp->gp_file_hek = share_hek(file, len, hash);
     gp->gp_egv = gv;
     gp->gp_refcnt = 1;
@@ -231,6 +205,7 @@ Perl_gv_init(pTHX_ GV *gv, HV *stash, const char *name, STRLEN len, int multi)
 
     PERL_ARGS_ASSERT_GV_INIT;
     assert (!(proto && has_constant));
+    assert( ! stash || (SvTYPE(stash) == SVt_PVHV) );
 
     if (has_constant) {
 	/* The constant has to be a simple scalar type.  */
@@ -273,9 +248,11 @@ Perl_gv_init(pTHX_ GV *gv, HV *stash, const char *name, STRLEN len, int multi)
 	GvMULTI_on(gv);
     if (doproto) {			/* Replicate part of newSUB here. */
 	ENTER;
+	SAVESPTR(PL_curstash);
+	HVcpREPLACE(PL_curstash, stash);
 	if (has_constant) {
 	    /* newCONSTSUB takes ownership of the reference from us.  */
-	    GvCV(gv) = newCONSTSUB(stash, name, has_constant);
+	    GvCV(gv) = newCONSTSUB(name, has_constant);
 	    /* If this reference was a copy of another, then the subroutine
 	       must have been "imported", by a Perl space assignment to a GV
 	       from a reference to CV.  */
@@ -283,14 +260,14 @@ Perl_gv_init(pTHX_ GV *gv, HV *stash, const char *name, STRLEN len, int multi)
 		GvIMPORTED_CV_on(gv);
 	} else {
 	    (void) start_subparse(0);	/* Create empty CV in compcv. */
-	    GvCV(gv) = PL_compcv;
+	    GvCV(gv) = (CV*)SvREFCNT_inc((SV*)PL_compcv);
 	}
 	LEAVE;
 
         mro_method_changed_in(GvSTASH(gv)); /* sub Foo::bar($) { (shift) } sub ASDF::baz($); *ASDF::baz = \&Foo::bar */
+	assert(SvTYPE(GvCV(gv)) == SVt_PVCV);
 	CvGV(GvCV(gv)) = gv;
 	CvFILE_set_from_cop(GvCV(gv), PL_curcop);
-	CvSTASH(GvCV(gv)) = PL_curstash;
 	if (proto) {
 	    sv_usepvn_flags((SV*)GvCV(gv), proto, protolen,
 			    SV_HAS_TRAILING_NUL);
@@ -525,6 +502,7 @@ S_gv_get_super_pkg(pTHX_ const char* name, I32 namelen)
     gv = *gvp;
     gv_init(gv, stash, "ISA", 3, TRUE);
     superisa = GvAVn(gv);
+    assert(SvTYPE(superisa) == SVt_PVAV);
     GvMULTI_on(gv);
     sv_magic((SV*)superisa, (SV*)gv, PERL_MAGIC_isa, NULL, 0);
 #ifdef USE_ITHREADS
@@ -563,16 +541,13 @@ Perl_gv_fetchmethod(pTHX_ HV *stash, const char *name)
 	stash = NULL;
 
     for (nend = name; *nend; nend++) {
-	if (*nend == '\'')
-	    nsplit = nend;
-	else if (*nend == ':' && *(nend + 1) == ':')
+	if (*nend == ':' && *(nend + 1) == ':')
 	    nsplit = ++nend;
     }
     if (nsplit) {
 	const char * const origname = name;
 	name = nsplit + 1;
-	if (*nsplit == ':')
-	    --nsplit;
+	--nsplit;
 	if ((nsplit - origname) == 5 && strnEQ(origname, "SUPER", 5)) {
 	    /* ->SUPER::method should really be looked up in original stash */
 	    SV * const tmpstr = sv_2mortal(Perl_newSVpvf(aTHX_ "%s::SUPER",
@@ -706,6 +681,7 @@ Perl_gv_stashpvn(pTHX_ const char *name, U32 namelen, I32 flags)
     if (!GvHV(tmpgv))
 	GvHV(tmpgv) = newHV();
     stash = GvHV(tmpgv);
+    assert(SvTYPE(stash) == SVt_PVHV);
     if (!HvNAME_get(stash))
 	hv_name_set(stash, name, namelen, 0);
     return stash;
@@ -777,8 +753,7 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 
     for (name_cursor = name; name_cursor < name_end; name_cursor++) {
 	if ((*name_cursor == ':' && name_cursor < name_em1
-	     && name_cursor[1] == ':')
-	    || (*name_cursor == '\'' && name_cursor[1]))
+	     && name_cursor[1] == ':'))
 	{
 	    if (!stash)
 		stash = PL_defstash;
@@ -793,10 +768,11 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 		if (len + 2 <= (I32)sizeof (smallbuf))
 		    tmpbuf = smallbuf;
 		else
-		    Newx(tmpbuf, len+2, char);
+		    Newx(tmpbuf, len+3, char);
 		Copy(name, tmpbuf, len, char);
 		tmpbuf[len++] = ':';
 		tmpbuf[len++] = ':';
+		tmpbuf[len] = '\0';
 		gvp = (GV**)hv_fetch(stash,tmpbuf,len,add);
 		gv = gvp ? *gvp : NULL;
 		if (gv && gv != (GV*)&PL_sv_undef) {
@@ -812,17 +788,18 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 
 		if (!(stash = GvHV(gv)))
 		    stash = GvHV(gv) = newHV();
+		if ( ! SvHVOK(stash) ) {
+		    Perl_croak(aTHX_ "stash '%s' is not a hash but %s", tmpbuf, Ddesc((SV*)stash));
+		}
 
 		if (!HvNAME_get(stash))
 		    hv_name_set(stash, nambeg, name_cursor - nambeg, 0);
 	    }
 
-	    if (*name_cursor == ':')
-		name_cursor++;
-	    name_cursor++;
+	    name_cursor+=2;
 	    name = name_cursor;
 	    if (name == name_end)
-		return gv ? gv : (GV*)*hv_fetchs(PL_defstash, "main::", TRUE);
+		return gv;
 	}
     }
     len = name_cursor - name;
@@ -873,7 +850,7 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 		stash = PL_defstash;
 	    else if (IN_PERL_COMPILETIME) {
 		stash = PL_curstash;
-		if (add && (PL_hints & HINT_STRICT_VARS) &&
+		if (add &&
 		    !(flags & GV_NOTQUAL) &&
 		    sv_type != SVt_PVCV &&
 		    sv_type != SVt_PVGV &&
@@ -1152,18 +1129,6 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 	/* Names of length 1.  (Or 0. But name is NUL terminated, so that will
 	   be case '\0' in this switch statement (ie a default case)  */
 	switch (*name) {
-	case '&':
-	case '`':
-	case '\'':
-	    if (
-		sv_type == SVt_PVAV ||
-		sv_type == SVt_PVHV ||
-		sv_type == SVt_PVCV ||
-		sv_type == SVt_PVIO
-		) { break; }
-	    PL_sawampersand = TRUE;
-	    goto magicalize;
-
 	case ':':
 	    sv_setpv(GvSVn(gv),PL_chopset);
 	    goto magicalize;
@@ -1219,7 +1184,6 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 	case '7':
 	case '8':
 	case '9':
-	case '.':
 	case '<':
 	case '>':
 	case ',':
@@ -1248,6 +1212,10 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 	case '(':
 	case ')':
 	case '[':
+	case '&':
+	case '`':
+	case '\'':
+	case '.':
 	    Perl_croak(aTHX_ "Unknown magic variable '%c%s'",
 		       sv_type == SVt_PVAV ? '@' : sv_type == SVt_PVHV ? '%' : '$',
 		       name);
@@ -1257,16 +1225,16 @@ Perl_gv_fetchpvn_flags(pTHX_ const char *nambeg, STRLEN full_len, I32 flags,
 }
 
 void
-Perl_gv_fullname4(pTHX_ SV *sv, const GV *gv, const char *prefix, bool keepmain)
+Perl_gv_fullname3(pTHX_ SV *sv, const GV *gv, const char *prefix)
 {
     const char *name;
     STRLEN namelen;
     const HV * const hv = GvSTASH(gv);
 
-    PERL_ARGS_ASSERT_GV_FULLNAME4;
+    PERL_ARGS_ASSERT_GV_FULLNAME3;
 
     if (!hv) {
-	SvOK_off(sv);
+	SvPVOK_off(sv);
 	return;
     }
     sv_setpv(sv, prefix ? prefix : "");
@@ -1279,21 +1247,20 @@ Perl_gv_fullname4(pTHX_ SV *sv, const GV *gv, const char *prefix, bool keepmain)
 	namelen = 8;
     }
 
-    if (keepmain || strNE(name, "main")) {
-	sv_catpvn(sv,name,namelen);
-	sv_catpvs(sv,"::");
-    }
+    sv_catpvn(sv,name,namelen);
+    sv_catpvs(sv,"::");
+
     sv_catpvn(sv,GvNAME(gv),GvNAMELEN(gv));
 }
 
 void
-Perl_gv_efullname4(pTHX_ SV *sv, const GV *gv, const char *prefix, bool keepmain)
+Perl_gv_efullname3(pTHX_ SV *sv, const GV *gv, const char *prefix)
 {
     const GV * const egv = GvEGV(gv);
 
-    PERL_ARGS_ASSERT_GV_EFULLNAME4;
+    PERL_ARGS_ASSERT_GV_EFULLNAME3;
 
-    gv_fullname4(sv, egv ? egv : gv, prefix, keepmain);
+    gv_fullname3(sv, egv ? egv : gv, prefix);
 }
 
 IO *
@@ -1312,7 +1279,7 @@ Perl_newIO(pTHX)
     iogv = gv_fetchpvs("FileHandle::", 0, SVt_PVHV);
     /* unless exists($main::{FileHandle}) and defined(%main::FileHandle::) */
     if (!(iogv && GvHV(iogv) && HvARRAY(GvHV(iogv))))
-      iogv = gv_fetchpvs("IO::Handle::", GV_ADD, SVt_PVHV);
+	iogv = gv_fetchpvs("IO::Handle::", GV_ADD, SVt_PVHV);
     SvSTASH_set(io, (HV*)SvREFCNT_inc(GvHV(iogv)));
     return io;
 }
@@ -1432,6 +1399,22 @@ Perl_gp_free(pTHX_ GV *gv)
 
     Safefree(gp);
     GvGP(gv) = 0;
+}
+
+void
+Perl_gp_tmprefcnt(pTHX_ GV *gv)
+{
+    dVAR;
+    GP* gp;
+
+    if (!gv || !isGV_with_GP(gv) || !(gp = GvGP(gv)))
+	return;
+
+    SvTMPREFCNT_inc(gp->gp_sv);
+    SvTMPREFCNT_inc(gp->gp_av);
+    SvTMPREFCNT_inc(gp->gp_hv);
+    SvTMPREFCNT_inc(gp->gp_io);
+    SvTMPREFCNT_inc(gp->gp_cv);
 }
 
 int

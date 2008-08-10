@@ -8,7 +8,7 @@
 BEGIN {
     if( %ENV{PERL_CORE} ) {
         chdir 't' if -d 't';
-        @INC = ('../lib', 'lib');
+        @INC = @('../lib', 'lib');
     }
     else {
         unshift @INC, 't/lib';
@@ -21,7 +21,6 @@ use MakeMaker::Test::Utils;
 use MakeMaker::Test::Setup::BFD;
 use ExtUtils::MakeMaker;
 use File::Spec;
-use TieOut;
 use Config;
 
 chdir 't';
@@ -43,22 +42,23 @@ END {
 ok( chdir 'Big-Dummy', "chdir'd to Big-Dummy" ) ||
   diag("chdir failed: $!");
 
-my $stdout = tie *STDOUT, 'TieOut' or die;
+my $stdout = '';
+close STDOUT;
+open STDOUT, '>>', \$stdout or die;
 my $mm = WriteMakefile(
     NAME          => 'Big::Dummy',
     VERSION_FROM  => 'lib/Big/Dummy.pm',
     PREREQ_PM     => \%(),
     PERL_CORE     => %ENV{PERL_CORE},
 );
-like( $stdout->read, qr{
+like( $stdout, qr{
                         Writing\ $Makefile\ for\ Big::Liar\n
                         Big::Liar's\ vars\n
                         INST_LIB\ =\ \S+\n
                         INST_ARCHLIB\ =\ \S+\n
                         Writing\ $Makefile\ for\ Big::Dummy\n
 }x );
-undef $stdout;
-untie *STDOUT;
+$stdout = '';
 
 isa_ok( $mm, 'ExtUtils::MakeMaker' );
 
@@ -97,9 +97,9 @@ is( $mm->{INST_ARCHLIB},
 is( $mm->{INST_BIN},     File::Spec->catdir($Curdir, 'blib', 'bin'),
                                      'INST_BIN' );
 
-is( keys %{$mm->{CHILDREN}}, 1 );
+is( nkeys %{$mm->{CHILDREN}}, 1 );
 my($child_pack) = keys %{$mm->{CHILDREN}};
-my $c_mm = $mm->{CHILDREN}{$child_pack};
+my $c_mm = $mm->{CHILDREN}->{$child_pack};
 is( $c_mm->{INST_ARCHLIB}, 
     $c_mm->{PERL_CORE} ? $c_mm->{PERL_ARCHLIB}
                        : File::Spec->catdir($Updir, 'blib', 'arch'),
@@ -120,7 +120,6 @@ is( $mm->{INSTALLDIRS}, 'site',     'INSTALLDIRS' );
 
 # Make sure the INSTALL*MAN*DIR variables work.  We forgot them
 # at one point.
-$stdout = tie *STDOUT, 'TieOut' or die;
 $mm = WriteMakefile(
     NAME          => 'Big::Dummy',
     VERSION_FROM  => 'lib/Big/Dummy.pm',
@@ -130,15 +129,14 @@ $mm = WriteMakefile(
     INSTALLVENDORMAN1DIR => 'none',
     INST_MAN1DIR         => 'none',
 );
-like( $stdout->read, qr{
+like( $stdout, qr{
                         Writing\ $Makefile\ for\ Big::Liar\n
                         Big::Liar's\ vars\n
                         INST_LIB\ =\ \S+\n
                         INST_ARCHLIB\ =\ \S+\n
                         Writing\ $Makefile\ for\ Big::Dummy\n
 }x );
-undef $stdout;
-untie *STDOUT;
+$stdout = '';
 
 isa_ok( $mm, 'ExtUtils::MakeMaker' );
 

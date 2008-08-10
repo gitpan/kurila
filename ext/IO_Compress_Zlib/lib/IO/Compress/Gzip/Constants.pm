@@ -11,9 +11,9 @@ our ($GZIP_FNAME_INVALID_CHAR_RE, $GZIP_FCOMMENT_INVALID_CHAR_RE);
 
 $VERSION = '2.006';
 
-@ISA = qw(Exporter);
+@ISA = @( qw(Exporter) );
 
-@EXPORT= qw(
+@EXPORT= @( qw(
 
     GZIP_ID_SIZE
     GZIP_ID1
@@ -58,7 +58,7 @@ $VERSION = '2.006';
 
     GZIP_MINIMUM_HEADER
 
-    );
+    ) );
 
 # Constant names derived from RFC 1952
 
@@ -107,7 +107,7 @@ use constant GZIP_ISIZE_MOD_VALUE   => GZIP_ISIZE_MAX + 1 ;
 # OS Names sourced from http://www.gzip.org/format.txt
 
 use constant GZIP_OS_DEFAULT=> 0xFF ;
-%GZIP_OS_Names = (
+%GZIP_OS_Names = %(
     0   => 'MS-DOS',
     1   => 'Amiga',
     2   => 'VMS',

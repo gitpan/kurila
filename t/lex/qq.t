@@ -1,12 +1,12 @@
 #!./perl
 
-print q(1..42
+print q(1..41
 );
 
 # This is() function is written to avoid ""
 my $test = 1;
 sub is {
-    my($left, $right) = @_;
+    my($left, $right) = < @_;
 
     if ($left eq $right) {
       printf 'ok %d
@@ -89,12 +89,11 @@ is (eval "qq\x{263A}foo\x{263A}", 'foo', "Unicode delimeters");
   # Array and derefence, this doesn't really belong in 'op/concat' but I
   # couldn't find a better place
 
-  my @x = qw|aap noot|;
-  my $dx = \@(@x);
+  my @x = @( qw|aap noot| );
+  my $dx = \@(< @x);
 
-  is("@x", "aap noot");
-  is("@$dx", "aap noot");
-  is("$dx->@", "aap noot");
+  is("{join ' ', <@x}", "aap noot");
+  is("{join ' ', <@$dx}", "aap noot");
 
   # Okay, so that wasn't very challenging.  Let's go Unicode.
 

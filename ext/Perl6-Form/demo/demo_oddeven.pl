@@ -1,28 +1,28 @@
 use Perl6::Form;
 
-my @text = ~< *DATA;
+my @text = @( ~< *DATA );
 
-my @title = ("Hamlet's Soliloquy","W. Shakespeare");
+my @title = @("Hamlet's Soliloquy","W. Shakespeare");
 
-my %header = (
-	first => sub { form(\%( page => \%(width=>@_[0]{page}{width})),
+my %header = %(
+	first => sub { form(\%( page => \%(width=>@_[0]->{page}->{width})),
 				        "\{II\{*\}II\}", \@title) . "\n";
 				 },
-	  odd => sub { form(\%( page => \%(width=>@_[0]{page}{width})),
+	  odd => sub { form(\%( page => \%(width=>@_[0]->{page}->{width})),
 				        "\{]]\{*\}]]\}", @title[0]) . "\n";
 				 },
-	 even => sub { form(\%( page => \%(width=>@_[0]{page}{width})),
+	 even => sub { form(\%( page => \%(width=>@_[0]->{page}->{width})),
 				        "\{[[\{*\}[[\}", @title[1]) . "\n";
 				 },
 );
 
 sub footer {
-	form \%( page => \%(width=>@_[0]{page}{width}) ),
+	form \%( page => \%(width=>@_[0]->{page}->{width}) ),
 		 "\n\{|\{*\}|\}",
-		 "(page @_[0]{page}{number})"
+		 "(page @_[0]->{page}->{number})"
 }
 
-my %page = (
+my %page = %(
 	header => \%header,
 	footer => \&footer,
 	length => 15,
@@ -30,9 +30,9 @@ my %page = (
 	feed   => ('_'x72)."\n",
 );
 
-print form \%(page=>\%page),
+print < form \%(page=>\%page),
 	 '{]]]]]}  {"{*}"}  {[[[[[}',
-	 \@(1..@text), \@text,  \@(1..@text);
+	 \@(1..nelems @text), \@text,  \@(1..nelems @text);
 
 __DATA__
 To be, or not to be -- that is the question:

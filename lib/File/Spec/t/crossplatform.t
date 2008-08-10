@@ -6,18 +6,18 @@ use lib File::Spec->catfile('t', 'lib');
 use Test::More;
 local $|=1;
 
-my @platforms = qw(Cygwin Epoc Mac OS2 Unix VMS Win32);
+my @platforms = @( qw(Cygwin Epoc Mac OS2 Unix VMS Win32) );
 my $tests_per_platform = 10;
 
-plan tests => 1 + @platforms * $tests_per_platform;
+plan tests => 1 + (nelems @platforms) * $tests_per_platform;
 
-my %volumes = (
+my %volumes = %(
 	       Mac => 'Macintosh HD',
 	       OS2 => 'A:',
 	       Win32 => 'A:',
 	       VMS => 'v',
 	      );
-my %other_vols = (
+my %other_vols = %(
 		  Mac => 'Mounted Volume',
 		  OS2 => 'B:',
 		  Win32 => 'B:',
@@ -26,7 +26,7 @@ my %other_vols = (
 
 ok 1, "Loaded";
 
-foreach my $platform (@platforms) {
+foreach my $platform (< @platforms) {
   my $module = "File::Spec::$platform";
   
  SKIP:
@@ -57,8 +57,8 @@ foreach my $platform (@platforms) {
     is $module->file_name_is_absolute($base), 1, "$base is absolute on $platform";
 
     # splitdir('') -> ()
-    my @result = $module->splitdir('');
-    is @result, 0, "$platform->splitdir('') -> ()";
+    my @result = @( < $module->splitdir('') );
+    is( (nelems @result), 0, "$platform->splitdir('') -> ()");
 
     # canonpath() -> undef
     $result = $module->canonpath();
@@ -103,8 +103,8 @@ foreach my $platform (@platforms) {
 }
 
 sub volumes_differ {
-  my ($module, $one, $two) = @_;
-  my ($one_v) = $module->splitpath( $module->rel2abs($one) );
-  my ($two_v) = $module->splitpath( $module->rel2abs($two) );
+  my ($module, $one, $two) = < @_;
+  my ($one_v) = < $module->splitpath( $module->rel2abs($one) );
+  my ($two_v) = < $module->splitpath( $module->rel2abs($two) );
   return $one_v ne $two_v;
 }

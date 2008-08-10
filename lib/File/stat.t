@@ -1,10 +1,5 @@
 #!./perl
 
-BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
-}
-
 use Test::More;
 use strict;
 
@@ -12,17 +7,17 @@ our @stat;
 
 BEGIN {
     our $hasst;
-    eval { my @n = stat "TEST" };
+    try { my @n = @(stat "TEST") };
     $hasst = 1 unless $@ && $@->{description} =~ m/unimplemented/;
     unless ($hasst) { plan skip_all => "no stat"; exit 0 }
     use Config;
     $hasst = 0 unless %Config{'i_sysstat'} eq 'define';
     unless ($hasst) { plan skip_all => "no sys/stat.h"; exit 0 }
-    @stat = stat "TEST"; # This is the function stat.
+    @stat = @(stat "TEST"); # This is the function stat.
     unless (@stat) { plan skip_all => "1..0 # Skip: no file TEST"; exit 0 }
 }
 
-plan tests => 19;
+plan tests => 16;
 
 use_ok( 'File::stat' );
 
@@ -58,31 +53,6 @@ is( $stat->ctime, @stat[10], "change time in position 10" );
 is( $stat->blksize, @stat[11], "IO block size in position 11" );
 
 is( $stat->blocks, @stat[12], "number of blocks in position 12" );
-
-SKIP: {
-	local *STAT;
-	skip("Could not open file: $!", 2) unless open(STAT, "<", 'TEST');
-	ok( File::stat::stat('STAT'), '... should be able to find filehandle' );
-
-	package foo;
-	local *STAT = *main::STAT;
-	main::ok( my $stat2 = File::stat::stat('STAT'), 
-		'... and filehandle in another package' );
-	close STAT;
-
-#	VOS open() updates atime; ignore this error (posix-975).
-	my $stat3 = $stat2;
-	if ($^O eq 'vos') {
-		@$stat3[8] = @$stat[8];
-	}
-
-	main::skip("Win32: different stat-info on filehandle", 1) if $^O eq 'MSWin32';
-	main::skip("dos: inode number is fake on dos", 1) if $^O eq 'dos';
-
-	main::skip("OS/2: inode number is not constant on os/2", 1) if $^O eq 'os2';
-
-	main::is( "@$stat", "@$stat3", '... and must match normal stat' );
-}
 
 local $!;
 $stat = stat '/notafile';

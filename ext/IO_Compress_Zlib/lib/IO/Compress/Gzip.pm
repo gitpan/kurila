@@ -14,14 +14,6 @@ use IO::Compress::Base::Common  v2.006 qw(:Status :Parse createSelfTiedObject);
 use IO::Compress::Gzip::Constants v2.006 ;
 use IO::Compress::Zlib::Extra v2.006 ;
 
-BEGIN
-{
-    if (defined &utf8::downgrade ) 
-      { *noUTF8 = \&utf8::downgrade }
-    else
-      { *noUTF8 = sub {} }  
-}
-
 require Exporter ;
 
 our ($VERSION, @ISA, @EXPORT_OK, %EXPORT_TAGS, $GzipError);
@@ -29,10 +21,10 @@ our ($VERSION, @ISA, @EXPORT_OK, %EXPORT_TAGS, $GzipError);
 $VERSION = '2.006';
 $GzipError = '' ;
 
-@ISA    = qw(IO::Compress::RawDeflate Exporter);
-@EXPORT_OK = qw( $GzipError gzip ) ;
-%EXPORT_TAGS = %IO::Compress::RawDeflate::DEFLATE_CONSTANTS ;
-push @{ %EXPORT_TAGS{all} }, @EXPORT_OK ;
+@ISA    = @( qw(IO::Compress::RawDeflate Exporter) );
+@EXPORT_OK = @( qw( $GzipError gzip ) ) ;
+%EXPORT_TAGS = %( < %IO::Compress::RawDeflate::DEFLATE_CONSTANTS ) ;
+push @{ %EXPORT_TAGS{all} }, < @EXPORT_OK ;
 Exporter::export_ok_tags('all');
 
 sub new
@@ -41,14 +33,14 @@ sub new
 
     my $obj = createSelfTiedObject($class, \$GzipError);
 
-    $obj->_create(undef, @_);
+    $obj->_create(undef, < @_);
 }
 
 
 sub gzip
 {
     my $obj = createSelfTiedObject(undef, \$GzipError);
-    return $obj->_def(@_);
+    return $obj->_def(< @_);
 }
 
 #sub newHeader
@@ -62,9 +54,9 @@ sub getExtraParams
 {
     my $self = shift ;
 
-    return (
+    return  @(
             # zlib behaviour
-            $self->getZlibParams(),
+            < $self->getZlibParams(),
 
             # Gzip header fields
             'Minimal'   => \@(0, 1, Parse_boolean,   0),
@@ -161,31 +153,15 @@ sub ckParams
 sub mkTrailer
 {
     my $self = shift ;
-    return pack("V V", *$self->{Compress}->crc32(), 
-                       *$self->{UnCompSize}->get32bit());
+    return pack("V V", $self->{Compress}->crc32(), 
+                       $self->{UnCompSize}->get32bit());
 }
 
 sub getInverseClass
 {
-    return ('IO::Uncompress::Gunzip',
+    return  @('IO::Uncompress::Gunzip',
                 \$IO::Uncompress::Gunzip::GunzipError);
 }
-
-sub getFileInfo
-{
-    my $self = shift ;
-    my $params = shift;
-    my $filename = shift ;
-
-    my $defaultTime = (stat($filename))[[9]] ;
-
-    $params->value('Name' => $filename)
-        if ! $params->parsed('Name') ;
-
-    $params->value('Time' => $defaultTime) 
-        if ! $params->parsed('Time') ;
-}
-
 
 sub mkHeader
 {
@@ -257,8 +233,6 @@ sub mkHeader
     # HEADER CRC
     $out .= pack("v", crc32($out) ^&^ 0x00FF ) if $param->value('HeaderCRC') ;
 
-    noUTF8($out);
-
     return $out ;
 }
 
@@ -304,8 +278,6 @@ IO::Compress::Gzip - Write RFC 1952 files/buffers
     $z->autoflush();
     $z->input_line_number();
     $z->newStream( [OPTS] );
-    
-    $z->deflateParams();
     
     $z->close() ;
 
@@ -1178,15 +1150,6 @@ OPTS consists of any of the the options that are available when creating
 the C<$z> object.
 
 See the L</"Constructor Options"> section for more details.
-
-
-=head2 deflateParams
-
-Usage is
-
-    $z->deflateParams
-
-TODO
 
 
 =head1 Importing 

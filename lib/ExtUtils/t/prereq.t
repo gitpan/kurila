@@ -6,7 +6,7 @@
 BEGIN {
     if( %ENV{PERL_CORE} ) {
         chdir 't' if -d 't';
-        @INC = ('../lib', 'lib');
+        @INC = @('../lib', 'lib');
     }
     else {
         unshift @INC, 't/lib';
@@ -14,9 +14,8 @@ BEGIN {
 }
 
 use strict;
-use Test::More tests => 13;
+use Test::More tests => 12;
 
-use TieOut;
 use MakeMaker::Test::Utils;
 use MakeMaker::Test::Setup::BFD;
 
@@ -36,7 +35,9 @@ ok( chdir 'Big-Dummy', "chdir'd to Big-Dummy" ) ||
   diag("chdir failed: $!");
 
 {
-    ok( my $stdout = tie *STDOUT, 'TieOut' );
+    close *STDOUT;
+    my $stdout = '';
+    open *STDOUT, '>>', \$stdout or die;
     my $warnings = '';
     local $^WARN_HOOK = sub {
         $warnings .= @_[0]->{description};
@@ -85,7 +86,7 @@ ok( chdir 'Big-Dummy', "chdir'd to Big-Dummy" ) ||
             strict->VERSION);
     
     $warnings = '';
-    eval {
+    try {
         WriteMakefile(
             NAME            => 'Big::Dummy',
             PREREQ_PM       => \%(
@@ -109,7 +110,7 @@ END
 
 
     $warnings = '';
-    eval {
+    try {
         WriteMakefile(
             NAME            => 'Big::Dummy',
             PREREQ_PM       => \%(

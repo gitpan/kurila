@@ -10,33 +10,32 @@ BEGIN {
 
 plan 'no_plan';
 
-$^WARN_HOOK = sub { die @_ };
+$^WARN_HOOK = sub { die < @_ };
 
 our ($anon1, $anon2, $anon3);
 
 sub eval_ok ($;$) {
     eval shift;
-    is( $@, '', @_);
+    diag $@->message if $@;
+    ok( ! $@, < @_);
 }
 
 eval_ok 'sub t1 ($) : locked { @_[0]++ }';
 eval_ok 'sub t2 : locked { @_[0]++ }';
-eval_ok 'sub t3 ($) : locked ;';
-eval_ok 'sub t4 : locked ;';
 eval_ok '$anon1 = sub ($) : locked:method { @_[0]++ }';
 eval_ok '$anon2 = sub : locked : method { @_[0]++ }';
 eval_ok '$anon3 = sub : method { @_[0]->[1] }';
 
-eval 'sub e1 ($) : plugh ;';
+eval 'sub e1 ($) : plugh { 1 }';
 like $@->message, qr/^Invalid CODE attributes?: ["']?plugh["']? at/;
 
-eval 'sub e2 ($) : plugh(0,0) xyzzy ;';
+eval 'sub e2 ($) : plugh(0,0) xyzzy { 1 }';
 like $@->message, qr/^Invalid CODE attributes: ["']?plugh\(0,0\)["']? /;
 
-eval 'sub e3 ($) : plugh(0,0 xyzzy ;';
+eval 'sub e3 ($) : plugh(0,0 xyzzy { 1 }';
 like $@->message, qr/Unterminated attribute parameter in attribute list at/;
 
-eval 'sub e4 ($) : plugh + xyzzy ;';
+eval 'sub e4 ($) : plugh + xyzzy { 1 }';
 like $@->message, qr/Invalid separator character '[+]' in attribute list at/;
 
 eval 'my main $x : = 0;';
@@ -95,62 +94,21 @@ sub X::MODIFY_CODE_ATTRIBUTES { die "@_[0]" }
 sub X::foo { 1 }
 *Y::bar = \&X::foo;
 *Y::bar = \&X::foo;	# second time for -w
-eval 'package Z; sub Y::bar : foo';
-like $@->message, qr/^X at /;
 
-eval 'package Z; sub Y::baz : locked {}';
+eval 'package Z; sub Y::baz : locked {}'; die if $@;
 my @attrs = eval 'attributes::get \&Y::baz';
-is "@attrs", "locked";
+is "{join ' ', <@attrs}", "locked";
 
-@attrs = eval 'attributes::get $anon1';
-is "@attrs", "locked method";
+@attrs = eval 'attributes::get $anon1'; die if $@;
+is "{join ' ', <@attrs}", "locked method", " # TODO";
 
 sub Z::DESTROY { }
 sub Z::FETCH_CODE_ATTRIBUTES { return 'Z' }
 my $thunk = eval 'bless +sub : method locked { 1 }, "Z"';
 is ref($thunk), "Z";
 
-@attrs = eval 'attributes::get $thunk';
-is "@attrs", "locked method Z";
-
-# Test attributes on predeclared subroutines:
-eval 'package A; sub PS : locked';
-@attrs = eval 'attributes::get \&A::PS';
-is "@attrs", "locked";
-
-# Test ability to modify existing sub's (or XSUB's) attributes.
-eval 'package A; sub X { @_[0] } sub X : locked';
-@attrs = eval 'attributes::get \&A::X';
-is "@attrs", "locked";
-
-# Above not with just 'pure' built-in attributes.
-sub Z::MODIFY_CODE_ATTRIBUTES { (); }
-eval 'package Z; sub L { @_[0] } sub L : Z locked';
-@attrs = eval 'attributes::get \&Z::L';
-is "@attrs", "locked Z";
-
-# Begin testing attributes that tie
-
-{
-    package Ttie;
-    sub DESTROY {}
-    sub TIESCALAR { my $x = @_[1]; bless \$x, @_[0]; }
-    sub FETCH { ${@_[0]} }
-    sub STORE {
-	::pass;
-	${@_[0]} = @_[1]*2;
-    }
-    package Tloop;
-    sub MODIFY_SCALAR_ATTRIBUTES { tie ${@_[1]}, 'Ttie', -1; (); }
-}
-
-eval_ok '
-    package Tloop;
-    for my $i (0..2) {
-	my $x : TieLoop = $i;
-	$x != $i*2 and ::is $x, $i*2;
-    }
-';
+@attrs = eval 'attributes::get $thunk'; die if $@;
+is "{join ' ', <@attrs}", "locked method Z", " # TODO";
 
 # bug #15898
 eval 'our ${""} : foo = 1';
@@ -159,21 +117,21 @@ eval 'my $$foo : bar = 1';
 like $@->message, qr/Can't declare scalar dereference in "my"/;
 
 
-my @code = qw(locked method);
-my @other = qw(shared unique);
+my @code = @( qw(locked method) );
+my @other = @( qw(shared unique) );
 my %valid;
-%valid{CODE} = \%(map {$_ => 1} @code);
-%valid{SCALAR} = \%(map {$_ => 1} @other);
+%valid{CODE} = \%(map {$_ => 1} < @code);
+%valid{SCALAR} = \%(map {$_ => 1} < @other);
 %valid{ARRAY} = %valid{HASH} = %valid{SCALAR};
 
 our ($scalar, @array, %hash);
 foreach my $value (\&foo, \$scalar, \@array, \%hash) {
     my $type = ref $value;
     foreach my $negate ('', '-') {
-	foreach my $attr (@code, @other) {
+	foreach my $attr (< @code, < @other) {
 	    my $attribute = $negate . $attr;
 	    eval "use attributes __PACKAGE__, \$value, '$attribute'";
-	    if (%valid{$type}{$attr}) {
+	    if (%valid{$type}->{$attr}) {
 		if ($attribute eq '-shared') {
 		    like $@->message, qr/^A variable may not be unshared/;
 		} else {

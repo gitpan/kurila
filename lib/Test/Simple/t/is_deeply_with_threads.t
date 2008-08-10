@@ -2,22 +2,12 @@
 
 # Test to see if is_deeply() plays well with threads.
 
-BEGIN {
-    if( %ENV{PERL_CORE} ) {
-        chdir 't';
-        @INC = ('../lib', 'lib');
-    }
-    else {
-        unshift @INC, 't/lib';
-    }
-}
-
 use strict;
 use Config;
 
 BEGIN {
     unless ( %Config{'useithreads'} && 
-             eval { require threads; 'threads'->import; 1; }) 
+             try { require threads; 'threads'->import; 1; }) 
     {
         print "1..0 # Skip: no working threads\n";
         exit 0;

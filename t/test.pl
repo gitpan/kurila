@@ -29,24 +29,24 @@ $NO_ENDING = 0;
 # Use this instead of print to avoid interference while testing globals.
 sub _print {
     local($\, $", $,) = (undef, ' ', '');
-    print STDOUT @_;
+    print STDOUT < @_;
 }
 
 sub _print_stderr {
     local($\, $", $,) = (undef, ' ', '');
-    print STDERR @_;
+    print STDERR < @_;
 }
 
 sub plan {
     my $n;
-    if (@_ == 1) {
+    if ((nelems @_) == 1) {
 	$n = shift;
 	if ($n eq 'no_plan') {
 	  undef $n;
 	  $noplan = 1;
 	}
     } else {
-	my %plan = @_;
+	my %plan = %( < @_ );
 	$n = %plan{tests};
     }
     _print "1..$n\n" unless $noplan;
@@ -68,20 +68,20 @@ END {
 # Use this instead of "print STDERR" when outputing failure diagnostic
 # messages
 sub _diag {
-    return unless @_;
-    my @mess = map { m/^#/ ? "$_\n" : "# $_\n" }
-               map { split m/\n/ } @_;
+    return unless (nelems @_);
+    my @mess = @( map { m/^#/ ? "$_\n" : "# $_\n" }
+               map { split m/\n/ } < @_ );
     my $func = $TODO ? \&_print : \&_print_stderr;
-    $func->(@mess);
+    $func->(< @mess);
 }
 
 sub diag {
-    _diag(@_);
+    _diag(< @_);
 }
 
 sub skip_all {
-    if (@_) {
-	_print "1..0 # Skipped: @_\n";
+    if ((nelems @_)) {
+	_print "1..0 # Skipped: {join ' ', <@_}\n";
     } else {
 	_print "1..0\n";
     }
@@ -89,7 +89,7 @@ sub skip_all {
 }
 
 sub _ok {
-    my ($pass, $where, $name, @mess) = @_;
+    my ($pass, $where, $name, < @mess) = < @_;
     # Do not try to microoptimize by factoring out the "not ".
     # VMS will avenge.
     my $out;
@@ -109,7 +109,7 @@ sub _ok {
     }
 
     # Ensure that the message is properly escaped.
-    _diag @mess;
+    _diag < @mess;
 
     $test = $test + 1; # don't use ++
 
@@ -117,14 +117,14 @@ sub _ok {
 }
 
 sub _where {
-    my @caller = caller($Level);
+    my @caller = @( caller($Level) );
     return "at @caller[1] line @caller[2]";
 }
 
 # DON'T use this for matches. Use like() instead.
 sub ok ($@) {
-    my ($pass, $name, @mess) = @_;
-    _ok($pass, _where(), $name, @mess);
+    my ($pass, $name, < @mess) = < @_;
+    _ok($pass, _where(), $name, < @mess);
 }
 
 sub _q {
@@ -134,7 +134,7 @@ sub _q {
 
 sub _qq {
     my $x = shift;
-    return defined $x ? '"' . display ($x) . '"' : 'undef';
+    return dump::view($x);
 };
 
 # keys are the codes \n etc map to, values are 2 char strings such as \n
@@ -145,31 +145,11 @@ foreach my $x (split m//, q|nrtfa\'"|) {
 # A way to display scalars containing control characters and Unicode.
 # Trying to avoid setting $_, or relying on local $_ to work.
 sub display {
-    my @result;
-    foreach my $x (@_) {
-        if (defined $x and not ref $x) {
-            my $y = '';
-            foreach my $c (unpack("U*", $x)) {
-                if ($c +> 255) {
-                    $y .= sprintf "\\x\{\%x\}", $c;
-                } elsif (%backslash_escape{$c}) {
-                    $y .= %backslash_escape{$c};
-                } else {
-                    my $z = chr $c; # Maybe we can get away with a literal...
-                    $z = sprintf "\\\%03o", $c if $z =~ m/[[:^print:]]/;
-                    $y .= $z;
-                }
-            }
-            $x = $y;
-        }
-        return $x unless wantarray;
-        push @result, $x;
-    }
-    return @result;
+    return dump::view(@_[0]);
 }
 
 sub is ($$@) {
-    my ($got, $expected, $name, @mess) = @_;
+    my ($got, $expected, $name, < @mess) = < @_;
 
     my $pass;
     if( !defined $got || !defined $expected ) {
@@ -181,18 +161,18 @@ sub is ($$@) {
     }
     else {
         local $@;
-        $pass = eval { $got eq $expected };
+        $pass = try { $got eq $expected };
     }
 
     unless ($pass) {
 	unshift(@mess, "#      got "._q($got)."\n",
 		       "# expected "._q($expected)."\n");
     }
-    _ok($pass, _where(), $name, @mess);
+    _ok($pass, _where(), $name, < @mess);
 }
 
 sub isnt ($$@) {
-    my ($got, $isnt, $name, @mess) = @_;
+    my ($got, $isnt, $name, < @mess) = < @_;
 
     my $pass;
     if( !defined $got || !defined $isnt ) {
@@ -210,11 +190,11 @@ sub isnt ($$@) {
         unshift(@mess, "# it should not be "._q($got)."\n",
                        "# but it is.\n");
     }
-    _ok($pass, _where(), $name, @mess);
+    _ok($pass, _where(), $name, < @mess);
 }
 
 sub cmp_ok ($$$@) {
-    my($got, $type, $expected, $name, @mess) = @_;
+    my($got, $type, $expected, $name, < @mess) = < @_;
 
     my $pass;
     {
@@ -232,13 +212,13 @@ sub cmp_ok ($$$@) {
         # This will also show numbers for some uneeded cases, but will
         # definately be helpful for things such as == and <= that fail
         if (not ref $got and not ref $expected
-            and $got eq $expected and $type !~ tr/a-z//) {
+            and $got eq $expected and $type !~ m/[a-z]/) {
             unshift @mess, "# $got - $expected = " . ($got - $expected) . "\n";
         }
         unshift(@mess, "#      got "._q($got)."\n",
                        "# expected $type "._q($expected)."\n");
     }
-    _ok($pass, _where(), $name, @mess);
+    _ok($pass, _where(), $name, < @mess);
 }
 
 # Check that $got is within $range of $expected
@@ -248,11 +228,11 @@ sub cmp_ok ($$$@) {
 # Here $range must be numeric, >= 0
 # Non numeric ranges might be a useful future extension. (eg %)
 sub within ($$$@) {
-    my ($got, $expected, $range, $name, @mess) = @_;
+    my ($got, $expected, $range, $name, < @mess) = < @_;
     my $pass;
     if (!defined $got or !defined $expected or !defined $range) {
         # This is a fail, but doesn't need extra diagnostics
-    } elsif ($got !~ tr/0-9// or $expected !~ tr/0-9// or $range !~ tr/0-9//) {
+    } elsif ($got !~ m/[0-9]/ or $expected !~ m/[0-9]/ or $range !~ m/[0-9]/) {
         # This is a fail
         unshift @mess, "# got, expected and range must be numeric\n";
     } elsif ($range +< 0) {
@@ -275,16 +255,16 @@ sub within ($$$@) {
 	unshift@mess, "#      got "._q($got)."\n",
 		      "# expected "._q($expected)." (within "._q($range).")\n";
     }
-    _ok($pass, _where(), $name, @mess);
+    _ok($pass, _where(), $name, < @mess);
 }
 
 # Note: this isn't quite as fancy as Test::More::like().
 
-sub like   ($$@) { like_yn (0,@_) }; # 0 for -
-sub unlike ($$@) { like_yn (1,@_) }; # 1 for un-
+sub like   ($$@) { like_yn (0,< @_) }; # 0 for -
+sub unlike ($$@) { like_yn (1,< @_) }; # 1 for un-
 
 sub like_yn ($$$@) {
-    my ($flip, $got, $expected, $name, @mess) = @_;
+    my ($flip, $got, $expected, $name, < @mess) = < @_;
     my $pass;
     $pass = $got =~ m/$expected/ if !$flip;
     $pass = $got !~ m/$expected/ if $flip;
@@ -294,19 +274,19 @@ sub like_yn ($$$@) {
 		? "# expected !~ m/$expected/\n" : "# expected m/$expected/\n");
     }
     local $Level = $Level + 1;
-    _ok($pass, _where(), $name, @mess);
+    _ok($pass, _where(), $name, < @mess);
 }
 
 sub pass {
-    _ok(1, '', @_);
+    _ok(1, '', < @_);
 }
 
 sub fail {
-    _ok(0, _where(), @_);
+    _ok(0, _where(), < @_);
 }
 
 sub curr_test {
-    $test = shift if @_;
+    $test = shift if (nelems @_);
     return $test;
 }
 
@@ -320,7 +300,7 @@ sub next_test {
 # be compatible with Test::More::skip().
 sub skip {
     my $why = shift;
-    my $n    = @_ ? shift : 1;
+    my $n    = (nelems @_) ? shift : 1;
     for (1..$n) {
         _print "ok $test # skip: $why\n";
         $test = $test + 1;
@@ -331,7 +311,7 @@ sub skip {
 
 sub todo_skip {
     my $why = shift;
-    my $n   = @_ ? shift : 1;
+    my $n   = (nelems @_) ? shift : 1;
 
     for (1..$n) {
         _print "not ok $test # TODO & SKIP: $why\n";
@@ -342,9 +322,9 @@ sub todo_skip {
 }
 
 sub eq_array {
-    my ($ra, $rb) = @_;
-    return 0 unless @$ra == @$rb;
-    for my $i (0..@$ra-1) {
+    my ($ra, $rb) = < @_;
+    return 0 unless (nelems @$ra) == nelems @$rb;
+    for my $i (0..(nelems @$ra)-1) {
 	next     if !defined $ra->[$i] && !defined $rb->[$i];
 	return 0 if !defined $ra->[$i];
 	return 0 if !defined $rb->[$i];
@@ -354,7 +334,7 @@ sub eq_array {
 }
 
 sub eq_hash {
-  my ($orig, $suspect) = @_;
+  my ($orig, $suspect) = < @_;
   my $fail;
   while (my ($key, $value) = each %$suspect) {
     # Force a hash recompute if this perl's internals can cache the hash key.
@@ -375,14 +355,14 @@ sub eq_hash {
     # Force a hash recompute if this perl's internals can cache the hash key.
     $_ = "" . $_;
     next if (exists $suspect->{$_});
-    _print "# key ", _qq($_), " was ", _qq($orig->{$_}), " now missing.\n";
+    _print "# key ", < _qq($_), " was ", < _qq($orig->{$_}), " now missing.\n";
     $fail = 1;
   }
   !$fail;
 }
 
 sub require_ok ($) {
-    my ($require) = @_;
+    my ($require) = < @_;
     eval <<REQUIRE_OK;
 require $require;
 REQUIRE_OK
@@ -390,7 +370,7 @@ REQUIRE_OK
 }
 
 sub use_ok ($) {
-    my ($use) = @_;
+    my ($use) = < @_;
     eval <<USE_OK;
 use $use;
 USE_OK
@@ -416,9 +396,9 @@ my $is_vms      = $^O eq 'VMS';
 my $is_cygwin   = $^O eq 'cygwin';
 
 sub _quote_args {
-    my ($runperl, $args) = @_;
+    my ($runperl, $args) = < @_;
 
-    foreach (@$args) {
+    foreach (< @$args) {
 	# In VMS protect with doublequotes because otherwise
 	# DCL will lowercase -- unless already doublequoted.
        $_ = q(").$_.q(") if $is_vms && !m/^\"/ && length($_) +> 0;
@@ -427,7 +407,7 @@ sub _quote_args {
 }
 
 sub _create_runperl { # Create the string to qx in runperl().
-    my %args = @_;
+    my %args = %( < @_ );
     my $runperl = $^X =~ m/\s/ ? qq{"$^X"} : $^X;
     #- this allows, for example, to set PERL_RUNPERL_DEBUG=/usr/bin/valgrind
     if (%ENV{PERL_RUNPERL_DEBUG}) {
@@ -457,7 +437,7 @@ sub _create_runperl { # Create the string to qx in runperl().
     if (defined %args{progs}) {
 	die "test.pl:runperl(): 'progs' must be an ARRAYREF " . _where()
 	    unless ref %args{progs} eq "ARRAY";
-        foreach my $prog (@{%args{progs}}) {
+        foreach my $prog (< @{%args{progs}}) {
             if ($is_mswin || $is_netware || $is_vms) {
                 $runperl .= qq ( -e "$prog" );
             }
@@ -522,8 +502,8 @@ sub runperl {
     my $result;
 
     my $tainted = $^TAINT;
-    my %args = @_;
-    exists %args{switches} && grep m/^-T$/, @{%args{switches}} and $tainted = $tainted + 1;
+    my %args = %( < @_ );
+    exists %args{switches} && grep m/^-T$/, < @{%args{switches}} and $tainted = $tainted + 1;
 
     if ($tainted) {
 	# We will assume that if you're running under -T, you really mean to
@@ -539,8 +519,8 @@ sub runperl {
 	    $sep = %Config{path_sep};
 	}
 
-	my @keys = grep {exists %ENV{$_}} qw(CDPATH IFS ENV BASH_ENV);
-	local %ENV{[@keys]} = ();
+	my @keys = @( grep {exists %ENV{$_}} qw(CDPATH IFS ENV BASH_ENV) );
+	local %ENV{[< @keys]} = ();
 	# Untaint, plus take out . and empty string:
 	local %ENV{'DCL$PATH'} = $1 if $is_vms && (%ENV{'DCL$PATH'} =~ m/(.*)/s);
 	%ENV{PATH} =~ m/(.*)/s;
@@ -564,7 +544,7 @@ sub runperl {
 *run_perl = \&runperl; # Nice alias.
 
 sub DIE {
-    _print_stderr "# @_\n";
+    _print_stderr "# {join ' ', <@_}\n";
     exit 1;
 }
 
@@ -599,7 +579,7 @@ sub which_perl {
 		warn "test.pl had problems loading File::Spec: $@";
 		$Perl = "./$perl";
 	    } else {
-		$Perl = 'File::Spec'->catfile('File::Spec'->curdir(), $perl);
+		$Perl = 'File::Spec'->catfile( <'File::Spec'->curdir(), $perl);
 	    }
 	}
 
@@ -619,7 +599,7 @@ sub which_perl {
 }
 
 sub unlink_all {
-    foreach my $file (@_) {
+    foreach my $file (< @_) {
         1 while unlink $file;
         _print_stderr "# Couldn't unlink '$file': $!\n" if -f $file;
     }
@@ -639,7 +619,7 @@ END { unlink_all $tmpfile }
 #
 
 sub _fresh_perl {
-    my($prog, $resolve, $runperl_args, $name) = @_;
+    my($prog, $resolve, $runperl_args, $name) = < @_;
 
     $runperl_args ||= \%();
     $runperl_args->{progfile} = $tmpfile;
@@ -659,7 +639,7 @@ sub _fresh_perl {
     print TEST $prog;
     close TEST or die "Cannot close $tmpfile: $!";
 
-    my $results = runperl(%$runperl_args);
+    my $results = runperl(< %$runperl_args);
     my $status = $?;
 
     # Clean up the results into something a bit more predictable.
@@ -704,11 +684,11 @@ sub _fresh_perl {
 #
 
 sub fresh_perl_is {
-    my($prog, $expected, $runperl_args, $name) = @_;
+    my($prog, $expected, $runperl_args, $name) = < @_;
     local $Level = 2;
     $expected =~ s/\n+$//; # is also removed from program output
     _fresh_perl($prog,
-		sub { @_ ? @_[0] eq $expected : $expected },
+		sub { (nelems @_) ? @_[0] eq $expected : $expected },
 		$runperl_args, $name);
 }
 
@@ -719,39 +699,39 @@ sub fresh_perl_is {
 #
 
 sub fresh_perl_like {
-    my($prog, $expected, $runperl_args, $name) = @_;
+    my($prog, $expected, $runperl_args, $name) = < @_;
     local $Level = 2;
     _fresh_perl($prog,
-		sub { @_ ?
+		sub { (nelems @_) ?
 			  @_[0] =~ (ref $expected ? $expected : m/$expected/) :
 		          $expected },
 		$runperl_args, $name);
 }
 
 sub can_ok ($@) {
-    my($proto, @methods) = @_;
+    my($proto, < @methods) = < @_;
     my $class = ref $proto || $proto;
 
-    unless( @methods ) {
-        return _ok( 0, _where(), "$class->can(...)" );
+    unless( nelems @methods ) {
+        return _ok( 0, < _where(), "$class->can(...)" );
     }
 
-    my @nok = ();
-    foreach my $method (@methods) {
+    my @nok = @( () );
+    foreach my $method (< @methods) {
         local($!, $@);  # don't interfere with caller's $@
                         # eval sometimes resets $!
-        eval { $proto->can($method) } || push @nok, $method;
+        try { $proto->can($method) } || push @nok, $method;
     }
 
     my $name;
-    $name = @methods == 1 ? "$class->can('@methods[0]')"
+    $name = (nelems @methods) == 1 ? "$class->can('@methods[0]')"
                           : "$class->can(...)";
 
-    _ok( !@nok, _where(), $name );
+    _ok( !nelems @nok, _where(), $name );
 }
 
 sub isa_ok ($$;$) {
-    my($object, $class, $obj_name) = @_;
+    my($object, $class, $obj_name) = < @_;
 
     my $diag;
     $obj_name = 'The object' unless defined $obj_name;
@@ -765,7 +745,7 @@ sub isa_ok ($$;$) {
     else {
         # We can't use UNIVERSAL::isa because we want to honor isa() overrides
         local($@, $!);  # eval sometimes resets $!
-        my $rslt = eval { $object->isa($class) };
+        my $rslt = try { $object->isa($class) };
         if( $@ ) {
             if( $@->{description} =~ m/^Can't call method "isa" on unblessed reference/ ) {
                 if( !UNIVERSAL::isa($object, $class) ) {
@@ -791,9 +771,9 @@ WHOA
 }
 
 sub dies_not(&;$) {
-    my ($e, $qr, $name) = @_;
+    my ($e, $qr, $name) = < @_;
     local $Level = 2;
-    if (eval { $e->(); 1; }) {
+    if (try { $e->(); 1; }) {
         return ok(1, $name);
     }
     diag $@->message;
@@ -801,8 +781,8 @@ sub dies_not(&;$) {
 }
 
 sub dies_like(&$;$) {
-    my ($e, $qr, $name) = @_;
-    if (eval { $e->(); 1; }) {
+    my ($e, $qr, $name) = < @_;
+    if (try { $e->(); 1; }) {
         local $Level = 2;
         diag "didn't die";
         return ok(0, $name);
@@ -812,7 +792,7 @@ sub dies_like(&$;$) {
 }
 
 sub eval_dies_like($$;$) {
-    my ($e, $qr, $name) = @_;
+    my ($e, $qr, $name) = < @_;
   TODO:
     {
         todo_skip("Compile time abortion are known to leak memory", 1) if %ENV{PERL_VALGRIND};

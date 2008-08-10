@@ -2,12 +2,12 @@
 
 BEGIN {
     chdir 't' if -d 't';
-    @INC = '../lib';
+    @INC = @( '../lib' );
 }
 
 BEGIN {
     our $hasgm;
-    eval { my $n = gmtime 0 };
+    try { my $n = gmtime 0 };
     $hasgm = 1 unless $@ && $@->{description} =~ m/unimplemented/;
     unless ($hasgm) { print "1..0 # Skip: no gmtime\n"; exit 0 }
 }
@@ -17,8 +17,8 @@ use strict;
 our @gmtime;
 
 BEGIN {
-    @gmtime = gmtime 0; # This is the function gmtime.
-    unless (@gmtime) { print "1..0 # Skip: gmtime failed\n"; exit 0 }
+    @gmtime = @( gmtime 0 ); # This is the function gmtime.
+    unless (nelems @gmtime) { print "1..0 # Skip: gmtime failed\n"; exit 0 }
 }
 
 print "1..10\n";

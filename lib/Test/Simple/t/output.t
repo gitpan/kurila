@@ -3,7 +3,7 @@
 BEGIN {
     if( %ENV{PERL_CORE} ) {
         chdir 't';
-        @INC = ('../lib', 'lib');
+        @INC = @('../lib', 'lib');
     }
     else {
         unshift @INC, 't/lib';
@@ -18,7 +18,7 @@ print "1..5\n";
 my $test_num = 1;
 # Utility testing functions.
 sub ok ($;$) {
-    my($test, $name) = @_;
+    my($test, $name) = < @_;
     my $ok = '';
     $ok .= "not " unless $test;
     $ok .= "ok $test_num";
@@ -30,7 +30,6 @@ sub ok ($;$) {
     return $test;
 }
 
-use TieOut;
 use Test::Builder;
 my $Test = Test::Builder->new();
 
@@ -53,13 +52,13 @@ ok($line eq 'hi!');
 
 open(FOO, ">>", "$tmpfile") or die $!;
 $out = $Test->output(\*FOO);
-$old = select *$out;
+my $old = select *$out;
 print "Hello!\n";
 close *$out;
 undef $out;
 select $old;
 open(IN, "<", $tmpfile) or die $!;
-my @lines = ~< *IN;
+my @lines = @( ~< *IN );
 close IN;
 
 ok(@lines[0] =~ m/hi!/);
@@ -68,8 +67,9 @@ ok(@lines[1] =~ m/Hello!/);
 
 
 # Ensure stray newline in name escaping works.
-$out = tie *FAKEOUT, 'TieOut';
-$Test->output(\*FAKEOUT);
+my $output = "";
+open my $out_fh, '>>', \$output or die;
+$Test->output($out_fh);
 $Test->exported_to(__PACKAGE__);
 $Test->no_ending(1);
 $Test->plan(tests => 5);
@@ -80,7 +80,6 @@ $Test->ok(1, "ok, like\nok");
 $Test->skip("wibble\nmoof");
 $Test->todo_skip("todo\nskip\n");
 
-my $output = $out->read;
 ok( $output eq <<OUTPUT ) || print STDERR $output;
 1..5
 ok 1 - ok

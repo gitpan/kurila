@@ -1,9 +1,9 @@
 #!./perl -T
 
 
-my %Expect_File = (); # what we expect for $_
-my %Expect_Name = (); # what we expect for $File::Find::name/fullname
-my %Expect_Dir  = (); # what we expect for $File::Find::dir
+my %Expect_File = %( () ); # what we expect for $_
+my %Expect_Name = %( () ); # what we expect for $File::Find::name/fullname
+my %Expect_Dir  = %( () ); # what we expect for $File::Find::dir
 my ($cwd, $cwd_untainted);
 
 use Config;
@@ -28,14 +28,14 @@ BEGIN {
 				 or
 				 substr($dir,0,1) ne "/"
 				 or
-				 (stat $dir)[[2]] ^&^ 002);
+				 @(stat $dir)[2] ^&^ 002);
     }
-    %ENV{'PATH'} = join($sep,@path);
+    %ENV{'PATH'} = join($sep,< @path);
 }
 
 use Test::More tests => 45;
 
-my $symlink_exists = eval { symlink("",""); 1 };
+my $symlink_exists = try { symlink("",""); 1 };
 
 use File::Find;
 use File::Spec;
@@ -45,7 +45,7 @@ cleanup();
 
 my $found;
 find(\%(wanted => sub { $found = 1 if ($_ eq 'commonsense.t') },
-		untaint => 1, untaint_pattern => qr|^(.+)$|), File::Spec->curdir);
+        untaint => 1, untaint_pattern => qr|^(.+)$|), File::Spec->curdir);
 
 ok($found, 'commonsense.t found');
 $found = 0;
@@ -141,21 +141,21 @@ sub dir_path {
 
     if ($first_arg eq '.') {
         if ($^O eq 'MacOS') {
-            return '' unless @_;
+            return '' unless (nelems @_);
             # ignore first argument; return a relative path
             # with leading ":" and with trailing ":"
-            return File::Spec->catdir(@_);
+            return File::Spec->catdir(< @_);
         } else { # other OS
-            return './' unless @_;
-            my $path = File::Spec->catdir(@_);
+            return './' unless (nelems @_);
+            my $path = File::Spec->catdir(< @_);
             # add leading "./"
             $path = "./$path";
             return $path;
         }
 
     } else { # $first_arg ne '.'
-        return $first_arg unless @_; # return plain filename
-	my $fname = File::Spec->catdir($first_arg, @_); # relative path
+        return $first_arg unless (nelems @_); # return plain filename
+	my $fname = File::Spec->catdir($first_arg, < @_); # relative path
 	$fname = VMS::Filespec::unixpath($fname) if $^O eq 'VMS';
         return $fname;
     }
@@ -167,7 +167,7 @@ sub dir_path {
 # above), except that there's no trailing ":" on Mac OS.
 
 sub topdir {
-    my $path = dir_path(@_);
+    my $path = dir_path(< @_);
     $path =~ s/:$// if ($^O eq 'MacOS');
     return $path;
 }
@@ -191,21 +191,21 @@ sub file_path {
 
     if ($first_arg eq '.') {
         if ($^O eq 'MacOS') {
-            return '' unless @_;
+            return '' unless (nelems @_);
             # ignore first argument; return a relative path
             # with leading ":", but without trailing ":"
-            return File::Spec->catfile(@_);
+            return File::Spec->catfile(< @_);
         } else { # other OS
-            return './' unless @_;
-            my $path = File::Spec->catfile(@_);
+            return './' unless (nelems @_);
+            my $path = File::Spec->catfile(< @_);
             # add leading "./"
             $path = "./$path";
             return $path;
         }
 
     } else { # $first_arg ne '.'
-        return $first_arg unless @_; # return plain filename
-	my $fname = File::Spec->catfile($first_arg, @_); # relative path
+        return $first_arg unless (nelems @_); # return plain filename
+	my $fname = File::Spec->catfile($first_arg, < @_); # relative path
 	$fname = VMS::Filespec::unixify($fname) if $^O eq 'VMS';
         return $fname;
     }
@@ -223,7 +223,7 @@ sub file_path {
 # plain file/directory names.
 
 sub file_path_name {
-    my $path = file_path(@_);
+    my $path = file_path(< @_);
     $path = ":$path" if (($^O eq 'MacOS') && ($path !~ m/:/));
     return $path;
 }
@@ -261,14 +261,14 @@ print "# check untainting (no follow)\n";
 
 # untainting here should work correctly
 
-%Expect_File = (File::Spec->curdir => 1, file_path('fsl') =>
+%Expect_File = %(File::Spec->curdir => 1, file_path('fsl') =>
                 1,file_path('fa_ord') => 1, file_path('fab') => 1,
                 file_path('fab_ord') => 1, file_path('faba') => 1,
                 file_path('faa') => 1, file_path('faa_ord') => 1);
 delete %Expect_File{ file_path('fsl') } unless $symlink_exists;
-%Expect_Name = ();
+%Expect_Name = %( () );
 
-%Expect_Dir = ( dir_path('fa') => 1, dir_path('faa') => 1,
+%Expect_Dir = %(dir_path('fa') => 1, dir_path('faa') => 1,
                 dir_path('fab') => 1, dir_path('faba') => 1,
                 dir_path('fb') => 1, dir_path('fba') => 1);
 
@@ -277,15 +277,15 @@ delete %Expect_Dir{[dir_path('fb'), dir_path('fba') ]} unless $symlink_exists;
 File::Find::find( \%(wanted => \&wanted_File_Dir_prune, untaint => 1,
 		   untaint_pattern => qr|^(.+)$|), topdir('fa') );
 
-is(scalar keys %Expect_File, 0, 'Found all expected files');
+is(nkeys %Expect_File, 0, 'Found all expected files');
 
 
 # don't untaint at all, should die
-%Expect_File = ();
-%Expect_Name = ();
-%Expect_Dir  = ();
+%Expect_File = %( () );
+%Expect_Name = %( () );
+%Expect_Dir  = %( () );
 undef $@;
-eval {File::Find::find( \%(wanted => \&simple_wanted), topdir('fa') );};
+try {File::Find::find( \%(wanted => \&simple_wanted), topdir('fa') );};
 like( $@->{description}, qr|Insecure dependency|, 'Tainted directory causes death (good)' );
 chdir($cwd_untainted);
 
@@ -293,7 +293,7 @@ chdir($cwd_untainted);
 # untaint pattern doesn't match, should die
 undef $@;
 
-eval {File::Find::find( \%(wanted => \&simple_wanted, untaint => 1,
+try {File::Find::find( \%(wanted => \&simple_wanted, untaint => 1,
                          untaint_pattern => qr|^(NO_MATCH)$|),
                          topdir('fa') );};
 
@@ -305,7 +305,7 @@ chdir($cwd_untainted);
 print "# check untaint_skip (No follow)\n";
 undef $@;
 
-eval {File::Find::find( \%(wanted => \&simple_wanted, untaint => 1,
+try {File::Find::find( \%(wanted => \&simple_wanted, untaint => 1,
                          untaint_skip => 1, untaint_pattern =>
                          qr|^(NO_MATCH)$|), topdir('fa') );};
 
@@ -326,7 +326,7 @@ SKIP: {
     # untainting here should work correctly
     # no_chdir is in effect, hence we use file_path_name to specify the expected paths for %Expect_File
 
-    %Expect_File = (file_path_name('fa') => 1,
+    %Expect_File = %(file_path_name('fa') => 1,
 		    file_path_name('fa','fa_ord') => 1,
 		    file_path_name('fa', 'fsl') => 1,
                     file_path_name('fa', 'fsl', 'fb_ord') => 1,
@@ -339,9 +339,9 @@ SKIP: {
                     file_path_name('fa', 'faa') => 1,
                     file_path_name('fa', 'faa', 'faa_ord') => 1);
 
-    %Expect_Name = ();
+    %Expect_Name = %( () );
 
-    %Expect_Dir = (dir_path('fa') => 1,
+    %Expect_Dir = %(dir_path('fa') => 1,
 		   dir_path('fa', 'faa') => 1,
                    dir_path('fa', 'fab') => 1,
 		   dir_path('fa', 'fab', 'faba') => 1,
@@ -352,13 +352,13 @@ SKIP: {
                        no_chdir => 1, untaint => 1, untaint_pattern =>
                        qr|^(.+)$| ), topdir('fa') );
 
-    is( scalar(keys %Expect_File), 0, 'Found all files in symlink test' );
+    is( (nkeys %Expect_File), 0, 'Found all files in symlink test' );
 
 
     # don't untaint at all, should die
     undef $@;
 
-    eval {File::Find::find( \%(wanted => \&simple_wanted, follow => 1),
+    try {File::Find::find( \%(wanted => \&simple_wanted, follow => 1),
 			    topdir('fa') );};
 
     like( $@->{description}, qr|Insecure dependency|, 'Not untainting causes death (good)' );
@@ -367,7 +367,7 @@ SKIP: {
     # untaint pattern doesn't match, should die
     undef $@;
 
-    eval {File::Find::find( \%(wanted => \&simple_wanted, follow => 1,
+    try {File::Find::find( \%(wanted => \&simple_wanted, follow => 1,
                              untaint => 1, untaint_pattern =>
                              qr|^(NO_MATCH)$|), topdir('fa') );};
 
@@ -378,7 +378,7 @@ SKIP: {
     print "# check untaint_skip (Follow)\n";
     undef $@;
 
-    eval {File::Find::find( \%(wanted => \&simple_wanted, untaint => 1,
+    try {File::Find::find( \%(wanted => \&simple_wanted, untaint => 1,
                              untaint_skip => 1, untaint_pattern =>
                              qr|^(NO_MATCH)$|), topdir('fa') );};
     like( $@->{description}, qr|insecure cwd|, 'Cwd not untainted with bad pattern (good)' );

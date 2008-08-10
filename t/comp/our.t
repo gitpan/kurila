@@ -1,8 +1,6 @@
 #!./perl
 
 BEGIN {
-    chdir 't';
-    @INC = '../lib';
     require './test.pl';
 }
 
@@ -12,7 +10,7 @@ use strict;
 
 no strict 'vars';
 
-$y = 1;
+our $y = 1;
 {
     my $y = 2;
     {

@@ -1,12 +1,5 @@
 #!./perl -w
 
-BEGIN {
-    # We're not going to chdir() into 't' because we don't know if
-    # chdir() works!  Instead, we'll hedge our bets and put both
-    # possibilities into @INC.
-    @INC = qw(t . lib ../lib);
-}
-
 use Config;
 require "./test.pl";
 plan(tests => 48);
@@ -35,12 +28,12 @@ my $Cwd = abs_path;
 
 # Let's get to a known position
 SKIP: {
-    my ($vol,$dir) = splitpath(abs_path,1);
+    my ($vol,$dir) = < splitpath(abs_path,1);
     my $test_dir = $IsVMS ? 'T' : 't';
     skip("Already in t/", 2) if (splitdir($dir))[-1] eq $test_dir;
 
     ok( chdir($test_dir),     'chdir($test_dir)');
-    is( abs_path, catdir($Cwd, $test_dir),    '  abs_path() agrees' );
+    is( < abs_path, < catdir($Cwd, $test_dir),    '  abs_path() agrees' );
 }
 
 $Cwd = abs_path;
@@ -56,22 +49,22 @@ SKIP: {
        ok(chdir($dh), "fchdir back");
     }
     else {
-       eval { chdir($dh); };
+       try { chdir($dh); };
        like($@->{description}, qr/^The dirfd function is unimplemented at/, "dirfd is unimplemented");
        chdir ".." or die $!;
     }
 
     # same with bareword file handles
     no warnings 'once';
-    *DH = $dh;
-    *FH = $fh;
+    *DH = *$dh{IO};
+    *FH = *$fh{IO};
     ok(chdir *FH, "fchdir op bareword");
     ok(-f "chdir.t", "verify that we are in op");
     if ($has_dirfd) {
        ok(chdir *DH, "fchdir back bareword");
     }
     else {
-       eval { chdir(*DH); };
+       try { chdir(*DH); };
        like($@->{description}, qr/^The dirfd function is unimplemented at/, "dirfd is unimplemented");
        chdir ".." or die $!;
     }
@@ -89,7 +82,7 @@ SKIP: {
 	chdir ".." or die $!;
     }
     else {
-	eval { chdir(*H); };
+	try { chdir(*H); };
 	like($@->{description}, qr/^The dirfd function is unimplemented at/,
 	     "dirfd is unimplemented");
 	SKIP: {
@@ -105,15 +98,15 @@ SKIP: {
 SKIP: {
     skip("has fchdir", 1) if $has_fchdir;
     opendir(my $dh, "op");
-    eval { chdir($dh); };
+    try { chdir($dh); };
     like($@->{description}, qr/^The fchdir function is unimplemented at/, "fchdir is unimplemented");
 }
 
 # The environment variables chdir() pays attention to.
-my @magic_envs = qw(HOME LOGDIR SYS$LOGIN);
+my @magic_envs = @( qw(HOME LOGDIR SYS$LOGIN) );
 
 sub check_env {
-    my($key) = @_;
+    my($key) = < @_;
 
     # Make sure $ENV{'SYS$LOGIN'} is only honored on VMS.
     if( $key eq 'SYS$LOGIN' && !$IsVMS && !$IsMacOS ) {
@@ -132,7 +125,6 @@ sub check_env {
 
 
         # Check the deprecated chdir(undef) feature.
-#line 64
         ok( chdir(undef),           "chdir(undef) w/ only \$ENV\{$key\} set" );
         is( abs_path, %ENV{$key},   '  abs_path() agrees' );
         is( $warning,  <<WARNING,   '  got uninit & deprecation warning' );
@@ -144,7 +136,6 @@ WARNING
 
         # Ditto chdir('').
         $warning = '';
-#line 76
         ok( chdir(''),              "chdir('') w/ only \$ENV\{$key\} set" );
         is( abs_path, %ENV{$key},   '  abs_path() agrees' );
         is( $warning,  <<WARNING,   '  got deprecation warning' );
@@ -155,9 +146,9 @@ WARNING
     }
 }
 
-my %Saved_Env = ();
+my %Saved_Env = %( () );
 sub clean_env {
-    foreach my $env (@magic_envs) {
+    foreach my $env (< @magic_envs) {
         %Saved_Env{$env} = %ENV{$env};
 
         # Can't actually delete SYS$ stuff on VMS.
@@ -180,7 +171,7 @@ END {
     no warnings 'uninitialized';
 
     # Restore the environment for VMS (and doesn't hurt for anyone else)
-    %ENV{[@magic_envs]} = %Saved_Env{[@magic_envs]};
+    %ENV{[< @magic_envs]} = %Saved_Env{[< @magic_envs]};
 
     # On VMS this must be deleted or process table is wrong on exit
     # when this script is run interactively.
@@ -188,7 +179,7 @@ END {
 }
 
 
-foreach my $key (@magic_envs) {
+foreach my $key (< @magic_envs) {
     # We're going to be using undefs a lot here.
     no warnings 'uninitialized';
 

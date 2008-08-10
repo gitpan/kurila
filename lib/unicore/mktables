@@ -33,7 +33,7 @@ my $UseDir         = "";
 my $FileList       = "$0.lst";
 my $MakeList       = 0;
 
-while (@ARGV)
+while ((nelems @ARGV))
 {
     my $arg = shift @ARGV;
     if ($arg eq '-v') {
@@ -86,26 +86,26 @@ if ($FileList) {
             push @$list, $file;
         }
         my %dupe;
-        @$list = grep !%dupe{ $_ }++, @$list;
+        @$list = @( grep !%dupe{ $_ }++, < @$list );
     }
     close $fh;
     die "No input or output files in '$FileList'!"
-        if !@input or !@output;
+        if !nelems @input or !nelems @output;
     if ( $MakeList ) {
-        foreach my $file (@output) {
+        foreach my $file (< @output) {
             unlink $file;
         }
     }            
     if ( $Verbose ) {
-        print "Expecting ".scalar( @input )." input files. ",
-              "Checking ".scalar( @output )." output files.\n";
+        print "Expecting ".scalar( nelems @input )." input files. ",
+              "Checking ".scalar( nelems @output )." output files.\n";
     }
     # we set maxtime to be the youngest input file, including $0 itself.
     my $maxtime = -M $0; # do this before the chdir!
     if ($UseDir) {
         chdir $UseDir or die "Failed to chdir to '$UseDir':$!";
     }
-    foreach my $in (@input) {
+    foreach my $in (< @input) {
         my $time = -M $in;
         die "Missing input file '$in'" unless defined $time;
         $maxtime = $time if $maxtime +< $time;
@@ -114,7 +114,7 @@ if ($FileList) {
     # now we check to see if any output files are older than maxtime, if
     # they are we need to continue on, otherwise we can presumably bail.
     my $ok = 1;
-    foreach my $out (@output) {
+    foreach my $out (< @output) {
         if ( ! -e $out ) {
             print "'$out' is missing.\n"
                 if $Verbose;
@@ -144,7 +144,7 @@ if ($FileList) {
 }
 
 foreach my $lib ('To', 'lib',
-		 map {File::Spec->catdir("lib",$_)}
+		 map { File::Spec->catdir("lib",$_)}
 		 qw(gc_sc dt bc hst ea jt lb nt ccc)) {
   next if -d $lib;
   mkdir $lib, 0755 or die "mkdir '$lib': $!";
@@ -172,14 +172,14 @@ sub force_unlink {
 ## write the lines to the file only if the contents have not changed.
 ## Filename can be given as an arrayref of directory names
 ##
-sub WriteIfChanged($\@)
+sub WriteIfChanged($$)
 {
     my $file  = shift;
     my $lines = shift;
 
-    $file = File::Spec->catfile(@$file) if ref $file;
+    $file = File::Spec->catfile(< @$file) if ref $file;
 
-    my $TextToWrite = join '', @$lines;
+    my $TextToWrite = join '', < $lines;
     if (open IN, "<", $file) {
         local($/) = undef;
         my $PreviousText = ~< *IN;
@@ -255,11 +255,11 @@ sub Build_Aliases()
 
     # Placate the warnings about used only once. (They are used again, but
     # via a typeglob lookup)
-    %utf8::PropertyAlias = ();
-    %utf8::PA_reverse = ();
-    %utf8::PropValueAlias = ();
-    %utf8::PVA_reverse = ();
-    %utf8::PVA_abbr_map = ();
+    %utf8::PropertyAlias = %( () );
+    %utf8::PA_reverse = %( () );
+    %utf8::PropValueAlias = %( () );
+    %utf8::PVA_reverse = %( () );
+    %utf8::PVA_abbr_map = %( () );
 
     open PA, "<", "PropertyAliases.txt"
 	or die "Can't open PropertyAliases.txt: $!";
@@ -275,7 +275,7 @@ sub Build_Aliases()
 
 	# The %utf8::... versions use japhy's code originally from utf8_pva.pl
 	# However, it's moved here so that we build the tables at runtime.
-	tr/ _-//d for $abbrev, $name;
+	s/[ _-]//g for $abbrev, $name;
 	%utf8::PropertyAlias{lc $abbrev} = $name;
 	%utf8::PA_reverse{lc $name} = $abbrev;
     }
@@ -288,33 +288,33 @@ sub Build_Aliases()
 	s/\s+$//;
 	next if m/^$/;
 
-	my ($prop, @data) = split m/\s*;\s*/;
+	my ($prop, < @data) = split m/\s*;\s*/;
 
 	if ($prop eq 'ccc') {
-	    %PropValueAlias{$prop}{@data[1]} = \@( @data[[0,2]] );
-	    %PVA_reverse{$prop}{@data[2]} = \@( @data[[0,1]] );
+	    %PropValueAlias{$prop}->{@data[1]} = \@( @data[[0,2]] );
+	    %PVA_reverse{$prop}->{@data[2]} = \@( @data[[0,1]] );
 	}
 	else {
             next if @data[0] eq "n/a";
-	    %PropValueAlias{$prop}{@data[0]} = @data[1];
-            %PVA_reverse{$prop}{@data[1]} = @data[0];
+	    %PropValueAlias{$prop}->{@data[0]} = @data[1];
+            %PVA_reverse{$prop}->{@data[1]} = @data[0];
 	}
 
 	shift @data if $prop eq 'ccc';
 	next if @data[0] eq "n/a";
 
-	@data[1] =~ tr/ _-//d;
-	%utf8::PropValueAlias{$prop}{lc @data[0]} = @data[1];
-	%utf8::PVA_reverse{$prop}{lc @data[1]} = @data[0];
+	@data[1] =~ s/[ _-]//g;
+	%utf8::PropValueAlias{$prop}->{lc @data[0]} = @data[1];
+	%utf8::PVA_reverse{$prop}->{lc @data[1]} = @data[0];
 
 	my $abbr_class = ($prop eq 'gc' or $prop eq 'sc') ? 'gc_sc' : $prop;
-	%utf8::PVA_abbr_map{$abbr_class}{lc @data[0]} = @data[0];
+	%utf8::PVA_abbr_map{$abbr_class}->{lc @data[0]} = @data[0];
     }
     close PVA;
 
     # backwards compatibility for L& -> LC
-    %utf8::PropValueAlias{gc}{'l&'} = %utf8::PropValueAlias{gc}{lc};
-    %utf8::PVA_abbr_map{gc_sc}{'l&'} = %utf8::PVA_abbr_map{gc_sc}{lc};
+    %utf8::PropValueAlias{gc}->{'l&'} = %utf8::PropValueAlias{gc}->{lc};
+    %utf8::PVA_abbr_map{gc_sc}->{'l&'} = %utf8::PVA_abbr_map{gc_sc}->{lc};
 
 }
 
@@ -329,14 +329,14 @@ sub Build_Aliases()
 ## Table->New constructor is called), but there are times when it needs to
 ## be done after-the-fact...)
 ##
-sub New_Prop($$$@)
+sub New_Prop($$$<)
 {
     my $Type = shift; ## "Is" or "In";
     my $Name = shift;
     my $Table = shift;
 
     ## remaining args are optional key/val
-    my %Args = @_;
+    my %Args = %( < @_ );
 
     my $Fuzzy = delete %Args{Fuzzy};
     my $Desc  = delete %Args{Desc}; # description
@@ -373,7 +373,7 @@ sub New_Prop($$$@)
 sub Table::New
 {
     my $class = shift;
-    my %Args = @_;
+    my %Args = %( < @_ );
 
     my $Table = bless \@(), $class;
 
@@ -415,7 +415,7 @@ sub Table::Replace($$)
     my $Table = shift; #self
     my $New   = shift;
 
-    @$Table = @$New;
+    @$Table = @( < @$New );
 }
 
 ##
@@ -527,7 +527,7 @@ sub Table::Invert
 
     my $New = Table->New();
     my $max = -1;
-    for my $range (@$Table)
+    for my $range (< @$Table)
     {
         my $start = $range->[RANGE_START];
         my $end   = $range->[RANGE_END];
@@ -554,15 +554,15 @@ sub Table::Invert
 sub Table::Merge
 {
     shift(@_) if not ref @_[0]; ## if called as a constructor, lose the class
-    my @Tables = @_;
+    my @Tables = @( < @_ );
 
     ## Accumulate all records from all tables
     my @Records;
-    for my $Arg (@Tables)
+    for my $Arg (< @Tables)
     {
         if (ref $Arg) {
             ## arg is a table -- get its ranges
-            push @Records, @$Arg;
+            push @Records, < @$Arg;
         } else {
             ## arg is a codepoint, make a range
             push @Records, \@( $Arg, $Arg )
@@ -570,11 +570,11 @@ sub Table::Merge
     }
 
     ## sort by range start, with longer ranges coming first.
-    my ($first, @Rest) = sort {
+    my ($first, < @Rest) = sort {
         ($a->[RANGE_START] <+> $b->[RANGE_START])
           or
         ($b->[RANGE_END]   <+> $b->[RANGE_END])
-    } @Records;
+    } < @Records;
 
     my $New = Table->New();
 
@@ -583,7 +583,7 @@ sub Table::Merge
                       $first->[RANGE_END]);
 
     ## Fold in records so long as they add new information.
-    for my $set (@Rest)
+    for my $set (< @Rest)
     {
         my $start = $set->[RANGE_START];
         my $end   = $set->[RANGE_END];
@@ -608,7 +608,7 @@ sub Table::Write
     my $filename = shift;
     my $comment  = shift;
 
-    my @OUT = $HEADER;
+    my @OUT = @( $HEADER );
     if (defined $comment) {
         $comment =~ s/\s+\Z//;
         $comment =~ s/^/# /gm;
@@ -616,7 +616,7 @@ sub Table::Write
     }
     push @OUT, "return <<'END';\n";
 
-    for my $set (@$Table)
+    for my $set (< @$Table)
     {
         my $start = $set->[RANGE_START];
         my $end   = $set->[RANGE_END];
@@ -654,7 +654,7 @@ sub IsUsable($)
 sub Table::ValidCode
 {
     my $Table = shift; #self
-    for my $set (@$Table) {
+    for my $set (< @$Table) {
         return $set->[RANGE_END] if IsUsable($set->[RANGE_END]);
     }
     return ();
@@ -667,9 +667,9 @@ sub Table::InvalidCode
 {
     my $Table = shift; #self
 
-    return 0x1234 if not @$Table;
+    return 0x1234 if not nelems @$Table;
 
-    for my $set (@$Table)
+    for my $set (< @$Table)
     {
         if (IsUsable($set->[RANGE_END] + 1))
         {
@@ -697,7 +697,7 @@ sub Table::InvalidCode
 ##
 ## This creates 'IsAll' as an alias for 'IsAny'
 ##
-sub New_Alias($$$@)
+sub New_Alias($$$<)
 {
     my $Type   = shift; ## "Is" or "In"
     my $Alias  = shift;
@@ -705,7 +705,7 @@ sub New_Alias($$$@)
     my $Name   = shift;
 
     ## remaining args are optional key/val
-    my %Args = @_;
+    my %Args = %( < @_ );
 
     my $Fuzzy = delete %Args{Fuzzy};
 
@@ -751,12 +751,12 @@ my %Cat;
 sub simple_dumper {
     my @lines;
     my $item;
-    foreach $item (@_) {
+    foreach $item (< @_) {
 	if (ref $item) {
 	    if (ref $item eq 'ARRAY') {
-		push @lines, '\@('."\n", simple_dumper (@$item), "),\n";
+		push @lines, '\@('."\n", < simple_dumper (< @$item), "),\n";
 	    } elsif (ref $item eq 'HASH') {
-		push @lines, '\%('."\n", simple_dumper (%$item), "),\n";
+		push @lines, '\%('."\n", < simple_dumper (< %$item), "),\n";
 	    } else {
 		die "Can't cope with $item";
 	    }
@@ -838,7 +838,7 @@ sub UnicodeData_Txt()
         my ($name, ## Name ("LATIN CAPITAL LETTER A")
             $cat,  ## Category ("Lu", "Zp", "Nd", etc.)
             $code, ## Code point (as an integer)
-            $op) = @_;
+            $op) = < @_;
 
         my $MajorCat = substr($cat, 0, 1); ## L, M, Z, S, etc
 
@@ -1009,7 +1009,7 @@ sub UnicodeData_Txt()
                 $Deco->Append($code, $deco);
                 if ($deco =~m/^<(\w+)>/)
                 {
-		    my $dshort = %PVA_reverse{dt}{ucfirst lc $1};
+		    my $dshort = %PVA_reverse{dt}->{ucfirst lc $1};
                     %DC{com}->Append($code);
 
                     %DC{$dshort} ||= Table->New();
@@ -1037,7 +1037,7 @@ sub UnicodeData_Txt()
     ## Unassigned is the same as 'Cn'
     New_Alias(Is => 'Unassigned', SameAs => 'Cn', Fuzzy => 0);
 
-    %Cat{C}->Replace(%Cat{C}->Merge(%Cat{Cn}));  ## Now merge in Cn into C
+    %Cat{C}->Replace( %Cat{C}->Merge(%Cat{Cn}));  ## Now merge in Cn into C
 
 
     # LC is Ll, Lu, and Lt.
@@ -1110,13 +1110,13 @@ sub UnicodeData_Txt()
     $Name->Write("Name.pl");
 
     {
-	my @PVA = $HEADER;
+	my @PVA = @( $HEADER );
 	foreach my $name (qw (PropertyAlias PA_reverse PropValueAlias
 			      PVA_reverse PVA_abbr_map)) {
 	    # Should I really jump through typeglob hoops just to avoid a
 	    # symbolic reference? (%{"utf8::$name})
-	    push @PVA, "\n", "\%utf8::$name = (\n",
-		simple_dumper (%{%utf8::{$name}}), ");\n";
+	    push @PVA, "\n", "\%utf8::$name = \%(\n", <
+		simple_dumper (< %{%utf8::{$name}}), ");\n";
 	}
 	push @PVA, "1;\n";
 	WriteIfChanged("PVA.pl", @PVA);
@@ -1126,13 +1126,13 @@ sub UnicodeData_Txt()
     for (keys %Bidi) {
 	%Bidi{$_}->Write(
 	    \@("lib","bc","$_.pl"),
-	    "BidiClass category '%PropValueAlias{bc}{$_}'"
+	    "BidiClass category '%PropValueAlias{bc}->{$_}'"
 	);
     }
 
     $Comb->Write("CombiningClass.pl");
     for (keys %{ %PropValueAlias{ccc} }) {
-	my ($code, $name) = @{ %PropValueAlias{ccc}{$_} };
+	my ($code, $name) = < @{ %PropValueAlias{ccc}->{$_} };
 	(my $c = Table->New())->Append($code);
 	$c->Write(
 	    \@("lib","ccc","$_.pl"),
@@ -1144,7 +1144,7 @@ sub UnicodeData_Txt()
     for (keys %DC) {
 	%DC{$_}->Write(
 	    \@("lib","dt","$_.pl"),
-	    "DecompositionType category '%PropValueAlias{dt}{$_}'"
+	    "DecompositionType category '%PropValueAlias{dt}->{$_}'"
 	);
     }
 
@@ -1152,7 +1152,7 @@ sub UnicodeData_Txt()
     for (keys %Number) {
 	%Number{$_}->Write(
 	    \@("lib","nt","$_.pl"),
-	    "NumericType category '%PropValueAlias{nt}{$_}'"
+	    "NumericType category '%PropValueAlias{nt}->{$_}'"
 	);
     }
 
@@ -1163,7 +1163,7 @@ sub UnicodeData_Txt()
     }
 
     for (keys %{ %PropValueAlias{gc} }) {
-	New_Alias(Is => %PropValueAlias{gc}{$_}, SameAs => $_, Fuzzy => 1);
+	New_Alias(Is => %PropValueAlias{gc}->{$_}, SameAs => $_, Fuzzy => 1);
     }
 }
 
@@ -1203,7 +1203,7 @@ sub LineBreak_Txt()
     for (keys %Lbrk) {
 	%Lbrk{$_}->Write(
 	    \@("lib","lb","$_.pl"),
-	    "Linebreak category '%PropValueAlias{lb}{$_}'"
+	    "Linebreak category '%PropValueAlias{lb}->{$_}'"
 	);
     }
 }
@@ -1244,7 +1244,7 @@ sub ArabicShaping_txt()
     for (keys %JoinType) {
 	%JoinType{$_}->Write(
 	    \@("lib","jt","$_.pl"),
-	    "JoiningType category '%PropValueAlias{jt}{$_}'"
+	    "JoiningType category '%PropValueAlias{jt}->{$_}'"
 	);
     }
 }
@@ -1281,7 +1281,7 @@ sub EastAsianWidth_txt()
     for (keys %EAW) {
 	%EAW{$_}->Write(
 	    \@("lib","ea","$_.pl"),
-	    "EastAsianWidth category '%PropValueAlias{ea}{$_}'"
+	    "EastAsianWidth category '%PropValueAlias{ea}->{$_}'"
 	);
     }
 }
@@ -1312,7 +1312,7 @@ sub HangulSyllableType_txt()
     for (keys %HST) {
 	%HST{$_}->Write(
 	    \@("lib","hst","$_.pl"),
-	    "HangulSyllableType category '%PropValueAlias{hst}{$_}'"
+	    "HangulSyllableType category '%PropValueAlias{hst}->{$_}'"
 	);
     }
 }
@@ -1362,9 +1362,9 @@ sub Scripts_txt()
     my %Script;
     my $Scripts = Table->New();
 
-    for my $script (sort { $a->[0] <+> $b->[0] } @ScriptInfo)
+    for my $script (sort { $a->[0] <+> $b->[0] } < @ScriptInfo)
     {
-        my ($first, $last, $name) = @$script;
+        my ($first, $last, $name) = < @$script;
         $Scripts->Append($first, $name);
 
         %Script{$name} ||= Table->New(Is    => $name,
@@ -1471,9 +1471,9 @@ sub PropList_txt()
     my $Props = Table->New();
     my %Prop;
 
-    for my $prop (sort { $a->[0] <+> $b->[0] } @PropInfo)
+    for my $prop (sort { $a->[0] <+> $b->[0] } < @PropInfo)
     {
-        my ($first, $last, $name) = @$prop;
+        my ($first, $last, $name) = < @$prop;
         $Props->Append($first, $name);
 
         %Prop{$name} ||= Table->New(Is    => $name,
@@ -1488,7 +1488,7 @@ sub PropList_txt()
     }
 
     for (keys %Prop) {
-	(my $file = %PA_reverse{$_}) =~ tr/_//d;
+	(my $file = %PA_reverse{$_}) =~ s/_//g;
 	# XXX I'm assuming that the names from %Prop don't suffer 8.3 clashes.
 	%BaseNames{lc $file}++;
 	%Prop{$_}->Write(
@@ -1600,7 +1600,7 @@ sub ExpectError($$)
 }
 
 ## This used only for making the test script
-my @GoodSeps = (
+my @GoodSeps = @(
                 " ",
                 "-",
                 " \t ",
@@ -1608,7 +1608,7 @@ my @GoodSeps = (
                 "",
                 "_",
                );
-my @BadSeps = (
+my @BadSeps = @(
                "--",
                "__",
                " _",
@@ -1624,12 +1624,12 @@ sub RandomlyFuzzifyName($;$)
     my @parts;
     for my $part (split m/[-\s_]+/, $Name)
     {
-        if (@parts) {
+        if ((nelems @parts)) {
             if ($WantError and rand() +< 0.3) {
-                push @parts, @BadSeps[rand(@BadSeps)];
+                push @parts, @BadSeps[rand(nelems @BadSeps)];
                 $WantError = 0;
             } else {
-                push @parts, @GoodSeps[rand(@GoodSeps)];
+                push @parts, @GoodSeps[rand(nelems @GoodSeps)];
             }
         }
         my $switch = int rand(4);
@@ -1643,13 +1643,13 @@ sub RandomlyFuzzifyName($;$)
             push @parts, $part;
         }
     }
-    my $new = join('', @parts);
+    my $new = join('', < @parts);
 
     if ($WantError) {
         if (rand() +>= 0.5) {
-            $new .= @BadSeps[rand(@BadSeps)];
+            $new .= @BadSeps[rand(nelems @BadSeps)];
         } else {
-            $new = @BadSeps[rand(@BadSeps)] . $new;
+            $new = @BadSeps[rand(nelems @BadSeps)] . $new;
         }
     }
     return $new;
@@ -1676,9 +1676,9 @@ sub MakePropTestScript()
     while (my ($Name, $Table) = each %FuzzyNameToTest)
     {
         my $Orig  = %CanonicalToOrig{$Name};
-        my %Names = (
+        my %Names = %(
                      $Name => 1,
-                     $Orig => 1,
+                     $Orig => 1, <
                      RandomlyFuzzifyName($Orig) => 1
                     );
 
@@ -1737,7 +1737,7 @@ sub RegisterFileForName($$$$)
         if ($Type eq 'Is') {
             die "oops[$CName]" if %Canonical{$CName};
             %Canonical{$CName} = $filename;
-            %CaComment{$CName} = $Name if $Name =~ tr/A-Z// +>= 2;
+            %CaComment{$CName} = $Name if $Name =~ m/([A-Z])/ +>= 2;
         } else {
             die "oops[$Type$CName]" if %Canonical{lc "$Type$CName"};
             %Canonical{lc "$Type$CName"} = $filename;
@@ -1778,7 +1778,7 @@ sub WriteAllMappings()
             {
                 ## 'Is' items lose 'Is' from the basename.
                 $filename = $Type eq 'Is' ?
-		    (%PVA_reverse{sc}{$Name} || $Name) :
+		    (%PVA_reverse{sc}->{$Name} || $Name) :
 		    "$Type$Name";
 
                 $filename =~ s/[^\w_]+/_/g; # "L&" -> "L_"
@@ -1817,8 +1817,8 @@ sub WriteAllMappings()
             {
                 my $Desc = %TableDesc{$Type}->{$Name} || "";
                 ## get list of names this table is reference by
-                my @Supported = $Name;
-                while (my ($Orig, $Alias) = each %{ %AliasInfo{$Type} })
+                my @Supported = @( $Name );
+                while (my ($Orig, $Alias) = each %{ %AliasInfo{$Type} || \%() })
                 {
                     if ($Orig eq $Name) {
                         push @Supported, $Alias;
@@ -1829,7 +1829,7 @@ sub WriteAllMappings()
                 my $OrigProp;
 
                 $Comment = "This file supports:\n";
-                for my $N (@Supported)
+                for my $N (< @Supported)
                 {
                     my $IsFuzzy = %FuzzyNames{$Type}->{$N};
                     my $Prop    = "\\p\{$TypeToShow$Name\}";
@@ -1870,7 +1870,7 @@ sub WriteAllMappings()
         }
 
         ## Register aliase info
-        for my $Name (sort {length $a <+> length $b} keys %{%AliasInfo{$Type}})
+        for my $Name (sort {length $a <+> length $b} keys %{%AliasInfo{$Type} || \%()})
         {
             my $Alias    = %AliasInfo{$Type}->{$Name};
             my $IsFuzzy  = %FuzzyNames{$Type}->{$Alias};
@@ -1895,14 +1895,14 @@ sub WriteAllMappings()
     ## Write out the property list
     ##
     {
-        my @OUT = (
+        my @OUT = @(
                    "##\n",
                    "## This file created by $0\n",
                    "## List of built-in \\p\{...\}/\\P\{...\} properties.\n",
                    "##\n",
                    "## '*' means name may be 'fuzzy'\n",
                    "##\n\n",
-                   sort { substr($a,2) cmp substr($b, 2) } @MAP,
+                   sort { substr($a,2) cmp substr($b, 2) } < @MAP,
                   );
         WriteIfChanged('Properties', @OUT);
     }
@@ -1911,13 +1911,13 @@ sub WriteAllMappings()
 
     ## Write Exact.pl
     {
-        my @OUT = (
+        my @OUT = @(
                    $HEADER,
                    "##\n",
                    "## Data in this file used by ../utf8_heavy.pl\n",
                    "##\n\n",
                    "## Mapping from name to filename in ./lib/gc_sc\n",
-                   "\%utf8::Exact = (\n",
+                   "\%utf8::Exact = \%(\n",
                   );
 
 	%Exact{InGreek} = 'InGreekA';  # this is evil kludge
@@ -1935,13 +1935,13 @@ sub WriteAllMappings()
 
     ## Write Canonical.pl
     {
-        my @OUT = (
+        my @OUT = @(
                    $HEADER,
                    "##\n",
                    "## Data in this file used by ../utf8_heavy.pl\n",
                    "##\n\n",
                    "## Mapping from lc(canonical name) to filename in ./lib\n",
-                   "\%utf8::Canonical = (\n",
+                   "\%utf8::Canonical = \%(\n",
                   );
         my $Trail = ""; ## used just to keep the spacing pretty
         for my $Name (sort keys %Canonical)
@@ -2009,14 +2009,14 @@ sub SpecialCasing_txt()
         my $NormalCase = do "To/$case.pl" || die "$0: $@\n";
 
         my @OUT =
-	    (
+	    @(
 	     $HEADER, "\n",
 	     "# The key UTF-8 _bytes_, the value UTF-8 (speed hack)\n",
-	     "\%utf8::ToSpec$case =\n(\n",
+	     "\%utf8::ToSpec$case =\n\%(\n",
 	    );
 
-        for my $prop (sort { $a->[0] <+> $b->[0] } @{%CaseInfo{$case}}) {
-            my ($ix, $code, $to) = @$prop;
+        for my $prop (sort { $a->[0] <+> $b->[0] } < @{%CaseInfo{$case}}) {
+            my ($ix, $code, $to) = < @$prop;
             my $tostr =
               join "", map { sprintf "\\x\{\%s\}", $_ } split ' ', $to;
             push @OUT, sprintf qq["\%s" => "$tostr",\n], join("", map { sprintf "\\x[\%02X]", $_ } unpack("U0C*", pack("U", $ix)));
@@ -2072,10 +2072,10 @@ sub CaseFolding_txt()
     my $CommonFold = do "To/Fold.pl" || die "$0: To/Fold.pl: $!\n";
 
     my @OUT =
-	(
+	@(
 	 $HEADER, "\n",
 	 "#  The ke UTF-8 _bytes_, the value UTF-8 (speed hack)\n",
-	 "\%utf8::ToSpecFold =\n(\n",
+	 "\%utf8::ToSpecFold =\n\%(\n",
 	);
     for my $code (sort { $a <+> $b } keys %Fold) {
         my $foldstr =
@@ -2135,9 +2135,9 @@ if ( $FileList and $MakeList ) {
 # Input files:
 
 EOFHEADER
-    my @input=("version",glob('*.txt'));
+    my @input=@("version",glob( <'*.txt'));
     print $ofh "$_\n" for 
-        @input,
+        < @input,
         "\n=================================\n",
         "# Output files:\n",
         # special files
@@ -2157,13 +2157,13 @@ EOFHEADER
         },
     ),"."); 
     
-    print $ofh "\n# ",scalar(@input)," input files\n",
+    print $ofh "\n# ",scalar(nelems @input)," input files\n",
                "# ",scalar($count+1)," output files\n\n",
                "# End list\n";  
     close $ofh 
         or warn "Failed to close $ofh: $!";
     
-    print "Filelist has ",scalar(@input)," input files and ",
+    print "Filelist has ",scalar(nelems @input)," input files and ",
           scalar($count+1)," output files\n"
         if $Verbose;
 }
@@ -2187,7 +2187,7 @@ sub Expect($$$)
 
     $Tests++;
     my $RegObj;
-    my $result = eval {
+    my $result = try {
         $RegObj = qr/$Regex/;
         $String =~ $RegObj ? 1 : 0
     };
@@ -2205,7 +2205,7 @@ sub Error($)
 {
     my $Regex  = shift;
     $Tests++;
-    if (eval { 'x' =~ qr/$Regex/; 1 }) {
+    if (try { 'x' =~ qr/$Regex/; 1 }) {
         $Fails++;
         my $Line = (caller)[2];
         print "expected error for /$Regex/ on $0 line $Line: $@\n";

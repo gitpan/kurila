@@ -1,7 +1,7 @@
 BEGIN {
     if(%ENV{PERL_CORE}) {
         chdir 't';
-        @INC = '../lib';
+        @INC = @( '../lib' );
     }
 }
 
@@ -19,7 +19,7 @@ die "Couldn't make an object!?" unless ok defined $x;
 $x->inc(0);
 
 $x->callback(sub {
-  print "#  ", join("  ", map "\{$_\}", @_), "\n";
+  print "#  ", join("  ", map "\{$_\}", < @_), "\n";
   return;
 });
 
@@ -59,7 +59,7 @@ use Pod::Simple;
 *pretty = \&Pod::Simple::BlackBox::pretty;
 
 print "# OK, starting run...\n# [[\n";
-my($name2where, $where2name) = $x->survey($here1, $here2);
+my($name2where, $where2name) = ($x->survey($here1, $here2), $x->path2name);
 print "# ]]\n#OK, run done.\n";
 
 my $p = pretty( $where2name, $name2where )."\n";

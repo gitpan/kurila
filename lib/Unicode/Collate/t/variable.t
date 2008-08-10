@@ -1,16 +1,4 @@
 
-BEGIN {
-    unless ("A" eq pack('U', 0x41)) {
-	print "1..0 # Unicode::Collate " .
-	    "cannot stringify a Unicode code point\n";
-	exit 0;
-    }
-    if (%ENV{PERL_CORE}) {
-	chdir('t') if -d 't';
-	@INC = $^O eq 'MacOS' ? qw(::lib) : qw(../lib);
-    }
-}
-
 use Test::More;
 BEGIN { plan tests => 37 };
 
@@ -22,8 +10,8 @@ ok(1);
 
 #########################
 
-sub _pack_U   { Unicode::Collate::pack_U(@_) }
-sub _unpack_U { Unicode::Collate::unpack_U(@_) }
+sub _pack_U   { Unicode::Collate::pack_U(< @_) }
+sub _unpack_U { Unicode::Collate::unpack_U(< @_) }
 
 my $A_acute = _pack_U(0xC1);
 my $acute   = _pack_U(0x0301);
@@ -33,7 +21,7 @@ my $Collator = Unicode::Collate->new(
   normalization => undef,
 );
 
-my %origVar = $Collator->change(variable => 'Blanked');
+my %origVar = %( < $Collator->change(variable => 'Blanked') );
 
 is($Collator->cmp("death", "de luge"), -1);
 is($Collator->cmp("de luge", "de-luge"), -1);
@@ -65,7 +53,7 @@ is($Collator->cmp("de luge", "de-luge"), -1);
 is($Collator->cmp("de-luge", "deLuge"), -1);
 is($Collator->cmp("deLuge", "de Luge"), -1);
 
-$Collator->change(%origVar);
+$Collator->change(< %origVar);
 
 ok($Collator->{variable}, 'shifted');
 

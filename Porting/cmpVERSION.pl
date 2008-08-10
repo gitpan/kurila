@@ -33,7 +33,7 @@ find(
 	       ! exists %skip{$File::Find::name}
 	       &&
 	       do { my $file2 =
-			catfile(catdir($dir2, $File::Find::dir), $_);
+			catfile( <catdir($dir2, $File::Find::dir), $_);
 		    (my $xs_file1 = $_)     =~ s/\.pm$/.xs/;
 		    (my $xs_file2 = $file2) =~ s/\.pm$/.xs/;
 		    if (-e $xs_file1 && -e $xs_file2) {
@@ -42,12 +42,12 @@ find(
 		    } else {
 			return if compare($_, $file2) == 0;
 		    }
-		    my $version1 = eval {MM->parse_version($_)};
-		    my $version2 = eval {MM->parse_version($file2)};
+		    my $version1 = try {MM->parse_version($_)};
+		    my $version2 = try {MM->parse_version($file2)};
 		    push @wanted, $File::Find::name
 			if defined $version1 &&
 			   defined $version2 &&
                            $version1 eq $version2
-		} }, curdir);
-print map { $_, "\n" } sort @wanted;
+		} }, < curdir);
+print map { $_, "\n" } sort < @wanted;
 

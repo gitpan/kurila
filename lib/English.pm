@@ -3,7 +3,7 @@ package English;
 our $VERSION = '1.04';
 
 require Exporter;
-@ISA = qw(Exporter);
+our @ISA = @( qw(Exporter) );
 
 =head1 NAME
 
@@ -30,180 +30,127 @@ $INPUT_RECORD_SEPARATOR if you are using the English module.
 
 See L<perlvar> for a complete list of these.
 
-=head1 PERFORMANCE
-
-This module can provoke sizeable inefficiencies for regular expressions,
-due to unfortunate implementation details.  If performance matters in
-your application and you don't need $PREMATCH, $MATCH, or $POSTMATCH,
-try doing
-
-   use English qw( -no_match_vars ) ;
-
-.  B<It is especially important to do this in modules to avoid penalizing
-all applications which use them.>
-
 =cut
 
 no warnings;
 
 my $globbed_match ;
 
+our @MINIMAL_EXPORT = @( qw(
+	$LAST_PAREN_MATCH
+	$INPUT_RECORD_SEPARATOR
+	$RS
+	$OUTPUT_AUTOFLUSH
+	$OUTPUT_FIELD_SEPARATOR
+	$OFS
+	$OUTPUT_RECORD_SEPARATOR
+	$ORS
+	$LIST_SEPARATOR
+	$SUBSCRIPT_SEPARATOR
+	$SUBSEP
+	$CHILD_ERROR
+	$OS_ERROR
+	%OS_ERROR_FLAGS
+	$ERRNO
+	%ERRNO_FLAGS
+	$EXTENDED_OS_ERROR
+	$PROCESS_ID
+	$PID
+	$REAL_USER_ID
+	$UID
+	$EFFECTIVE_USER_ID
+	$EUID
+	$REAL_GROUP_ID
+	$GID
+	$EFFECTIVE_GROUP_ID
+	$EGID
+	$PROGRAM_NAME
+	$PERL_VERSION
+	$COMPILING
+	$DEBUGGING
+	$SYSTEM_FD_MAX
+	$INPLACE_EDIT
+	$PERLDB
+	$BASETIME
+	$WARNING
+	$EXECUTABLE_NAME
+	$OSNAME
+	$LAST_REGEXP_CODE_RESULT
+	$EXCEPTIONS_BEING_CAUGHT
+	$LAST_SUBMATCH_RESULT
+	@LAST_MATCH_START
+	@LAST_MATCH_END
+) );
+
 # Grandfather $NAME import
 sub import {
     my $this = shift;
-    my @list = grep { ! m/^-no_match_vars$/ } @_ ;
+    my @list = @( grep { ! m/^-no_match_vars$/ } < @_ ) ;
     local $Exporter::ExportLevel = 1;
-    if ( @_ == @list ) {
-        *EXPORT = \@COMPLETE_EXPORT ;
-        $globbed_match ||= (
-	    eval q{
-		*MATCH				= *&	;
-		*PREMATCH			= *`	;
-		*POSTMATCH			= *'	;
-		1 ;
-	       }
-	    || do {
-		require Carp ;
-		Carp::croak("Can't create English for match leftovers: $@") ;
-	    }
-	) ;
-    }
-    else {
-        *EXPORT = \@MINIMAL_EXPORT ;
-    }
-    Exporter::import($this,grep {s/^\$/*/} @list);
+    *EXPORT = \@MINIMAL_EXPORT ;
+    Exporter::import($this,grep {s/^\$/*/} < @list);
 }
-
-@MINIMAL_EXPORT = qw(
-	*ARG
-	*LAST_PAREN_MATCH
-	*INPUT_LINE_NUMBER
-	*NR
-	*INPUT_RECORD_SEPARATOR
-	*RS
-	*OUTPUT_AUTOFLUSH
-	*OUTPUT_FIELD_SEPARATOR
-	*OFS
-	*OUTPUT_RECORD_SEPARATOR
-	*ORS
-	*LIST_SEPARATOR
-	*SUBSCRIPT_SEPARATOR
-	*SUBSEP
-	*CHILD_ERROR
-	*OS_ERROR
-	*ERRNO
-	*EXTENDED_OS_ERROR
-	*EVAL_ERROR
-	*PROCESS_ID
-	*PID
-	*REAL_USER_ID
-	*UID
-	*EFFECTIVE_USER_ID
-	*EUID
-	*REAL_GROUP_ID
-	*GID
-	*EFFECTIVE_GROUP_ID
-	*EGID
-	*PROGRAM_NAME
-	*PERL_VERSION
-	*COMPILING
-	*DEBUGGING
-	*SYSTEM_FD_MAX
-	*INPLACE_EDIT
-	*PERLDB
-	*BASETIME
-	*WARNING
-	*EXECUTABLE_NAME
-	*OSNAME
-	*LAST_REGEXP_CODE_RESULT
-	*EXCEPTIONS_BEING_CAUGHT
-	*LAST_SUBMATCH_RESULT
-	@LAST_MATCH_START
-	@LAST_MATCH_END
-);
-
-
-@MATCH_EXPORT = qw(
-	*MATCH
-	*PREMATCH
-	*POSTMATCH
-);
-
-@COMPLETE_EXPORT = ( @MINIMAL_EXPORT, @MATCH_EXPORT ) ;
-
-# The ground of all being. @ARG is deprecated (5.005 makes @_ lexical)
-
-	*ARG					= *_	;
 
 # Matching.
 
-	*LAST_PAREN_MATCH			= *+	;
-	*LAST_SUBMATCH_RESULT			= *^N ;
+	*LAST_PAREN_MATCH			= *+{SCALAR}	;
+	*LAST_SUBMATCH_RESULT			= *^N{SCALAR} ;
 	*LAST_MATCH_START			= *-{ARRAY} ;
 	*LAST_MATCH_END				= *+{ARRAY} ;
 
 # Input.
 
-	*INPUT_LINE_NUMBER			= *.	;
-	    *NR					= *.	;
-	*INPUT_RECORD_SEPARATOR			= */	;
-	    *RS					= */	;
+	*INPUT_RECORD_SEPARATOR			= */{SCALAR}	;
+	    *RS					= */{SCALAR}	;
 
 # Output.
 
-	*OUTPUT_AUTOFLUSH			= *|	;
-	*OUTPUT_FIELD_SEPARATOR			= *,	;
-	    *OFS				= *,	;
-	*OUTPUT_RECORD_SEPARATOR		= *\	;
-	    *ORS				= *\	;
+	*OUTPUT_AUTOFLUSH			= *|{SCALAR}	;
+	*OUTPUT_FIELD_SEPARATOR			= *,{SCALAR}	;
+	    *OFS				= *,{SCALAR}	;
+	*OUTPUT_RECORD_SEPARATOR		= *\{SCALAR}	;
+	    *ORS				= *\{SCALAR}	;
 
 # Interpolation "constants".
 
-	*LIST_SEPARATOR				= *"	;
-	*SUBSCRIPT_SEPARATOR			= *;	;
-	    *SUBSEP				= *;	;
+	*LIST_SEPARATOR				= *"{SCALAR}	;
+	*SUBSCRIPT_SEPARATOR			= *;{SCALAR}	;
+	    *SUBSEP				= *;{SCALAR}	;
 
 # Error status.
 
-	*CHILD_ERROR				= *?	;
-	*OS_ERROR				= *!	;
-	    *ERRNO				= *!	;
-	*OS_ERROR				= *!	;
-	    *ERRNO				= *!	;
-	*EXTENDED_OS_ERROR			= *^E	;
-	*EVAL_ERROR				= *@	;
+	*CHILD_ERROR				= *?{SCALAR}	;
+	*OS_ERROR				= *!{SCALAR}	;
+	    *ERRNO				= *!{SCALAR}	;
+	*OS_ERROR_FLAGS				= *!{HASH}	;
+	    *ERRNO_FLAGS				= *!{HASH}	;
+	*EXTENDED_OS_ERROR			= *^E{SCALAR}	;
 
 # Process info.
 
-	*PROCESS_ID				= *$	;
-	    *PID				= *$	;
-	*REAL_USER_ID				= *<	;
-	    *UID				= *<	;
-	*EFFECTIVE_USER_ID			= *>	;
-	    *EUID				= *>	;
-	*REAL_GROUP_ID				= *^GID	;
-	*EFFECTIVE_GROUP_ID			= *^EGID	;
-	*PROGRAM_NAME				= *0	;
+	*PROCESS_ID				= *{\(*$)}{SCALAR}	;
+	    *PID				= *{\(*$)}{SCALAR}	;
+	*REAL_USER_ID				= *<{SCALAR}	;
+	    *UID				= *<{SCALAR}	;
+	*EFFECTIVE_USER_ID			= *>{SCALAR}	;
+	    *EUID				= *>{SCALAR}	;
+	*REAL_GROUP_ID				= *^GID{SCALAR}	;
+	*EFFECTIVE_GROUP_ID			= *^EGID{SCALAR}	;
+	*PROGRAM_NAME				= *0{SCALAR}	;
 
 # Internals.
 
-	*PERL_VERSION				= *^V	;
-	*COMPILING				= *^C	;
-	*DEBUGGING				= *^D	;
-	*SYSTEM_FD_MAX				= *^F	;
-	*INPLACE_EDIT				= *^I	;
-	*PERLDB					= *^P	;
-	*LAST_REGEXP_CODE_RESULT		= *^R	;
-	*EXCEPTIONS_BEING_CAUGHT		= *^S	;
-	*BASETIME				= *^T	;
-	*WARNING				= *^W	;
-	*EXECUTABLE_NAME			= *^X	;
-	*OSNAME					= *^O	;
-
-# Deprecated.
-
-#	*ARRAY_BASE				= *[	;
-#	*OFMT					= *#	;
-#	*OLD_PERL_VERSION			= *]	;
+	*PERL_VERSION				= *^V{SCALAR}	;
+	*COMPILING				= *^C{SCALAR}	;
+	*DEBUGGING				= *^D{SCALAR}	;
+	*SYSTEM_FD_MAX				= *^F{SCALAR}	;
+	*INPLACE_EDIT				= *^I{SCALAR}	;
+	*PERLDB					= *^P{SCALAR}	;
+	*LAST_REGEXP_CODE_RESULT		= *^R{SCALAR}	;
+	*EXCEPTIONS_BEING_CAUGHT		= *^S{SCALAR}	;
+	*BASETIME				= *^T{SCALAR}	;
+	*WARNING				= *^W{SCALAR}	;
+	*EXECUTABLE_NAME			= *^X{SCALAR}	;
+	*OSNAME					= *^O{SCALAR}	;
 
 1;

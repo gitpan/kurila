@@ -3,9 +3,9 @@
 my @WARN;
 
 BEGIN {
-    unless(grep m/blib/, @INC) {
+    unless(grep m/blib/, < @INC) {
 	chdir 't' if -d 't';
-	@INC = '../lib';
+	@INC = @( '../lib' );
 	require './test.pl';
     }
     $^WARN_HOOK = sub { push @WARN, @_[0]->{description} };
@@ -23,6 +23,8 @@ use charnames ':full';
 
 print "not " unless "Here\N{EXCLAMATION MARK}?" eq "Here!?";
 print "ok 1\n";
+
+our ($res, $encoded_be, $encoded_alpha, $encoded_bet, $encoded_deseng);
 
 {
   use bytes;			# TEST -utf8 can switch utf8 on
@@ -224,7 +226,7 @@ print "ok 33\n";
     print "not " unless "\N{HORIZONTAL TABULATION}" eq "\t";
     print "ok 34\n";
 
-    print "not " unless grep { m/"HORIZONTAL TABULATION" is deprecated/ } @WARN;
+    print "not " unless grep { m/"HORIZONTAL TABULATION" is deprecated/ } < @WARN;
     print "ok 35\n";
 
     no warnings 'deprecated';
@@ -232,7 +234,7 @@ print "ok 33\n";
     print "not " unless "\N{VERTICAL TABULATION}" eq "\013";
     print "ok 36\n";
 
-    print "not " if grep { m/"VERTICAL TABULATION" is deprecated/ } @WARN;
+    print "not " if grep { m/"VERTICAL TABULATION" is deprecated/ } < @WARN;
     print "ok 37\n";
 }
 
@@ -267,7 +269,7 @@ print "ok 42\n";
 print "not " if defined charnames::viacode(0x110000);
 print "ok 45\n";
 
-print "not " if grep { m/you asked for U+110000/ } @WARN;
+print "not " if grep { m/you asked for U+110000/ } < @WARN;
 print "ok 46\n";
 
 
@@ -281,11 +283,11 @@ END { if ($tmpfile) { 1 while unlink $tmpfile; } }
 
 my @prgs;
 {   local $/ = undef;
-    @prgs = split "\n########\n", ~< *DATA;
+    @prgs = @( split "\n########\n", ~< *DATA );
     }
 
 my $i = 46;
-for (@prgs) {
+for (< @prgs) {
     my ($code, $exp) = ((split m/\nEXPECT\n/), '$');
     my ($prog, $fil) = ((split m/\nFILE\n/, $code), "");
     $prog = "use utf8; " . $prog;
@@ -298,8 +300,7 @@ for (@prgs) {
 	print $ali $fil;
 	close $ali or die "Could not close $alifile: $!";
 	}
-    my $res = runperl( switches => $switch, 
-                       progfile => $tmpfile,
+    my $res = runperl( progfile => $tmpfile,
                        stderr => 1 );
     my $status = $?;
     $res =~ s/[\r\n]+$//;
@@ -314,9 +315,9 @@ for (@prgs) {
     my $pfx = ($res =~ s/^PREFIX\n//);
     my $rexp = qr{^$exp};
     if ($res =~ s/^SKIPPED\n//) {
-	print "$results\n";
+	print "$res\n";
 	}
-    elsif (($pfx and $res !~ m/^\Q$expected/) or
+    elsif (($pfx and $res !~ m/^\Q$exp/) or
 	  (!$pfx and $res !~ $rexp)) {
         print STDERR
 	    "PROG:\n$prog\n",
@@ -346,7 +347,7 @@ print "ok 74\n";
 my $names = do "unicore/Name.pl";
 print defined $names ? "ok 75\n" : "not ok 75\n";
 if (ord('A') == 65) { # as on ASCII or UTF-8 machines
-  my $non_ascii = $names =~ tr/\0-\177//c;
+  my $non_ascii = $names =~ s/[^\0-\177]//g;
   print $non_ascii ? "not ok 76 # $non_ascii\n" : "ok 76\n";
 } else {
   print "ok 76\n";

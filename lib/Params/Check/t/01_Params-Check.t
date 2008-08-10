@@ -148,13 +148,13 @@ use constant TRUE   => sub { 1 };
 }
 
 ### strict_type tests ###
-{   my @list = (
+{   my @list = @(
         \@( \%( strict_type => 1, default => \@() ),  0 ),
         \@( \%( default => \@() ),                    1 ),
     );
 
     ### check for strict_type global, and in the template key ###
-    for my $aref (@list) {
+    for my $aref (< @list) {
 
         my $tmpl = \%( foo => $aref->[0] );
         local   $Params::Check::STRICT_TYPE = $aref->[1];
@@ -195,13 +195,13 @@ use constant TRUE   => sub { 1 };
 }
 
 ### defined tests ###
-{   my @list = (
+{   my @list = @(
         \@( \%( defined => 1, default => 1 ),  0 ),
         \@( \%( default => 1 ),                1 ),
     );
 
     ### check for strict_type global, and in the template key ###
-    for my $aref (@list) {
+    for my $aref (< @list) {
 
         my $tmpl = \%( foo => $aref->[0] );
         local   $Params::Check::ONLY_ALLOW_DEFINED = $aref->[1];
@@ -254,7 +254,7 @@ use constant TRUE   => sub { 1 };
 
     local $Params::Check::WARNINGS_FATAL = 1;
 
-    eval { check( $tmpl, \%( foo => 1 ) ) };      
+    try { check( $tmpl, \%( foo => 1 ) ) };      
 
     ok( $@,             "Call dies with fatal toggled" );
     like( $@->{description},           qr/invalid type/,
@@ -321,7 +321,7 @@ use constant TRUE   => sub { 1 };
     );
 
     ### the rv we expect ###
-    my $get = \%( %$try, bureau => 'NSA' );
+    my $get = \%( < %$try, bureau => 'NSA' );
 
     my $rv = check( $tmpl, $try );
     
@@ -333,9 +333,9 @@ use constant TRUE   => sub { 1 };
 
 ### $Params::Check::CALLER_DEPTH test
 {
-    sub wrapper { check  ( @_ ) };
-    sub inner   { wrapper( @_ ) };
-    sub outer   { inner  ( @_ ) };
+    sub wrapper { check  ( < @_ ) };
+    sub inner   { wrapper( < @_ ) };
+    sub outer   { inner  ( < @_ ) };
     outer( \%( dummy => \%( required => 1 )), \%() );
 
     like( last_error, qr/for .*::wrapper by .*::inner$/,

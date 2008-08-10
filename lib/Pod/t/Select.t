@@ -2,16 +2,12 @@
 use warnings;
 use strict;
 
-BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
-};
-
 use Test::More tests => 9;
 
 require_ok( 'Pod::Select' );
 
-my $fake_out = tie *FAKEOUT, 'CatchOut';
+my $fake_out = \$( '' );
+open my $fake_out_fh, '>>', $fake_out;
 
 my $p_s = Pod::Select->new;
 isa_ok( $p_s, 'Pod::Select' );
@@ -24,7 +20,7 @@ Select.t - Tests for Pod::Select.
 EO_NAME
 
 $p_s->select( 'NAME' );
-$p_s->parse_from_file( $0, \*FAKEOUT );
+$p_s->parse_from_file( $0, $fake_out_fh );
 is( $$fake_out, $pod, 'select( NAME )' );
 
 $pod .= << 'EO_SYNOPSIS';
@@ -36,7 +32,7 @@ EO_SYNOPSIS
 
 $$fake_out = '';
 $p_s->select( 'NAME', 'SYNOPSIS' );
-$p_s->parse_from_file( $0, \*FAKEOUT );
+$p_s->parse_from_file( $0, $fake_out_fh );
 is( $$fake_out, $pod, 'select( NAME, SYNOPSIS )' );
 
 $pod .= << 'EO_AUTHOR';
@@ -48,7 +44,7 @@ EO_AUTHOR
 
 $$fake_out = '';
 $p_s->add_selection( 'AUTHOR' );
-$p_s->parse_from_file( $0, \*FAKEOUT );
+$p_s->parse_from_file( $0, $fake_out_fh );
 is( $$fake_out, $pod, 'add_selection( AUTHOR )' );
 
 my $head1 = $p_s->curr_headings(1);
@@ -63,7 +59,7 @@ EO_DESCRIPTION
 
 $$fake_out = '';
 $p_s->select( 'DESCRIPTION/subsection' );
-$p_s->parse_from_file( $0, \*FAKEOUT );
+$p_s->parse_from_file( $0, $fake_out_fh );
 is( $$fake_out, $pod, 'select( DESCRIPTION/subsection )' );
 
 
@@ -79,13 +75,9 @@ EO_DESCRIPTION
 
 $$fake_out = '';
 $p_s->select( 'DESCRIPTION/!.+' );
-$p_s->parse_from_file( $0, \*FAKEOUT );
+$p_s->parse_from_file( $0, $fake_out_fh );
 is( $$fake_out, $pod, 'select( DESCRIPTION/!.+ )' );
 
-
-package CatchOut;
-sub TIEHANDLE { bless \( my $self ), shift }
-sub PRINT     { my $self = shift; $$self .= @_[0] }
 
 __END__
 

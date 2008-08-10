@@ -1,13 +1,8 @@
 #!./perl
 
-BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
-}
-
 BEGIN { require "./test.pl"; }
 
-plan(tests => 23);
+plan(tests => 19);
 
 use File::Spec;
 
@@ -17,14 +12,8 @@ open(TRY, ">", 'Io_argv1.tmp') || (die "Can't open temp file: $!");
 print TRY "a line\n";
 close TRY or die "Could not close: $!";
 
-$x = runperl(
-    prog	=> 'while (~< *ARGV) { print $., $_; }',
-    args	=> \@( 'Io_argv1.tmp', 'Io_argv1.tmp' ),
-);
-is($x, "1a line\n2a line\n", '~< *ARGV from two files');
-
 {
-    $x = runperl(
+    my $x = runperl(
 	prog	=> 'while (~< *ARGV) { print $_; }',
 	stdin	=> "foo\n",
 	args	=> \@( 'Io_argv1.tmp', '-' ),
@@ -45,25 +34,14 @@ is($x, "1a line\n2a line\n", '~< *ARGV from two files');
     is( 0+$?, 0, q(eof() doesn't segfault) );
 }
 
-@ARGV = ('Io_argv1.tmp', 'Io_argv1.tmp', $devnull, 'Io_argv1.tmp');
-while ( ~< *ARGV) {
-    $y .= $. . $_;
-    if (eof()) {
-	is($., 3, '$. counts ~< *ARGV');
-    }
-}
-
-is($y, "1a line\n2a line\n3a line\n", '~< *ARGV from @ARGV');
-
-
 open(TRY, ">", 'Io_argv1.tmp') or die "Can't open temp file: $!";
 close TRY or die "Could not close: $!";
 open(TRY, ">", 'Io_argv2.tmp') or die "Can't open temp file: $!";
 close TRY or die "Could not close: $!";
-@ARGV = ('Io_argv1.tmp', 'Io_argv2.tmp');
+@ARGV = @('Io_argv1.tmp', 'Io_argv2.tmp');
 $^I = '_bak';   # not .bak which confuses VMS
 $/ = undef;
-my $i = 7;
+my $i = 4;
 while ( ~< *ARGV) {
     s/^/ok $i\n/;
     ++$i;
@@ -85,19 +63,19 @@ ok( eof TRY );
 }
 
 open STDIN, "<", 'Io_argv1.tmp' or die $!;
-@ARGV = ();
+@ARGV = @( () );
 ok( !eof(),     'STDIN has something' );
 
-is( ~< *ARGV, "ok 7\n" );
+is( ~< *ARGV, "ok 4\n" );
 
 open STDIN, '<', $devnull or die $!;
-@ARGV = ();
+@ARGV = @( () );
 ok( eof(),      'eof() true with empty @ARGV' );
 
-@ARGV = ('Io_argv1.tmp');
+@ARGV = @('Io_argv1.tmp');
 ok( !eof() );
 
-@ARGV = ($devnull, $devnull);
+@ARGV = @($devnull, $devnull);
 ok( !eof() );
 
 close ARGV or die $!;
@@ -120,21 +98,6 @@ ok( eof(),      'eof() true after closing ARGV' );
     is( ~< *F, undef );
     close F or die "Could not close: $!";
 }
-
-# This used to dump core
-fresh_perl_is( <<'**PROG**', "foobar", \%(), "ARGV aliasing and eof()" ); 
-open OUT, ">", "Io_argv3.tmp" or die "Can't open temp file: $!";
-print OUT "foo";
-close OUT;
-open IN, "<", "Io_argv3.tmp" or die "Can't open temp file: $!";
-*ARGV = *IN;
-while (~< *ARGV) {
-    print;
-    print "bar" if eof();
-}
-close IN;
-unlink "Io_argv3.tmp";
-**PROG**
 
 END {
     1 while unlink 'Io_argv1.tmp', 'Io_argv1.tmp_bak',

@@ -20,11 +20,11 @@ our ($VERSION, @ISA, @EXPORT_OK, %EXPORT_TAGS, %DEFLATE_CONSTANTS, $RawInflateEr
 $VERSION = '2.006';
 $RawInflateError = '';
 
-@ISA    = qw( IO::Uncompress::Base Exporter );
-@EXPORT_OK = qw( $RawInflateError rawinflate ) ;
-%DEFLATE_CONSTANTS = ();
-%EXPORT_TAGS = %IO::Uncompress::Base::EXPORT_TAGS ;
-push @{ %EXPORT_TAGS{all} }, @EXPORT_OK ;
+@ISA    = @( qw( IO::Uncompress::Base Exporter ) );
+@EXPORT_OK = @( qw( $RawInflateError rawinflate ) ) ;
+%DEFLATE_CONSTANTS = %( () );
+%EXPORT_TAGS = %( < %IO::Uncompress::Base::EXPORT_TAGS ) ;
+push @{ %EXPORT_TAGS{all} }, < @EXPORT_OK ;
 Exporter::export_ok_tags('all');
 
 
@@ -33,13 +33,13 @@ sub new
 {
     my $class = shift ;
     my $obj = createSelfTiedObject($class, \$RawInflateError);
-    $obj->_create(undef, 0, @_);
+    $obj->_create(undef, 0, < @_);
 }
 
 sub rawinflate
 {
     my $obj = createSelfTiedObject(undef, \$RawInflateError);
-    return $obj->_inf(@_);
+    return $obj->_inf(< @_);
 }
 
 sub getExtraParams
@@ -61,7 +61,7 @@ sub mkUncomp
     my $class = shift ;
     my $got = shift ;
 
-    my ($obj, $errstr, $errno) = IO::Uncompress::Adapter::Inflate::mkUncompObject(
+    my ($obj, $errstr, $errno) = < IO::Uncompress::Adapter::Inflate::mkUncompObject(
                                                                 $got->value('CRC32'),
                                                                 $got->value('ADLER32'),
                                                                 $got->value('Scan'),
@@ -70,12 +70,12 @@ sub mkUncomp
     return $self->saveErrorString(undef, $errstr, $errno)
         if ! defined $obj;
 
-    *$self->{Uncomp} = $obj;
+    $self->{Uncomp} = $obj;
 
      my $magic = $self->ckMagic()
         or return 0;
 
-    *$self->{Info} = $self->readHeader($magic)
+    $self->{Info} = $self->readHeader($magic)
         or return undef ;
 
     return 1;
@@ -113,7 +113,7 @@ sub _isRaw
 {
     my $self   = shift ;
 
-    my $got = $self->_isRawx(@_);
+    my $got = $self->_isRawx(< @_);
 
     if ($got) {
         *$self->{Pending} = *$self->{HeaderPending} ;
@@ -142,8 +142,8 @@ sub _isRawx
     my $temp_buf = $magic . $buffer ;
     *$self->{HeaderPending} = $temp_buf ;    
     $buffer = '';
-    my $status = *$self->{Uncomp}->uncompr(\$temp_buf, \$buffer, $self->smartEof()) ;
-    return $self->saveErrorString(undef, *$self->{Uncomp}{Error}, STATUS_ERROR)
+    my $status = *$self->{Uncomp}->uncompr(\$temp_buf, \$buffer, < $self->smartEof()) ;
+    return $self->saveErrorString(undef, *$self->{Uncomp}->{Error}, STATUS_ERROR)
         if $status == STATUS_ERROR;
 
     #my $buf_len = *$self->{Uncomp}->uncompressedBytes();
@@ -287,7 +287,7 @@ sub zap
 {
     my $self  = shift ;
 
-    my $headerLength = *$self->{Info}{HeaderLength};
+    my $headerLength = *$self->{Info}->{HeaderLength};
     my $block_offset =  $headerLength + *$self->{Uncomp}->getLastBlockOffset();
     @_[0] = $headerLength + *$self->{Uncomp}->getEndOffset();
     #printf "# End $_[0], headerlen $headerLength \n";;
@@ -309,20 +309,6 @@ sub zap
 
     return 1 ;
 }
-
-sub createDeflate
-{
-    my $self  = shift ;
-    my ($def, $status) = *$self->{Uncomp}->createDeflateStream(
-                                    -AppendOutput   => 1,
-                                    -WindowBits => - MAX_WBITS,
-                                    -CRC32      => *$self->{Params}->value('CRC32'),
-                                    -ADLER32    => *$self->{Params}->value('ADLER32'),
-                                );
-    
-    return wantarray ? ($status, $def) : $def ;                                
-}
-
 
 1; 
 

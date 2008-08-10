@@ -1,13 +1,6 @@
 #!./perl -w
 
-BEGIN {
-    if (%ENV{PERL_CORE}) {
-        chdir 't';
-        @INC = '../lib';
-    }
-}
 use Cwd;
-chdir 't';
 
 use strict;
 use Config;
@@ -40,16 +33,16 @@ ok( !defined(&abs_path),        '  nor abs_path()' );
 ok( !defined(&fast_abs_path),   '  nor fast_abs_path()');
 
 {
-  my @fields = qw(PATH IFS CDPATH ENV BASH_ENV);
-  my $before = grep exists %ENV{$_}, @fields;
+  my @fields = @( qw(PATH IFS CDPATH ENV BASH_ENV) );
+  my $before = grep exists %ENV{$_}, < @fields;
   cwd();
-  my $after = grep exists %ENV{$_}, @fields;
+  my $after = grep exists %ENV{$_}, < @fields;
   is($before, $after, "cwd() shouldn't create spurious entries in \%ENV");
 }
 
 # XXX force Cwd to bootsrap its XSUBs since we have set @INC = "../lib"
 # XXX and subsequent chdir()s can make them impossible to find
-eval { fastcwd };
+try { fastcwd };
 
 # Must find an external pwd (or equivalent) command.
 
@@ -74,7 +67,7 @@ SKIP: {
 
     print "# native pwd = '$pwd_cmd'\n";
 
-    local %ENV{[qw(PATH IFS CDPATH ENV BASH_ENV)]};
+    local %ENV{[qw(PATH IFS CDPATH ENV BASH_ENV)]} = ();
     my ($pwd_cmd_untainted) = $pwd_cmd =~ m/^(.+)$/; # Untaint.
     chomp(my $start = `$pwd_cmd_untainted`);
 
@@ -113,8 +106,8 @@ SKIP: {
     }
 }
 
-my @test_dirs = qw{_ptrslt_ _path_ _to_ _a_ _dir_};
-my $Test_Dir     = File::Spec->catdir(@test_dirs);
+my @test_dirs = @( qw{_ptrslt_ _path_ _to_ _a_ _dir_} );
+my $Test_Dir     = File::Spec->catdir(< @test_dirs);
 
 mkpath(\@($Test_Dir), 0, 0777);
 Cwd::chdir $Test_Dir;
@@ -136,7 +129,7 @@ foreach my $func (qw(cwd getcwd fastcwd fastgetcwd)) {
 dir_ends_with( %ENV{PWD}, $Test_Dir, 'Cwd::chdir() updates $ENV{PWD}' );
 my $updir = File::Spec->updir;
 
-for (1..@test_dirs) {
+for (1..nelems @test_dirs) {
   Cwd::chdir $updir;
   print "#%ENV{PWD}\n";
 }
@@ -170,7 +163,7 @@ SKIP: {
     my $fast_abs_path =  Cwd::fast_abs_path("linktest");
     my $want          =  quotemeta(
                              File::Spec->rel2abs(
-			         %ENV{PERL_CORE} ? $Test_Dir : File::Spec->catdir('t', $Test_Dir)
+			         %ENV{PERL_CORE} ? $Test_Dir : < File::Spec->catdir('t', $Test_Dir)
                                                 )
                                   );
 
@@ -227,22 +220,22 @@ SKIP: {
 
 sub bracketed_form_dir {
   return join '', map "[$_]", 
-    grep length, File::Spec->splitdir(File::Spec->canonpath( shift() ));
+    grep length, < File::Spec->splitdir(File::Spec->canonpath( shift() ));
 }
 
 sub dir_ends_with {
   my ($dir, $expect) = (shift, shift);
   my $bracketed_expect = quotemeta bracketed_form_dir($expect);
-  like( bracketed_form_dir($dir), qr|$bracketed_expect$|i, (@_ ? shift : ()) );
+  like( bracketed_form_dir($dir), qr|$bracketed_expect$|i, ((nelems @_) ? shift : ()) );
 }
 
 sub bracketed_form_path {
   return join '', map "[$_]", 
-    grep length, File::Spec->splitpath(File::Spec->canonpath( shift() ));
+    grep length, < File::Spec->splitpath(File::Spec->canonpath( shift() ));
 }
 
 sub path_ends_with {
   my ($dir, $expect) = (shift, shift);
   my $bracketed_expect = quotemeta bracketed_form_path($expect);
-  like( bracketed_form_path($dir), qr|$bracketed_expect$|i, (@_ ? shift : ()) );
+  like( bracketed_form_path($dir), qr|$bracketed_expect$|i, ((nelems @_) ? shift : ()) );
 }

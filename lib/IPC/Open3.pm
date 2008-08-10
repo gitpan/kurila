@@ -6,12 +6,11 @@ our ($VERSION, @ISA, @EXPORT);
 
 require Exporter;
 
-use Carp;
 use Symbol qw(gensym qualify);
 
 $VERSION	= 1.02;
-@ISA		= qw(Exporter);
-@EXPORT		= qw(open3);
+@ISA		= @( qw(Exporter) );
+@EXPORT		= @( qw(open3) );
 
 =head1 NAME
 
@@ -148,23 +147,23 @@ our $Me = 'open3 (bug)';	# you should never see this, it's always localized
 
 sub xfork {
     my $pid = fork;
-    defined $pid or croak "$Me: fork failed: $!";
+    defined $pid or die "$Me: fork failed: $!";
     return $pid;
 }
 
 sub xpipe {
-    pipe @_[0], @_[1] or croak "$Me: pipe(" . Symbol::glob_name(@_[0]) . ", " . Symbol::glob_name(@_[1]) . ") failed: $!";
+    pipe @_[0], @_[1] or die "$Me: pipe(" . Symbol::glob_name(@_[0]) . ", " . Symbol::glob_name(@_[1]) . ") failed: $!";
 }
 
 # I tried using a * prototype character for the filehandle but it still
 # disallows a bearword while compiling under strict subs.
 
 sub xopen {
-    open @_[0], @_[1], @_[2] or croak "$Me: open(...)"; # . Symbol::glob_name($_[0]) . ", $_[1], " . Symbol::glob_name($_[2]) . ") failed: $!";
+    open @_[0], @_[1], @_[2] or die "$Me: open(...)"; # . Symbol::glob_name($_[0]) . ", $_[1], " . Symbol::glob_name($_[2]) . ") failed: $!";
 }
 
 sub xclose {
-    close @_[0] or croak "$Me: close(*" . Symbol::glob_name(@_[0]) . ") failed: $!";
+    close @_[0] or die "$Me: close(*" . Symbol::glob_name(@_[0]->*) . ") failed: $!";
 }
 
 sub fh_is_fd {
@@ -180,25 +179,25 @@ my $do_spawn = $^O eq 'os2' || $^O eq 'MSWin32';
 
 sub _open3 {
     local $Me = shift;
-    my($package, $dad_wtr, $dad_rdr, $dad_err, @cmd) = @_;
+    my($package, $dad_wtr, $dad_rdr, $dad_err, < @cmd) = < @_;
     my($dup_wtr, $dup_rdr, $dup_err, $kidpid);
 
-    if (@cmd +> 1 and @cmd[0] eq '-') {
-	croak "Arguments don't make sense when the command is '-'"
+    if ((nelems @cmd) +> 1 and @cmd[0] eq '-') {
+	die "Arguments don't make sense when the command is '-'"
     }
 
     # simulate autovivification of filehandles because
     # it's too ugly to use @_ throughout to make perl do it for us
     # tchrist 5-Mar-00
 
-    unless (eval  {
+    unless (try  {
 	$dad_wtr = @_[1] = gensym unless defined $dad_wtr;
 	$dad_rdr = @_[2] = gensym unless defined $dad_rdr;
 	1; }) 
     {
-	# must strip crud for croak to add back, or looks ugly
+	# must strip crud for die to add back, or looks ugly
 	$@ =~ s/(?<=value attempted) at .*//s;
-	croak "$Me: $@";
+	die "$Me: $@";
     } 
 
     $dad_err ||= $dad_rdr;
@@ -236,13 +235,13 @@ sub _open3 {
 	}
 
 	if ($dup_wtr) {
-	    xopen \*STDIN,  "<&", $dad_wtr if fileno(STDIN) != xfileno($dad_wtr);
+	    xopen \*STDIN,  "<&", $dad_wtr if fileno(\*STDIN) != xfileno($dad_wtr);
 	} else {
 	    xclose $dad_wtr;
 	    xopen \*STDIN,  "<&=", fileno $kid_rdr;
 	}
 	if ($dup_rdr) {
-	    xopen \*STDOUT, ">&", $dad_rdr if fileno(STDOUT) != xfileno($dad_rdr);
+	    xopen \*STDOUT, ">&", $dad_rdr if fileno(\*STDOUT) != xfileno($dad_rdr);
 	} else {
 	    xclose $dad_rdr;
 	    xopen \*STDOUT, ">&=", $kid_wtr;
@@ -263,9 +262,9 @@ sub _open3 {
 	}
 	return 0 if (@cmd[0] eq '-');
 	local($")=(" ");
-	exec @cmd or do {
-	    carp "$Me: exec of @cmd failed";
-	    eval { require POSIX; POSIX::_exit(255); };
+	exec < @cmd or do {
+	    warn "$Me: exec of {join ' ', <@cmd} failed";
+	    try { require POSIX; POSIX::_exit(255); };
 	    exit 255;
 	};
     } elsif ($do_spawn) {
@@ -296,7 +295,7 @@ sub _open3 {
 	  $kid_err = $kid_wtr;
 	}
 	require IO::Pipe;
-	$kidpid = eval {
+	$kidpid = try {
 	    spawn_with_handles( \@( \%( mode => 'r',
 				    open_as => $kid_rdr,
 				    handle => \*STDIN ),
@@ -306,7 +305,7 @@ sub _open3 {
 				  \%( mode => 'w',
 				    open_as => $kid_err,
 				    handle => \*STDERR ),
-				), \@close, @cmd);
+				), \@close, < @cmd);
 	};
 	die "$Me: $@" if $@;
     }
@@ -323,11 +322,11 @@ sub _open3 {
 }
 
 sub open3 {
-    if (@_ +< 4) {
+    if ((nelems @_) +< 4) {
 	local $" = ', ';
-	croak "open3(@_): not enough arguments";
+	die "open3({join ' ', <@_}): not enough arguments";
     }
-    return _open3 'open3', scalar caller, @_
+    return _open3 'open3', scalar caller, < @_
 }
 
 sub spawn_with_handles {
@@ -336,13 +335,13 @@ sub spawn_with_handles {
     my ($fd, $pid, @saved_fh, $saved, %saved, @errs);
     require Fcntl;
 
-    foreach $fd (@$fds) {
+    foreach $fd (< @$fds) {
 	$fd->{tmp_copy} = IO::Handle->new_from_fd($fd->{handle}, $fd->{mode});
 	%saved{fileno $fd->{handle}} = $fd->{tmp_copy};
     }
-    foreach $fd (@$fds) {
+    foreach $fd (< @$fds) {
 	bless $fd->{handle}, 'IO::Handle'
-	    unless eval { $fd->{handle}->isa('IO::Handle') } ;
+	    unless try { $fd->{handle}->isa('IO::Handle') } ;
 	# If some of handles to redirect-to coincide with handles to
 	# redirect, we need to use saved variants:
 	$fd->{handle}->fdopen(%saved{fileno $fd->{open_as}} || $fd->{open_as},
@@ -350,22 +349,22 @@ sub spawn_with_handles {
     }
     unless ($^O eq 'MSWin32') {
 	# Stderr may be redirected below, so we save the err text:
-	foreach $fd (@$close_in_child) {
+	foreach $fd (< @$close_in_child) {
 	    fcntl($fd, Fcntl::F_SETFD(), 1) or push @errs, "fcntl $fd: $!"
 		unless %saved{fileno $fd}; # Do not close what we redirect!
 	}
     }
 
-    unless (@errs) {
-	$pid = eval { system 1, @_ }; # 1 == P_NOWAIT
+    unless (nelems @errs) {
+	$pid = try { system 1, < @_ }; # 1 == P_NOWAIT
 	push @errs, "IO::Pipe: Can't spawn-NOWAIT: $!" if !$pid || $pid +< 0;
     }
 
-    foreach $fd (@$fds) {
+    foreach $fd (< @$fds) {
 	$fd->{handle}->fdopen($fd->{tmp_copy}, $fd->{mode});
-	$fd->{tmp_copy}->close or croak "Can't close: $!";
+	$fd->{tmp_copy}->close or die "Can't close: $!";
     }
-    croak join "\n", @errs if @errs;
+    die join "\n", < @errs if (nelems @errs);
     return $pid;
 }
 

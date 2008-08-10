@@ -1439,7 +1439,7 @@ S_make_trie(pTHX_ RExC_state_t *pRExC_state, regnode *startbranch, regnode *firs
                         }
                         state = newstate;
                     } else {
-                        Perl_croak( aTHX_ "panic! In trie construction, no char mapping for %"IVdf, uvc );
+                        Perl_croak( aTHX_ "panic! In trie construction, no char mapping for %d", uvc );
 		    }
 		}
 	    }
@@ -1614,7 +1614,7 @@ S_make_trie(pTHX_ RExC_state_t *pRExC_state, regnode *startbranch, regnode *firs
                         }
                         state = trie->trans[ state + charid ].next;
                     } else {
-                        Perl_croak( aTHX_ "panic! In trie construction, no char mapping for %"IVdf, uvc );
+                        Perl_croak( aTHX_ "panic! In trie construction, no char mapping for %d", uvc );
                     }
                     /* charid is now 0 if we dont know the char read, or nonzero if we do */
                 }
@@ -4151,7 +4151,7 @@ reStudy:
             &data, -1, NULL, NULL,
             SCF_DO_SUBSTR | SCF_WHILEM_VISITED_POS | stclass_flag,0);
 
-	DEBUG_EXECUTE_r( PerlIO_printf(Perl_debug_log, "minlen: %d\n", minlen));
+	DEBUG_EXECUTE_r( PerlIO_printf(Perl_debug_log, "minlen: %d\n", (int)minlen));
 	
         CHECK_RESTUDY_GOTO;
 
@@ -4797,11 +4797,11 @@ SV*
 Perl_reg_qr_package(pTHX_ REGEXP * const rx)
 {
     PERL_ARGS_ASSERT_REG_QR_PACKAGE;
-	PERL_UNUSED_ARG(rx);
-	if (0)
-	    return NULL;
-	else
-	    return newSVpvs("Regexp");
+    PERL_UNUSED_ARG(rx);
+    if (0)
+	return NULL;
+    else
+	return newSVpvs("Regexp");
 }
 
 /* Scans the name of a named buffer from the pattern.
@@ -6061,7 +6061,7 @@ S_regclassfold_value(pTHX_ RExC_state_t *pRExC_state, UV value)
     AV* unicode_alternate  = NULL;
 
     GET_RE_DEBUG_FLAGS_DECL;
-    PERL_ARGS_ASSERT_REG_NAMEDSEQ;
+    PERL_ARGS_ASSERT_REGCLASSFOLD_VALUE;
 
     /* Assume we are going to generate an ANYOF node. */
     ret = reganode(pRExC_state, (UTF ? ANYOFU : ANYOF), 0);
@@ -6217,6 +6217,7 @@ S_reg_namedseq(pTHX_ RExC_state_t *pRExC_state, UV *valuep)
     STRLEN len; /* this has various purposes throughout the code */
     bool cached = 0; /* if this is true then we shouldn't refcount dev sv_str */
     regnode *ret = NULL;
+    PERL_ARGS_ASSERT_REG_NAMEDSEQ;
     
     if (*RExC_parse != '{') {
         vFAIL("Missing braces on \\N{}");
@@ -7387,7 +7388,7 @@ S_regclass(pTHX_ RExC_state_t *pRExC_state, U32 depth)
 	    ANYOF_FLAGS(ret) |= ANYOF_FOLD;
 	if (UTF)
 	    ANYOF_FLAGS(ret) |= ANYOF_UNICODE;
-	DEBUG_EXECUTE_r(PerlIO_printf(Perl_debug_log, "regclass %d - %d\n", RExC_flags & RXf_PMf_UTF8, UTF));
+	DEBUG_EXECUTE_r(PerlIO_printf(Perl_debug_log, "regclass %d - %d\n", (int)(RExC_flags & RXf_PMf_UTF8), UTF));
 	ANYOF_BITMAP_ZERO(ret);
 	listsv = newSVpvs("# comment\n");
     }
@@ -7480,7 +7481,7 @@ S_regclass(pTHX_ RExC_state_t *pRExC_state, U32 depth)
 		STRLEN numlen;
 		char* d;
 		/* use temporary buffer of at least the length of the parsed string */
-		SV* buf = newSV(RExC_end - RExC_parse + 1);
+		SV* buf = sv_2mortal(newSV(RExC_end - RExC_parse + 1));
 		SvPOK_on(buf);
 		d = SvPV_mutable(buf, len);
 		RExC_parse = (char*)parse_escape(RExC_parse-1, d, &len, RExC_end);
@@ -7829,6 +7830,7 @@ S_regclassfold(pTHX_ RExC_state_t *pRExC_state, U32 depth)
     STRLEN numlen;
 
     GET_RE_DEBUG_FLAGS_DECL;
+    PERL_ARGS_ASSERT_REGCLASSFOLD;
 
     DEBUG_PARSE("clasfold");
 
@@ -7907,6 +7909,9 @@ S_anyof_get_swash(pTHX_ RExC_state_t *pRExC_state, regnode* ret, SV* listsv, AV*
 	AV * const av = newAV();
 	SV *rv;
 	SV *sw  = NULL;
+
+	PERL_ARGS_ASSERT_ANYOF_GET_SWASH;
+
 	/* The 0th element stores the character class description
 	 * in its textual form: used later (regexec.c:Perl_regclass_swash())
 	 * to initialize the appropriate swash (which gets stored in
@@ -8809,6 +8814,32 @@ Perl_pregfree2(pTHX_ REGEXP *rx)
 #endif
     Safefree(r->swap);
     Safefree(r->offs);
+}
+
+void
+Perl_preg_tmprefcnt(pTHX_ REGEXP *rx)
+{
+    dVAR;
+    struct regexp *const r = (struct regexp *)SvANY(rx);
+
+    PERL_ARGS_ASSERT_PREGFREE2;
+
+    if (r->mother_re) {
+        SvTMPREFCNT_inc(r->mother_re);
+    } else {
+        if (RXp_PAREN_NAMES(r))
+            SvTMPREFCNT_inc(RXp_PAREN_NAMES(r));
+    }        
+    if (r->substrs) {
+        if (r->anchored_substr)
+            SvTMPREFCNT_inc(r->anchored_substr);
+        if (r->float_substr)
+            SvTMPREFCNT_inc(r->float_substr);
+    }
+#ifdef PERL_OLD_COPY_ON_WRITE
+    if (r->saved_copy)
+        SvTMPREFCNT_inc(r->saved_copy);
+#endif
 }
 
 /*  reg_temp_copy()

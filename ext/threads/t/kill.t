@@ -2,10 +2,6 @@ use strict;
 use warnings;
 
 BEGIN {
-    if (%ENV{'PERL_CORE'}){
-        chdir 't';
-        unshift @INC, '../lib';
-    }
     use Config;
     if (! %Config{'useithreads'}) {
         print("1..0 # Skip: Perl not compiled with 'useithreads'\n");
@@ -18,7 +14,7 @@ use ExtUtils::testlib;
 use threads;
 
 BEGIN {
-    eval {
+    try {
         require threads::shared;
         threads::shared->import();
     };
@@ -29,7 +25,7 @@ BEGIN {
 
     local %SIG{'HUP'} = sub {};
     my $thr = threads->create(sub {});
-    eval { $thr->kill('HUP') };
+    try { $thr->kill('HUP') };
     $thr->join();
     if ($@ && $@->{description} =~ m/safe signals/) {
         print("1..0 # Skip: Not using safe signals\n");
@@ -49,7 +45,7 @@ my $TEST = 1;
 
 sub ok($$)
 {
-    my ($xok, $xname) = @_;
+    my ($xok, $xname) = < @_;
     $q->enqueue($xok, $xname);
 
     while ($q->pending()) {

@@ -3,7 +3,7 @@
 BEGIN {
     if( %ENV{PERL_CORE} ) {
         chdir 't' if -d 't';
-        @INC = ('../lib', 'lib');
+        @INC = @('../lib', 'lib');
     }
     else {
         unshift @INC, 't/lib';
@@ -33,7 +33,7 @@ $mm->prefixify('installbin', 'wibble', 'something', $default);
 is( $mm->{INSTALLBIN}, %Config{installbin},
                                             'prefixify w/defaults');
 
-$mm->{ARGS}{PREFIX} = 'foo';
+$mm->{ARGS}->{PREFIX} = 'foo';
 $mm->prefixify('installbin', 'wibble', 'something', $default);
 is( $mm->{INSTALLBIN}, File::Spec->catdir('something', $default),
                                             'prefixify w/defaults and PREFIX');

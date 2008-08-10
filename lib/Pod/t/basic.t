@@ -8,20 +8,11 @@
 # This program is free software; you may redistribute it and/or modify it
 # under the same terms as Perl itself.
 
+use TestInit;
+
 BEGIN {
-    chdir 't' if -d 't';
-    if (%ENV{PERL_CORE}) {
-        @INC = '../lib';
-    } else {
-        unshift (@INC, '../blib/lib');
-    }
-    unshift (@INC, '../blib/lib');
     $| = 1;
     print "1..11\n";
-}
-
-END {
-    print "not ok 1\n" unless $loaded;
 }
 
 use bytes;
@@ -45,7 +36,6 @@ sub source_path {
     }
 }
 
-$loaded = 1;
 print "ok 1\n";
 
 # Hard-code a few values to try to get reproducible results.
@@ -55,19 +45,19 @@ print "ok 1\n";
 
 # Map of translators to file extensions to find the formatted output to
 # compare against.
-my %translators = ('Pod::Man'              => 'man',
+my %translators = %('Pod::Man'              => 'man',
                    'Pod::Text'             => 'txt',
                    'Pod::Text::Color'      => 'clr',
                    'Pod::Text::Overstrike' => 'ovr',
                    'Pod::Text::Termcap'    => 'cap');
 
 # Set default options to match those of pod2man and pod2text.
-%options = (sentence => 0);
+our %options = %(sentence => 0);
 
 my $n = 2;
 for (sort keys %translators) {
     if ($_ eq 'Pod::Text::Color') {
-        eval { require Term::ANSIColor };
+        try { require Term::ANSIColor };
         if ($@) {
             print "ok $n # skip\n";
             $n++;
@@ -77,7 +67,7 @@ for (sort keys %translators) {
         }
         require Pod::Text::Color;
     }
-    my $parser = $_->new (%options);
+    my $parser = $_->new (< %options);
     print (($parser && ref ($parser) eq $_) ? "ok $n\n" : "not ok $n\n");
     $n++;
 
@@ -85,7 +75,7 @@ for (sort keys %translators) {
     # line.  That means that we don't check those things; oh well.  The header
     # changes with each version change or touch of the input file.
     open (OUT, ">", 'out.tmp') or die "Cannot create out.tmp: $!\n";
-    $parser->parse_from_file (source_path ('basic.pod'), \*OUT);
+    $parser->parse_from_file ( source_path ('basic.pod'), \*OUT);
     close OUT;
     if ($_ eq 'Pod::Man') {
         open (TMP, "<", 'out.tmp') or die "Cannot open out.tmp: $!\n";
@@ -115,7 +105,7 @@ for (sort keys %translators) {
         # OS/390 is EBCDIC, which uses a different character for ESC
         # apparently.  Try to convert so that the test still works.
         if ($^O eq 'os390' && $_ eq 'Pod::Text::Termcap') {
-            $output =~ tr/\033/\047/;
+            $output =~ s/\033/\047/g;
         }
 
         if ($master eq $output) {

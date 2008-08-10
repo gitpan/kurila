@@ -8,31 +8,21 @@
 
 sub BEGIN {
     if (%ENV{PERL_CORE}){
-	chdir('t') if -d 't';
-	@INC = ('.', '../lib', '../ext/Storable/t');
-    } else {
-	unshift @INC, 't';
-    }
-    require Config; Config->import;
-    if (%ENV{PERL_CORE} and %Config{'extensions'} !~ m/\bStorable\b/) {
-        print "1..0 # Skip: Storable was not built\n";
-        exit 0;
+	push @INC, '../ext/Storable/t';
     }
     require 'st-dump.pl';
 }
 
-sub ok;
-
 use Storable qw(freeze thaw);
 
 %::immortals
-  = (u => \undef,
+  = %(u => \undef,
      'y' => \(1 == 1),
      n => \(1 == 0)
 );
 
 my $test = 12;
-my $tests = $test + 6 + 2 * 6 * keys %::immortals;
+my $tests = $test + 6 + 2 * 6 * nkeys %::immortals;
 print "1..$tests\n";
 
 package SHORT_NAME;
@@ -45,13 +35,13 @@ sub make { bless \@(), shift }
 
 sub STORABLE_freeze {
 	my $self = shift;
-	return ("", $self);
+	return @("", $self);
 }
 
 sub STORABLE_thaw {
 	my $self = shift;
 	my $cloning = shift;
-	my ($x, $obj) = @_;
+	my ($x, $obj) = < @_;
 	die "STORABLE_thaw" unless $obj \== $self;
 }
 
@@ -64,7 +54,7 @@ my $name = "LONG_NAME_" . 'xxxxxxxxxxxxx::' x 14 . "final";
 eval <<EOC;
 package $name;
 
-\@ISA = ("SHORT_NAME");
+our \@ISA = \@("SHORT_NAME");
 EOC
 die $@ if $@;
 ok 1, $@ eq '';
@@ -72,7 +62,7 @@ ok 1, $@ eq '';
 eval <<EOC;
 package {$name}_WITH_HOOK;
 
-\@ISA = ("SHORT_NAME_WITH_HOOK");
+our \@ISA = \@("SHORT_NAME_WITH_HOOK");
 EOC
 ok 2, ! $@ ;
 
@@ -91,7 +81,7 @@ ok 3, 1;
 
 my $y = thaw $x;
 ok 4, ref $y eq 'ARRAY';
-ok 5, @{$y} == @pool;
+ok 5, nelems(@{$y}) == nelems(@pool);
 
 ok 6, ref $y->[0] eq 'SHORT_NAME';
 ok 7, ref $y->[1] eq 'SHORT_NAME_WITH_HOOK';
@@ -117,26 +107,26 @@ ok 10, $good;
 
 package RETURNS_IMMORTALS;
 
-sub make { my $self = shift; bless \@(@_), $self }
+sub make { my $self = shift; bless \@( < @_), $self }
 
 sub STORABLE_freeze {
   # Some reference some number of times.
   my $self = shift;
-  my ($what, $times) = @$self;
-  return ("$what$times", (%::immortals{$what}) x $times);
+  my ($what, $times) = < @$self;
+  return @("$what$times", (%::immortals{$what}) x $times);
 }
 
 sub STORABLE_thaw {
 	my $self = shift;
 	my $cloning = shift;
-	my ($x, @refs) = @_;
+	my ($x, < @refs) = < @_;
 	my ($what, $times) = $x =~ m/(.)(\d+)/;
 	die "'$x' didn't match" unless defined $times;
-	main::ok ++$test, @refs == $times;
+	main::ok ++$test, nelems(@refs) == $times;
 	my $expect = %::immortals{$what};
 	die "'$x' did not give a reference" unless ref $expect;
 	my $fail;
-	foreach (@refs) {
+	foreach (< @refs) {
 	  $fail++ if $_ != $expect;
 	}
 	main::ok ++$test, !$fail;
@@ -163,8 +153,8 @@ foreach $count (1..3) {
 
 package HAS_HOOK;
 
-$loaded_count = 0;
-$thawed_count = 0;
+our $loaded_count = 0;
+our $thawed_count = 0;
 
 sub make {
   bless \@();
@@ -172,7 +162,7 @@ sub make {
 
 sub STORABLE_freeze {
   my $self = shift;
-  return '';
+  return @('');
 }
 
 package main;

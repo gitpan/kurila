@@ -56,7 +56,7 @@ is( $r, join($dirsep, "Foo", "Bar.pm") );
 our $fh;
 
 {
-    local $TODO = "overrie readline";
+    local our $TODO = "overrie readline";
     $r = 11;
     BEGIN { *CORE::GLOBAL::readline = sub (;*) { ++$r }; }
     is( (~< *FH)	, 12 );
@@ -85,23 +85,23 @@ is( qx/cp/,	    "cp 9", 'qx' );
 BEGIN { *Rgs::readpipe = sub ($) { ++$r . " @_[0]" }; }
 {
     package Rgs;
-    ::is( `rm`,		  "10 rm", '``' );
-    ::is( qx/cp/,	  "11 cp", 'qx' );
+    main::is( `rm`,		  "10 rm", '``' );
+    main::is( qx/cp/,	  "11 cp", 'qx' );
 }
 
 # Verify that the parsing of overriden keywords isn't messed up
 # by the indirect object notation
 {
     local $^WARN_HOOK = sub {
-	::like( @_[0]->message, qr/^ok overriden at/ );
+	main::like( @_[0]->message, qr/^ok overriden at/ );
     };
-    BEGIN { *OverridenWarn::warn = sub { CORE::warn "@_ overriden"; }; }
+    BEGIN { *OverridenWarn::warn = sub { CORE::warn "{join ' ', <@_} overriden"; }; }
     package OverridenWarn;
     sub foo { "ok" }
     warn( OverridenWarn->foo() );
     warn OverridenWarn->foo();
 }
-BEGIN { *OverridenPop::pop = sub { ::is( @_[0][0], "ok" ) }; }
+BEGIN { *OverridenPop::pop = sub { main::is( @_[0]->[0], "ok" ) }; }
 {
     package OverridenPop;
     sub foo { \@( "ok" ) }
@@ -110,7 +110,7 @@ BEGIN { *OverridenPop::pop = sub { ::is( @_[0][0], "ok" ) }; }
 }
 
 {
-    eval {
+    try {
         local *CORE::GLOBAL::require = sub {
             CORE::require(@_[0]);
         }        ;

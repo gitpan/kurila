@@ -2,8 +2,6 @@
 # [perl #33173] shellwords.pl and tainting
 
 BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
     require Config;
     if (%Config::Config{extensions} !~ m/\bList\/Util\b/) {
 	print "1..0 # Skip: Scalar::Util was not built\n";
@@ -14,10 +12,10 @@ BEGIN {
 use Text::ParseWords qw(shellwords old_shellwords);
 use Scalar::Util qw(tainted);
 
-print "1..2\n";
+use Test::More;
 
-print "not " if grep { not tainted($_) } shellwords("$0$^X");
-print "ok 1\n";
+plan tests => 2;
 
-print "not " if grep { not tainted($_) } old_shellwords("$0$^X");
-print "ok 2\n";
+ok( ! grep { not tainted($_) } < shellwords("$0$^X") );
+
+ok( ! grep { not tainted($_) } < old_shellwords("$0$^X") );

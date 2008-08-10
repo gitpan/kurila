@@ -6,7 +6,7 @@ use B qw(minus_c save_BEGINs);
 use Carp;
 
 sub import {
-    my ($class, @options) = @_;
+    my ($class, < @options) = < @_;
     my ($quiet, $veryquiet) = (0, 0);
     if (@options[0] eq '-q' || @options[0] eq '-qq') {
 	$quiet = 1;
@@ -41,7 +41,7 @@ sub import {
 		croak "use of backend $backend failed: $@";
 	    }
 
-	    my $compilesub = &{*{Symbol::fetch_glob("B::{$backend}::compile")}}(@options);
+	    my $compilesub = &{*{Symbol::fetch_glob("B::{$backend}::compile")}}( < @options);
 	    if (ref($compilesub) ne "CODE") {
 		die $compilesub;
 	    }

@@ -31,7 +31,7 @@ while ( ~< *DATA) {
     %seen{$key} = qq[opcode "$key"];
 
     push(@ops, $key);
-    %opnum{$key} =( @ops-1);
+    %opnum{$key} =( (nelems @ops)-1);
     %desc{$key} = $desc;
     %check{$key} = $check;
     %ckname{$check}++;
@@ -44,7 +44,7 @@ while ( ~< *DATA) {
 my %alias;
 
 # Format is "this function" => "does these op names"
-my @raw_alias = (
+my @raw_alias = @(
 		 Perl_do_kv => \@(qw( keys values )),
 		 Perl_unimplemented_op => \@(qw(padany mapstart custom)),
 		 # All the ops with a body of { return NORMAL; }
@@ -88,11 +88,11 @@ my @raw_alias = (
 		 Perl_pp_shift => \@('pop'),
 		 Perl_pp_sin => \@(qw(cos exp log sqrt)),
 		 Perl_pp_bit_or => \@('bit_xor'),
-		 Perl_pp_rv2av => \@('rv2hv'),
+		 Perl_pp_rv2sv => \@('rv2av rv2hv'),
 		);
 
 while (my ($func, $names) = splice @raw_alias, 0, 2) {
-    %alias{$_} = $func for @$names;
+    %alias{$_} = $func for < @$names;
 }
 
 # Emit defines.
@@ -145,13 +145,13 @@ typedef enum opcode \{
 END
 
 my $i = 0;
-for (@ops) {
+for (< @ops) {
     # print $on "\t", &tab(3,"OP_\U$_,"), "/* ", $i++, " */\n";
       print $on "\t", &tab(3,"OP_\U$_"), " = ", $i++, ",\n";
 }
 print $on "\t", &tab(3,"OP_max"), "\n";
 print $on "\} opcode;\n";
-print $on "\n#define MAXO ", scalar @ops, "\n";
+print $on "\n#define MAXO ", scalar nelems @ops, "\n";
 print $on "#define OP_phoney_INPUT_ONLY -1\n";
 print $on "#define OP_phoney_OUTPUT_ONLY -2\n\n";
 
@@ -171,7 +171,7 @@ EXTCONST char* const PL_op_name[];
 EXTCONST char* const PL_op_name[] = \{
 END
 
-for (@ops) {
+for (< @ops) {
     print qq(\t"$_",\n);
 }
 
@@ -189,7 +189,7 @@ EXTCONST char* const PL_op_desc[];
 EXTCONST char* const PL_op_desc[] = \{
 END
 
-for (@ops) {
+for (< @ops) {
     my($safe_desc) = %desc{$_};
 
     # Have to escape double quotes and escape characters.
@@ -239,7 +239,7 @@ EXT Perl_ppaddr_t PL_ppaddr[] /* or perlvars.h */
 = \{
 END
 
-for (@ops) {
+for (< @ops) {
     if (my $name = %alias{$_}) {
 	print "\tMEMBER_TO_FPTR($name),\t/* Perl_pp_$_ */\n";
     }
@@ -274,8 +274,8 @@ EXT Perl_check_t PL_check[] /* or perlvars.h */
 = \{
 END
 
-for (@ops) {
-    print "\t", &tab(3, "MEMBER_TO_FPTR(Perl_%check{$_}),"), "\t/* $_ */\n";
+for (< @ops) {
+    print "\t", tab(3, "MEMBER_TO_FPTR(Perl_%check{$_}),"), "\t/* $_ */\n";
 }
 
 print <<END;
@@ -300,7 +300,7 @@ EXTCONST U32 PL_opargs[];
 EXTCONST U32 PL_opargs[] = \{
 END
 
-my %argnum = (
+my %argnum = %(
     'S',  1,		# scalar
     'L',  2,		# list
     'A',  3,		# array value
@@ -310,7 +310,7 @@ my %argnum = (
     'R',  7,		# scalar reference
 );
 
-my %opclass = (
+my %opclass = %(
     '0',  0,		# baseop
     '1',  1,		# unop
     '2',  2,		# binop
@@ -319,7 +319,6 @@ my %opclass = (
     '/',  5,		# pmop
     '$',  6,		# svop_or_padop
     '#',  7,		# padop
-    '"',  8,		# pvop_or_svop
     '{',  9,		# loop
     ';',  10,		# cop
     '%',  11,		# baseop_or_unop
@@ -327,7 +326,7 @@ my %opclass = (
     '}',  13,		# loopexop
 );
 
-my %opflags = (
+my %opflags = %(
     'm' =>   1,		# needs stack mark
     'f' =>   2,		# fold constants
     's' =>   4,		# always produces scalar
@@ -345,7 +344,7 @@ my %OP_IS_FT_ACCESS;
 my $OCSHIFT = 9;
 my $OASHIFT = 13;
 
-for my $op (@ops) {
+for my $op (< @ops) {
     my $argsum = 0;
     my $flags = %flags{$op};
     for my $flag (keys %opflags) {
@@ -377,7 +376,7 @@ for my $op (@ops) {
 	$argshift += 4;
     }
     $argsum = sprintf("0x\%08x", $argsum);
-    print "\t", &tab(3, "$argsum,"), "/* $op */\n";
+    print "\t",  tab(3, "$argsum,"), "/* $op */\n";
 }
 
 print <<END;
@@ -405,11 +404,11 @@ gen_op_is_macro( \%OP_IS_FILETEST, 'OP_IS_FILETEST');
 gen_op_is_macro( \%OP_IS_FT_ACCESS, 'OP_IS_FILETEST_ACCESS');
 
 sub gen_op_is_macro {
-    my ($op_is, $macname) = @_;
-    if (keys %$op_is) {
+    my ($op_is, $macname) = < @_;
+    if (%$op_is) {
 	
 	# get opnames whose numbers are lowest and highest
-	my ($first, @rest) = sort {
+	my ($first, < @rest) = sort {
 	    $op_is->{$a} <+> $op_is->{$b}
 	} keys %$op_is;
 	
@@ -420,7 +419,7 @@ sub gen_op_is_macro {
 
 	# verify that op-ct matches 1st..last range (and fencepost)
 	# (we know there are no dups)
-	if ( $op_is->{$last} - $op_is->{$first} == scalar @rest + 1) {
+	if ( $op_is->{$last} - $op_is->{$first} == scalar (nelems @rest) + 1) {
 	    
 	    # contiguous ops -> optimized version
 	    print $on "(op) >= OP_" . uc($first) . " && (op) <= OP_" . uc($last);
@@ -477,7 +476,7 @@ for (sort keys %ckname) {
 
 print $pp "\n\n";
 
-for (@ops) {
+for (< @ops) {
     next if m/^i_(pre|post)(inc|dec)$/;
     next if m/^custom$/;
     print $pp "PERL_PPDEF(Perl_pp_$_)\n";
@@ -500,7 +499,7 @@ END {
 
 ###########################################################################
 sub tab {
-    my ($l, $t) = @_;
+    my ($l, $t) = < @_;
     $t .= "\t" x ($l - (length($t) + 1) / 8);
     $t;
 }
@@ -523,7 +522,6 @@ sub tab {
 # pp.c	pos substr each not OK (RETPUSHUNDEF)
 #	substr vec also not OK due to LV to target (are they???)
 #	ref not OK (RETPUSHNO)
-#	trans not OK (dTARG; TARG = sv_newmortal();)
 #	ucfirst etc not OK: TMP arg processed inplace
 #	quotemeta not OK (unsafe when TARG == arg)
 #	each repeat not OK too due to list context
@@ -617,8 +615,6 @@ gvsv		scalar variable		ck_null		ds$
 gv		glob value		ck_null		ds$	
 gelem		glob elem		ck_null		d2	S S
 padsv		private variable	ck_null		ds0
-padav		private array		ck_null		d0
-padhv		private hash		ck_null		d0
 padany		private value		ck_null		d0
 
 pushre		push regexp		ck_null		d/
@@ -630,10 +626,10 @@ rv2sv		scalar dereference	ck_rvconst	ds1
 rv2cv		subroutine dereference	ck_rvconst	d1
 anoncode	anonymous subroutine	ck_anoncode	$	
 prototype	subroutine prototype	ck_null		s%	S
-refgen		reference constructor	ck_spair	m1	L
 srefgen		single ref constructor	ck_null		fs1	S
 ref		reference-type operator	ck_fun		stu%	S?
 bless		bless			ck_fun		s@	S S?
+anonscalar	anonymous scalar ($())	ck_fun		$	S
 
 # Pushy I/O.
 
@@ -652,7 +648,6 @@ match		pattern match (m//)	ck_match	d/
 qr		pattern quote (qr//)	ck_match	s/
 subst		substitution (s///)	ck_match	dis/	S
 substcont	substitution iterator	ck_null		dis|	
-trans		transliteration (tr///)	ck_match	is"	S
 
 # Lvalue operators.
 # sassign is special-cased for op class
@@ -781,7 +776,8 @@ aslice		array slice		ck_null		m@	A L
 
 each		each			ck_fun		%	H
 values		values			ck_fun		t%	H
-keys		keys			ck_fun		t%	H
+keys		keys			ck_fun		t%	S
+nkeys		numer of keys		ck_fun		t1	S
 delete		delete			ck_delete	%	S
 exists		exists			ck_exists	is%	S
 rv2hv		hash dereference	ck_rvconst	dt1	
@@ -799,8 +795,12 @@ join		join or string		ck_fun		mst@	S L
 
 list		list			ck_null		m@	L
 lslice		list slice		ck_null		2	H L L
-anonlist	anonymous list (%())	ck_fun		m@	L
-anonhash	anonymous hash (@())	ck_fun		m@	L
+anonlist	anonymous list (@())	ck_fun		m@	L
+anonhash	anonymous hash (%())	ck_fun		m@	L
+listlast	listlast		ck_null		ms@	L
+
+expand		expand			ck_fun		1	S
+nelems		numer of elements	ck_fun		t1	S
 
 splice		splice			ck_fun		m@	A S? S? L
 push		push			ck_fun		imsT@	A L
@@ -836,7 +836,6 @@ dorassign	defined or assignment (//=)	ck_null		s|
 method		method lookup		ck_method	d1
 entersub	subroutine entry	ck_subr		dmt1	L
 leavesub	subroutine exit		ck_null		1	
-leavesublv	lvalue subroutine return	ck_null		1	
 caller		caller			ck_fun		t%	S?
 warn		warn			ck_fun		imst@	L
 die		die			ck_die		dimst@	L
@@ -852,7 +851,7 @@ enteriter	foreach loop entry	ck_null		d{
 iter		foreach loop iterator	ck_null		0	
 enterloop	loop entry		ck_null		d{	
 leaveloop	loop exit		ck_null		2	
-return		return			ck_return	dm@	L
+return		return			ck_return	dm@	S?
 last		last			ck_null		ds}	
 next		next			ck_null		ds}	
 redo		redo			ck_null		ds}	
@@ -860,13 +859,6 @@ dump		dump			ck_null		ds}
 goto		goto			ck_null		ds}	
 exit		exit			ck_exit		ds%	S?
 method_named	method with known name	ck_null		d$
-
-entergiven	given()			ck_null		d|
-leavegiven	leave given block	ck_null		1
-enterwhen	when()			ck_null		d|
-leavewhen	leave when block	ck_null		1
-break		break			ck_null		0
-continue	continue		ck_null		0
 
 # I/O.
 
@@ -1038,8 +1030,8 @@ hintseval	eval hints		ck_svconst	s$
 entereval	eval "string"		ck_eval		d%	S
 leaveeval	eval "string" exit	ck_null		1	S
 #evalonce	eval constant string	ck_null		d1	S
-entertry	eval {block}		ck_null		|	
-leavetry	eval {block} exit	ck_null		@	
+entertry	try {block}		ck_try		d|	
+leavetry	try {block} exit	ck_null		@	
 
 # Get system info.
 

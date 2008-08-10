@@ -1,17 +1,6 @@
 #!./perl
 
 BEGIN {
-    if (%ENV{PERL_CORE}){
-	chdir('t') if -d 't';
-	if ($^O eq 'MacOS') {
-	    @INC = qw(: ::lib ::macos:lib);
-	} else {
-	    @INC = '.';
-	    push @INC, '../lib';
-	}
-    } else {
-	unshift @INC, 't';
-    }
     require Config;
     if ((%Config::Config{'extensions'} !~ m/\bB\b/) ){
         print "1..0 # Skip -- Perl configured without B module\n";
@@ -22,7 +11,7 @@ BEGIN {
 $|  = 1;
 use warnings;
 use strict;
-use Test::More tests => 59;
+use Test::More tests => 58;
 
 BEGIN { use_ok( 'B' ); }
 
@@ -43,35 +32,31 @@ sub hock { "yarrow" }
 
 package main;
 use vars qw(%Subs);
-local %Subs = ();
+local %Subs = %( () );
 B::walksymtable(\%Testing::Symtable::, 'find_syms', sub { @_[0] =~ m/Foo/ },
                 'Testing::Symtable::');
 
 sub B::GV::find_syms {
-    my($symbol) = @_;
+    my($symbol) = < @_;
 
     %main::Subs{$symbol->STASH->NAME . '::' . $symbol->NAME}++;
 }
 
-my @syms = map { 'Testing::Symtable::'.$_ } qw(This That wibble moo car
-                                               BEGIN);
+my @syms = @( map { 'Testing::Symtable::'.$_ } qw(This That wibble moo car
+                                               BEGIN) );
 push @syms, "Testing::Symtable::Foo::yarrow";
 
 # Make sure we hit all the expected symbols.
-ok( join('', sort @syms) eq join('', sort keys %Subs), 'all symbols found' );
+{
+    local $TODO = 1;
+    is( join('#', sort keys %Subs), join('#', sort < @syms), 'all symbols found' );
+}
 
 # Make sure we only hit them each once.
 ok( (!grep $_ != 1, values %Subs), '...and found once' );
 
 # Tests for MAGIC / MOREMAGIC
-ok( B::svref_2object(\$.)->MAGIC->TYPE eq "\0", '$. has \0 magic' );
-{
-    my $e = '';
-    # Used to dump core, bug #16828
-    eval { B::svref_2object(\$.)->MAGIC->MOREMAGIC->TYPE; };
-    like( $@->{description}, qr/Can't call method "TYPE" on an undefined value/, 
-	'$. has no more magic' );
-}
+ok( B::svref_2object(\$1)->MAGIC->TYPE eq "\0", '$1 has \0 magic' );
 
 my $r = qr/foo/;
 my $obj = B::svref_2object($r);
@@ -102,7 +87,7 @@ my $pv_ret = $pv_ref->object_2svref();
 is(ref $pv_ret, "SCALAR", "Test object_2svref() return is SCALAR");
 is($$pv_ret, $pv, "Test object_2svref()");
 is($pv_ref->PV(), $pv, "Test PV()");
-eval { is($pv_ref->RV(), $pv, "Test RV()"); };
+try { is($pv_ref->RV(), $pv, "Test RV()"); };
 ok($@, "Test RV()");
 is($pv_ref->PVX(), $pv, "Test PVX()");
 
@@ -148,7 +133,7 @@ my $hv_ref = B::svref_2object(\$hv);
 is(ref $hv_ref, "$RV_class",
    "Test $RV_class return from svref_2object - hash");
 
-local *gv = *STDOUT;
+local *gv = *STDOUT{IO};
 my $gv_ref = B::svref_2object(\*gv);
 is(ref $gv_ref, "B::GV", "Test B::GV return from svref_2object");
 ok(! $gv_ref->is_empty(), "Test is_empty()");
@@ -172,7 +157,7 @@ is(B::perlstring("\n"), '"\n"', "Testing B::perlstring()");
 is(B::perlstring("\""), '"\""', "Testing B::perlstring()");
 is(B::class(bless \%(), "Wibble::Bibble"), "Bibble", "Testing B::class()");
 is(B::cast_I32(3.14), 3, "Testing B::cast_I32()");
-is(B::opnumber("chop"), 37, "Testing opnumber with opname (chop)");
+is(B::opnumber("chop"), 34, "Testing opnumber with opname (chop)");
 
 {
     no warnings 'once';

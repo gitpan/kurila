@@ -1,17 +1,6 @@
 #!./perl
 
 BEGIN {
-    if (%ENV{PERL_CORE}){
-	chdir('t') if -d 't';
-	if ($^O eq 'MacOS') {
-	    @INC = qw(: ::lib ::macos:lib);
-	} else {
-	    @INC = '.';
-	    push @INC, '../lib';
-	}
-    } else {
-	unshift @INC, 't';
-    }
     require Config;
     if ((%Config::Config{'extensions'} !~ m/\bB\b/) ){
         print "1..0 # Skip -- Perl configured without B module\n";
@@ -29,7 +18,7 @@ my $a;
 my $Is_VMS = $^O eq 'VMS';
 my $Is_MacOS = $^O eq 'MacOS';
 
-my $path = join " ", map { qq["-I$_"] } @INC;
+my $path = join " ", map { qq["-I$_"] } < @INC;
 my $redir = $Is_MacOS ? "" : "2>&1";
 
 $a = `$^X $path "-MO=Debug" -e 1 $redir`;
@@ -52,14 +41,14 @@ my $is_thread = %Config{use5005threads} && %Config{use5005threads} eq 'define';
 if ($is_thread) {
     $b=<<EOF;
 leave enter nextstate label leaveloop enterloop null and defined null
-threadsv readline rvgv gv lineseq nextstate aassign null pushmark split pushre
+threadsv readline rvgv gv lineseq nextstate sassign null pushmark split pushre
 threadsv const null pushmark rvav gv nextstate subst const unstack
 EOF
 } else {
     $b=<<EOF;
 leave enter nextstate label leaveloop enterloop null and defined null
-null gvsv readline rvgv gv lineseq nextstate aassign null pushmark split pushre
-null gvsv const null pushmark rvav gv nextstate subst const unstack
+null gvsv readline rvgv gv lineseq nextstate sassign anonlist pushmark split pushre
+null gvsv const rvav gv nextstate subst const unstack
 EOF
 }
 $b=~s/\n/ /g;$b=~s/\s+/ /g;

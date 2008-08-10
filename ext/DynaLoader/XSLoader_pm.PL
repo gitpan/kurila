@@ -2,7 +2,7 @@ use strict;
 use Config;
 
 sub to_string {
-    my ($value) = @_;
+    my ($value) = < @_;
     $value =~ s/\\/\\\\/g;
     $value =~ s/'/\\'/g;
     return "'$value'";
@@ -49,7 +49,7 @@ sub load {
 
     goto retry unless $module and defined &dl_load_file;
 
-    my @modparts = split(m/::/,$module);
+    my @modparts = @( split(m/::/,$module) );
     my $modfname = @modparts[-1];
 
 EOT
@@ -70,9 +70,9 @@ print OUT <<'EOT' if $^O eq 'os2';
 EOT
 
 print OUT <<'EOT';
-    my $modpname = join('/',@modparts);
-    my $modlibname = (caller())[1];
-    my $c = @modparts;
+    my $modpname = join('/', < @modparts);
+    my $modlibname = @(caller())[1];
+    my $c = nelems @modparts;
     $modlibname =~ s,[\\/][^\\/]+$,, while $c--;	# Q&D basename
     my $file = "$modlibname/auto/$modpname/$modfname.$dl_dlext";
 
@@ -85,7 +85,7 @@ print OUT <<'EOT';
 
     my $bootname = "boot_$module";
     $bootname =~ s/\W/_/g;
-    @DynaLoader::dl_require_symbols = ($bootname);
+    @DynaLoader::dl_require_symbols = @($bootname);
 
     my $boot_symbol_ref;
 
@@ -126,7 +126,7 @@ print OUT <<'EOT';
 
     # See comment block above
     push(@DynaLoader::dl_shared_objects, $file); # record files loaded
-    return &$xs(@_);
+    return &$xs(<@_);
 
   retry:
     my $bootstrap_inherit = DynaLoader->can('bootstrap_inherit') || 
@@ -134,16 +134,9 @@ print OUT <<'EOT';
     goto &$bootstrap_inherit;
 }
 
-# Versions of DynaLoader prior to 5.6.0 don't have this function.
 sub bootstrap_inherit {
-    package DynaLoader;
-
-    my $module = @_[0];
-    local *DynaLoader::isa = *{Symbol::fetch_glob("$module\::ISA")};
-    local @DynaLoader::isa = (@DynaLoader::isa, 'DynaLoader');
-    # Cannot goto due to delocalization.  Will report errors on a wrong line?
     require DynaLoader;
-    DynaLoader::bootstrap(@_);
+    DynaLoader::bootstrap_inherit(<@_);
 }
 
 1;
@@ -223,7 +216,7 @@ boilerplate.
 
     @ISA = qw( OnePackage OtherPackage );
     $VERSION = '0.01';
-    eval {
+    try {
        require XSLoader;
        XSLoader::load('YourPackage', $VERSION);
        1;

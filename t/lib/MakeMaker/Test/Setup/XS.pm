@@ -1,8 +1,8 @@
 package MakeMaker::Test::Setup::XS;
 
-@ISA = qw(Exporter);
+our @ISA = @( qw(Exporter) );
 require Exporter;
-@EXPORT = qw(setup_xs teardown_xs);
+our @EXPORT = @( qw(setup_xs teardown_xs) );
 
 use strict;
 use File::Path;
@@ -11,16 +11,16 @@ use MakeMaker::Test::Utils;
 
 my $Is_VMS = $^O eq 'VMS';
 
-my %Files = (
+my %Files = %(
              'XS-Test/lib/XS/Test.pm'     => <<'END',
 package XS::Test;
 
 require Exporter;
 require DynaLoader;
 
-$VERSION = 1.01;
-@ISA    = qw(Exporter DynaLoader);
-@EXPORT = qw(is_even);
+our $VERSION = 1.01;
+our @ISA    = qw(Exporter DynaLoader);
+our @EXPORT = qw(is_even);
 
 bootstrap XS::Test $VERSION;
 

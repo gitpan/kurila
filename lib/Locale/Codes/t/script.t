@@ -12,8 +12,8 @@ use Locale::Script;
 # otherwise "ok N". If the eval dies, then the OK_TO_DIE flag is checked.
 # If it is true (1), the test is treated as passing, otherwise it failed.
 #-----------------------------------------------------------------------
-@TESTS =
-(
+our @TESTS =
+@(
 	#================================================
 	# TESTS FOR code2script
 	#================================================
@@ -69,9 +69,6 @@ use Locale::Script;
  \@('!defined script_code2code("bo", LOCALE_CODE_ALPHA_3, LOCALE_CODE_ALPHA_3)', 0),
  \@('!defined script_code2code("aa", LOCALE_CODE_ALPHA_2, LOCALE_CODE_ALPHA_3)', 0),
  \@('!defined script_code2code("aa", LOCALE_CODE_ALPHA_3, LOCALE_CODE_ALPHA_3)', 0),
- \@('!defined script_code2code("aa", LOCALE_CODE_ALPHA_2)', 1),
- \@('!defined script_code2code()', 1),                  # no argument
- \@('!defined script_code2code(undef)', 1),             # undef argument
 
  #---- some successful examples -----------------------------------------
  \@('script_code2code("BO", LOCALE_CODE_ALPHA_2, LOCALE_CODE_ALPHA_3) eq "bod"', 0),
@@ -83,24 +80,17 @@ use Locale::Script;
 
 );
 
-print "1..", int(@TESTS), "\n";
+use Test::More;
 
-$testid = 1;
-foreach $test (@TESTS)
+plan tests => (nelems @TESTS);
+
+foreach my $test (< @TESTS)
 {
-    eval "print (($test->[0]) ? \"ok $testid\\n\" : \"not ok $testid\\n\" )";
-    if ($@)
-    {
-	if (!$test->[1])
-	{
-	    print "not ok $testid\n";
-	}
-	else
-	{
-	    print "ok $testid\n";
-	}
+    diag($test->[0]);
+    my $ok = eval "$test->[0]";
+    if ($test->[1]) {
+        ok($@);
+    } else {
+        ok($ok);
     }
-    ++$testid;
 }
-
-exit 0;

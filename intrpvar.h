@@ -99,10 +99,6 @@ PERLVAR(Icurpm,		PMOP *)		/* what to do \ interps in REs from */
 
 The input record separator - C<$/> in Perl space.
 
-=for apidoc mn|GV*|PL_last_in_gv
-
-The GV which was last used for a filehandle input operation. (C<< <FH> >>)
-
 =for apidoc mn|SV*|PL_ofs_sv
 
 The output field separator - C<$,> in Perl space.
@@ -111,7 +107,6 @@ The output field separator - C<$,> in Perl space.
 */
 
 PERLVAR(Irs,		SV *)		/* input record separator $/ */
-PERLVAR(Ilast_in_gv,	GV *)		/* GV used in last <FH> */
 PERLVAR(Iofs_sv,	SV *)		/* output field separator $, */
 PERLVAR(Idefoutgv,	GV *)		/* default FH for output */
 PERLVARI(Ichopset,	const char *, " \n-")	/* $: */
@@ -138,7 +133,6 @@ PERLVAR(Ilastgotoprobe,	OP*)		/* from pp_ctl.c */
 
 /* sort stuff */
 PERLVAR(Isortcop,	OP *)		/* user defined sort routine */
-PERLVAR(Isortstash,	HV *)		/* which is in some package or other */
 PERLVAR(Ifirstgv,	GV *)		/* $a */
 PERLVAR(Isecondgv,	GV *)		/* $b */
 
@@ -208,15 +202,12 @@ PERLVAR(Iwarnhook,	SV *)
 /* switches */
 PERLVAR(Ipatchlevel,	SV *)
 PERLVAR(Ilocalpatches,	const char * const *)
-PERLVARI(Isplitstr,	const char *, " ")
 
 PERLVAR(Iminus_c,	bool)
 PERLVAR(Iminus_n,	bool)
 PERLVAR(Iminus_p,	bool)
 PERLVAR(Iminus_l,	bool)
 PERLVAR(Iminus_a,	bool)
-PERLVAR(Iminus_F,	bool)
-PERLVAR(Idoswitches,	bool)
 PERLVAR(Iminus_E,	bool)
 
 /*
@@ -230,7 +221,6 @@ The C variable which corresponds to Perl's $^W warning variable.
 
 PERLVAR(Idowarn,	U8)
 PERLVAR(Idoextract,	bool)
-PERLVAR(Isawampersand,	bool)		/* must save all match strings */
 PERLVAR(Iunsafe,	bool)
 PERLVAR(Iexit_flags,	U8)		/* was exit() unexpected, etc. */
 PERLVAR(Isrand_called,	bool)
@@ -458,15 +448,6 @@ PERLVAR(Ihints,		U32)		/* pragma-tic compile-time flags */
 PERLVAR(Idebug,		VOL U32)	/* flags given to -D switch */
 
 PERLVARI(Iamagic_generation,	long,	0)
-
-#ifdef USE_LOCALE_COLLATE
-PERLVAR(Icollation_name,char *)		/* Name of current collation */
-PERLVAR(Icollxfrm_base,	Size_t)		/* Basic overhead in *xfrm() */
-PERLVARI(Icollxfrm_mult,Size_t,	2)	/* Expansion factor in *xfrm() */
-PERLVARI(Icollation_ix,	U32,	0)	/* Collation generation index */
-PERLVARI(Icollation_standard, bool,	TRUE)
-					/* Assume simple collation */
-#endif /* USE_LOCALE_COLLATE */
 
 
 #if defined (PERL_UTF8_CACHE_ASSERT) || defined (DEBUGGING)

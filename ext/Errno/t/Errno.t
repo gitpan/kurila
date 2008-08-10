@@ -1,23 +1,12 @@
 #!./perl -w
 
-BEGIN {
-    unless(grep m/blib/, @INC) {
-	chdir 't' if -d 't';
-	if ($^O eq 'MacOS') { 
-	    @INC = qw(: ::lib ::macos:lib); 
-	} else { 
-	    @INC = '../lib'; 
-	}
-    }
-}
-
-use Test::More tests => 10;
+use Test::More tests => 11;
 
 BEGIN {
     use_ok("Errno");
 }
 
-BAIL_OUT("No errno's are exported") unless @Errno::EXPORT_OK;
+BAIL_OUT("No errno's are exported") unless (nelems @Errno::EXPORT_OK);
 
 my $err = @Errno::EXPORT_OK[0];
 my $num = &{*{Symbol::fetch_glob("Errno::$err")}};
@@ -30,16 +19,19 @@ ok(exists %!{$err});
 $! = 0;
 ok(! %!{$err});
 
-ok(join(",",sort keys(%!)) eq join(",",sort @Errno::EXPORT_OK));
+ok(join(",",sort keys(%!)) eq join(",",sort < @Errno::EXPORT_OK));
 
-eval { exists %!{''} };
+try { exists %!{''} };
 ok(! $@);
 
-eval {%!{$err} = "qunckkk" };
+try {%!{$err} = "qunckkk" };
 like($@->{description}, qr/^ERRNO hash is read only!/);
 
-eval {delete %!{$err}};
+try {delete %!{$err}};
 like($@->{description}, qr/^ERRNO hash is read only!/);
+
+$! = Errno::EINPROGRESS();
+is( %!{EINPROGRESS}, Errno::EINPROGRESS );
 
 # The following tests are in trouble if some OS picks errno values
 # through Acme::MetaSyntactic::batman

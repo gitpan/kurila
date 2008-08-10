@@ -1,19 +1,12 @@
 #!./perl -w
 
 BEGIN {
-        if (%ENV{PERL_CORE}){
-	        chdir('t') if -d 't';
-	        @INC = ('.', 'lib', '../lib');
-        } else {
-	        unshift @INC, 't';
-	        push @INC, "../../t";
-        }
 	require Config;
 	if ((%Config::Config{'extensions'} !~ m/\bB\b/) ){
 		print "1..0 # Skip -- Perl configured without B module\n";
 		exit 0;
 	}
-	require 'test.pl';
+	require './test.pl';
 }
 
 use strict;
@@ -37,8 +30,8 @@ plan( 9 ); # And someone's responsible.
 # use() makes it difficult to avoid O::import()
 require_ok( 'O' );
 
-my @args = ('-Ilib', '-MO=success,foo,bar', '-e', '1' );
-my @lines = get_lines( @args );
+my @args = @('-Ilib', '-MO=success,foo,bar', '-e', '1' );
+my @lines = @( < get_lines( < @args ) );
 
 is( @lines[0], 'Compiling!', 'Output should not be saved without -q switch' );
 is( @lines[1], '(foo) <bar>', 'O.pm should call backend compile() method' );
@@ -46,7 +39,7 @@ is( @lines[2], '[]', 'Nothing should be in $O::BEGIN_output without -q' );
 is( @lines[3], '-e syntax OK', 'O.pm should not munge perl output without -qq');
 
 @args[1] = '-MO=-q,success,foo,bar';
-@lines = get_lines( @args );
+@lines = @( < get_lines( < @args ) );
 isnt( @lines[1], 'Compiling!', 'Output should not be printed with -q switch' );
 
 SKIP: {
@@ -55,17 +48,17 @@ SKIP: {
 	is( @lines[1], "[Compiling!", '... but should be in $O::BEGIN_output' );
 
 	@args[1] = '-MO=-qq,success,foo,bar';
-	@lines = get_lines( @args );
-	is( scalar @lines, 3, '-qq should suppress even the syntax OK message' );
+	@lines = @( < get_lines( < @args ) );
+	is( scalar nelems @lines, 3, '-qq should suppress even the syntax OK message' );
 }
 
 @args[1] = '-MO=success,fail';
-@lines = get_lines( @args );
+@lines = @( < get_lines( < @args ) );
 like( @lines[1], qr/fail at .eval/,
 	'O.pm should die if backend compile() does not return a subref' );
 
 sub get_lines {
-	split(m/[\r\n]+/, runperl( args => \@( @_ ), stderr => 1 ));
+	@( split(m/[\r\n]+/, runperl( args => \@( < @_ ), stderr => 1 )) );
 }
 
 END {

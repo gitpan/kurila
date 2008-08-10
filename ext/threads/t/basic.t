@@ -2,10 +2,6 @@ use strict;
 use warnings;
 
 BEGIN {
-    if (%ENV{'PERL_CORE'}){
-        chdir 't';
-        unshift @INC, '../lib';
-    }
     use Config;
     if (! %Config{'useithreads'}) {
         print("1..0 # Skip: Perl not compiled with 'useithreads'\n");
@@ -16,7 +12,7 @@ BEGIN {
 use ExtUtils::testlib;
 
 sub ok {
-    my ($id, $ok, $name) = @_;
+    my ($id, $ok, $name) = < @_;
 
     # You have to do it this way or VMS will get confused.
     if ($ok) {

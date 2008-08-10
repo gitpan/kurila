@@ -1,16 +1,9 @@
 #!/usr/bin/perl -w
 
-BEGIN {
-    if( %ENV{PERL_CORE} ) {
-        chdir 't';
-        @INC = '../lib';
-    }
-}
-
 use Config;
 BEGIN {
     unless ( %Config{'useithreads'} && 
-             eval { require threads; 'threads'->import; 1; }) 
+             try { require threads; 'threads'->import; 1; }) 
     {
         print "1..0 # Skip: no working threads\n";
         exit 0;

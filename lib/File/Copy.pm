@@ -12,10 +12,6 @@ use warnings;
 use File::Spec;
 use Config;
 our(@ISA, @EXPORT, @EXPORT_OK, $VERSION, $Too_Big, $Syscopy_is_copy);
-sub copy;
-sub syscopy;
-sub cp;
-sub mv;
 
 # Note that this module implements only *part* of the API defined by
 # the File/Copy.pm module of the File-Tools-2.0 package.  However, that
@@ -25,31 +21,21 @@ sub mv;
 $VERSION = '2.11';
 
 require Exporter;
-@ISA = qw(Exporter);
-@EXPORT = qw(copy move);
-@EXPORT_OK = qw(cp mv);
+@ISA = @( qw(Exporter) );
+@EXPORT = @( qw(copy move) );
+@EXPORT_OK = @( qw(cp mv) );
 
 $Too_Big = 1024 * 1024 * 2;
 
-sub croak {
-    require Carp;
-    goto &Carp::croak;
-}
-
-sub carp {
-    require Carp;
-    goto &Carp::carp;
-}
-
 my $macfiles;
 if ($^O eq 'MacOS') {
-	$macfiles = eval { require Mac::MoreFiles };
+	$macfiles = try { require Mac::MoreFiles };
 	warn 'Mac::MoreFiles could not be loaded; using non-native syscopy'
 		if $@ && $^W;
 }
 
 sub _catname {
-    my($from, $to) = @_;
+    my($from, $to) = < @_;
     if (not defined &basename) {
 	require File::Basename;
 	File::Basename->import('basename');
@@ -72,8 +58,8 @@ sub _eq {
 }
 
 sub copy {
-    croak("Usage: copy(FROM, TO [, BUFFERSIZE]) ")
-      unless(@_ == 2 || @_ == 3);
+    die("Usage: copy(FROM, TO [, BUFFERSIZE]) ")
+      unless((nelems @_) == 2 || (nelems @_) == 3);
 
     my $from = shift;
     my $to = shift;
@@ -90,7 +76,7 @@ sub copy {
 			 : (ref(\$to) eq 'GLOB'));
 
     if (_eq($from, $to)) { # works for references, too
-	carp("'$from' and '$to' are identical (not copied)");
+	warn("'$from' and '$to' are identical (not copied)");
         # The "copy" was a success as the source and destination contain
         # the same data.
         return 1;
@@ -98,11 +84,11 @@ sub copy {
 
     if (((%Config{d_symlink} && %Config{d_readlink}) || %Config{d_link}) &&
 	!($^O eq 'MSWin32' || $^O eq 'os2')) {
-	my @fs = stat($from);
-	if (@fs) {
-	    my @ts = stat($to);
-	    if (@ts && @fs[0] == @ts[0] && @fs[1] == @ts[1]) {
-		carp("'$from' and '$to' are identical (not copied)");
+	my @fs = @( stat($from) );
+	if ((nelems @fs)) {
+	    my @ts = @( stat($to) );
+	    if ((nelems @ts) && @fs[0] == @ts[0] && @fs[1] == @ts[1]) {
+		warn("'$from' and '$to' are identical (not copied)");
                 return 0;
 	    }
 	}
@@ -133,7 +119,7 @@ sub copy {
                 # So add a '.' for a null extension.
 
                 $copy_to = VMS::Filespec::vmsify($to);
-                my ($vol, $dirs, $file) = File::Spec->splitpath($copy_to);
+                my ($vol, $dirs, $file) = < File::Spec->splitpath($copy_to);
                 $file = $file . '.' unless ($file =~ m/(?<!\^)\./);
                 $copy_to = File::Spec->catpath($vol, $dirs, $file);
 
@@ -155,7 +141,6 @@ sub copy {
        $from_h = $from;
     } else {
 	$from = _protect($from) if $from =~ m/^\s/s;
-       $from_h = \do { local *FH };
        open($from_h, "<", "$from\0") or goto fail_open1;
        binmode $from_h or die "($!,$^E)";
 	$closefrom = 1;
@@ -166,15 +151,14 @@ sub copy {
        $to_h = $to;
     } else {
 	$to = _protect($to) if $to =~ m/^\s/s;
-       $to_h = \do { local *FH };
        open($to_h,">", "$to\0") or goto fail_open2;
        binmode $to_h or die "($!,$^E)";
 	$closeto = 1;
     }
 
-    if (@_) {
+    if ((nelems @_)) {
 	$size = shift(@_) + 0;
-	croak("Bad buffer size for copy: $size\n") unless ($size +> 0);
+	die("Bad buffer size for copy: $size\n") unless ($size +> 0);
     } else {
 	$size = tied(*$from_h) ? 0 : -s $from_h || 0;
 	$size = 1024 if ($size +< 512);
@@ -219,9 +203,9 @@ sub copy {
 }
 
 sub move {
-    croak("Usage: move(FROM, TO) ") unless @_ == 2;
+    die("Usage: move(FROM, TO) ") unless (nelems @_) == 2;
 
-    my($from,$to) = @_;
+    my($from,$to) = < @_;
 
     my($fromsz,$tosz1,$tomt1,$tosz2,$tomt2,$sts,$ossts);
 
@@ -246,7 +230,7 @@ sub move {
             # So add a '.' for a null extension.
 
             $rename_to = VMS::Filespec::vmsify($to);
-            my ($vol, $dirs, $file) = File::Spec->splitpath($rename_to);
+            my ($vol, $dirs, $file) = < File::Spec->splitpath($rename_to);
             $file = $file . '.' unless ($file =~ m/(?<!\^)\./);
             $rename_to = File::Spec->catpath($vol, $dirs, $file);
 
@@ -269,7 +253,7 @@ sub move {
 
     {
         local $@;
-        eval {
+        try {
             copy($from,$to) or die;
             my($atime, $mtime) = (stat($from))[[8,9]];
             utime($atime, $mtime, $to);
@@ -301,7 +285,7 @@ unless (defined &syscopy) {
 	*syscopy = \&rmscopy;
     } elsif ($^O eq 'mpeix') {
 	*syscopy = sub {
-	    return 0 unless @_ == 2;
+	    return 0 unless (nelems @_) == 2;
 	    # Use the MPE cp program in order to
 	    # preserve MPE file attributes.
 	    return system('/bin/cp', '-f', @_[0], @_[1]) == 0;
@@ -309,12 +293,12 @@ unless (defined &syscopy) {
     } elsif ($^O eq 'MSWin32' && defined &DynaLoader::boot_DynaLoader) {
 	# Win32::CopyFile() fill only work if we can load Win32.xs
 	*syscopy = sub {
-	    return 0 unless @_ == 2;
-	    return Win32::CopyFile(@_, 1);
+	    return 0 unless (nelems @_) == 2;
+	    return Win32::CopyFile(< @_, 1);
 	};
     } elsif ($macfiles) {
 	*syscopy = sub {
-	    my($from, $to) = @_;
+	    my($from, $to) = < @_;
 	    my($dir, $toname);
 
 	    return 0 unless -e $from;

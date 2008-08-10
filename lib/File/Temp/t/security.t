@@ -15,7 +15,7 @@ use File::Spec;
 # File::Temp since this END block must be evaluated after the
 # END block configured by File::Temp
 my @files; # list of files to remove
-END { foreach (@files) { ok( !(-e $_) )} }
+END { foreach (< @files) { ok( !(-e $_) )} }
 
 use File::Temp qw/ tempfile unlink0 /;
 ok(1);
@@ -87,10 +87,10 @@ sub test_security {
 
   # Create the tempfile
   my $template = "tmpXXXXX";
-  my ($fh1, $fname1) = eval { tempfile ( $template, 
-				  DIR => File::Spec->tmpdir,
-				  UNLINK => 1,
-				);
+  my ($fh1, $fname1) = < try { tempfile ( $template,
+                                          DIR => File::Spec->tmpdir,
+                                          UNLINK => 1,
+                                      );
 			    };
 
   if (defined $fname1) {
@@ -98,8 +98,7 @@ sub test_security {
       ok( (-e $fname1) );
       push(@files, $fname1); # store for end block
   } elsif (File::Temp->safe_level() != File::Temp::STANDARD) {
-      chomp($@);
-      my $skip2 = "Skip: " . File::Spec->tmpdir() . " possibly insecure:  $@.  " .
+      my $skip2 = "Skip: " . File::Spec->tmpdir() . " possibly insecure:  {$@ && $@->message}.  " .
 	 "See INSTALL under 'make test'";
       skip($skip2, 1);
       # plus we need an end block so the tests come out in the right order
@@ -114,7 +113,7 @@ sub test_security {
       eval q{ END { skip($skip,1); } 1; } || die;
       return;
   }
-  my ($fh2, $fname2) = eval { tempfile ($template,  UNLINK => 1 ); };
+  my ($fh2, $fname2) = < try { tempfile ($template,  UNLINK => 1 ); };
   if (defined $fname2) {
       print "# fname2 = $fname2\n";
       ok( (-e $fname2) );

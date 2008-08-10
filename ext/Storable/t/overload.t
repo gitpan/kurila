@@ -6,22 +6,20 @@
 #  in the README file that comes with the distribution.
 #  
 
+use Config;
+
 sub BEGIN {
     if (%ENV{PERL_CORE}){
-	chdir('t') if -d 't';
-	@INC = ('.', '../lib', '../ext/Storable/t');
+	push @INC, '../ext/Storable/t';
     } else {
 	unshift @INC, 't';
     }
-    require Config; Config->import;
     if (%ENV{PERL_CORE} and %Config{'extensions'} !~ m/\bStorable\b/) {
         print "1..0 # Skip: Storable was not built\n";
         exit 0;
     }
     require 'st-dump.pl';
 }
-
-sub ok;
 
 use Storable qw(freeze thaw);
 
@@ -30,7 +28,7 @@ print "1..16\n";
 package OVERLOADED;
 
 use overload
-	'""' => sub { @_[0][0] };
+	'""' => sub { @_[0]->[0] };
 
 package main;
 
@@ -40,21 +38,21 @@ $b = thaw freeze $a;
 ok 1, ref $b eq 'OVERLOADED';
 ok 2, "$b" eq "77";
 
-$c = thaw freeze \$a;
+my $c = thaw freeze \$a;
 ok 3, ref $c eq 'REF';
 ok 4, ref $$c eq 'OVERLOADED';
 ok 5, "$$c" eq "77";
 
-$d = thaw freeze \@($a, $a);
+my $d = thaw freeze \@($a, $a);
 ok 6, "$d->[0]" eq "77";
-$d->[0][0]++;
+$d->[0]->[0]++;
 ok 7, "$d->[1]" eq "78";
 
 package REF_TO_OVER;
 
 sub make {
 	my $self = bless \%(), shift;
-	my ($over) = @_;
+	my ($over) = < @_;
 	$self->{over} = $over;
 	return $self;
 }
@@ -97,8 +95,7 @@ if (ord ('A') == 193) { # EBCDIC.
 
 # see note at the end of do_retrieve in Storable.xs about why this test has to
 # use a reference to an overloaded reference, rather than just a reference.
-my $t = eval {thaw $f};
-print "# $@" if $@;
+my $t = try {thaw $f}; die if $@;
 ok 13, $@ eq "";
 ok 14, ref ($t) eq 'REF';
 ok 15, ref ($$t) eq 'HAS_OVERLOAD';

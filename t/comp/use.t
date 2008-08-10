@@ -1,8 +1,6 @@
 #!./perl
 
 BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
     %INC{"feature.pm"} = 1; # so we don't attempt to load feature.pm
 }
 
@@ -13,7 +11,7 @@ print "1..26\n";
 my $test = 1;
 
 sub _ok {
-    my ($type, $got, $expected, $name) = @_;
+    my ($type, $got, $expected, $name) = < @_;
 
     my $result;
     if ($type eq 'is') {
@@ -37,7 +35,7 @@ sub _ok {
 	} else {
 	    print "not ok $test\n";
 	}
-	my @caller = caller(2);
+	my @caller = @( caller(2) );
 	print "# Failed test at @caller[1] line @caller[2]\n";
 	print "# Got      '$got'\n";
 	if ($type eq 'is') {
@@ -53,13 +51,13 @@ sub _ok {
 }
 
 sub like ($$;$) {
-    _ok ('like', @_);
+    _ok ('like', < @_);
 }
 sub is ($$;$) {
-    _ok ('is', @_);
+    _ok ('is', < @_);
 }
 sub isnt ($$;$) {
-    _ok ('isnt', @_);
+    _ok ('isnt', < @_);
 }
 
 eval "use 5.000";	# implicit semicolon
@@ -75,14 +73,14 @@ like ($@->message, qr/use VERSION is not valid in Perl Kurila/);
 our $testimport;
 our $version_check;
 %INC{'testuse.pm'} = 1;
-*testuse::import = sub { $testimport = \@(@_) };
+*testuse::import = sub { $testimport = \@(< @_) };
 *testuse::VERSION = sub { $version_check = @_[1] };
 
 # test calling of 'VERSION' and 'import' with correct arguments
 eval "use testuse v0.9";
 is ($@, '');
 is $version_check->{'original'}, "v0.9";
-is @{$testimport}, 1, "import called with only packagename";
+is( (nelems @{$testimport}), 1, "import called with only packagename");
 
 # test the default VERSION check.
 undef *testuse::VERSION;

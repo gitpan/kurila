@@ -7,7 +7,7 @@ use Time::Local;
 
 # Set up time values to test
 my @time =
-  (
+  @(
    #year,mon,day,hour,min,sec
    \@(1970,  1,  2, 00, 00, 00),
    \@(1980,  2, 28, 12, 00, 00),
@@ -25,7 +25,7 @@ my @time =
   );
 
 my @bad_time =
-    (
+    @(
      # month too large
      \@(1995, 13, 01, 01, 01, 01),
      # day too large
@@ -39,7 +39,7 @@ my @bad_time =
     );
 
 my @neg_time =
-    (
+    @(
      # test negative epochs for systems that handle it
      \@( 1969, 12, 31, 16, 59, 59 ),
      \@( 1950, 04, 12, 9, 30, 31 ),
@@ -47,7 +47,7 @@ my @neg_time =
 
 # Leap year tests
 my @years =
-    (
+    @(
      \@( 1900 => 0 ),
      \@( 1947 => 0 ),
      \@( 1996 => 1 ),
@@ -62,21 +62,21 @@ my $neg_epoch_ok = defined ((localtime(-259200))[[0]]) ? 1 : 0;
 
 # use vmsish 'time' makes for oddness around the Unix epoch
 if ($^O eq 'VMS') {
-    @time[0][2]++;
+    @time[0]->[2]++;
     $neg_epoch_ok = 0; # time_t is unsigned
 }
 
-my $tests = (@time * 12);
-$tests += @neg_time * 12;
-$tests += @bad_time;
-$tests += @years;
+my $tests = ((nelems @time) * 12);
+$tests += (nelems @neg_time) * 12;
+$tests += nelems @bad_time;
+$tests += nelems @years;
 $tests += 10;
 $tests += 8 if %ENV{MAINTAINER};
 
 plan tests => $tests;
 
-for (@time, @neg_time) {
-    my($year, $mon, $mday, $hour, $min, $sec) = @$_;
+for (< @time, < @neg_time) {
+    my($year, $mon, $mday, $hour, $min, $sec) = < @$_;
     $year -= 1900;
     $mon--;
 
@@ -92,12 +92,12 @@ for (@time, @neg_time) {
 
             my($s,$m,$h,$D,$M,$Y) = localtime($time);
 
-            is($s, $sec, "timelocal second for @$_");
-            is($m, $min, "timelocal minute for @$_");
-            is($h, $hour, "timelocal hour for @$_");
-            is($D, $mday, "timelocal day for @$_");
-            is($M, $mon, "timelocal month for @$_");
-            is($Y, $year, "timelocal year for @$_");
+            is($s, $sec, "timelocal second for {join ' ', <@$_}");
+            is($m, $min, "timelocal minute for {join ' ', <@$_}");
+            is($h, $hour, "timelocal hour for {join ' ', <@$_}");
+            is($D, $mday, "timelocal day for {join ' ', <@$_}");
+            is($M, $mon, "timelocal month for {join ' ', <@$_}");
+            is($Y, $year, "timelocal year for {join ' ', <@$_}");
         }
 
         {
@@ -106,22 +106,22 @@ for (@time, @neg_time) {
 
             my($s,$m,$h,$D,$M,$Y) = gmtime($time);
 
-            is($s, $sec, "timegm second for @$_");
-            is($m, $min, "timegm minute for @$_");
-            is($h, $hour, "timegm hour for @$_");
-            is($D, $mday, "timegm day for @$_");
-            is($M, $mon, "timegm month for @$_");
-            is($Y, $year, "timegm year for @$_");
+            is($s, $sec, "timegm second for {join ' ', <@$_}");
+            is($m, $min, "timegm minute for {join ' ', <@$_}");
+            is($h, $hour, "timegm hour for {join ' ', <@$_}");
+            is($D, $mday, "timegm day for {join ' ', <@$_}");
+            is($M, $mon, "timegm month for {join ' ', <@$_}");
+            is($Y, $year, "timegm year for {join ' ', <@$_}");
         }
     }
 }
 
-for (@bad_time) {
-    my($year, $mon, $mday, $hour, $min, $sec) = @$_;
+for (< @bad_time) {
+    my($year, $mon, $mday, $hour, $min, $sec) = < @$_;
     $year -= 1900;
     $mon--;
 
-    eval { timegm($sec,$min,$hour,$mday,$mon,$year) };
+    try { timegm($sec,$min,$hour,$mday,$mon,$year) };
 
     like($@ && $@->{description}, qr/.*out of range.*/, 'invalid time caused an error');
 }
@@ -150,8 +150,8 @@ for (@bad_time) {
     ok($hour == 2 || $hour == 3, 'hour should be 2 or 3');
 }
 
-for my $p (@years) {
-    my ( $year, $is_leap_year ) = @$p;
+for my $p (< @years) {
+    my ( $year, $is_leap_year ) = < @$p;
 
     my $string = $is_leap_year ? 'is' : 'is not';
     is( Time::Local::_is_leap_year($year), $is_leap_year,
@@ -163,24 +163,24 @@ SKIP:
     skip 'this platform does not support negative epochs.', 6
         unless $neg_epoch_ok;
 
-    eval { timegm(0,0,0,29,1,1900) };
+    try { timegm(0,0,0,29,1,1900) };
     like($@ && $@->{description}, qr/Day '29' out of range 1\.\.28/,
          'does not accept leap day in 1900');
 
-    eval { timegm(0,0,0,29,1,200) };
+    try { timegm(0,0,0,29,1,200) };
     like($@ && $@->{description}, qr/Day '29' out of range 1\.\.28/,
          'does not accept leap day in 2100 (year passed as 200)');
 
-    eval { timegm(0,0,0,29,1,0) };
+    try { timegm(0,0,0,29,1,0) };
     is($@, '', 'no error with leap day of 2000 (year passed as 0)');
 
-    eval { timegm(0,0,0,29,1,1904) };
+    try { timegm(0,0,0,29,1,1904) };
     is($@, '', 'no error with leap day of 1904');
 
-    eval { timegm(0,0,0,29,1,4) };
+    try { timegm(0,0,0,29,1,4) };
     is($@, '', 'no error with leap day of 2004 (year passed as 4)');
 
-    eval { timegm(0,0,0,29,1,96) };
+    try { timegm(0,0,0,29,1,96) };
     is($@, '', 'no error with leap day of 1996 (year passed as 96)');
 }
 

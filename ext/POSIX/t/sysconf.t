@@ -1,11 +1,6 @@
 #!perl -T
 
 BEGIN {
-    if (%ENV{PERL_CORE}) {
-        chdir 't';
-        @INC = '../lib';
-    }
-
     use Config;
     use Test::More;
     plan skip_all => "POSIX is unavailable" if %Config{'extensions'} !~ m!\bPOSIX\b!;
@@ -17,32 +12,32 @@ use POSIX;
 use Scalar::Util qw(looks_like_number);
 
 sub check(@) {
-    grep { eval "&$_;1" or $@->{description}!~m/vendor has not defined POSIX macro/ } @_
+    @( grep { eval "&$_;1" or $@->{description}!~m/vendor has not defined POSIX macro/ } < @_ )
 }       
 
-my @path_consts = check qw(
+my @path_consts = @( < check qw(
     _PC_CHOWN_RESTRICTED _PC_LINK_MAX _PC_NAME_MAX
     _PC_NO_TRUNC _PC_PATH_MAX
-);
+) );
 
-my @path_consts_terminal = check qw(
+my @path_consts_terminal = @( < check qw(
     _PC_MAX_CANON _PC_MAX_INPUT _PC_VDISABLE
-);
+) );
 
-my @path_consts_fifo = check qw(
+my @path_consts_fifo = @( < check qw(
     _PC_PIPE_BUF
-);
+) );
 
-my @sys_consts = check qw(
+my @sys_consts = @( < check qw(
     _SC_ARG_MAX _SC_CHILD_MAX _SC_CLK_TCK _SC_JOB_CONTROL
     _SC_NGROUPS_MAX _SC_OPEN_MAX _SC_PAGESIZE _SC_SAVED_IDS
     _SC_STREAM_MAX _SC_VERSION _SC_TZNAME_MAX
-);
+) );
 
-my $tests = 2 * 3 * @path_consts +
-            2 * 3 * @path_consts_terminal +
-            2 * 3 * @path_consts_fifo +
-                3 * @sys_consts;
+my $tests = 2 * 3 * (nelems @path_consts) +
+            2 * 3 * (nelems @path_consts_terminal) +
+            2 * 3 * (nelems @path_consts_fifo) +
+                3 * (nelems @sys_consts);
 plan $tests 
      ? (tests => $tests) 
      : (skip_all => "No tests to run on this OS")
@@ -59,7 +54,7 @@ my $r;
 my $TTY = "/dev/tty";
 
 sub _check_and_report {
-    my ($eval_status, $return_val, $description) = @_;
+    my ($eval_status, $return_val, $description) = < @_;
     my $success = defined($return_val) || $! == 0;
     is( $eval_status, '', $description );
     SKIP: {
@@ -82,11 +77,11 @@ sub _check_and_report {
 SKIP: {
     my $fd = POSIX::open($testdir, O_RDONLY)
         or skip "could not open test directory '$testdir' ($!)",
-	  3 * @path_consts;
+	  3 * nelems @path_consts;
 
-    for my $constant (@path_consts) {
+    for my $constant (< @path_consts) {
 	    $! = 0;
-            $r = eval { fpathconf( $fd, eval "$constant()" ) };
+            $r = try { fpathconf( $fd, eval "$constant()" ) };
             _check_and_report( $@, $r, "calling fpathconf($fd, $constant) " );
     }
     
@@ -94,14 +89,14 @@ SKIP: {
 }
 
 # testing pathconf() on a non-terminal file
-for my $constant (@path_consts) {
+for my $constant (< @path_consts) {
 	$! = 0;
-        $r = eval { pathconf( $testdir, eval "$constant()" ) };
+        $r = try { pathconf( $testdir, eval "$constant()" ) };
         _check_and_report( $@, $r, qq[calling pathconf("$testdir", $constant)] );
 }
 
 SKIP: {
-    my $n = 2 * 3 * @path_consts_terminal;
+    my $n = 2 * 3 * nelems @path_consts_terminal;
 
     -c $TTY
 	or skip("$TTY not a character file", $n);
@@ -113,17 +108,17 @@ SKIP: {
     my $fd = fileno(TTY);
 
     # testing fpathconf() on a terminal file
-    for my $constant (@path_consts_terminal) {
+    for my $constant (< @path_consts_terminal) {
 	$! = 0;
-	$r = eval { fpathconf( $fd, eval "$constant()" ) };
+	$r = try { fpathconf( $fd, eval "$constant()" ) };
 	_check_and_report( $@, $r, qq[calling fpathconf($fd, $constant) ($TTY)] );
     }
     
     close(TTY);
     # testing pathconf() on a terminal file
-    for my $constant (@path_consts_terminal) {
+    for my $constant (< @path_consts_terminal) {
 	$! = 0;
-	$r = eval { pathconf( $TTY, eval "$constant()" ) };
+	$r = try { pathconf( $TTY, eval "$constant()" ) };
 	_check_and_report( $@, $r, qq[calling pathconf($TTY, $constant)] );
     }
 }
@@ -131,16 +126,16 @@ SKIP: {
 my $fifo = "fifo$$";
 
 SKIP: {
-    eval { mkfifo($fifo, 0666) }
-	or skip("could not create fifo $fifo ($!)", 2 * 3 * @path_consts_fifo);
+    try { mkfifo($fifo, 0666) }
+	or skip("could not create fifo $fifo ($!)", 2 * 3 * nelems @path_consts_fifo);
 
   SKIP: {
       my $fd = POSIX::open($fifo, O_RDWR)
-	  or skip("could not open $fifo ($!)", 3 * @path_consts_fifo);
+	  or skip("could not open $fifo ($!)", 3 * nelems @path_consts_fifo);
 
-      for my $constant (@path_consts_fifo) {
+      for my $constant (< @path_consts_fifo) {
 	  $! = 0;
-	  $r = eval { fpathconf( $fd, eval "$constant()" ) };
+	  $r = try { fpathconf( $fd, eval "$constant()" ) };
 	  _check_and_report( $@, $r, "calling fpathconf($fd, $constant) ($fifo)" );
       }
     
@@ -148,9 +143,9 @@ SKIP: {
   }
 
   # testing pathconf() on a fifo file
-  for my $constant (@path_consts_fifo) {
+  for my $constant (< @path_consts_fifo) {
       $! = 0;
-      $r = eval { pathconf( $fifo, eval "$constant()" ) };
+      $r = try { pathconf( $fifo, eval "$constant()" ) };
       _check_and_report( $@, $r, qq[calling pathconf($fifo, $constant)] );
   }
 }
@@ -167,9 +162,9 @@ SKIP: {
         
 }
 # testing sysconf()
-for my $constant (@sys_consts) {
+for my $constant (< @sys_consts) {
 	$! = 0;
-	$r = eval { sysconf( eval "$constant()" ) };
+	$r = try { sysconf( eval "$constant()" ) };
 	_check_and_report( $@, $r, "calling sysconf($constant)" );
 }
 

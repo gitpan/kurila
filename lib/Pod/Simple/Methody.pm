@@ -4,13 +4,14 @@ use strict;
 use Pod::Simple ();
 use vars qw(@ISA $VERSION);
 $VERSION = '2.02';
-@ISA = ('Pod::Simple');
+@ISA = @('Pod::Simple');
 
 # Yes, we could use named variables, but I want this to be impose
 # as little an additional performance hit as possible.
 
 sub _handle_element_start {
-  @_[1] =~ tr/-:./__/;
+  @_[1] =~ s/-|:/_/g;
+  @_[1] =~ s/\.//g;
   ( @_[0]->can( 'start_' . @_[1] )
     || return
   )->(
@@ -22,12 +23,13 @@ sub _handle_text {
   ( @_[0]->can( 'handle_text' )
     || return
   )->(
-    @_
+    < @_
   );
 }
 
 sub _handle_element_end {
-  @_[1] =~ tr/-:./__/;
+  @_[1] =~ s/-|:/_/g;
+  @_[1] =~ s/\.//g;
   ( @_[0]->can( 'end_' . @_[1] )
     || return
   )->(

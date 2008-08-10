@@ -57,8 +57,7 @@ print "# a bit of meta-testing...\n";
 
 
 
-
-print '# ', Pod::Simple::pretty(x( "=pod\n\nI like pie.\n" )), "\n";
+print '# ', Pod::Simple::pretty( x( "=pod\n\nI like pie.\n" )), "\n";
 print "# Making sure we get a tree at all...\n";
 ok x( "=pod\n\nI like pie.\n" );
 
@@ -127,19 +126,19 @@ sub deq { # deep-equals
   # So it's a ref:
   use UNIVERSAL;
   if(UNIVERSAL::isa(@_[0], 'ARRAY')) {
-    return '' unless @{@_[0]} == @{@_[1]};
-    for(my $i = 0; $i +< @{@_[0]}; $i++) {
+    return '' unless (nelems @{@_[0]}) == nelems @{@_[1]};
+    for(my $i = 0; $i +< nelems @{@_[0]}; $i++) {
       print("# NEQ ", Pod::Simple::pretty(@_[0]),
           "\n#  != ", Pod::Simple::pretty(@_[1]), "\n"),
-       return '' unless deq(@_[0][$i], @_[1][$i]); # recurse!
+       return '' unless deq(@_[0]->[$i], @_[1]->[$i]); # recurse!
     }
     return 1;
   } elsif(UNIVERSAL::isa(@_[0], 'HASH')) {
     return 1 if $hashes_dont_matter;
-    return '' unless keys %{@_[0]} == keys %{@_[1]};
+    return '' unless nelems(@(keys %{@_[0]})) == (nelems(@( keys %{@_[1]})));
     foreach my $k (keys %{@_[0]}) {
-      return '' unless exists @_[1]{$k};
-      return '' unless deq(@_[0]{$k}, @_[1]{$k});
+      return '' unless exists @_[1]->{$k};
+      return '' unless deq(@_[0]->{$k}, @_[1]->{$k});
     }
     return 1;
   } else {

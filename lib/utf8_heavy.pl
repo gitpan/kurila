@@ -19,10 +19,10 @@ our (%PropertyAlias, %PA_reverse, %PropValueAlias, %PVA_reverse, %PVA_abbr_map);
 use bytes;
 
 sub SWASHNEW_real {
-    my ($class, $type, $list, $minbits, $none) = @_;
+    my ($class, $type, $list, $minbits, $none) = < @_;
     local $^D = 0 if $^D;
 
-    print STDERR "SWASHNEW @_\n" if DEBUG;
+    print STDERR "SWASHNEW {join ' ', <@_}\n" if DEBUG;
 
     ##
     ## Get the list of codepoints for the type.
@@ -72,11 +72,9 @@ sub SWASHNEW_real {
 	    my $caller1 = $type =~ s/(.+)::// ? $1 : caller(1);
 
 	    if (defined $caller1 && $type =~ m/^(?:\w+)$/) {
-		my $prop = *{Symbol::fetch_glob("{$caller1}::$type")};
-		if (exists &{$prop}) {
-		    no strict 'refs';
-		    
-		    $list = &{$prop};
+		my $prop = Symbol::fetch_glob("{$caller1}::$type");
+		if (exists &{*{$prop}}) {
+		    $list = &{*{$prop}};
 		    last GETFILE;
 		}
 	    }
@@ -98,24 +96,24 @@ sub SWASHNEW_real {
 	    require "unicore/PVA.pl";
 	    if ($type =~ m/^([\w\s]+)[:=]\s*(.*)/) {
 		my ($enum, $val) = (lc $1, lc $2);
-		$enum =~ tr/ _-//d;
-		$val =~ tr/ _-//d;
+		$enum =~ s/[ _-]//g;
+		$val =~ s/[ _-]//g;
 
 		my $pa = %PropertyAlias{$enum} ? $enum : %PA_reverse{$enum};
-		my $f = %PropValueAlias{$pa}{$val} ? $val : %PVA_reverse{$pa}{lc $val};
+		my $f = %PropValueAlias{$pa}->{$val} ? $val : %PVA_reverse{$pa}->{lc $val};
 
 		if ($pa and $f) {
 		    $pa = "gc_sc" if $pa eq "gc" or $pa eq "sc";
-		    $file = "unicore/lib/$pa/%PVA_abbr_map{$pa}{lc $f}.pl";
+		    $file = "unicore/lib/$pa/%PVA_abbr_map{$pa}->{lc $f}.pl";
 		    last GETFILE;
 		}
 	    }
 	    else {
 		my $t = lc $type;
-		$t =~ tr/ _-//d;
+		$t =~ s/[ _-]//g;
 
-		if (%PropValueAlias{gc}{$t} or %PropValueAlias{sc}{$t}) {
-		    $file = "unicore/lib/gc_sc/%PVA_abbr_map{gc_sc}{$t}.pl";
+		if (%PropValueAlias{gc}->{$t} or %PropValueAlias{sc}->{$t}) {
+		    $file = "unicore/lib/gc_sc/%PVA_abbr_map{gc_sc}->{$t}.pl";
 		    last GETFILE;
 		}
 	    }
@@ -209,15 +207,15 @@ sub SWASHNEW_real {
 
     my $ORIG = $list;
     if ($list) {
-	my @tmp = split(m/^/m, $list);
+	my @tmp = @( split(m/^/m, $list) );
 	my %seen;
 	no warnings;
-	$extras = join '', grep m/^[^0-9a-fA-F]/, @tmp;
+	$extras = join '', grep m/^[^0-9a-fA-F]/, < @tmp;
 	$list = join '',
 	    map  { $_->[1] }
 	    sort { $a->[0] <+> $b->[0] }
 	    map  { m/^([0-9a-fA-F]+)/; \@( CORE::hex($1), $_ ) }
-	    grep { m/^([0-9a-fA-F]+)/ and not %seen{$1}++ } @tmp; # XXX doesn't do ranges right
+	    grep { m/^([0-9a-fA-F]+)/ and not %seen{$1}++ } < @tmp; # XXX doesn't do ranges right
     }
 
     if ($none) {
@@ -274,7 +272,7 @@ sub SWASHNEW_real {
 	EXTRAS => $extras,
 	LIST => $list,
 	NONE => $none,
-	@extras,
+	< @extras,
     ) => $class;
 
     if ($file) {

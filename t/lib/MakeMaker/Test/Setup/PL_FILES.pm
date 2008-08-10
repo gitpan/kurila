@@ -1,8 +1,8 @@
 package MakeMaker::Test::Setup::PL_FILES;
 
-@ISA = qw(Exporter);
+our @ISA = @( qw(Exporter) );
 require Exporter;
-@EXPORT = qw(setup teardown);
+our @EXPORT = @( qw(setup teardown) );
 
 use strict;
 use File::Path;
@@ -10,7 +10,7 @@ use File::Basename;
 use File::Spec;
 use MakeMaker::Test::Utils;
 
-my %Files = (
+my %Files = %(
              'PL_FILES-Module/Makefile.PL'   => <<'END',
 use ExtUtils::MakeMaker;
 
@@ -47,7 +47,7 @@ die unless PL::Foo::bar() == 42;
 
 # Had a bug where PL_FILES weren't sent the file to generate
 die "argv empty\n" unless @ARGV;
-die "too many in argv: @ARGV\n" unless @ARGV == 1;
+die "too many in argv: {join ' ', <@ARGV}\n" unless nelems @ARGV == 1;
 
 my $file = @ARGV[0];
 open OUT, ">", "$file" or die $!;
@@ -67,12 +67,12 @@ sub _gen_pm_files {
 #!/usr/bin/perl -w
 
 # Ensure we do NOT have blib in @INC when building a module
-eval { require PL::Foo; };
+try { require PL::Foo; };
 #die $@ unless $@ =~ m{^Can't locate PL/Foo.pm in \@INC };
 
 # Had a bug where PL_FILES weren't sent the file to generate
 die "argv empty\n" unless @ARGV;
-die "too many in argv: @ARGV\n" unless @ARGV == 1;
+die "too many in argv: @ARGV\n" unless nelems @ARGV == 1;
 
 my $file = @ARGV[0];
 open OUT, ">", "$file" or die $!;

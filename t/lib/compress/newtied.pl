@@ -15,7 +15,7 @@ BEGIN
     # use Test::NoWarnings, if available
     my $extra = 0 ;
     $extra = 1
-        if eval { require Test::NoWarnings ;  'Test::NoWarnings'->import(); 1 };
+        if try { require Test::NoWarnings ;  'Test::NoWarnings'->import(); 1 };
 
     plan tests => $tests + $extra ;
 
@@ -142,11 +142,11 @@ EOT
                 ok ! eof $io;
                 is $io->tell(), 0 ;
                 is tell($io), 0 ;
-                my @lines = ~< $io;
-                is @lines, 6
-                    or print "# Got " . scalar(@lines) . " lines, expected 6\n" ;
+                my @lines = @( ~< $io );
+                is (nelems @lines), 6
+                    or print "# Got " . scalar(nelems @lines) . " lines, expected 6\n" ;
                 is @lines[1], "of a paragraph\n" ;
-                is join('', @lines), $str ;
+                is join('', < @lines), $str ;
                 is $., 6; 
         #print "TELL says " . tell($io) , " should be ${ \length($str) }\n" ;
                 is $io->tell(), length($str) ;
@@ -156,7 +156,7 @@ EOT
                 ok eof $io;
 
                 ok ! ( defined($io->getline)  ||
-                          (@tmp = $io->getlines) ||
+                          (@tmp = @( < $io->getlines )) ||
                           defined( ~< $io)         ||
                           defined($io->getc)     ||
                           read($io, $buf, 100)   != 0) ;
@@ -167,9 +167,9 @@ EOT
                 local $/;  # slurp mode
                 my $io = $UncompressClass->new($name);
                 ok ! $io->eof;
-                my @lines = $io->getlines;
+                my @lines = @( < $io->getlines );
                 ok $io->eof;
-                ok @lines == 1 && @lines[0] eq $str;
+                ok (nelems @lines) == 1 && @lines[0] eq $str;
             
                 $io = $UncompressClass->new($name);
                 ok ! $io->eof;
@@ -182,10 +182,10 @@ EOT
                 local $/ = "";  # paragraph mode
                 my $io = $UncompressClass->new($name);
                 ok ! $io->eof;
-                my @lines = ~< $io;
+                my @lines = @( ~< $io );
                 ok $io->eof;
-                ok @lines == 2 
-                    or print "# Got " . scalar(@lines) . " lines, expected 2\n" ;
+                ok (nelems @lines) == 2 
+                    or print "# Got " . scalar(nelems @lines) . " lines, expected 2\n" ;
                 ok @lines[0] eq "This is an example\nof a paragraph\n\n\n"
                     or print "# @lines[0]\n";
                 ok @lines[1] eq "and a single line.\n\n";
@@ -194,7 +194,7 @@ EOT
             {
                 local $/ = "is";
                 my $io = $UncompressClass->new($name);
-                my @lines = ();
+                my @lines = @( () );
                 my $no = 0;
                 my $err = 0;
                 ok ! $io->eof;
@@ -206,9 +206,9 @@ EOT
                 ok $err == 0 ;
                 ok $io->eof;
             
-                ok @lines == 3 
-                    or print "# Got " . scalar(@lines) . " lines, expected 3\n" ;
-                ok join("-", @lines) eq
+                ok (nelems @lines) == 3 
+                    or print "# Got " . scalar(nelems @lines) . " lines, expected 3\n" ;
+                ok join("-", < @lines) eq
                                  "This- is- an example\n" .
                                 "of a paragraph\n\n\n" .
                                 "and a single line.\n\n";
@@ -222,10 +222,10 @@ EOT
 
                 ok $io, "opened ok" ;
             
-                #eval { read($io, $buf, -1); } ;
+                #try { read($io, $buf, -1); } ;
                 #like $@, mkErr("length parameter is negative"), "xxx $io $UncompressClass $RawInflateError" ;
 
-                #eval { read($io, 1) } ;
+                #try { read($io, 1) } ;
                 #like $@, mkErr("buffer parameter is read-only");
 
                 is read($io, $buf, 0), 0, "Requested 0 bytes" ;
@@ -292,10 +292,10 @@ EOT
             my $a = $CompressClass-> new((\$b))  ;
 
             ok ! $a->error() ;
-            eval { seek($a, -1, 10) ; };
+            try { seek($a, -1, 10) ; };
             like $@->{description}, mkErr("seek: unknown value, 10, for whence parameter");
 
-            eval { seek($a, -1, SEEK_END) ; };
+            try { seek($a, -1, SEEK_END) ; };
             like $@->{description}, mkErr("cannot seek backwards");
 
             print $a "fred";
@@ -304,13 +304,13 @@ EOT
 
             my $u = $UncompressClass-> new((\$b))  ;
 
-            eval { seek($u, -1, 10) ; };
+            try { seek($u, -1, 10) ; };
             like $@->{description}, mkErr("seek: unknown value, 10, for whence parameter");
 
-            eval { seek($u, -1, SEEK_END) ; };
+            try { seek($u, -1, SEEK_END) ; };
             like $@->{description}, mkErr("seek: SEEK_END not allowed");
 
-            eval { seek($u, -1, SEEK_CUR) ; };
+            try { seek($u, -1, SEEK_CUR) ; };
             like $@->{description}, mkErr("cannot seek backwards");
         }
 

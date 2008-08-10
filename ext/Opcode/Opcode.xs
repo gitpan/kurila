@@ -293,22 +293,19 @@ PPCODE:
 
     opmask_addlocal(aTHX_ mask, op_mask_buf);
 
-    save_aptr(&PL_endav);
-    PL_endav = (AV*)sv_2mortal((SV*)newAV()); /* ignore END blocks for now	*/
+    SAVESPTR(PL_endav);
+    SVcpSTEAL(PL_endav, (SV*)newAV()); /* ignore END blocks for now	*/
 
-    save_hptr(&PL_defstash);		/* save current default stash	*/
+    SAVESPTR(PL_defstash);		/* save current default stash	*/
     /* the assignment to global defstash changes our sense of 'main'	*/
-    PL_defstash = gv_stashpv(Package, GV_ADDWARN); /* should exist already	*/
+    SVcpREPLACE(PL_defstash, gv_stashpv(Package, GV_ADDWARN)); /* should exist already	*/
 
-    save_hptr(&PL_curstash);
-    PL_curstash = PL_defstash;
+    SAVESPTR(PL_curstash);
+    SVcpREPLACE(PL_curstash, PL_defstash);
 
-    /* defstash must itself contain a main:: so we'll add that now	*/
-    /* take care with the ref counts (was cause of long standing bug)	*/
-    /* XXX I'm still not sure if this is right, GV_ADDWARN should warn!	*/
+    /* make "main::" the default stash */
     gv = gv_fetchpv("main::", GV_ADDWARN, SVt_PVHV);
-    sv_free((SV*)GvHV(gv));
-    GvHV(gv) = (HV*)SvREFCNT_inc(PL_defstash);
+    SVcpREPLACE(PL_curstash, GvHV(gv));
 
     /* %INC must be clean for use/require in compartment */
     dummy_hv = save_hash(PL_incgv);
@@ -364,14 +361,18 @@ PPCODE:
     int i, j, myopcode;
     const char * const bitmap = SvPV(opset, len);
     char **names = (desc) ? get_op_descs() : get_op_names();
+    AV *av;
     dMY_CXT;
+
+    av = newAV();
+    mXPUSHs((SV*)av);
 
     verify_opset(aTHX_ opset,1);
     for (myopcode=0, i=0; i < opset_len; i++) {
 	const U16 bits = bitmap[i];
 	for (j=0; j < 8 && myopcode < PL_maxo; j++, myopcode++) {
 	    if ( bits & (1 << j) )
-		XPUSHs(sv_2mortal(newSVpv(names[myopcode], 0)));
+		av_push(av, newSVpv(names[myopcode], 0));
 	}
     }
     }
@@ -448,41 +449,27 @@ CODE:
 
 
 void
-opdesc(...)
+opdesc(op)
+    SV* op;    
 PPCODE:
     int i;
     STRLEN len;
-    SV **args;
     char **op_desc = get_op_descs(); 
     dMY_CXT;
 
     /* copy args to a scratch area since we may push output values onto	*/
     /* the stack faster than we read values off it if masks are used.	*/
-    args = (SV**)SvPVX(sv_2mortal(newSVpvn((char*)&ST(0), items*sizeof(SV*))));
-    for (i = 0; i < items; i++) {
-	const char * const opname = SvPV(args[i], len);
-	SV *bitspec = get_op_bitspec(aTHX_ opname, len, 1);
-	if (SvIOK(bitspec)) {
-	    const int myopcode = SvIV(bitspec);
-	    if (myopcode < 0 || myopcode >= PL_maxo)
-		croak("panic: opcode %d (%s) out of range",myopcode,opname);
-	    XPUSHs(sv_2mortal(newSVpv(op_desc[myopcode], 0)));
-	}
-	else if (SvPOK(bitspec) && SvCUR(bitspec) == (STRLEN)opset_len) {
-	    int b, j;
-	    const char * const bitmap = SvPV_nolen_const(bitspec);
-	    int myopcode = 0;
-	    for (b=0; b < opset_len; b++) {
-		const U16 bits = bitmap[b];
-		for (j=0; j < 8 && myopcode < PL_maxo; j++, myopcode++)
-		    if (bits & (1 << j))
-			XPUSHs(sv_2mortal(newSVpv(op_desc[myopcode], 0)));
-	    }
-	}
-	else
-	    croak("panic: invalid bitspec for \"%s\" (type %u)",
-		opname, (unsigned)SvTYPE(bitspec));
+    const char * const opname = SvPV(op, len);
+    SV *bitspec = get_op_bitspec(aTHX_ opname, len, 1);
+    if (SvIOK(bitspec)) {
+        const int myopcode = SvIV(bitspec);
+        if (myopcode < 0 || myopcode >= PL_maxo)
+            croak("panic: opcode %d (%s) out of range",myopcode,opname);
+        mXPUSHs(newSVpv(op_desc[myopcode], 0));
     }
+    else
+        croak("panic: invalid bitspec for \"%s\" (type %u)",
+              opname, (unsigned)SvTYPE(bitspec));
 
 
 void

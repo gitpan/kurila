@@ -13,7 +13,7 @@
 # increment the test count in the BEGIN block below.  We don't use any of the
 # fancy test modules intentionally for backward compatibility to older
 # versions of Perl.
-@TESTS = (
+our @TESTS = @(
     \@( 'foo',
       undef, 'foo', 'foo', undef, 'pod' ),
 
@@ -91,29 +91,23 @@
       'news:yld72axzc8.fsf@windlord.stanford.edu', undef, 'url' )
 );
 
+use TestInit;
+
 BEGIN {
-    chdir 't' if -d 't';
-    unshift (@INC, '../blib/lib');
-    $| = 1;
     print "1..25\n";
 }
 
-END {
-    print "not ok 1\n" unless $loaded;
-}
-
 use Pod::ParseLink;
-$loaded = 1;
 print "ok 1\n";
 
 # Used for reporting test failures.
-my @names = qw(text inferred name section type);
+my @names = @( qw(text inferred name section type) );
 
 my $n = 2;
-for (@TESTS) {
-    my @expected = @$_;
+for (< @TESTS) {
+    my @expected = @( < @$_ );
     my $link = shift @expected;
-    my @results = parselink ($link);
+    my @results = @( < parselink ($link) );
     my $okay = 1;
     for (0..4) {
         # Make sure to check undef explicitly; we don't want undef to match

@@ -115,6 +115,10 @@ S_mro_get_linear_isa_c3(pTHX_ HV* stash, I32 level)
     gvp = (GV**)hv_fetchs(stash, "ISA", FALSE);
     isa = (gvp && (gv = *gvp) && isGV_with_GP(gv)) ? GvAV(gv) : NULL;
 
+    if ( isa && ! SvAVOK(isa) ) {
+	Perl_croak(aTHX_ "@ISA is not an array but %s", Ddesc((SV*)isa));
+    }
+
     /* For a better idea how the rest of this works, see the much clearer
        pure perl version in Algorithm::C3 0.01:
        http://search.cpan.org/src/STEVAN/Algorithm-C3-0.01/lib/Algorithm/C3.pm
@@ -136,19 +140,26 @@ S_mro_get_linear_isa_c3(pTHX_ HV* stash, I32 level)
         SV** isa_ptr = AvARRAY(isa);
         while(items--) {
             SV* const isa_item = *isa_ptr++;
-            HV* const isa_item_stash = gv_stashsv(isa_item, 0);
-            if(!isa_item_stash) {
-                /* if no stash, make a temporary fake MRO
-                   containing just itself */
-                AV* const isa_lin = newAV();
-                av_push(isa_lin, newSVsv(isa_item));
-                av_push(seqs, (SV*)isa_lin);
-            }
-            else {
-                /* recursion */
-                AV* const isa_lin = mro_get_linear_isa_c3(isa_item_stash, level + 1);
-                av_push(seqs, SvREFCNT_inc_simple_NN((SV*)isa_lin));
-            }
+	    if ( ! SvPVOK(isa_item) ) {
+		sv_dump(isa_item);
+		refcnt_check();
+		Perl_croak(aTHX_ "@ISA element which is not an plain value");
+	    }
+	    {
+		HV* const isa_item_stash = gv_stashsv(isa_item, 0);
+		if(!isa_item_stash) {
+		    /* if no stash, make a temporary fake MRO
+		       containing just itself */
+		    AV* const isa_lin = newAV();
+		    av_push(isa_lin, newSVsv(isa_item));
+		    av_push(seqs, (SV*)isa_lin);
+		}
+		else {
+		    /* recursion */
+		    AV* const isa_lin = mro_get_linear_isa_c3(isa_item_stash, level + 1);
+		    av_push(seqs, SvREFCNT_inc_simple_NN((SV*)isa_lin));
+		}
+	    }
         }
         av_push(seqs, SvREFCNT_inc_simple_NN((SV*)isa));
 
@@ -790,7 +801,7 @@ XS(XS_mro_nextcan)
             /* we found a real sub here */
             sv = sv_2mortal(newSV(0));
 
-            gv_efullname4(sv, cvgv, NULL, TRUE);
+            gv_efullname3(sv, cvgv, NULL);
 
             fq_subname = SvPVX(sv);
             fq_subname_len = SvCUR(sv);

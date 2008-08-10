@@ -6,7 +6,7 @@ BEGIN {
     }
     if (%ENV{PERL_CORE}) {
 	chdir('t') if -d 't';
-	@INC = $^O eq 'MacOS' ? qw(::lib) : qw(../lib);
+	@INC = @( $^O eq 'MacOS' ? qw(::lib) : qw(../lib) );
     }
 }
 
@@ -150,7 +150,7 @@ my $overCJK = Unicode::Collate->new(
 ENTRIES
   overrideCJK => sub {
     my $u = 0xFFFF - @_[0]; # reversed
-    \@($u, 0x20, 0x2, $u);
+    @(\@($u, 0x20, 0x2, $u));
   },
 );
 

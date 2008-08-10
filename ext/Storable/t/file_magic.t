@@ -24,7 +24,7 @@ for my $f (<data_*>) {
 print ");\n";
 EOT
 
-my @tests = (
+my @tests = @(
     \@(
         "perl-store\x[04]1234\4\4\4\x[D4]\x[C2]\32\b\3\13\0\0\0v\b\x[C5]\32\b...",
         \%(
@@ -380,11 +380,11 @@ my @tests = (
     ),
 );
 
-plan tests => 31 + 2 * @tests;
+plan tests => 31 + 2 * nelems @tests;
 
 my $file = "xx-$$.pst";
 
-is(eval { Storable::file_magic($file) }, undef, "empty file give undef");
+is(try { Storable::file_magic($file) }, undef, "empty file give undef");
 like($@->{description}, qq{/^Can't open '\Q$file\E':/}, "...and croaks");
 is(Storable::file_magic(__FILE__), undef, "not an image");
 
@@ -403,7 +403,7 @@ store(\%(), $file);
 
     ok(!$info->{netorder}, "no netorder");
 
-    my %attrs = (
+    my %attrs = %(
         nvsize  => 5.006, 
         ptrsize => 5.005, 
         map {$_ => 5.004} qw(byteorder intsize longsize)
@@ -432,8 +432,8 @@ nstore(\%(), $file);
     }
 }
 
-for my $test (@tests) {
-    my($data, $expected) = @$test;
+for my $test (< @tests) {
+    my($data, $expected) = < @$test;
     open(FH, ">", "$file") || die "Can't create $file: $!";
     binmode(FH);
     print FH $data;

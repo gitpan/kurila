@@ -1,7 +1,5 @@
 BEGIN {
-    chdir 't' if -d 't';
-    @INC = qw(../lib .);
-    require "test.pl";
+    require "./test.pl";
 }
 
 plan tests => 4784;
@@ -30,7 +28,7 @@ END
 sub test_regexp ($$) {
   # test that given string consists of N-1 chars matching $qr1, and 1
   # char matching $qr2
-  my ($str, $blk) = @_;
+  my ($str, $blk) = <@_;
 
   # constructing these objects here makes the last test loop go much faster
   my $qr1 = qr/(\p{$blk}+)/;
@@ -61,33 +59,33 @@ if (ord('A') == 193) {
 }
 
 # make sure it finds built-in class
-is(($str =~ m/(\p{Letter}+)/)[0], 'ABCDEFGHIJKLMNOPQRSTUVWXYZ');
-is(($str =~ m/(\p{l}+)/)[0], 'ABCDEFGHIJKLMNOPQRSTUVWXYZ');
+is(@($str =~ m/(\p{Letter}+)/)[0], 'ABCDEFGHIJKLMNOPQRSTUVWXYZ');
+is(@($str =~ m/(\p{l}+)/)[0], 'ABCDEFGHIJKLMNOPQRSTUVWXYZ');
 
 # make sure it finds user-defined class
-is(($str =~ m/(\p{MyUniClass}+)/)[0], '0123456789:;<=>?@ABCDEFGHIJKLMNO');
+is(@($str =~ m/(\p{main::MyUniClass}+)/)[0], '0123456789:;<=>?@ABCDEFGHIJKLMNO');
 
 # make sure it finds class in other package
-is(($str =~ m/(\p{Other::Class}+)/)[0], '@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_');
+is(@($str =~ m/(\p{Other::Class}+)/)[0], '@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_');
 
 # make sure it finds class in other OTHER package
-is(($str =~ m/(\p{A::B::Intersection}+)/)[0], '@ABCDEFGHIJKLMNO');
+is(@($str =~ m/(\p{A::B::Intersection}+)/)[0], '@ABCDEFGHIJKLMNO');
 
 # all of these should look in lib/unicore/bc/AL.pl
 $str = "\x{070D}\x{070E}\x{070F}\x{0710}\x{0711}";
-is(($str =~ m/(\P{BidiClass: ArabicLetter}+)/)[0], "\x{070E}\x{070F}");
-is(($str =~ m/(\P{BidiClass: AL}+)/)[0], "\x{070E}\x{070F}");
-is(($str =~ m/(\P{BC :ArabicLetter}+)/)[0], "\x{070E}\x{070F}");
-is(($str =~ m/(\P{bc=AL}+)/)[0], "\x{070E}\x{070F}");
+is(@($str =~ m/(\P{BidiClass: ArabicLetter}+)/)[0], "\x{070E}\x{070F}");
+is(@($str =~ m/(\P{BidiClass: AL}+)/)[0], "\x{070E}\x{070F}");
+is(@($str =~ m/(\P{BC :ArabicLetter}+)/)[0], "\x{070E}\x{070F}");
+is(@($str =~ m/(\P{bc=AL}+)/)[0], "\x{070E}\x{070F}");
 
 # make sure InGreek works
 $str = "[\x{038B}\x{038C}\x{038D}]";
 
-is(($str =~ m/(\p{InGreek}+)/)[0], "\x{038B}\x{038C}\x{038D}");
-is(($str =~ m/(\p{Script:InGreek}+)/)[0], "\x{038B}\x{038C}\x{038D}");
-is(($str =~ m/(\p{Script=InGreek}+)/)[0], "\x{038B}\x{038C}\x{038D}");
-is(($str =~ m/(\p{sc:InGreek}+)/)[0], "\x{038B}\x{038C}\x{038D}");
-is(($str =~ m/(\p{sc=InGreek}+)/)[0], "\x{038B}\x{038C}\x{038D}");
+is(@($str =~ m/(\p{InGreek}+)/)[0], "\x{038B}\x{038C}\x{038D}");
+is(@($str =~ m/(\p{Script:InGreek}+)/)[0], "\x{038B}\x{038C}\x{038D}");
+is(@($str =~ m/(\p{Script=InGreek}+)/)[0], "\x{038B}\x{038C}\x{038D}");
+is(@($str =~ m/(\p{sc:InGreek}+)/)[0], "\x{038B}\x{038C}\x{038D}");
+is(@($str =~ m/(\p{sc=InGreek}+)/)[0], "\x{038B}\x{038C}\x{038D}");
 
 use File::Spec;
 my $updir = 'File::Spec'->updir;
@@ -100,7 +98,7 @@ my $updir = 'File::Spec'->updir;
 no warnings 'utf8'; # we do not want warnings about surrogates etc
 
 sub char_range {
-    my ($h1, $h2) = @_;
+    my ($h1, $h2) = <@_;
 
     my $str;
 
@@ -114,7 +112,7 @@ sub char_range {
 	    }
 	}
     } else {
-	$str = join "", map chr, $h1 .. (($h2 || $h1) + 1);
+	$str = join "", map { chr $_ } $h1 .. (($h2 || $h1) + 1);
     }
 
     return $str;
@@ -149,7 +147,7 @@ while (my ($abbrev, $files) = each %utf8::PVA_abbr_map) {
 for my $p ('gc', 'sc') {
   while (my ($abbr) = each %{ %utf8::PropValueAlias{$p} }) {
     my $filename = 'File::Spec'->catfile(
-      $updir => lib => unicore => lib => gc_sc => "%utf8::PVA_abbr_map{gc_sc}{$abbr}.pl"
+      $updir => lib => unicore => lib => gc_sc => "%utf8::PVA_abbr_map{gc_sc}->{$abbr}.pl"
     );
 
     next unless -e $filename;
@@ -158,7 +156,7 @@ for my $p ('gc', 'sc') {
     my $str = char_range($h1, $h2);
 
     for my $x ($p, %( gc => 'General Category', sc => 'Script' ){$p}) {
-      for my $y ($abbr, %utf8::PropValueAlias{$p}{$abbr}, %utf8::PVA_abbr_map{gc_sc}{$abbr}) {
+      for my $y ($abbr, %utf8::PropValueAlias{$p}->{$abbr}, %utf8::PVA_abbr_map{gc_sc}->{$abbr}) {
         is($str =~ m/(\p{$x: $y}+)/ && $1, substr($str, 0, -1));
         is($str =~ m/(\P{$x= $y}+)/ && $1, substr($str, -1));
         SKIP: {

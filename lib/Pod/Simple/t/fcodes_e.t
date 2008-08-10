@@ -1,7 +1,7 @@
 BEGIN {
     if(%ENV{PERL_CORE}) {
         chdir 't';
-        @INC = '../lib';
+        @INC = @( '../lib' );
     }
 }
 
@@ -23,10 +23,10 @@ print "# Pod::Escapes version $Pod::Escapes::VERSION\n",
 # Presumably that's the library being used
 
 
-sub e ($$) { Pod::Simple::DumpAsXML->_duo(@_) }
+sub e ($$) { Pod::Simple::DumpAsXML->_duo(< @_) }
 
-&ok( e "", "" );
-&ok( e "\n", "", );
+&ok( < e "", "" );
+&ok( < e "\n", "", );
 
 
 print "# Testing some basic mnemonic E sequences...\n";

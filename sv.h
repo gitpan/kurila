@@ -8,6 +8,17 @@
  *
  */
 
+#ifdef PERL_VALGRIND
+#  include "valgrind/memcheck.h"
+#else
+#  define VALGRIND_MAKE_MEM_UNDEFINED(p, s)
+#  define VALGRIND_MAKE_MEM_DEFINED(p, s)
+#  define VALGRIND_MAKE_MEM_NOACCESS(p, s)
+#  define VALGRIND_MEMPOOL_ALLOC(pool, p, s)
+#  define VALGRIND_MEMPOOL_FREE(pool, p)
+#  define VALGRIND_CREATE_MEMPOOL(pool, x, s)
+#endif
+
 #ifdef sv_flags
 #undef sv_flags		/* Convex has this in <signal.h> for sigvec() */
 #endif
@@ -64,6 +75,19 @@ typedef enum {
 	SVt_LAST	/* keep last in enum. used to size arrays */
 } svtype;
 
+
+typedef enum {
+    Dt_UNDEF,
+    Dt_PLAIN,
+    Dt_REF,
+    Dt_ARRAY,
+    Dt_HASH,
+    Dt_IO,
+    Dt_GLOB,
+    Dt_COMPLEX
+} datatype;
+
+
 /* There is collusion here with sv_clear - sv_clear exits early for SVt_NULL
    and SVt_IV, so never reaches the clause at the end that uses
    sv_type_details->body_size to determine whether to call safefree(). Hence
@@ -88,7 +112,8 @@ typedef struct hek HEK;
 #define _SV_HEAD(ptrtype) \
     ptrtype	sv_any;		/* pointer to body */	\
     U32		sv_refcnt;	/* how many references to us */	\
-    U32		sv_flags	/* what we are */
+    U32		sv_flags;	/* what we are */  \
+    U32		sv_tmprefcnt	/* temporary how many references to us */
 
 #define _SV_HEAD_UNION \
     union {				\
@@ -105,13 +130,6 @@ typedef struct hek HEK;
 struct STRUCT_SV {		/* struct sv { */
     _SV_HEAD(void*);
     _SV_HEAD_UNION;
-#ifdef DEBUG_LEAKING_SCALARS
-    PERL_BITFIELD32 sv_debug_optype:9;	/* the type of OP that allocated us */
-    PERL_BITFIELD32 sv_debug_inpad:1;	/* was allocated in a pad for an OP */
-    PERL_BITFIELD32 sv_debug_cloned:1;	/* was cloned for an ithread */
-    PERL_BITFIELD32 sv_debug_line:16;	/* the line where we were allocated */
-    char *	sv_debug_file;		/* the file where we were allocated */
-#endif
 };
 
 struct gv {
@@ -209,13 +227,16 @@ perform the upgrade if necessary.  See C<svtype>.
 #define SvANY(sv)	(sv)->sv_any
 #define SvFLAGS(sv)	(sv)->sv_flags
 #define SvREFCNT(sv)	(sv)->sv_refcnt
+#define SvTMPREFCNT(sv)	(sv)->sv_tmprefcnt
 
 #if defined(__GNUC__) && !defined(PERL_GCC_BRACE_GROUPS_FORBIDDEN)
 #  define SvREFCNT_inc(sv)		\
     ({					\
 	SV * const _sv = (SV*)(sv);	\
-	if (_sv)			\
+	if (_sv) {				\
+	    assert(SvTYPE(_sv) != SVTYPEMASK);	\
 	     (SvREFCNT(_sv))++;		\
+        }  \
 	_sv;				\
     })
 #  define SvREFCNT_inc_simple(sv)	\
@@ -247,6 +268,16 @@ perform the upgrade if necessary.  See C<svtype>.
 	(void)((PL_Sv=(SV*)(sv)) ? ++(SvREFCNT(PL_Sv)) : 0)
 #endif
 
+#  define SvTMPREFCNT_inc(sv)		\
+    ({					\
+	SV * const _sv = (SV*)(sv);	\
+	if (_sv) {			\
+	    assert(SvTYPE(_sv) != SVTYPEMASK);	\
+	     (SvTMPREFCNT(_sv))++;		\
+        } \
+	_sv;				\
+    })
+
 /* These guys don't need the curly blocks */
 #define SvREFCNT_inc_simple_void(sv)	STMT_START { if (sv) SvREFCNT(sv)++; } STMT_END
 #define SvREFCNT_inc_simple_NN(sv)	(++(SvREFCNT(sv)),(SV*)(sv))
@@ -259,8 +290,8 @@ perform the upgrade if necessary.  See C<svtype>.
 	SV * const _sv = (SV*)(sv);	\
 	if (_sv) {			\
 	    if (SvREFCNT(_sv)) {	\
-		if (--(SvREFCNT(_sv)) == 0) \
-		    Perl_sv_free2(aTHX_ _sv);	\
+		if (--(SvREFCNT(_sv)) == 0) {			\
+		    Perl_sv_free2(aTHX_ _sv);	} 		\
 	    } else {			\
 		sv_free(_sv);		\
 	    }				\
@@ -341,9 +372,6 @@ perform the upgrade if necessary.  See C<svtype>.
 #define PRIVSHIFT 4	/* (SVp_?OK >> PRIVSHIFT) == SVf_?OK */
 
 #define SVf_AMAGIC	0x10000000  /* has magical overloaded methods */
-/* Ensure this value does not clash with the GV_ADD* flags in gv.h: */
-#define SVf_NOTUSED    0x20000000  /* was: SVf_UTF8. SvPV is UTF-8 encoded */
-					   
 
 /* Some private flags. */
 
@@ -410,7 +438,7 @@ union _xivu {
 
 union _xmgu {
     MAGIC*  xmg_magic;		/* linked list of magicalness */
-    HV*	    xmg_ourstash;	/* Stash for our (when SvPAD_OUR is true) */
+    GV*     xmg_ourgv;          /* Glob for our (when SvPAD_OUR is true) */
 };
 
 struct xpv {
@@ -695,10 +723,16 @@ Set the actual length of the string which is in the SV.  See C<SvIV_set>.
 #define assert_not_glob(sv)	
 #endif
 
-#define SvOK(sv)		((SvTYPE(sv) == SVt_BIND)		\
+#define SvAVOK(sv)              (SvTYPE(sv) == SVt_PVAV)
+#define SvHVOK(sv)              (SvTYPE(sv) == SVt_PVHV)
+#define SvIOOK(sv)              (SvTYPE(sv) == SVt_PVIO)
+
+#define SvPVOK(sv)		((SvTYPE(sv) == SVt_BIND)		\
 				 ? (SvFLAGS(SvRV(sv)) & SVf_OK)		\
 				 : (SvFLAGS(sv) & SVf_OK))
-#define SvOK_off(sv)		(assert_not_ROK(sv) assert_not_glob(sv)	\
+#define SvOK(sv)		(SvAVOK(sv) || SvHVOK(sv) || SvPVOK(sv) || SvIOOK(sv) )
+#define SvOK_off(sv)		( SvAVOK(sv) || SvHVOK(sv) ? sv_setsv(sv, NULL) : SvPVOK_off(sv) )
+#define SvPVOK_off(sv)		(assert_not_ROK(sv) assert_not_glob(sv)	\
 				 SvFLAGS(sv) &=	~(SVf_OK|		\
 						  SVf_IVisUV),	\
 							SvOOK_off(sv))
@@ -708,8 +742,6 @@ Set the actual length of the string which is in the SV.  See C<SvIV_set>.
 
 #define SvOKp(sv)		(SvFLAGS(sv) & (SVp_IOK|SVp_NOK|SVp_POK))
 #define SvIOKp(sv)		(SvFLAGS(sv) & SVp_IOK)
-#define SvIOKp_on(sv)		(assert_not_glob(sv) SvRELEASE_IVX_(sv)	\
-				    SvFLAGS(sv) |= SVp_IOK)
 #define SvNOKp(sv)		(SvFLAGS(sv) & SVp_NOK)
 #define SvNOKp_on(sv)		(assert_not_glob(sv) SvFLAGS(sv) |= SVp_NOK)
 #define SvPOKp(sv)		(SvFLAGS(sv) & SVp_POK)
@@ -914,13 +946,14 @@ the scalar's value cannot change unless written to.
 #  define SvPAD_STATE_on(sv)	(SvFLAGS(sv) |= SVpad_NAME|SVpad_STATE)
 #endif
 
-#define SvOURSTASH(sv)	\
-	(SvPAD_OUR(sv) ? ((XPVMG*) SvANY(sv))->xmg_u.xmg_ourstash : NULL)
-#define SvOURSTASH_set(sv, st)					\
-        STMT_START {						\
-	    assert(SvTYPE(sv) == SVt_PVMG);			\
-	    ((XPVMG*) SvANY(sv))->xmg_u.xmg_ourstash = st;	\
-	} STMT_END
+#define SvOURGV(sv) \
+       (SvPAD_OUR(sv) ? ((XPVMG*) SvANY(sv))->xmg_u.xmg_ourgv : NULL)
+#define SvOURGV_set(sv, st)                                 \
+        STMT_START {                                           \
+           assert(SvTYPE(sv) == SVt_PVMG);                     \
+           ((XPVMG*) SvANY(sv))->xmg_u.xmg_ourgv = st;      \
+       } STMT_END
+
 
 #ifdef PERL_DEBUG_COW
 #else
@@ -1054,12 +1087,6 @@ the scalar's value cannot change unless written to.
 #define SvENDx(sv) ((PL_Sv = (sv)), SvEND(PL_Sv))
 
 
-/* Ask a scalar nicely to try to become an IV, if possible.
-   Not guaranteed to stay returning void */
-/* Macro won't actually call sv_2iv if already IOK */
-#define SvIV_please(sv) \
-	STMT_START {if (!SvIOKp(sv) && (SvNOK(sv) || SvPOK(sv))) \
-		(void) SvIV(sv); } STMT_END
 #define SvIV_set(sv, val) \
 	STMT_START { assert(SvTYPE(sv) == SVt_IV || SvTYPE(sv) >= SVt_PVIV); \
 		assert(SvTYPE(sv) != SVt_PVAV);		\
@@ -1114,12 +1141,12 @@ the scalar's value cannot change unless written to.
 		(((XPV*)  SvANY(sv))->xpv_len = (val)); } STMT_END
 #define SvEND_set(sv, val) \
 	STMT_START { assert(SvTYPE(sv) >= SVt_PV); \
-		(SvCUR(sv) = (val) - SvPVX(sv)); } STMT_END
+		(SvCUR(sv) = (val) - SvPVX_const(sv)); } STMT_END
 
 #define SvPV_renew(sv,n) \
 	STMT_START { SvLEN_set(sv, n); \
 		SvPV_set((sv), (MEM_WRAP_CHECK_(n,char)			\
-				(char*)saferealloc((Malloc_t)SvPVX(sv), \
+				(char*)saferealloc((Malloc_t)SvPVX_mutable(sv), \
 						   (MEM_SIZE)((n)))));  \
 		 } STMT_END
 
@@ -1148,6 +1175,8 @@ the scalar's value cannot change unless written to.
    a reference */
 #  define prepare_SV_for_RV(sv)						\
     STMT_START {							\
+		    if (SvTYPE(sv) == SVt_PVAV || SvTYPE(sv) == SVt_PVHV)	\
+			Perl_croak(aTHX_ "Can't update array or hash to ref"); \
 		    if (SvTYPE(sv) < SVt_PV && SvTYPE(sv) != SVt_IV)	\
 			sv_upgrade(sv, SVt_IV);				\
 		    else if (SvTYPE(sv) >= SVt_PV) {			\

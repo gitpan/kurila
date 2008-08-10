@@ -1178,32 +1178,7 @@ Perl_write_to_stderr(pTHX_ const char* message, int msglen)
 
     PERL_ARGS_ASSERT_WRITE_TO_STDERR;
 
-    if (PL_stderrgv && SvREFCNT(PL_stderrgv) 
-	&& (io = GvIO(PL_stderrgv))
-	&& (mg = SvTIED_mg((SV*)io, PERL_MAGIC_tiedscalar))) 
     {
-	dSP;
-	ENTER;
-	SAVETMPS;
-
-	save_re_context();
-	SAVESPTR(PL_stderrgv);
-	PL_stderrgv = NULL;
-
-	PUSHSTACKi(PERLSI_MAGIC);
-
-	PUSHMARK(SP);
-	EXTEND(SP,2);
-	PUSHs(SvTIED_obj((SV*)io, mg));
-	mPUSHp(message, msglen);
-	PUTBACK;
-	call_method("PRINT", G_SCALAR);
-
-	POPSTACK;
-	FREETMPS;
-	LEAVE;
-    }
-    else {
 #ifdef USE_SFIO
 	/* SFIO can really mess with your errno */
 	const int e = errno;
@@ -1224,12 +1199,12 @@ bool
 Perl_vdie_common(pTHX_ SV *msv, bool warn)
 {
     dVAR;
-    HV *stash;
     GV *gv;
     CV *cv;
     SV **const hook = warn ? &PL_warnhook : &PL_diehook;
     /* sv_2cv might call Perl_croak() or Perl_warner() */
     SV * const oldhook = *hook;
+    PERL_ARGS_ASSERT_VDIE_COMMON;
 
     if ( *hook == NULL ) {
 	const char *msg;
@@ -1247,14 +1222,28 @@ Perl_vdie_common(pTHX_ SV *msv, bool warn)
 	return FALSE;
     }
     if ( *hook == PERL_DIEHOOK_FATAL ) {
-	write_to_stderr("recursive die\n", 13);
+	const COP *cop = PL_curcop;
+	if (CopLINE(cop)) {
+	    const char* message = "recursive die at ";
+	    char buffer[20];
+	    char* filename = OutCopFILE(cop);
+	    int blen;
+	    write_to_stderr("recursive die at ", strlen(message));
+	    write_to_stderr(filename, strlen(filename));
+	    blen = snprintf(&buffer, 20, " line %"IVdf".\n", (IV)CopLINE(cop));
+	    write_to_stderr(&buffer, blen);
+	}
+	else {
+	    const char* message = "recursive die at unknown location\n";
+	    write_to_stderr(message, strlen(message));
+	}
 	return FALSE;
     }
 
     ENTER;
     SAVESPTR(*hook);
     *hook = PERL_DIEHOOK_IGNORE;
-    cv = sv_2cv(oldhook, &stash, &gv, 0);
+    cv = sv_2cv(oldhook, &gv, 0);
     LEAVE;
     if (cv && !CvDEPTH(cv) && (CvROOT(cv) || CvXSUB(cv))) {
 	dSP;
@@ -1342,6 +1331,7 @@ Perl_die_nocontext(const char* pat, ...)
 {
     dTHX;
     va_list args;
+    PERL_ARGS_ASSERT_DIE_NOCONTEXT;
     va_start(args, pat);
     vdie(pat, &args);
     /* NOTREACHED */
@@ -1355,6 +1345,7 @@ Perl_croak_nocontext(const char *pat, ...)
 {
     dTHX;
     va_list args;
+    PERL_ARGS_ASSERT_CROAK_NOCONTEXT;
     va_start(args, pat);
     vdie(pat, &args);
     /* NOTREACHED */
@@ -1409,17 +1400,19 @@ Perl_vwarn(pTHX_ const char* pat, va_list *args)
 	    SvCUR_set(PL_errors, 0);
 	}
 
-	ENTER;
-	PUSHSTACKi(PERLSI_WARNHOOK);
-	PUSHMARK(SP);
-	XPUSHs(msv);
-	PUTBACK;
-	call_sv(PL_errorcreatehook, G_SCALAR);
-	SPAGAIN;
-	msv = POPs;
-	PUTBACK;
-	POPSTACK;
-	LEAVE;
+	if (PL_errorcreatehook) {
+	    ENTER;
+	    PUSHSTACKi(PERLSI_WARNHOOK);
+	    PUSHMARK(SP);
+	    XPUSHs(msv);
+	    PUTBACK;
+	    call_sv(PL_errorcreatehook, G_SCALAR);
+	    SPAGAIN;
+	    msv = POPs;
+	    PUTBACK;
+	    POPSTACK;
+	    LEAVE;
+	}
     }
 
     vdie_common(msv, TRUE);
@@ -3455,11 +3448,6 @@ Perl_get_vtbl(pTHX_ int vtbl_id)
     case want_vtbl_regdatum:
 	result = &PL_vtbl_regdatum;
 	break;
-#ifdef USE_LOCALE_COLLATE
-    case want_vtbl_collxfrm:
-	result = &PL_vtbl_collxfrm;
-	break;
-#endif
     case want_vtbl_amagic:
 	result = &PL_vtbl_amagic;
 	break;
@@ -5838,7 +5826,7 @@ Perl_get_db_sub(pTHX_ SV **svp, CV *cv)
 	    SvREFCNT_dec(tmp);
 	}
 	else {
-	    gv_efullname4(dbsv, gv, NULL, TRUE);
+	    gv_efullname3(dbsv, gv, NULL);
 	}
     }
     else {

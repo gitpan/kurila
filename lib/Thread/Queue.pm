@@ -15,7 +15,7 @@ my ($make_shared, $validate_count, $validate_index);
 sub new
 {
     my $class = shift;
-    my @queue :shared = map { $make_shared->($_) } @_;
+    my @queue :shared = @( map { $make_shared->($_) } < @_ );
     return bless(\@queue, $class);
 }
 
@@ -24,7 +24,7 @@ sub enqueue
 {
     my $queue = shift;
     lock(@$queue);
-    push(@$queue, map { $make_shared->($_) } @_)
+    push(@$queue, map { $make_shared->($_) } < @_)
         and cond_signal(@$queue);
 }
 
@@ -33,7 +33,7 @@ sub pending
 {
     my $queue = shift;
     lock(@$queue);
-    return scalar(@$queue);
+    return scalar(nelems @$queue);
 }
 
 # Return 1 or more items from the head of a queue, blocking if needed
@@ -42,11 +42,11 @@ sub dequeue
     my $queue = shift;
     lock(@$queue);
 
-    my $count = @_ ? $validate_count->(shift) : 1;
+    my $count = (nelems @_) ? $validate_count->(shift) : 1;
 
     # Wait for requisite number of items
-    cond_wait(@$queue) until (@$queue +>= $count);
-    cond_signal(@$queue) if (@$queue +> $count);
+    cond_wait(@$queue) until ((nelems @$queue) +>= $count);
+    cond_signal(@$queue) if ((nelems @$queue) +> $count);
 
     # Return single item
     return shift(@$queue) if ($count == 1);
@@ -63,7 +63,7 @@ sub dequeue_nb
     my $queue = shift;
     lock(@$queue);
 
-    my $count = @_ ? $validate_count->(shift) : 1;
+    my $count = (nelems @_) ? $validate_count->(shift) : 1;
 
     # Return single item
     return shift(@$queue) if ($count == 1);
@@ -71,7 +71,7 @@ sub dequeue_nb
     # Return multiple items
     my @items;
     for (1..$count) {
-        last if (! @$queue);
+        last if (! nelems @$queue);
         push(@items, shift(@$queue));
     }
     return @items;
@@ -82,7 +82,7 @@ sub peek
 {
     my $queue = shift;
     lock(@$queue);
-    my $index = @_ ? $validate_index->(shift) : 0;
+    my $index = (nelems @_) ? $validate_index->(shift) : 0;
     return @$queue[$index];
 }
 
@@ -94,11 +94,11 @@ sub insert
 
     my $index = $validate_index->(shift);
 
-    return if (! @_);   # Nothing to insert
+    return if (! nelems @_);   # Nothing to insert
 
     # Support negative indices
     if ($index +< 0) {
-        $index += @$queue;
+        $index += nelems @$queue;
         if ($index +< 0) {
             $index = 0;
         }
@@ -106,15 +106,15 @@ sub insert
 
     # Dequeue items from $index onward
     my @tmp;
-    while (@$queue +> $index) {
+    while ((nelems @$queue) +> $index) {
         unshift(@tmp, pop(@$queue))
     }
 
     # Add new items to the queue
-    push(@$queue, map { $make_shared->($_) } @_);
+    push(@$queue, map { < $make_shared->($_) } < @_);
 
     # Add previous items back onto the queue
-    push(@$queue, @tmp);
+    push(@$queue, < @tmp);
 
     # Soup's up
     cond_signal(@$queue);
@@ -126,12 +126,12 @@ sub extract
     my $queue = shift;
     lock(@$queue);
 
-    my $index = @_ ? $validate_index->(shift) : 0;
-    my $count = @_ ? $validate_count->(shift) : 1;
+    my $index = (nelems @_) ? $validate_index->(shift) : 0;
+    my $count = (nelems @_) ? $validate_count->(shift) : 1;
 
     # Support negative indices
     if ($index +< 0) {
-        $index += @$queue;
+        $index += nelems @$queue;
         if ($index +< 0) {
             $count += $index;
             return if ($count +<= 0);            # Beyond the head of the queue
@@ -141,16 +141,16 @@ sub extract
 
     # Dequeue items from $index+$count onward
     my @tmp;
-    while (@$queue +> ($index+$count)) {
+    while ((nelems @$queue) +> ($index+$count)) {
         unshift(@tmp, pop(@$queue))
     }
 
     # Extract desired items
     my @items;
-    unshift(@items, pop(@$queue)) while (@$queue +> $index);
+    unshift(@items, pop(@$queue)) while ((nelems @$queue) +> $index);
 
     # Add back any removed items
-    push(@$queue, @tmp);
+    push(@$queue, < @tmp);
 
     # Return single item
     return @items[0] if ($count == 1);
@@ -178,7 +178,7 @@ $make_shared = sub {
             # Make empty shared array ref
             $copy = &share(\@());
             # Recursively copy and add contents
-            push(@$copy, map { $make_shared->($_) } @$item);
+            push(@$copy, map { < $make_shared->($_) } < @$item);
         }
 
         # Copy a hash ref

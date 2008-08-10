@@ -1,10 +1,5 @@
 #!./perl -w
 
-BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
-}
-
 use Test::More;
 
 BEGIN { plan tests => 8 }
@@ -41,7 +36,7 @@ chdir(File::Spec->updir) or die "cannot change to parent of t/ directory: $!";
     my @warnings;
     local $^WARN_HOOK = sub { push @warnings, @_[0]->{description} };
 
-    eval {
+    try {
         $num_warnings = validate qq{
             lib  -d
 # comment, followed "blank" line (w/ whitespace):
@@ -53,7 +48,7 @@ chdir(File::Spec->updir) or die "cannot change to parent of t/ directory: $!";
         };
     };
 
-    print STDERR $_ for @warnings;
+    print STDERR $_ for < @warnings;
     if ( !$@ && !@warnings && defined($num_warnings) && $num_warnings == 0 ) {
         ok(1);
     }
@@ -70,14 +65,14 @@ chdir(File::Spec->updir) or die "cannot change to parent of t/ directory: $!";
 
     local $^WARN_HOOK = sub { push @warnings, @_[0]->{description} };
 
-    eval {
+    try {
         $num_warnings = validate qq{
             lib    -f
             README -f
         };
     };
 
-    if ( !$@ && @warnings == 1
+    if ( !$@ && (nelems @warnings) == 1
              && @warnings[0] =~ m/lib is not a plain file/
              && defined($num_warnings)
              && $num_warnings == 1 )
@@ -99,7 +94,7 @@ chdir(File::Spec->updir) or die "cannot change to parent of t/ directory: $!";
 
     local $^WARN_HOOK = sub { push @warnings, @_[0]->{description} };
 
-    eval {
+    try {
         $num_warnings = validate q{
             lib     -effd
             README -f || die
@@ -108,7 +103,7 @@ chdir(File::Spec->updir) or die "cannot change to parent of t/ directory: $!";
         };
     };
 
-    if ( !$@ && @warnings == 3
+    if ( !$@ && (nelems @warnings) == 3
              && @warnings[0] =~ m/lib is not a plain file/
              && @warnings[1] =~ m/README is not a directory/
              && @warnings[2] =~ m/my warning: lib/
@@ -132,7 +127,7 @@ chdir(File::Spec->updir) or die "cannot change to parent of t/ directory: $!";
 
     local $^WARN_HOOK = sub { push @warnings, @_[0]->{description} };
 
-    eval {
+    try {
         $num_warnings = validate qq{
             lib                -d || die
             '$path_to_libFile' cd
@@ -145,7 +140,7 @@ chdir(File::Spec->updir) or die "cannot change to parent of t/ directory: $!";
         };
     };
 
-    if ( !$@ && @warnings == 2
+    if ( !$@ && (nelems @warnings) == 2
              && @warnings[0] =~ m/Spec is not a plain file/
              && @warnings[1] =~ m/INSTALL is not a directory/
              && defined($num_warnings)
@@ -164,7 +159,7 @@ chdir(File::Spec->updir) or die "cannot change to parent of t/ directory: $!";
 {
     my $num_warnings;
 
-    eval {
+    try {
         $num_warnings = validate q{
             lib       -ef || die
             README    -d
@@ -187,7 +182,7 @@ chdir(File::Spec->updir) or die "cannot change to parent of t/ directory: $!";
 {
     my $num_warnings;
 
-    eval {
+    try {
         $num_warnings = validate q{
             lib       -ef || die "yadda $file yadda...\n"
             README    -d
@@ -207,7 +202,7 @@ chdir(File::Spec->updir) or die "cannot change to parent of t/ directory: $!";
 #### TEST 7 -- Quoted file names ####
 {
     my $num_warnings;
-    eval {
+    try {
         $num_warnings = validate q{
             "a file with whitespace" !-ef
             'a file with whitespace' !-ef
@@ -226,7 +221,7 @@ chdir(File::Spec->updir) or die "cannot change to parent of t/ directory: $!";
 #### TEST 8 -- Malformed query ####
 {
     my $num_warnings;
-    eval {
+    try {
         $num_warnings = validate q{
             a file with whitespace !-ef
         };

@@ -4,19 +4,19 @@
 #
 # $PERL5OPT, $PERL5LIB, etc.
 
+use TestInit;
+use Config;
+
 BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
-    require Config; Config->import;
     unless (%Config{'d_fork'}) {
         print "1..0 # Skip: no fork\n";
-	    exit 0;
+        exit 0;
     }
 }
 
 BEGIN { require './test.pl'; }
 
-plan tests => 17;
+plan tests => 16;
 
 my $STDOUT = './results-0';
 my $STDERR = './results-1';
@@ -33,34 +33,34 @@ delete %ENV{PERL5OPT};
 # second element is an explanation of the failure
 sub runperl {
   local *F;
-  my ($env, $args, $stdout, $stderr) = @_;
+  my ($env, $args, $stdout, $stderr) = < @_;
 
   unshift @$args, '-I../lib';
 
   $stdout = '' unless defined $stdout;
   $stderr = '' unless defined $stderr;
-  local %ENV = %ENV;
+  local %ENV = %( < %ENV );
   delete %ENV{PERLLIB};
   delete %ENV{PERL5LIB};
   delete %ENV{PERL5OPT};
   my $pid = fork;
-  return (0, "Couldn't fork: $!") unless defined $pid;   # failure
+  return  @(0, "Couldn't fork: $!") unless defined $pid;   # failure
   if ($pid) {                   # parent
     my ($actual_stdout, $actual_stderr);
     wait;
-    return (0, "Failure in child.\n") if ($?>>8) == $FAILURE_CODE;
+    return  @(0, "Failure in child.\n") if ($?>>8) == $FAILURE_CODE;
 
-    open F, "<", $STDOUT or return (0, "Couldn't read $STDOUT file");
+    open F, "<", $STDOUT or return  @(0, "Couldn't read $STDOUT file");
     { local $/; $actual_stdout = ~< *F }
-    open F, "<", $STDERR or return (0, "Couldn't read $STDERR file");
+    open F, "<", $STDERR or return  @(0, "Couldn't read $STDERR file");
     { local $/; $actual_stderr = ~< *F }
 
     if ($actual_stdout ne $stdout) {
-      return (0, "Stdout mismatch: expected:\n[$stdout]\nsaw:\n[$actual_stdout]");
+      return  @(0, "Stdout mismatch: expected:\n[$stdout]\nsaw:\n[$actual_stdout]");
     } elsif ($actual_stderr ne $stderr) {
-      return (0, "Stderr mismatch: expected:\n[$stderr]\nsaw:\n[$actual_stderr]");
+      return  @(0, "Stderr mismatch: expected:\n[$stderr]\nsaw:\n[$actual_stderr]");
     } else {
-      return 1;                 # success
+      return @(1, '');                 # success
     }
   } else {                      # child
     for my $k (keys %$env) {
@@ -68,7 +68,7 @@ sub runperl {
     }
     open STDOUT, ">", $STDOUT or exit $FAILURE_CODE;
     open STDERR, ">", $STDERR or it_didnt_work();
-    { exec $PERL, @$args }
+    { exec $PERL, < @$args }
     it_didnt_work();
   }
 }
@@ -79,8 +79,8 @@ sub it_didnt_work {
     exit $FAILURE_CODE;
 }
 
-sub try {
-  my ($success, $reason) = runperl(@_);
+sub tryrun {
+  my ($success, $reason) = < runperl(< @_);
   ok( !!$success, 1, $reason );
 }
 
@@ -94,97 +94,94 @@ sub try {
 #                    -T, tainting will be enabled, and any
 #                    subsequent options ignored.
 
-try(\%(PERL5OPT => '-w'), \@('-e', 'print $::x'),
+tryrun(\%(PERL5OPT => '-w'), \@('-e', 'print $main::x'),
     "", 
     qq{Name "main::x" used only once: possible typo at -e line 1.
-Use of uninitialized value \$x in print at -e line 1.
+Use of uninitialized value \$main::x in print at -e line 1.
 });
 
-try(\%(PERL5OPT => '-Mstrict'), \@('-e', 'print $::x'),
-    "", "");
-
-try(\%(PERL5OPT => '-Mstrict'), \@('-e', 'print $x'),
+tryrun(\%(PERL5OPT => '-Mstrict'), \@('-e', 'print $x'),
     "", 
     qq{Global symbol "\$x" requires explicit package name at -e line 1, at end of line
 Execution of -e aborted due to compilation errors. at -e line 1.\n});
 
 # Fails in 5.6.0
-try(\%(PERL5OPT => '-Mstrict -w'), \@('-e', 'print $x'),
+tryrun(\%(PERL5OPT => '-Mstrict -w'), \@('-e', 'print $x'),
     "", 
     qq{Global symbol "\$x" requires explicit package name at -e line 1, at end of line
 Execution of -e aborted due to compilation errors. at -e line 1.\n});
 
 # Fails in 5.6.0
-try(\%(PERL5OPT => '-w -Mstrict'), \@('-e', 'print $::x'),
+tryrun(\%(PERL5OPT => '-w -Mstrict'), \@('-e', 'print $main::x'),
     "", 
     <<ERROR
 Name "main::x" used only once: possible typo at -e line 1.
-Use of uninitialized value \$x in print at -e line 1.
+Use of uninitialized value \$main::x in print at -e line 1.
 ERROR
     );
 
 # Fails in 5.6.0
-try(\%(PERL5OPT => '-w -Mstrict'), \@('-e', 'print $::x'),
+tryrun(\%(PERL5OPT => '-w -Mstrict'), \@('-e', 'print $main::x'),
     "", 
     <<ERROR
 Name "main::x" used only once: possible typo at -e line 1.
-Use of uninitialized value \$x in print at -e line 1.
+Use of uninitialized value \$main::x in print at -e line 1.
 ERROR
     );
 
-try(\%(PERL5OPT => '-MExporter'), \@('-e0'),
+tryrun(\%(PERL5OPT => '-MExporter'), \@('-e0'),
     "", 
     "");
 
 # Fails in 5.6.0
-try(\%(PERL5OPT => '-MExporter -MExporter'), \@('-e0'),
+tryrun(\%(PERL5OPT => '-MExporter -MExporter'), \@('-e0'),
     "", 
     "");
 
-try(\%(PERL5OPT => '-Mstrict -Mwarnings'), 
+tryrun(\%(PERL5OPT => '-Mstrict -Mwarnings'), 
     \@('-e', 'print "ok" if %INC{"strict.pm"} and %INC{"warnings.pm"}'),
     "ok",
     "");
 
-try(\%(PERL5OPT => '-w -w'),
+tryrun(\%(PERL5OPT => '-w -w'),
     \@('-e', 'print %ENV{PERL5OPT}'),
     '-w -w',
     '');
 
-try(\%(PERL5OPT => '-t'),
+tryrun(\%(PERL5OPT => '-t'),
     \@('-e', 'print $^TAINT'),
     '-1',
     '');
 
-try(\%(PERLLIB => "foobar%Config{path_sep}42"),
-    \@('-e', 'print grep { $_ eq "foobar" } @INC'),
+tryrun(\%(PERLLIB => "foobar%Config{path_sep}42"),
+    \@('-e', 'print grep { $_ eq "foobar" } < @INC'),
     'foobar',
     '');
 
-try(\%(PERLLIB => "foobar%Config{path_sep}42"),
-    \@('-e', 'print grep { $_ eq "42" } @INC'),
+tryrun(\%(PERLLIB => "foobar%Config{path_sep}42"),
+    \@('-e', 'print grep { $_ eq "42" } < @INC'),
     '42',
     '');
 
-try(\%(PERL5LIB => "foobar%Config{path_sep}42"),
-    \@('-e', 'print grep { $_ eq "foobar" } @INC'),
+tryrun(\%(PERL5LIB => "foobar%Config{path_sep}42"),
+    \@('-e', 'print grep { $_ eq "foobar" } < @INC'),
     'foobar',
     '');
 
-try(\%(PERL5LIB => "foobar%Config{path_sep}42"),
-    \@('-e', 'print grep { $_ eq "42" } @INC'),
+tryrun(\%(PERL5LIB => "foobar%Config{path_sep}42"),
+    \@('-e', 'print grep { $_ eq "42" } < @INC'),
     '42',
     '');
 
-try(\%(PERL5LIB => "foo",
+tryrun(\%(PERL5LIB => "foo",
      PERLLIB => "bar"),
-    \@('-e', 'print grep { $_ eq "foo" } @INC'),
+    \@('-e', 'print grep { $_ eq "foo" } < @INC'),
     'foo',
     '');
 
-try(\%(PERL5LIB => "foo",
+tryrun(\%(PERL5LIB => "foo",
      PERLLIB => "bar"),
-    \@('-e', 'print grep { $_ eq "bar" } @INC'),
+    \@('-e', 'print grep { $_ eq "bar" } < @INC'),
     '',
     '');
 

@@ -8,17 +8,17 @@ BEGIN {
     require "./test.pl";
 }
 
-print "1..56\n";
+plan tests => 55;
 
-@A::ISA = 'B';
-@B::ISA = 'C';
+@A::ISA = @( 'B' );
+@B::ISA = @( 'C' );
 
 sub C::d {"C::d"}
 sub D::d {"D::d"}
 
 # First, some basic checks of method-calling syntax:
 my $obj = bless \@(), "Pack";
-sub Pack::method { shift; join(",", "method", @_) }
+sub Pack::method { shift; join(",", "method", < @_) }
 my $mname = "method";
 
 is(Pack->method("a","b","c"), "method,a,b,c");
@@ -40,16 +40,19 @@ is($obj->?$mname(), "method");
 is($obj->method, "method");
 is($obj->?$mname, "method");
 
+dies_like( sub { @(1, 2)->method() },
+           qr/Can't call method "method" on ARRAY/ );
+
 is( A->d, "C::d");		# Update hash table;
 
 *B::d = \&D::d;			# Import now.
 is(A->d, "D::d");		# Update hash table;
 
 {
-    local @A::ISA = qw(C);	# Update hash table with split() assignment
+    local @A::ISA = @( qw(C) );	# Update hash table with split() assignment
     is(A->d, "C::d");
-    @A::ISA = 0;
-    is(eval { A->d } || "fail", "fail");
+    @A::ISA = @( 0 );
+    is(try { A->d } || "fail", "fail");
 }
 is(A->d, "D::d");
 
@@ -58,7 +61,8 @@ is(A->d, "D::d");
     eval 'sub B::d {"B::d1"}';	# Import now.
     is(A->d, "B::d1");	# Update hash table;
     undef &B::d;
-    is((eval { A->d }, ($@->{description} =~ m/Undefined subroutine/)), 1);
+    dies_like( sub { A->d },
+               m/Undefined subroutine/ );
 }
 
 is(A->d, "D::d");		# Back to previous state
@@ -89,26 +93,16 @@ is(A->d, "C::d");
 
 {
     local *C::d;
-    is(eval { A->d } || "nope", "nope");
+    is(try { A->d } || "nope", "nope");
 }
 is(A->d, "C::d");
-
-*A::x = *A::d;			# See if cache incorrectly follows synonyms
-A->d;
-is(eval { A->x } || "nope", "nope");
-
-{
-    # this test added due to bug discovery
-    no strict 'refs';
-    is(defined(@{*{Symbol::fetch_glob("unknown_package::ISA")}}) ? "defined" : "undefined", "undefined");
-}
 
 # test that failed subroutine calls don't affect method calls
 {
     package A1;
     sub foo { "foo" }
     package A2;
-    our @ISA = 'A1';
+    our @ISA = @( 'A1' );
     package main;
     is(A2->foo(), "foo");
     is(do { eval 'A2::foo()'; $@ ? 1 : 0}, 1);
@@ -149,27 +143,27 @@ is(do { eval '$e = bless \%(), "UNIVERSAL"; $e->E::F::foo()';
 # TODO: we need some tests for the SUPER:: pseudoclass
 
 # failed method call or UNIVERSAL::can() should not autovivify packages
-is( %::{"Foo::"} || "none", "none");  # sanity check 1
-is( %::{"Foo::"} || "none", "none");  # sanity check 2
+is( %main::{"Foo::"} || "none", "none");  # sanity check 1
+is( %main::{"Foo::"} || "none", "none");  # sanity check 2
 
-is( UNIVERSAL::can("Foo", "boogie") ? "yes":"no", "no" );
-is( %::{"Foo::"} || "none", "none");  # still missing?
+is( UNIVERSAL::can("main::Foo", "boogie") ? "yes":"no", "no" );
+is( %main::{"Foo::"} || "none", "none");  # still missing?
 
-is( Foo->UNIVERSAL::can("boogie")   ? "yes":"no", "no" );
-is( %::{"Foo::"} || "none", "none");  # still missing?
+is( main::Foo->UNIVERSAL::can("boogie")   ? "yes":"no", "no" );
+is( %main::{"Foo::"} || "none", "none");  # still missing?
 
-is( Foo->can("boogie")              ? "yes":"no", "no" );
-is( %::{"Foo::"} || "none", "none");  # still missing?
+is( main::Foo->can("boogie")              ? "yes":"no", "no" );
+is( %main::{"Foo::"} || "none", "none");  # still missing?
 
-is( eval 'Foo->boogie(); 1'         ? "yes":"no", "no" );
-is( %::{"Foo::"} || "none", "none");  # still missing?
+is( eval 'main::Foo->boogie(); 1'         ? "yes":"no", "no" );
+is( %main::{"Foo::"} || "none", "none");  # still missing?
 
-is(do { eval 'Foo->boogie()';
-	  $@->message =~ m/^\QCan't locate object method "boogie" via package "Foo" (perhaps / ? 1 : $@}, 1);
+is(do { eval 'main::Foo->boogie()';
+	  $@->message =~ m/^\QCan't locate object method "boogie" via package "main::Foo" (perhaps / ? 1 : $@}, 1);
 
-eval 'sub Foo::boogie { "yes, sir!" }';
-is( %::{"Foo::"} ? "ok" : "none", "ok");  # should exist now
-is( Foo->boogie(), "yes, sir!");
+eval 'sub main::Foo::boogie { "yes, sir!" }';
+is( %main::{"Foo::"} ? "ok" : "none", "ok");  # should exist now
+is( main::Foo->boogie(), "yes, sir!");
 
 # TODO: universal.t should test NoSuchPackage->isa()/can()
 
@@ -179,14 +173,14 @@ package main;
 our @X;
 package Amajor;
 sub test {
-    push @main::X, 'Amajor', @_;
+    push @main::X, 'Amajor', < @_;
 }
 package Bminor;
 use base qw(Amajor);
 package main;
 sub Bminor::test {
     @_[0]->Bminor::SUPER::test('x', 'y');
-    push @main::X, 'Bminor', @_;
+    push @main::X, 'Bminor', < @_;
 }
 Bminor->test('y', 'z');
-is("@X", "Amajor Bminor x y Bminor Bminor y z");
+is("{join ' ', <@X}", "Amajor Bminor x y Bminor Bminor y z");

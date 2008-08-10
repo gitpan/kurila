@@ -5,8 +5,6 @@
 # build or testsuite that upgraded an NV to an RV
 
 BEGIN {
-    chdir 't';
-    @INC = '../lib';
     require './test.pl';
 }
 
@@ -15,7 +13,7 @@ use strict;
 my $null;
 
 $! = 1;
-my %types = (
+my %types = %(
     null => $null,
     iv => 3,
     nv => .5,
@@ -32,11 +30,11 @@ my %types = (
 
 # use Devel::Peek; Dump $pvmg;
 
-my @keys = keys %types;
-plan tests => @keys * @keys;
+my @keys = @( keys %types );
+plan tests => (nelems @keys) * nelems @keys;
 
-foreach my $source_type (@keys) {
-    foreach my $dest_type (@keys) {
+foreach my $source_type (< @keys) {
+    foreach my $dest_type (< @keys) {
 	# Pads re-using variables might contaminate this
 	my $vars = \%();
 	$vars->{dest} = %types{$dest_type};

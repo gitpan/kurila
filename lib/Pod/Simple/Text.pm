@@ -9,7 +9,7 @@ use Pod::Simple::Methody ();
 use Pod::Simple ();
 use vars qw( @ISA $VERSION $FREAKYMODE);
 $VERSION = '2.02';
-@ISA = ('Pod::Simple::Methody');
+@ISA = @('Pod::Simple::Methody');
 BEGIN { *DEBUG = defined(&Pod::Simple::DEBUG)
           ? \&Pod::Simple::DEBUG
           : sub() {0}
@@ -21,7 +21,7 @@ $Text::Wrap::wrap = 'overflow';
 
 sub new {
   my $self = shift;
-  my $new = $self->SUPER::new(@_);
+  my $new = $self->SUPER::new(< @_);
   $new->{'output_fh'} ||= *STDOUT{IO};
   $new->accept_target_as_text(qw( text plaintext plain ));
   $new->nix_X_codes(1);
@@ -34,28 +34,28 @@ sub new {
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-sub handle_text {  @_[0]{'Thispara'} .= @_[1] }
+sub handle_text {  @_[0]->{'Thispara'} .= @_[1] }
 
-sub start_Para  {  @_[0]{'Thispara'} = '' }
-sub start_head1 {  @_[0]{'Thispara'} = '' }
-sub start_head2 {  @_[0]{'Thispara'} = '' }
-sub start_head3 {  @_[0]{'Thispara'} = '' }
-sub start_head4 {  @_[0]{'Thispara'} = '' }
+sub start_Para  {  @_[0]->{'Thispara'} = '' }
+sub start_head1 {  @_[0]->{'Thispara'} = '' }
+sub start_head2 {  @_[0]->{'Thispara'} = '' }
+sub start_head3 {  @_[0]->{'Thispara'} = '' }
+sub start_head4 {  @_[0]->{'Thispara'} = '' }
 
-sub start_Verbatim    { @_[0]{'Thispara'} = ''   }
-sub start_item_bullet { @_[0]{'Thispara'} = $FREAKYMODE ? '' : '* ' }
-sub start_item_number { @_[0]{'Thispara'} = $FREAKYMODE ? '' : "@_[1]{'number'}. "  }
-sub start_item_text   { @_[0]{'Thispara'} = ''   }
+sub start_Verbatim    { @_[0]->{'Thispara'} = ''   }
+sub start_item_bullet { @_[0]->{'Thispara'} = $FREAKYMODE ? '' : '* ' }
+sub start_item_number { @_[0]->{'Thispara'} = $FREAKYMODE ? '' : "@_[1]->{'number'}. "  }
+sub start_item_text   { @_[0]->{'Thispara'} = ''   }
 
-sub start_over_bullet  { ++@_[0]{'Indent'} }
-sub start_over_number  { ++@_[0]{'Indent'} }
-sub start_over_text    { ++@_[0]{'Indent'} }
-sub start_over_block   { ++@_[0]{'Indent'} }
+sub start_over_bullet  { ++@_[0]->{'Indent'} }
+sub start_over_number  { ++@_[0]->{'Indent'} }
+sub start_over_text    { ++@_[0]->{'Indent'} }
+sub start_over_block   { ++@_[0]->{'Indent'} }
 
-sub   end_over_bullet  { --@_[0]{'Indent'} }
-sub   end_over_number  { --@_[0]{'Indent'} }
-sub   end_over_text    { --@_[0]{'Indent'} }
-sub   end_over_block   { --@_[0]{'Indent'} }
+sub   end_over_bullet  { --@_[0]->{'Indent'} }
+sub   end_over_number  { --@_[0]->{'Indent'} }
+sub   end_over_text    { --@_[0]->{'Indent'} }
+sub   end_over_block   { --@_[0]->{'Indent'} }
 
 
 # . . . . . Now the actual formatters:
@@ -74,9 +74,9 @@ sub emit_par {
   my $indent = ' ' x ( 2 * $self->{'Indent'} + 4 + ($tweak_indent||0) );
    # Yes, 'STRING' x NEGATIVE gives '', same as 'STRING' x 0
 
-  $self->{'Thispara'} =~ tr{\x{AD}}{}d if Pod::Simple::ASCII;
+  $self->{'Thispara'} =~ s/\x{AD}//g if Pod::Simple::ASCII;
   my $out = Text::Wrap::wrap($indent, $indent, $self->{'Thispara'} .= "\n");
-  $out =~ tr{\x{A0}}{ } if Pod::Simple::ASCII;
+  $out =~ s/\x{A0}/ /g if Pod::Simple::ASCII;
   print {$self->{'output_fh'}} $out, "\n";
   $self->{'Thispara'} = '';
   
@@ -88,8 +88,8 @@ sub emit_par {
 sub end_Verbatim  {
   my $self = shift;
   if(Pod::Simple::ASCII) {
-    $self->{'Thispara'} =~ tr{\x{A0}}{ };
-    $self->{'Thispara'} =~ tr{\x{AD}}{}d;
+    $self->{'Thispara'} =~ s/\x{A0}/ /g;
+    $self->{'Thispara'} =~ s/\x{AD}//g;
   }
 
   my $i = ' ' x ( 2 * $self->{'Indent'} + 4);

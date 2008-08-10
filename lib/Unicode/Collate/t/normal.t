@@ -6,12 +6,12 @@ BEGIN {
     }
     if (%ENV{PERL_CORE}) {
 	chdir('t') if -d 't';
-	@INC = $^O eq 'MacOS' ? qw(::lib) : qw(../lib);
+	@INC = @( $^O eq 'MacOS' ? qw(::lib) : qw(../lib) );
     }
 }
 
 BEGIN {
-    eval { require Unicode::Normalize; };
+    try { require Unicode::Normalize; };
     if ($@) {
 	print "1..0 # skipped: Unicode::Normalize needed for this test\n";
 	print $@;

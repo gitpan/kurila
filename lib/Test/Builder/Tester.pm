@@ -5,7 +5,6 @@ our $VERSION = "1.13";
 
 use Test::Builder;
 use Symbol;
-use Carp;
 
 =head1 NAME
 
@@ -55,9 +54,9 @@ my $t = Test::Builder->new;
 ###
 
 use Exporter;
-our @ISA = qw(Exporter);
+our @ISA = @( qw(Exporter) );
 
-our @EXPORT = qw(test_out test_err test_fail test_diag test_test line_num);
+our @EXPORT = @( qw(test_out test_err test_fail test_diag test_test line_num) );
 
 # _export_to_level and import stolen directly from Test::More.  I am
 # the king of cargo cult programming ;-)
@@ -69,40 +68,35 @@ sub _export_to_level
       my $level = shift;
       (undef) = shift;                  # XXX redundant arg
       my $callpkg = caller($level);
-      $pkg->export($callpkg, @_);
+      $pkg->export($callpkg, < @_);
 }
 
 sub import {
     my $class = shift;
-    my(@plan) = @_;
+    my(@plan) = @( < @_ );
 
     my $caller = caller;
 
     $t->exported_to($caller);
-    $t->plan(@plan);
+    $t->plan(< @plan);
 
-    my @imports = ();
-    foreach my $idx (0..(@plan-1)) {
+    my @imports = @( () );
+    foreach my $idx (0..((nelems @plan)-1)) {
         if( @plan[$idx] eq 'import' ) {
-            @imports = @{@plan[$idx+1]};
+            @imports = @( < @{@plan[$idx+1]} );
             last;
         }
     }
 
-    __PACKAGE__->_export_to_level(1, __PACKAGE__, @imports);
+    __PACKAGE__->_export_to_level(1, __PACKAGE__, < @imports);
 }
 
 ###
 # set up file handles
 ###
 
-# create some private file handles
-my $output_handle = gensym;
-my $error_handle  = gensym;
-
-# and tie them to this package
-my $out = tie *$output_handle, "Test::Builder::Tester::Tie", "STDOUT";
-my $err = tie *$error_handle,  "Test::Builder::Tester::Tie", "STDERR";
+my $out = Test::Builder::Tester::Tie->new("STDOUT");
+my $err = Test::Builder::Tester::Tie->new("STDERR");
 
 ####
 # exported functions
@@ -136,9 +130,9 @@ sub _start_testing
     $original_todo_handle    = $t->todo_output();
 
     # switch out to our own handles
-    $t->output($output_handle);
-    $t->failure_output($error_handle);
-    $t->todo_output($error_handle);
+    $t->output($out->handle);
+    $t->failure_output($err->handle);
+    $t->todo_output($err->handle);
 
     # clear the expected list
     $out->reset();
@@ -192,7 +186,7 @@ sub test_out
     # do we need to do any setup?
     _start_testing() unless $testing;
 
-    $out->expect(@_)
+    $out->expect(< @_)
 }
 
 sub test_err
@@ -200,7 +194,7 @@ sub test_err
     # do we need to do any setup?
     _start_testing() unless $testing;
 
-    $err->expect(@_)
+    $err->expect(< @_)
 }
 
 =item test_fail
@@ -279,7 +273,7 @@ sub test_diag
 
     # expect the same thing, but prepended with "#     "
     local $_;
-    $err->expect(map {"# $_"} @_)
+    $err->expect(map {"# $_"} < @_)
 }
 
 =item test_test
@@ -326,18 +320,18 @@ sub test_test
    # decode the arguements as described in the pod
    my $mess;
    my %args;
-   if (@_ == 1)
+   if ((nelems @_) == 1)
      { $mess = shift }
    else
    {
-     %args = @_;
+     %args = %( < @_ );
      $mess = %args{name} if exists(%args{name});
      $mess = %args{title} if exists(%args{title});
      $mess = %args{label} if exists(%args{label});
    }
 
     # er, are we testing?
-    croak "Not testing.  You must declare output with a test function first."
+    die "Not testing.  You must declare output with a test function first."
 	unless $testing;
 
     # okay, reconnect the test suite back to the saved handles
@@ -433,7 +427,7 @@ the PERL5LIB.
 my $color;
 sub color
 {
-  $color = shift if @_;
+  $color = shift if (nelems @_);
   $color;
 }
 
@@ -489,12 +483,26 @@ package Test::Builder::Tester::Tie;
 ##
 # add line(s) to be expected
 
+sub new {
+    my ($class, $type) = < @_;
+
+    my $self = bless \%( got => '', type => $type ), $class;
+    open my $fh, '>', \$self->{'got'} or die "$!";
+    $self->{'filehandle'} = $fh;
+    return $self;
+}
+
+sub handle {
+    my $self = shift;
+    return $self->{'filehandle'};
+}
+
 sub expect
 {
     my $self = shift;
 
-    my @checks = @_;
-    foreach my $check (@checks) {
+    my @checks = @( < @_ );
+    foreach my $check (< @checks) {
         $check = $self->_translate_Failed_check($check);
         push @{$self->{wanted}}, ref $check ? $check : "$check\n";
     }
@@ -503,7 +511,7 @@ sub expect
 
 sub _translate_Failed_check
 {
-    my($self, $check) = @_;
+    my($self, $check) = < @_;
 
     if( $check =~ m/\A(.*)#     (Failed .*test) \((.*?) at line (\d+)\)\Z(?!\n)/ ) {
         $check = "/\Q$1\E#\\s+\Q$2\E.*?\\n?.*?\Qat $3\E line \Q$4\E.*\\n?/";
@@ -523,9 +531,9 @@ sub check
     # turn off warnings as these might be undef
     local $^W = 0;
 
-    my @checks = @{$self->{wanted}};
+    my @checks = @( < @{$self->{wanted}} );
     my $got = $self->{got};
-    foreach my $check (@checks) {
+    foreach my $check (< @checks) {
         $check = "\Q$check\E" unless ($check =~ s,^/(.*)/$,$1, or ref $check);
         return 0 unless $got =~ s/^$check//;
     }
@@ -542,13 +550,13 @@ sub complaint
     my $self = shift;
     my $type   = $self->type;
     my $got    = $self->got;
-    my $wanted = join "\n", @{$self->wanted};
+    my $wanted = join "\n", < @{$self->wanted};
 
     # are we running in colour mode?
     if (Test::Builder::Tester::color)
     {
       # get color
-      eval { require Term::ANSIColor };
+      try { require Term::ANSIColor };
       unless ($@)
       {
         # colours
@@ -591,11 +599,9 @@ sub complaint
 sub reset
 {
     my $self = shift;
-    %$self = (
-              type   => $self->{type},
-              got    => '',
-              wanted => \@(),
-             );
+    seek $self->{'filehandle'}, 0, 0;
+    $self->{'got'} = '';
+    $self->{'wanted'} = \@();
 }
 
 
@@ -616,31 +622,5 @@ sub type
     my $self = shift;
     return $self->{type};
 }
-
-###
-# tie interface
-###
-
-sub PRINT  {
-    my $self = shift;
-    $self->{got} .= join '', @_;
-}
-
-sub TIEHANDLE {
-    my($class, $type) = @_;
-
-    my $self = bless \%(
-                   type => $type
-               ), $class;
-
-    $self->reset;
-
-    return $self;
-}
-
-sub READ {}
-sub READLINE {}
-sub GETC {}
-sub FILENO {}
 
 1;

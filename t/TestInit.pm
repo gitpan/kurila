@@ -19,7 +19,7 @@ our $VERSION = 1.01;
 
 BEGIN {
     chdir 't' if -d 't';
-    @INC = '../lib';
+    @INC = @('../lib');
 }
 
 # Don't interfere with the taintedness of %ENV, this could perturbate tests

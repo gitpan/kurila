@@ -1,10 +1,5 @@
 #!./perl
 
-BEGIN {
-	chdir 't' if -d 't';
-	unshift @INC, '../lib';
-}
-
 BEGIN{
 	# Don't do anything if POSIX is missing, or sigaction missing.
 	use Config;
@@ -80,10 +75,10 @@ ok($ok10, "SIGHUP handler called");
 
 is(ref(%SIG{HUP}), 'CODE');
 
-sigaction(SIGHUP, POSIX::SigAction->new(\&::foo));
+sigaction(SIGHUP, POSIX::SigAction->new(\&main::foo));
 # Make sure the signal mask gets restored after sigaction croak()s.
-eval {
-	my $act=POSIX::SigAction->new(\&::foo);
+try {
+	my $act=POSIX::SigAction->new(\&main::foo);
 	delete $act->{HANDLER};
 	sigaction(SIGINT, $act);
 };
@@ -100,17 +95,17 @@ ok(!$x && $ok, "signal mask gets restored after early return");
 sigaction(SIGHUP, $newaction, $oldaction);
 is(ref($oldaction->{HANDLER}), 'CODE');
 
-eval {
+try {
 	sigaction(SIGHUP, undef, $oldaction);
 };
 ok(!$@, "undef for new action");
 
-eval {
+try {
 	sigaction(SIGHUP, 0, $oldaction);
 };
 ok(!$@, "zero for new action");
 
-eval {
+try {
 	sigaction(SIGHUP, bless(\%(),'Class'), $oldaction);
 };
 ok($@, "any object not good as new action");
@@ -119,7 +114,7 @@ SKIP: {
     skip("SIGCONT not trappable in $^O", 1)
 	if ($^O eq 'VMS');
     $newaction=POSIX::SigAction->new(sub { $ok10=1; });
-    if (eval { SIGCONT; 1 }) {
+    if (try { SIGCONT; 1 }) {
 	sigaction(SIGCONT, POSIX::SigAction->new('DEFAULT'));
 	{
 	    local($^W)=0;
@@ -205,6 +200,6 @@ SKIP: {
     kill 'HUP', $$;
 }
 
-eval { sigaction(-999, "foo"); };
+try { sigaction(-999, "foo"); };
 like($@->{description}, qr/Negative signals/,
     "Prevent negative signals instead of core dumping");

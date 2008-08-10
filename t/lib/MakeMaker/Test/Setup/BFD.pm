@@ -1,8 +1,8 @@
 package MakeMaker::Test::Setup::BFD;
 
-our @ISA = qw(Exporter);
+our @ISA = @( qw(Exporter) );
 require Exporter;
-our @EXPORT = qw(setup_recurs teardown_recurs);
+our @EXPORT = @( qw(setup_recurs teardown_recurs) );
 
 use strict;
 use File::Path;
@@ -11,11 +11,11 @@ use MakeMaker::Test::Utils;
 
 my $Is_VMS = $^O eq 'VMS';
 
-my %Files = (
+my %Files = %(
              'Big-Dummy/lib/Big/Dummy.pm'     => <<'END',
 package Big::Dummy;
 
-$VERSION = 0.01;
+our $VERSION = 0.01;
 
 =head1 NAME
 
@@ -30,7 +30,7 @@ END
 use ExtUtils::MakeMaker;
 
 # This will interfere with the PREREQ_PRINT tests.
-printf "Current package is: \%s\n", __PACKAGE__ unless "@ARGV" =~ m/PREREQ/;
+printf "Current package is: \%s\n", __PACKAGE__ unless (join " ", <@ARGV) =~ m/PREREQ/;
 
 WriteMakefile(
     NAME          => 'Big::Dummy',
@@ -72,7 +72,7 @@ END
              'Big-Dummy/Liar/lib/Big/Liar.pm' => <<'END',
 package Big::Liar;
 
-$VERSION = 0.01;
+our $VERSION = 0.01;
 
 1;
 END

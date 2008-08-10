@@ -78,11 +78,6 @@
 #define PL_checkav_save		(vTHX->Icheckav_save)
 #define PL_chopset		(vTHX->Ichopset)
 #define PL_clocktick		(vTHX->Iclocktick)
-#define PL_collation_ix		(vTHX->Icollation_ix)
-#define PL_collation_name	(vTHX->Icollation_name)
-#define PL_collation_standard	(vTHX->Icollation_standard)
-#define PL_collxfrm_base	(vTHX->Icollxfrm_base)
-#define PL_collxfrm_mult	(vTHX->Icollxfrm_mult)
 #define PL_colors		(vTHX->Icolors)
 #define PL_colorset		(vTHX->Icolorset)
 #define PL_compcv		(vTHX->Icompcv)
@@ -116,7 +111,6 @@
 #define PL_diehook		(vTHX->Idiehook)
 #define PL_dirty		(vTHX->Idirty)
 #define PL_doextract		(vTHX->Idoextract)
-#define PL_doswitches		(vTHX->Idoswitches)
 #define PL_dowarn		(vTHX->Idowarn)
 #define PL_dumper_fd		(vTHX->Idumper_fd)
 #define PL_dumpindent		(vTHX->Idumpindent)
@@ -158,7 +152,6 @@
 #define PL_inplace		(vTHX->Iinplace)
 #define PL_isarev		(vTHX->Iisarev)
 #define PL_known_layers		(vTHX->Iknown_layers)
-#define PL_last_in_gv		(vTHX->Ilast_in_gv)
 #define PL_lastfd		(vTHX->Ilastfd)
 #define PL_lastgotoprobe	(vTHX->Ilastgotoprobe)
 #define PL_lastscream		(vTHX->Ilastscream)
@@ -250,7 +243,6 @@
 #define PL_savestack		(vTHX->Isavestack)
 #define PL_savestack_ix		(vTHX->Isavestack_ix)
 #define PL_savestack_max	(vTHX->Isavestack_max)
-#define PL_sawampersand		(vTHX->Isawampersand)
 #define PL_scopestack		(vTHX->Iscopestack)
 #define PL_scopestack_ix	(vTHX->Iscopestack_ix)
 #define PL_scopestack_max	(vTHX->Iscopestack_max)
@@ -265,7 +257,6 @@
 #define PL_slabs		(vTHX->Islabs)
 #define PL_sort_RealCmp		(vTHX->Isort_RealCmp)
 #define PL_sortcop		(vTHX->Isortcop)
-#define PL_sortstash		(vTHX->Isortstash)
 #define PL_splitstr		(vTHX->Isplitstr)
 #define PL_srand_called		(vTHX->Isrand_called)
 #define PL_stack_base		(vTHX->Istack_base)
@@ -379,11 +370,6 @@
 #define PL_Icheckav_save	PL_checkav_save
 #define PL_Ichopset		PL_chopset
 #define PL_Iclocktick		PL_clocktick
-#define PL_Icollation_ix	PL_collation_ix
-#define PL_Icollation_name	PL_collation_name
-#define PL_Icollation_standard	PL_collation_standard
-#define PL_Icollxfrm_base	PL_collxfrm_base
-#define PL_Icollxfrm_mult	PL_collxfrm_mult
 #define PL_Icolors		PL_colors
 #define PL_Icolorset		PL_colorset
 #define PL_Icompcv		PL_compcv
@@ -417,7 +403,6 @@
 #define PL_Idiehook		PL_diehook
 #define PL_Idirty		PL_dirty
 #define PL_Idoextract		PL_doextract
-#define PL_Idoswitches		PL_doswitches
 #define PL_Idowarn		PL_dowarn
 #define PL_Idumper_fd		PL_dumper_fd
 #define PL_Idumpindent		PL_dumpindent
@@ -459,7 +444,6 @@
 #define PL_Iinplace		PL_inplace
 #define PL_Iisarev		PL_isarev
 #define PL_Iknown_layers	PL_known_layers
-#define PL_Ilast_in_gv		PL_last_in_gv
 #define PL_Ilastfd		PL_lastfd
 #define PL_Ilastgotoprobe	PL_lastgotoprobe
 #define PL_Ilastscream		PL_lastscream
@@ -551,7 +535,6 @@
 #define PL_Isavestack		PL_savestack
 #define PL_Isavestack_ix	PL_savestack_ix
 #define PL_Isavestack_max	PL_savestack_max
-#define PL_Isawampersand	PL_sawampersand
 #define PL_Iscopestack		PL_scopestack
 #define PL_Iscopestack_ix	PL_scopestack_ix
 #define PL_Iscopestack_max	PL_scopestack_max
@@ -566,7 +549,6 @@
 #define PL_Islabs		PL_slabs
 #define PL_Isort_RealCmp	PL_sort_RealCmp
 #define PL_Isortcop		PL_sortcop
-#define PL_Isortstash		PL_sortstash
 #define PL_Isplitstr		PL_splitstr
 #define PL_Isrand_called	PL_srand_called
 #define PL_Istack_base		PL_stack_base

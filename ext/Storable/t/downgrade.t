@@ -12,19 +12,6 @@
 # This test checks downgrade behaviour on pre-5.8 perls when new 5.8 features
 # are encountered.
 
-sub BEGIN {
-    if (%ENV{PERL_CORE}){
-	chdir('t') if -d 't';
-	@INC = ('.', '../lib');
-    } else {
-	unshift @INC, 't';
-    }
-    require Config; Config->import;
-    if (%ENV{PERL_CORE} and %Config{'extensions'} !~ m/\bStorable\b/) {
-        print "1..0 # Skip: Storable was not built\n";
-        exit 0;
-    }
-}
 
 use Test::More;
 use Storable 'thaw';
@@ -34,10 +21,10 @@ require utf8;
 use strict;
 use vars qw(@RESTRICT_TESTS %R_HASH %U_HASH $UTF8_CROAK $RESTRICTED_CROAK);
 
-@RESTRICT_TESTS = ('Locked hash', 'Locked hash placeholder',
+@RESTRICT_TESTS = @('Locked hash', 'Locked hash placeholder',
                    'Locked keys', 'Locked keys placeholder',
                   );
-%R_HASH = (perl => 'rules');
+%R_HASH = %(perl => 'rules');
 
 {
   # This is cheating. "\xdf" in Latin 1 is beta S, so will match \w if it
@@ -52,7 +39,7 @@ use vars qw(@RESTRICT_TESTS %R_HASH %U_HASH $UTF8_CROAK $RESTRICTED_CROAK);
   # an a circumflex, so we need to be explicit.
 
   my $a_circumflex = "\xe5"; # a byte.
-  %U_HASH = (map {$_, $_} 'castle', "ch{$a_circumflex}teau", $utf8, chr 0x57CE);
+  %U_HASH = %(map {$_, $_} 'castle', "ch{$a_circumflex}teau", $utf8, chr 0x57CE);
   plan tests => 162;
 }
 
@@ -77,8 +64,8 @@ my %tests;
 
 # use Data::Dumper; $Data::Dumper::Useqq = 1; print Dumper \%tests;
 sub thaw_hash {
-  my ($name, $expected) = @_;
-  my $hash = eval {thaw %tests{$name}};
+  my ($name, $expected) = < @_;
+  my $hash = try {thaw %tests{$name}};
   is ($@, '', "Thawed $name without error?");
   isa_ok ($hash, 'HASH');
   ok (defined $hash && eq_hash($hash, $expected),
@@ -88,8 +75,8 @@ sub thaw_hash {
 }
 
 sub thaw_scalar {
-  my ($name, $expected, $bug) = @_;
-  my $scalar = eval {thaw %tests{$name}};
+  my ($name, $expected, $bug) = < @_;
+  my $scalar = try {thaw %tests{$name}};
   is ($@, '', "Thawed $name without error?");
   isa_ok ($scalar, 'SCALAR', "Thawed $name?");
   is ($$scalar, $expected, "And it is the data we expected?");
@@ -97,21 +84,21 @@ sub thaw_scalar {
 }
 
 sub thaw_fail {
-  my ($name, $expected) = @_;
-  my $thing = eval {thaw %tests{$name}};
+  my ($name, $expected) = < @_;
+  my $thing = try {thaw %tests{$name}};
   is ($thing, undef, "Thawed $name failed as expected?");
   like ($@->{description}, $expected, "Error as predicted?");
 }
 
 sub test_locked_hash {
   my $hash = shift;
-  my @keys = keys %$hash;
+  my @keys = @( keys %$hash );
   my ($key, $value) = each %$hash;
-  eval {$hash->{$key} = reverse $value};
+  try {$hash->{$key} = 'x' . $value};
   like( $@->{description}, "/^Modification of a read-only value attempted/",
         'trying to change a locked key' );
   is ($hash->{$key}, $value, "hash should not change?");
-  eval {$hash->{use} = 'perl'};
+  try {$hash->{use} = 'perl'};
   like( $@->{description}, "/^Attempt to access disallowed key 'use' in a restricted hash/",
         'trying to add another key' );
   ok (eq_array(\@(keys %$hash), \@keys), "Still the same keys?");
@@ -119,13 +106,13 @@ sub test_locked_hash {
 
 sub test_restricted_hash {
   my $hash = shift;
-  my @keys = keys %$hash;
+  my @keys = @( keys %$hash );
   my ($key, $value) = each %$hash;
-  eval {$hash->{$key} = reverse $value};
+  try {$hash->{$key} = 'x' . $value};
   is( $@, '',
         'trying to change a restricted key' );
-  is ($hash->{$key}, reverse ($value), "hash should change");
-  eval {$hash->{use} = 'perl'};
+  is ($hash->{$key}, 'x' . $value, "hash should change");
+  try {$hash->{use} = 'perl'};
   like( $@->{description}, "/^Attempt to access disallowed key 'use' in a restricted hash/",
         'trying to add another key' );
   ok (eq_array(\@(keys %$hash), \@keys), "Still the same keys?");
@@ -133,14 +120,14 @@ sub test_restricted_hash {
 
 sub test_placeholder {
   my $hash = shift;
-  eval {$hash->{rules} = 42};
+  try {$hash->{rules} = 42};
   is ($@, '', 'No errors');
   is ($hash->{rules}, 42, "New value added");
 }
 
 sub test_newkey {
   my $hash = shift;
-  eval {$hash->{nms} = "http://nms-cgi.sourceforge.net/"};
+  try {$hash->{nms} = "http://nms-cgi.sourceforge.net/"};
   is ($@, '', 'No errors');
   is ($hash->{nms}, "http://nms-cgi.sourceforge.net/", "New value added");
 }

@@ -8,9 +8,8 @@ sub nil {}
 
 sub OVERLOAD {
   my $package = shift;
-  my %arg = @_;
+  my %arg = %( < @_ );
   my ($sub, $fb);
-  no strict 'refs';
   % {*{Symbol::fetch_glob($package . "::OVERLOAD")}}{dummy}++; # Register with magic by touching.
   *{Symbol::fetch_glob($package . "::()")} = \&nil; # Make it findable via fetchmethod.
   for (keys %arg) {
@@ -29,17 +28,17 @@ sub OVERLOAD {
 }
 
 sub import {
-  my $package = (caller())[[0]];
+  my $package = @(caller())[0];
   # *{$package . "::OVERLOAD"} = \&OVERLOAD;
   shift;
-  $package->overload::OVERLOAD(@_);
+  $package->overload::OVERLOAD(< @_);
 }
 
 sub unimport {
   my $package = (caller())[[0]];
   %{*{Symbol::fetch_glob($package . "::OVERLOAD")}}{dummy}++; # Upgrade the table
   shift;
-  for (@_) {
+  for (< @_) {
     if ($_ eq 'fallback') {
       undef $ {*{Symbol::fetch_glob($package . "::()")}};
     } else {
@@ -101,13 +100,13 @@ sub AddrRef {
   return sprintf("$class_prefix$type(0x\%x)", $addr);
 }
 
-*StrVal = *AddrRef;
+*StrVal = \&AddrRef;
 
 sub mycan {				# Real can would leave stubs.
-  my ($package, $meth) = @_;
+  my ($package, $meth) = < @_;
 
   my $mro = mro::get_linear_isa($package);
-  foreach my $p (@$mro) {
+  foreach my $p (< @$mro) {
     my $fqmeth = $p . q{::} . $meth;
     return \*{Symbol::fetch_glob($fqmeth)} if defined &{Symbol::fetch_glob($fqmeth)};
   }
@@ -115,7 +114,7 @@ sub mycan {				# Real can would leave stubs.
   return undef;
 }
 
-%constants = (
+%constants = %(
 	      'integer'	  =>  0x1000, # HINT_NEW_INTEGER
 	      'float'	  =>  0x2000, # HINT_NEW_FLOAT
 	      'binary'	  =>  0x4000, # HINT_NEW_BINARY
@@ -123,7 +122,7 @@ sub mycan {				# Real can would leave stubs.
 	      'qr'	  => 0x10000, # HINT_NEW_RE
 	     );
 
-%ops = ( with_assign	  => "+ - * / \% ** << >> x .",
+%ops = %( with_assign	  => "+ - * / \% ** << >> x .",
 	 assign		  => "+= -= *= /= \%= **= <<= >>= x= .=",
 	 num_comparison	  => "+< +<= +>  +>= == !=",
 	 '3way_comparison'=> "<+> cmp",
@@ -140,8 +139,8 @@ sub mycan {				# Real can would leave stubs.
 use warnings::register;
 sub constant {
   # Arguments: what, sub
-  while (@_) {
-    if (@_ == 1) {
+  while ((nelems @_)) {
+    if ((nelems @_) == 1) {
         warnings::warnif ("Odd number of arguments for overload::constant");
         last;
     }
@@ -166,7 +165,7 @@ sub constant {
 
 sub remove_constant {
   # Arguments: what, sub
-  while (@_) {
+  while ((nelems @_)) {
     delete %^H{@_[0]};
     $^H ^&^= ^~^ %constants{@_[0]};
     shift, shift;

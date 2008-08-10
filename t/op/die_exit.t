@@ -14,7 +14,7 @@ $| = 1;
 
 use strict;
 
-my %tests = (
+my %tests = %(
 	 1 => \@(   0,   0),
 	 2 => \@(   0,   1), 
 	 3 => \@(   0, 127), 
@@ -35,7 +35,7 @@ my %tests = (
 	17 => \@(  0,  512, '{ local *F; open F, q[TEST]; close F; $!=0 } die;'),
 );
 
-my $max = keys %tests;
+my $max = nkeys %tests;
 
 print "1..$max\n";
 
@@ -43,7 +43,7 @@ print "1..$max\n";
 open(STDERR, ">", "die_exit.err") or die "Can't open temp error file:  $!";
 
 foreach my $test (1 .. $max) {
-    my($bang, $query, $code) = @{%tests{$test}};
+    my($bang, $query, $code) = < @{%tests{$test}};
     $code ||= 'die;';
     if ($^O eq 'MSWin32' || $^O eq 'NetWare' || $^O eq 'VMS') {
         system(qq{$^X -e "\$! = $bang; \$? = $query; $code"});

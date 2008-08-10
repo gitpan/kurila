@@ -1,14 +1,14 @@
 package MakeMaker::Test::Setup::Problem;
 
-@ISA = qw(Exporter);
+our @ISA = @( qw(Exporter) );
 require Exporter;
-@EXPORT = qw(setup_recurs teardown_recurs);
+our @EXPORT = @( qw(setup_recurs teardown_recurs) );
 
 use strict;
 use File::Path;
 use File::Basename;
 
-my %Files = (
+my %Files = %(
              'Problem-Module/Makefile.PL'   => <<'END',
 use ExtUtils::MakeMaker;
 
@@ -18,7 +18,7 @@ WriteMakefile(
 END
 
              'Problem-Module/subdir/Makefile.PL'    => <<'END',
-printf "\@INC \%s .\n", (grep { $_ eq '.' } @INC) ? "has" : "doesn't have";
+printf "\@INC \%s .\n", (grep { $_ eq '.' } < @INC) ? "has" : "doesn't have";
 
 warn "I think I'm going to be sick\n";
 die "YYYAaaaakkk\n";

@@ -1,12 +1,5 @@
 #!./perl -T
 
-BEGIN {
-    unless(grep m/blib/, @INC) {
-	chdir 't' if -d 't';
-	@INC = '../lib';
-    }
-}
-
 use Config;
 
 BEGIN {
@@ -20,13 +13,13 @@ END { unlink "./__taint__$$" }
 
 print "1..3\n";
 use IO::File;
-$x = IO::File->new( "./__taint__$$", ">") || die("Cannot open ./__taint__$$\n");
+my $x = IO::File->new( "./__taint__$$", ">") || die("Cannot open ./__taint__$$\n");
 print $x "$$\n";
 $x->close;
 
 $x = IO::File->new( "./__taint__$$", "<") || die("Cannot open ./__taint__$$\n");
-chop($unsafe = ~< $x);
-eval { kill 0 * $unsafe };
+chop(my $unsafe = ~< $x);
+try { kill 0 * $unsafe };
 print "not " if ((($^O ne 'MSWin32') && ($^O ne 'NetWare')) and ($@->{description} !~ m/^Insecure/o));
 print "ok 1\n";
 $x->close;
@@ -38,7 +31,7 @@ $x->untaint;
 print "not " if ($?);
 print "ok 2\n"; # Calling the method worked
 chop($unsafe = ~< $x);
-eval { kill 0 * $unsafe };
+try { kill 0 * $unsafe };
 print "not " if ($@ and $@->{description} =~ m/^Insecure/o);
 print "ok 3\n"; # No Insecure message from using the data
 $x->close;

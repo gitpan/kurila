@@ -3342,7 +3342,6 @@ struct nextmadtoken {
 #include "regexp.h"
 #include "util.h"
 #include "form.h"
-#include "gv.h"
 #include "pad.h"
 #include "cv.h"
 #include "opnames.h"
@@ -3765,10 +3764,8 @@ Gid_t getegid (void);
 #define PERL_MAGIC_dbline	  'l' /* Debugger %_<filename element */
 #define PERL_MAGIC_shared	  'N' /* Shared between threads */
 #define PERL_MAGIC_shared_scalar  'n' /* Shared between threads */
-#define PERL_MAGIC_collxfrm	  'o' /* Locale transformation */
 #define PERL_MAGIC_tied		  'P' /* Tied array or hash */
 #define PERL_MAGIC_tiedelem	  'p' /* Tied array or hash element */
-#define PERL_MAGIC_tiedscalar	  'q' /* Tied scalar or handle */
 #define PERL_MAGIC_qr		  'r' /* precompiled qr// regex */
 #define PERL_MAGIC_sig		  'S' /* %SIG hash */
 #define PERL_MAGIC_sigelem	  's' /* %SIG hash element */
@@ -4375,15 +4372,14 @@ EXTCONST unsigned char PL_freq[];
 #ifdef DOINIT
 EXTCONST char* const PL_block_type[] = {
 	"NULL",
-	"WHEN",
+	"(NOT USED)",
 	"BLOCK",
-	"GIVEN",
+	"(NOT USED)",
 	"LOOP_FOR",
 	"LOOP_PLAIN",
 	"LOOP_LAZYSV",
 	"LOOP_LAZYIV",
 	"SUB",
-	"FORMAT",
 	"EVAL",
 	"SUBST"
 };
@@ -4399,12 +4395,6 @@ EXTCONST char* PL_block_type[];
    allow us add a comparison check in perlmain.c in the near future.  */
 #ifdef DOINIT
 EXTCONST char PL_bincompat_options[] =
-#  ifdef DEBUG_LEAKING_SCALARS
-			     " DEBUG_LEAKING_SCALARS"
-#  endif
-#  ifdef DEBUG_LEAKING_SCALARS_FORK_DUMP
-			     " DEBUG_LEAKING_SCALARS_FORK_DUMP"
-#  endif
 #  ifdef FAKE_THREADS
 			     " FAKE_THREADS"
 #  endif
@@ -4550,7 +4540,6 @@ enum {		/* pass one of these to get_vtbl */
     want_vtbl_uvar,
     want_vtbl_defelem,
     want_vtbl_regexp,
-    want_vtbl_collxfrm,
     want_vtbl_amagic,
     want_vtbl_amagicelem,
     want_vtbl_regdata,
@@ -4574,8 +4563,6 @@ enum {		/* pass one of these to get_vtbl */
 				/* currently defined by vms/vmsish.h */
 
 #define HINT_BLOCK_SCOPE	0x00000100
-#define HINT_STRICT_SUBS	0x00000200 /* strict pragma */
-#define HINT_STRICT_VARS	0x00000400 /* strict pragma */
 
 /* The HINT_NEW_* constants are used by the overload pragma */
 #define HINT_NEW_INTEGER	0x00001000
@@ -4600,7 +4587,7 @@ enum {		/* pass one of these to get_vtbl */
 #define HINT_SORT_MERGESORT	0x00000002
 #define HINT_SORT_STABLE	0x00000100 /* sort styles (currently one) */
 
-#define DEFAULT_HINTS ( HINT_STRICT_SUBS ) /* ( HINT_STRICT_REFS | HINT_STRICT_SUBS ) */
+#define DEFAULT_HINTS 0
 
 /* Various states of the input record separator SV (rs) */
 #define RsSNARF(sv)   (! SvOK(sv))
@@ -4799,6 +4786,7 @@ END_EXTERN_C
 
 START_EXTERN_C
 
+#include "gv.h"
 #include "svx.h"
 
 /* PERL_GLOBAL_STRUCT_PRIVATE wants to keep global data like the
@@ -5164,19 +5152,6 @@ MGVTBL_SET(
     0,
     0
 );
-#ifdef USE_LOCALE_COLLATE
-MGVTBL_SET(
-    PL_vtbl_collxfrm,
-    0,
-    MEMBER_TO_FPTR(Perl_magic_setcollxfrm),
-    0,
-    0,
-    0,
-    0,
-    0,
-    0
-);
-#endif
 
 MGVTBL_SET(
     PL_vtbl_hintselem,

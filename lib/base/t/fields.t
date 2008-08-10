@@ -21,21 +21,21 @@ is_deeply( \@(sort keys %Foo::FIELDS),
 );
 
 sub show_fields {
-    my($base, $mask) = @_;
+    my($base, $mask) = < @_;
     no strict 'refs';
     my $fields = \%{*{Symbol::fetch_glob($base.'::FIELDS')}};
-    return grep { (%fields::attr{$base}[$fields->{$_}] ^&^ $mask) == $mask} 
-                keys %$fields;
+    return @(grep { (%fields::attr{$base}->[$fields->{$_}] ^&^ $mask) == $mask} 
+                keys %$fields);
 }
 
-is_deeply( \@(sort &show_fields('Foo', fields::PUBLIC)),
+is_deeply( \@(sort < &show_fields('Foo', fields::PUBLIC)),
            \@(sort qw(Pants who what)));
-is_deeply( \@(sort &show_fields('Foo', fields::PRIVATE)),
+is_deeply( \@(sort < &show_fields('Foo', fields::PRIVATE)),
            \@(sort qw(_no _up_yours)));
 
 foreach (Foo->new) {
     my $obj = $_;
-    my %test = ( Pants => 'Whatever', _no => 'Yeah',
+    my %test = %( Pants => 'Whatever', _no => 'Yeah',
                  what  => 'Ahh',      who => 'Moo',
                  _up_yours => 'Yip' );
 
@@ -53,7 +53,7 @@ foreach (Foo->new) {
         return if @_[0] =~ m/^Pseudo-hashes are deprecated/ 
     };
     my $phash;
-    eval { $phash = fields::phash(name => "Joe", rank => "Captain") };
+    try { $phash = fields::phash(name => "Joe", rank => "Captain") };
     like $@->{description}, qr/^Pseudo-hashes have been removed from Perl/;
 }
 
@@ -68,7 +68,7 @@ foreach (Foo->new) {
     my $a = Foo::Autoviv->new();
     $a->{foo} = \@('a', 'ok', 'c');
     $a->{bar} = \%( A => 'ok' );
-    is( $a->{foo}[1],    'ok' );
+    is( $a->{foo}->[1],    'ok' );
     is( $a->{bar}->{A},, 'ok' );
 }
 
@@ -78,7 +78,7 @@ use fields qw(a b c);
 
 sub new {
     my $self = fields::new(shift);
-    %$self = @_ if @_;
+    (<%$self) = < @_ if (nelems @_);
     $self;
 }
 

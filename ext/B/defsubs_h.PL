@@ -4,7 +4,7 @@
 #!perl -w
 use strict;
 use File::Spec;
-my (undef, $headerpath) = @ARGV;
+my (undef, $headerpath) = < @ARGV;
 my ($out) = __FILE__ =~ m/(^.*)\.PL/i;
 $out =~ s/_h$/.h/;
 unlink $out if -l $out;
@@ -25,7 +25,6 @@ foreach my $const (qw(
 		      CVf_METHOD
 		      CVf_NODEBUG
 		      CVf_UNIQUE
-		      CVf_WEAKOUTSIDE
 		      GVf_IMPORTED_AV
 		      GVf_IMPORTED_CV
 		      GVf_IMPORTED_HV
@@ -75,7 +74,11 @@ sub doconst
  my $sym = shift;
  my $l = length($sym);
  print OUT <<"END";
- newCONSTSUB(stash,"$sym",newSViv($sym)); 
+ ENTER;
+ SAVESPTR(PL_curstash);
+ HVcpREPLACE(PL_curstash, stash);
+ newCONSTSUB("$sym",newSViv($sym)); 
  av_push(export_ok,newSVpvn("$sym",$l));
+ LEAVE;
 END
 }

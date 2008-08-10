@@ -25,9 +25,9 @@ if ($x eq "hi there\n") {print "ok 2\n";} else {print "not ok 2\n";}
 my @x;
 @x[0] = 'foo';
 @x[1] = 'foo';
-my $tmp = (@x-1);
+my $tmp = ((nelems @x)-1);
 print "#3\t:$tmp: == :1:\n";
-if ((@x-1) == '1') {print "ok 3\n";} else {print "not ok 3\n";}
+if (((nelems @x)-1) == '1') {print "ok 3\n";} else {print "not ok 3\n";}
 
 # check numeric literal
 
@@ -40,12 +40,12 @@ if (($x ^|^ 1) == 101) {print "ok 5\n";} else {print "not ok 5\n";}
 # check <> pseudoliteral
 
 if ($^O eq 'MacOS') {
-	open(try, "<", "Dev:Null") || (die "Can't open /dev/null.");
+	open(TRY, "<", "Dev:Null") || (die "Can't open /dev/null.");
 } else {
-	open(try, "<", "/dev/null") || open(try,"<", "nla0:") || (die "Can't open /dev/null.");
+	open(TRY, "<", "/dev/null") || open(TRY,"<", "nla0:") || (die "Can't open /dev/null.");
 }
 
-if ( ~< *try eq '') {
+if ( ~< *TRY eq '') {
     print "ok 6\n";
 }
 else {
@@ -53,5 +53,5 @@ else {
     die "/dev/null IS NOT A CHARACTER SPECIAL FILE!!!!\n" unless -c '/dev/null';
 }
 
-open(try, "<", "TEST") || (die "Can't open TEST.");
-if ( ~< *try ne '') {print "ok 7\n";} else {print "not ok 7\n";}
+open(TRY, "<", "TEST") || (die "Can't open TEST.");
+if ( ~< *TRY ne '') {print "ok 7\n";} else {print "not ok 7\n";}

@@ -1,12 +1,5 @@
 #!./perl
 
-BEGIN {
-    unless(grep m/blib/, @INC) {
-	chdir 't' if -d 't';
-	@INC = '../lib';
-    }
-}
-
 use Config;
 
 BEGIN {
@@ -35,26 +28,26 @@ $| = 1;
 
 print "1..8\n";
 
-eval {
+try {
     %SIG{ALRM} = sub { die; };
     alarm 60;
 };
 
 package Multi;
 require IO::Socket::INET;
-@ISA=qw(IO::Socket::INET);
+our @ISA= @(qw(IO::Socket::INET) );
 
 use Socket qw(inet_aton inet_ntoa unpack_sockaddr_in);
 
 sub _get_addr
 {
-    my($sock,$addr_str, $multi) = @_;
+    my($sock,$addr_str, $multi) = < @_;
     #print "_get_addr($sock, $addr_str, $multi)\n";
 
     print "not " unless $multi;
     print "ok 2\n";
 
-    (
+     @(
      # private IP-addresses which I hope does not work anywhere :-)
      inet_aton("10.250.230.10"),
      inet_aton("10.250.230.12"),
@@ -65,8 +58,8 @@ sub _get_addr
 sub connect
 {
     my $self = shift;
-    if (@_ == 1) {
-	my($port, $addr) = unpack_sockaddr_in(@_[0]);
+    if ((nelems @_) == 1) {
+	my($port, $addr) = < unpack_sockaddr_in(@_[0]);
 	$addr = inet_ntoa($addr);
 	#print "connect($self, $port, $addr)\n";
 	if($addr eq "10.250.230.10") {
@@ -78,7 +71,7 @@ sub connect
 	    return 0;
 	}
     }
-    $self->SUPER::connect(@_);
+    $self->SUPER::connect(< @_);
 }
 
 
@@ -87,18 +80,18 @@ package main;
 
 use IO::Socket;
 
-$listen = IO::Socket::INET->new(Listen => 2,
+my $listen = IO::Socket::INET->new(Listen => 2,
 				Proto => 'tcp',
 				Timeout => 5,
 			       ) or die "$!";
 
 print "ok 1\n";
 
-$port = $listen->sockport;
+my $port = $listen->sockport;
 
-if($pid = fork()) {
+if(my $pid = fork()) {
 
-    $sock = $listen->accept() or die "$!";
+    my $sock = $listen->accept() or die "$!";
     print "ok 5\n";
 
     print $sock->getline();
@@ -112,7 +105,7 @@ if($pid = fork()) {
 
 } elsif(defined $pid) {
 
-    $sock = Multi->new(PeerPort => $port,
+    my $sock = Multi->new(PeerPort => $port,
 		       Proto => 'tcp',
 		       PeerAddr => 'localhost',
 		       MultiHomed => 1,

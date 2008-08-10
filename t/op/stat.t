@@ -77,7 +77,7 @@ sleep 2;
 
 SKIP: {
     unlink $tmpfile_link;
-    my $lnk_result = eval { link $tmpfile, $tmpfile_link };
+    my $lnk_result = try { link $tmpfile, $tmpfile_link };
     skip "link() unimplemented", 6 if $@ and $@->{description} =~ m/unimplemented/;
 
     is( $@, '',         'link() implemented' );
@@ -156,7 +156,7 @@ SKIP: {
     SKIP: {
         # Going to try to switch away from root.  Might not work.
         my $olduid = $>;
-        eval { $> = 1; };
+        try { $> = 1; };
         skip "Can't test -r or -w meaningfully if you're superuser", 2
           if $> == 0;
 
@@ -168,7 +168,7 @@ SKIP: {
         ok(!-w $tmpfile,    "   -w");
 
         # switch uid back (may not be implemented)
-        eval { $> = $olduid; };
+        try { $> = $olduid; };
     }
 
     ok(! -x $tmpfile,   '   -x');
@@ -197,7 +197,7 @@ ok(! -f $Curdir,          '!-f cwd' );
 
 SKIP: {
     unlink($tmpfile_link);
-    my $symlink_rslt = eval { symlink $tmpfile, $tmpfile_link };
+    my $symlink_rslt = try { symlink $tmpfile, $tmpfile_link };
     skip "symlink not implemented", 3 if $@ and $@->{description} =~ m/unimplemented/;
 
     is( $@, '',     'symlink() implemented' );
@@ -236,29 +236,29 @@ SKIP: {
 
     skip "$CMD failed", 6 if $DEV eq '';
 
-    my @DEV = do { my $dev; opendir($dev, "/dev") ? readdir($dev) : () };
+    my @DEV = @( do { my $dev; opendir($dev, "/dev") ? readdir($dev) : () } );
 
-    skip "opendir failed: $!", 6 if @DEV == 0;
+    skip "opendir failed: $!", 6 if (nelems @DEV) == 0;
 
     # /dev/stdout might be either character special or a named pipe,
     # or a symlink, or a socket, depending on which OS and how are
     # you running the test, so let's censor that one away.
     # Similar remarks hold for stderr.
     $DEV =~ s{^[cpls].+?\sstdout$}{}m;
-    @DEV =  grep { $_ ne 'stdout' } @DEV;
+    @DEV = @(  grep { $_ ne 'stdout' } < @DEV );
     $DEV =~ s{^[cpls].+?\sstderr$}{}m;
-    @DEV =  grep { $_ ne 'stderr' } @DEV;
+    @DEV = @(  grep { $_ ne 'stderr' } < @DEV );
 
     # /dev/printer is also naughty: in IRIX it shows up as
     # Srwx-----, not srwx------.
     $DEV =~ s{^.+?\sprinter$}{}m;
-    @DEV =  grep { $_ ne 'printer' } @DEV;
+    @DEV = @(  grep { $_ ne 'printer' } < @DEV );
 
     # If running as root, we will see .files in the ls result,
     # and readdir() will see them always.  Potential for conflict,
     # so let's weed them out.
     $DEV =~ s{^.+?\s\..+?$}{}m;
-    @DEV =  grep { ! m{^\..+$} } @DEV;
+    @DEV = @(  grep { ! m{^\..+$} } < @DEV );
 
     # Irix ls -l marks sockets with 'S' while 's' is a 'XENIX semaphore'.
     if ($^O eq 'irix') {
@@ -266,10 +266,10 @@ SKIP: {
     }
 
     my $try = sub {
-	my @c1 = eval qq[\$DEV =~ m/^@_[0].*/mg];
-	my @c2 = eval qq[grep \{ @_[1] "/dev/\$_" \} \@DEV];
-	my $c1 = scalar @c1;
-	my $c2 = scalar @c2;
+	my @c1 = @( eval qq[\$DEV =~ m/^@_[0].*/mg] );
+	my @c2 = @( eval qq[grep \{ @_[1] "/dev/\$_" \} < \@DEV] );
+	my $c1 = nelems @c1;
+	my $c2 = nelems @c2;
 	is($c1, $c2, "ls and @_[1] agreeing on /dev ($c1 $c2)");
     };
 
@@ -294,10 +294,10 @@ SKIP: {
 
     # Find a set of directories that's very likely to have setuid files
     # but not likely to be *all* setuid files.
-    my @bin = grep {-d && -r && -x} qw(/sbin /usr/sbin /bin /usr/bin);
-    skip "Can't find a setuid file to test with", 3 unless @bin;
+    my @bin = @( grep {-d && -r && -x} qw(/sbin /usr/sbin /bin /usr/bin) );
+    skip "Can't find a setuid file to test with", 3 unless (nelems @bin);
 
-    for my $bin (@bin) {
+    for my $bin (< @bin) {
         opendir BIN, $bin or die "Can't opendir $bin: $!";
         while (defined($_ = readdir BIN)) {
             $_ = "$bin/$_";
@@ -337,7 +337,7 @@ SKIP: {
     ok(! -t *TTY,    '!-t on closed TTY filehandle');
 
     {
-        local $TODO = 'STDIN not a tty when output is to pipe' if $Is_VMS;
+        local our $TODO = 'STDIN not a tty when output is to pipe' if $Is_VMS;
         ok(-t,          '-t on STDIN');
     }
 }
@@ -367,7 +367,7 @@ ok(! -T $Perl,    '!-T');
 
 open(FOO, "<",$statfile);
 SKIP: {
-    eval { -T *FOO; };
+    try { -T *FOO; };
     skip "-T/B on filehandle not implemented", 15 if $@ and $@->{description} =~ m/not implemented/;
 
     is( $@, '',     '-T on filehandle causes no errors' );
@@ -416,8 +416,8 @@ ok(-f(),    '     -f() "');
 unlink $tmpfile or print "# unlink failed: $!\n";
 
 # bug id 20011101.069
-my @r = \stat($Curdir);
-is(scalar @r, 13,   'stat returns full 13 elements');
+my @r = @( stat($Curdir) );
+is(nelems @r, 13,   'stat returns full 13 elements');
 
 stat $0;
 dies_like( sub { lstat _ },
@@ -428,9 +428,9 @@ dies_like( sub { -l _ },
            '-l _ croaks after stat' );
 
 lstat $0;
-eval { lstat _ };
+try { lstat _ };
 is( "$@", "", "lstat _ ok after lstat" );
-eval { -l _ };
+try { -l _ };
 is( "$@", "", "-l _ ok after lstat" );
   
 SKIP: {
@@ -457,10 +457,10 @@ my $f = 'tstamp.tmp';
 unlink $f;
 ok (open(S, ">", "$f"), 'can create tmp file');
 close S or die;
-my @a = stat $f;
-print "# time=$^T, stat=(@a)\n";
-my @b = (-M _, -A _, -C _);
-print "# -MAC=(@b)\n";
+my @a = @( stat $f );
+print "# time=$^T, stat=({join ' ', <@a})\n";
+my @b = @(-M _, -A _, -C _);
+print "# -MAC=({join ' ', <@b})\n";
 ok( (-M _) +< 0, 'negative -M works');
 ok( (-A _) +< 0, 'negative -A works');
 ok( (-C _) +< 0, 'negative -C works');
@@ -470,7 +470,7 @@ ok(unlink($f), 'unlink tmp file');
     ok(open(F, ">", $tmpfile), 'can create temp file');
     close F;
     chmod 0077, $tmpfile;
-    my @a = stat($tmpfile);
+    my @a = @( stat($tmpfile) );
     my $s1 = -s _;
     -T _;
     my $s2 = -s _;
@@ -500,8 +500,8 @@ SKIP: {
 {
     # RT #8244: *FILE{IO} does not behave like *FILE for stat() and -X() operators
     ok(open(F, ">", $tmpfile), 'can create temp file');
-    my @thwap = stat *F{IO};
-    ok(@thwap, "stat(*F\{IO\}) works");    
+    my @thwap = @( stat *F{IO} );
+    ok((nelems @thwap), "stat(*F\{IO\}) works");    
     ok( -f *F{IO} , "single file tests work with *F\{IO\}");
     close F;
     unlink $tmpfile;

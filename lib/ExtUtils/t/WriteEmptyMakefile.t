@@ -5,7 +5,7 @@
 BEGIN {
     if( %ENV{PERL_CORE} ) {
         chdir 't' if -d 't';
-        @INC = ('../lib', 'lib');
+        @INC = @('../lib', 'lib');
     }
     else {
         unshift @INC, 't/lib';
@@ -15,19 +15,20 @@ BEGIN {
 chdir 't';
 
 use strict;
-use Test::More tests => 5;
+use Test::More tests => 4;
 
 use ExtUtils::MakeMaker qw(WriteEmptyMakefile);
-use TieOut;
 
 can_ok __PACKAGE__, 'WriteEmptyMakefile';
 
-eval { WriteEmptyMakefile("something"); };
+try { WriteEmptyMakefile("something"); };
 like $@->{description}, qr/Need an even number of args/;
 
 
 {
-    ok( my $stdout = tie *STDOUT, 'TieOut' );
+    my $stdout = '';
+    close STDOUT;
+    open STDOUT, '>>', \$stdout or die;
 
     ok !-e 'wibble';
     END { 1 while unlink 'wibble' }

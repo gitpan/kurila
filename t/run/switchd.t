@@ -1,10 +1,5 @@
 #!./perl -w
 
-BEGIN {
-    chdir 't' if -d 't';
-    @INC = qw(../lib lib);
-}
-
 BEGIN { require "./test.pl"; }
 
 # This test depends on t/lib/Devel/switchd.pm.
@@ -12,8 +7,8 @@ BEGIN { require "./test.pl"; }
 plan(tests => 2);
 
 my $r;
-my @tmpfiles = ();
-END { unlink @tmpfiles }
+my @tmpfiles = @( () );
+END { unlink < @tmpfiles }
 
 my $filename = 'swdtest.tmp';
 SKIP: {

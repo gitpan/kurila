@@ -34,7 +34,6 @@
 #endif
 
 #define sv_cmp_static Perl_sv_cmp
-#define sv_cmp_locale_static Perl_sv_cmp_locale
 
 #ifndef SMALLSORT
 #define	SMALLSORT (200)
@@ -1474,7 +1473,6 @@ PP(pp_sort)
     register SV **p1 = ORIGMARK+1, **p2;
     register I32 max, i;
     AV* av = NULL;
-    HV *stash;
     GV *gv;
     CV *cv = NULL;
     I32 gimme = GIMME;
@@ -1511,10 +1509,9 @@ PP(pp_sort)
 	    kid = kUNOP->op_first;			/* pass rv2gv */
 	    kid = kUNOP->op_first;			/* pass leave */
 	    PL_sortcop = kid->op_next;
-	    stash = CopSTASH(PL_curcop);
 	}
 	else {
-	    cv = sv_2cv(*++MARK, &stash, &gv, 0);
+	    cv = sv_2cv(*++MARK, &gv, 0);
 	    if (cv && SvPOK(cv)) {
 		const char * const proto = SvPV_nolen_const((SV*)cv);
 		if (proto && strEQ(proto, "$$")) {
@@ -1527,7 +1524,7 @@ PP(pp_sort)
 		}
 		else if (gv) {
 		    SV *tmpstr = sv_newmortal();
-		    gv_efullname4(tmpstr, gv, NULL, TRUE);
+		    gv_efullname3(tmpstr, gv, NULL);
 		    DIE(aTHX_ "Undefined sort subroutine \"%"SVf"\" called",
 			SVfARG(tmpstr));
 		}
@@ -1544,7 +1541,6 @@ PP(pp_sort)
     }
     else {
 	PL_sortcop = NULL;
-	stash = CopSTASH(PL_curcop);
     }
 
     /* optimiser converts "@a = sort @a" to "sort \@a";
@@ -1637,10 +1633,8 @@ PP(pp_sort)
 	    if (!hasargs && !is_xsub) {
 		SAVESPTR(PL_firstgv);
 		SAVESPTR(PL_secondgv);
-		SAVESPTR(PL_sortstash);
-		PL_firstgv = gv_fetchpvs("a", GV_ADD|GV_NOTQUAL, SVt_PV);
-		PL_secondgv = gv_fetchpvs("b", GV_ADD|GV_NOTQUAL, SVt_PV);
-		PL_sortstash = stash;
+		GVcpREPLACE(PL_firstgv, gv_fetchpvs("a", GV_ADD|GV_NOTQUAL, SVt_PV));
+		GVcpREPLACE(PL_secondgv, gv_fetchpvs("b", GV_ADD|GV_NOTQUAL, SVt_PV));
 		SAVESPTR(GvSV(PL_firstgv));
 		SAVESPTR(GvSV(PL_secondgv));
 	    }
@@ -1743,8 +1737,8 @@ S_sortcv(pTHX_ SV *const a, SV *const b)
  
     PERL_ARGS_ASSERT_SORTCV;
 
-    GvSV(PL_firstgv) = a;
-    GvSV(PL_secondgv) = b;
+    SVcpREPLACE(GvSV(PL_firstgv), a);
+    SVcpREPLACE(GvSV(PL_secondgv), b);
     PL_stack_sp = PL_stack_base;
     PL_op = PL_sortcop;
     CALLRUNOPS(aTHX);

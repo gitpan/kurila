@@ -1,9 +1,4 @@
 BEGIN {
-    if(%ENV{PERL_CORE}) {
-        chdir 't';
-        @INC = '../lib';
-    }
-
     use Config;
     if (%Config::Config{'extensions'} !~ m/\bEncode\b/) {
       print "1..0 # Skip: Encode was not built\n";
@@ -100,7 +95,7 @@ foreach my $f (@testfiles) {
   }
 
   my $outstring;
-  eval {
+  try {
     my $p = Pod::Simple::DumpAsXML->new;
     $p->output_string( \$outstring );
     $p->parse_file( $f );

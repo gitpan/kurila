@@ -19,10 +19,10 @@ our ($VERSION, @ISA, @EXPORT_OK, %DEFLATE_CONSTANTS, %EXPORT_TAGS, $RawDeflateEr
 $VERSION = '2.006';
 $RawDeflateError = '';
 
-@ISA = qw(IO::Compress::Base Exporter);
-@EXPORT_OK = qw( $RawDeflateError rawdeflate ) ;
+@ISA = @( qw(IO::Compress::Base Exporter) );
+@EXPORT_OK = @( qw( $RawDeflateError rawdeflate ) ) ;
 
-%EXPORT_TAGS = ( flush     => \@(qw{  
+%EXPORT_TAGS = %( flush     => \@(qw{  
                                     Z_NO_FLUSH
                                     Z_PARTIAL_FLUSH
                                     Z_SYNC_FLUSH
@@ -52,15 +52,15 @@ $RawDeflateError = '';
     {
         push @{%EXPORT_TAGS{constants}}, 
                  grep { !%seen{$_}++ } 
-                 @{ %EXPORT_TAGS{$_} }
+                 < @{ %EXPORT_TAGS{$_} }
     }
     %EXPORT_TAGS{all} = %EXPORT_TAGS{constants} ;
 }
 
 
-%DEFLATE_CONSTANTS = %EXPORT_TAGS;
+%DEFLATE_CONSTANTS = %( < %EXPORT_TAGS );
 
-push @{ %EXPORT_TAGS{all} }, @EXPORT_OK ;
+push @{ %EXPORT_TAGS{all} }, < @EXPORT_OK ;
 
 Exporter::export_ok_tags('all');
               
@@ -72,13 +72,13 @@ sub new
 
     my $obj = createSelfTiedObject($class, \$RawDeflateError);
 
-    return $obj->_create(undef, @_);
+    return $obj->_create(undef, < @_);
 }
 
 sub rawdeflate
 {
     my $obj = createSelfTiedObject(undef, \$RawDeflateError);
-    return $obj->_def(@_);
+    return $obj->_def(< @_);
 }
 
 sub ckParams
@@ -95,7 +95,7 @@ sub mkComp
     my $class = shift ;
     my $got = shift ;
 
-    my ($obj, $errstr, $errno) = IO::Compress::Adapter::Deflate::mkCompObject(
+    my ($obj, $errstr, $errno) = < IO::Compress::Adapter::Deflate::mkCompObject(
                                                  $got->value('CRC32'),
                                                  $got->value('Adler32'),
                                                  $got->value('Level'),
@@ -147,7 +147,7 @@ sub getZlibParams
     use Compress::Raw::Zlib  v2.006 qw(Z_DEFLATED Z_DEFAULT_COMPRESSION Z_DEFAULT_STRATEGY);
 
     
-    return (
+    return  @(
         
             # zlib behaviour
             #'Method'   => [0, 1, Parse_unsigned,  Z_DEFLATED],
@@ -156,7 +156,6 @@ sub getZlibParams
 
             'CRC32'     => \@(0, 1, Parse_boolean,   0),
             'ADLER32'   => \@(0, 1, Parse_boolean,   0),
-            'Merge'     => \@(1, 1, Parse_boolean,   0),
         );
     
     
@@ -164,7 +163,7 @@ sub getZlibParams
 
 sub getInverseClass
 {
-    return ('IO::Uncompress::RawInflate', 
+    return  @('IO::Uncompress::RawInflate', 
                 \$IO::Uncompress::RawInflate::RawInflateError);
 }
 
@@ -178,70 +177,7 @@ sub getFileInfo
 
 use IO::Seekable qw(SEEK_SET);
 
-sub createMerge
-{
-    my $self = shift ;
-    my $outValue = shift ;
-    my $outType = shift ;
-
-    my ($invClass, $error_ref) = $self->getInverseClass();
-    eval "require $invClass" 
-        or die "aaaahhhh" ;
-
-    my $inf = $invClass->new( $outValue, 
-                             Transparent => 0, 
-                             #Strict     => 1,
-                             AutoClose   => 0,
-                             Scan        => 1)
-       or return $self->saveErrorString(undef, "Cannot create InflateScan object: $$error_ref" ) ;
-
-    my $end_offset = 0;
-    $inf->scan() 
-        or return $self->saveErrorString(undef, "Error Scanning: $$error_ref", $inf->errorNo) ;
-    $inf->zap($end_offset) 
-        or return $self->saveErrorString(undef, "Error Zapping: $$error_ref", $inf->errorNo) ;
-
-    my $def = *$self->{Compress} = $inf->createDeflate();
-
-    *$self->{Header} = *$inf->{Info}{Header};
-    *$self->{UnCompSize} = *$inf->{UnCompSize}->clone();
-    *$self->{CompSize} = *$inf->{CompSize}->clone();
-    # TODO -- fix this
-    #*$self->{CompSize} = new U64(0, *$self->{UnCompSize_32bit});
-
-
-    if ( $outType eq 'buffer') 
-      { substr( ${ *$self->{Buffer} }, $end_offset, undef, '') }
-    elsif ($outType eq 'handle' || $outType eq 'filename') {
-        *$self->{FH} = *$inf->{FH} ;
-        delete *$inf->{FH};
-        *$self->{FH}->flush() ;
-        *$self->{Handle} = 1 if $outType eq 'handle';
-
-        #seek(*$self->{FH}, $end_offset, SEEK_SET) 
-        *$self->{FH}->seek($end_offset, SEEK_SET) 
-            or return $self->saveErrorString(undef, $!, $!) ;
-    }
-
-    return $def ;
-}
-
 #### zlib specific methods
-
-sub deflateParams 
-{
-    my $self = shift ;
-
-    my $level = shift ;
-    my $strategy = shift ;
-
-    my $status = *$self->{Compress}->deflateParams(Level => $level, Strategy => $strategy) ;
-    return $self->saveErrorString(0, *$self->{Compress}{Error}, *$self->{Compress}{ErrorNo})
-        if $status == STATUS_ERROR;
-
-    return 1;    
-}
-
 
 
 
@@ -282,8 +218,6 @@ IO::Compress::RawDeflate - Write RFC 1951 files/buffers
     $z->autoflush();
     $z->input_line_number();
     $z->newStream( [OPTS] );
-    
-    $z->deflateParams();
     
     $z->close() ;
 
@@ -650,42 +584,6 @@ This parameter defaults to 0.
 
 
 
-
-
-=item C<< Merge => 0|1 >>
-
-This option is used to compress input data and append it to an existing
-compressed data stream in C<$output>. The end result is a single compressed
-data stream stored in C<$output>. 
-
-
-
-It is a fatal error to attempt to use this option when C<$output> is not an
-RFC 1951 data stream.
-
-
-
-There are a number of other limitations with the C<Merge> option:
-
-=over 5 
-
-=item 1
-
-This module needs to have been built with zlib 1.2.1 or better to work. A
-fatal error will be thrown if C<Merge> is used with an older version of
-zlib.  
-
-=item 2
-
-If C<$output> is a file or a filehandle, it must be seekable.
-
-=back
-
-
-This parameter defaults to 0.
-
-
-
 =item -Level 
 
 Defines the compression level used by zlib. The value should either be
@@ -952,15 +850,6 @@ OPTS consists of any of the the options that are available when creating
 the C<$z> object.
 
 See the L</"Constructor Options"> section for more details.
-
-
-=head2 deflateParams
-
-Usage is
-
-    $z->deflateParams
-
-TODO
 
 
 =head1 Importing 

@@ -9,7 +9,7 @@ BEGIN {
             $W++;
         }
         else {
-            warn @_[0];
+            print STDERR @_[0]->message;
         }
     };
 }
@@ -57,8 +57,8 @@ use base qw(M B2);
 
 # Test that multiple inheritance fails.
 package D6;
-eval { 'base'->import(qw(B2 M B3)); };
-::like($@->{description}, qr/can't multiply inherit fields/i, 
+try { 'base'->import(qw(B2 M B3)); };
+main::like($@->{description}, qr/can't multiply inherit fields/i, 
     'No multiple field inheritance');
 
 package Foo::Bar;
@@ -100,7 +100,7 @@ use fields qw(b1);
 
 package main;
 
-my %EXPECT = (
+my %EXPECT = %(
               B1 => \@(qw(b1 b2 b3)),
               D1 => \@(qw(b1 b2 b3 d1 d2 d3)),
               D2 => \@(qw(b1 b2 b3 _d1 _d2 d1 d2)),
@@ -129,15 +129,15 @@ my %EXPECT = (
 
 while(my($class, $efields) = each %EXPECT) {
     no strict 'refs';
-    my %fields = %{*{Symbol::fetch_glob($class.'::FIELDS')}};
+    my %fields = %( < %{*{Symbol::fetch_glob($class.'::FIELDS')}} );
     my %expected_fields;
-    foreach my $idx (1..@$efields) {
+    foreach my $idx (1..nelems @$efields) {
         my $key = $efields->[$idx-1];
         next unless $key;
         %expected_fields{$key} = $idx;
     }
 
-    ::is_deeply(\%fields, \%expected_fields, "\%FIELDS check:  $class");
+    main::is_deeply(\%fields, \%expected_fields, "\%FIELDS check:  $class");
 }
 
 # Did we get the appropriate amount of warnings?
@@ -169,14 +169,14 @@ use fields qw(yo this _lah meep 42);
 package E2;
 use fields qw(_yo ahhh this);
 
-eval {
+try {
     package Broken;
 
     # The error must occur at run time for the eval to catch it.
     require base;
     'base'->import(qw(E1 E2));
 };
-::like( $@->{description}, qr/Can't multiply inherit fields/i, 'Again, no multi inherit' );
+main::like( $@->{description}, qr/Can't multiply inherit fields/i, 'Again, no multi inherit' );
 
 
 # Test that a package with no fields can inherit from a package with

@@ -3,11 +3,6 @@
 # Tests for perl exit codes, playing with $?, etc...
 
 
-BEGIN {
-    chdir 't' if -d 't';
-    @INC = qw(. ../lib);
-}
-
 # Run some code, return its wait status.
 sub run {
     my($code) = shift;
@@ -15,19 +10,20 @@ sub run {
     return system($^X, "-e", $code);
 }
 
+our $numtests;
 BEGIN {
     # MacOS system() doesn't have good return value
     $numtests = ($^O eq 'VMS') ? 16 : ($^O eq 'MacOS') ? 0 : 17;
 }
 
-require "test.pl";
+require "./test.pl";
 plan(tests => $numtests);
 
 my $native_success = 0;
    $native_success = 1 if $^O eq 'VMS';
 
 if ($^O ne 'MacOS') {
-my $exit, $exit_arg;
+my ($exit, $exit_arg);
 
 $exit = run('exit');
 is( $exit >> 8, 0,              'Normal exit' );
@@ -35,7 +31,7 @@ is( $exit, $?,                  'Normal exit $?' );
 is( $^CHILD_ERROR_NATIVE, $native_success,  'Normal exit $^CHILD_ERROR_NATIVE' );
 
 if ($^O ne 'VMS') {
-  my $posix_ok = eval { require POSIX; };
+  my $posix_ok = try { require POSIX; };
   my $wait_macros_ok = defined &POSIX::WIFEXITED;
 
   $exit = run('exit 42');

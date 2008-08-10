@@ -6,17 +6,17 @@ $^I = $^O eq 'VMS' ? '_bak' : '.bak';
 
 plan( tests => 2 );
 
-my @tfiles     = ('.a','.b','.c');
-my @tfiles_bak = (".a$^I", ".b$^I", ".c$^I");
+my @tfiles     = @('.a','.b','.c');
+my @tfiles_bak = @(".a$^I", ".b$^I", ".c$^I");
 
 END { unlink_all('.a','.b','.c',".a$^I", ".b$^I", ".c$^I"); }
 
-for my $file (@tfiles) {
+for my $file (< @tfiles) {
     runperl( prog => 'print qq(foo\n);', 
              args => \@('>', $file) );
 }
 
-@ARGV = @tfiles;
+@ARGV = @( < @tfiles );
 
 while ( ~< *ARGV) {
     s/foo/bar/;

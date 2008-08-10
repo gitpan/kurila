@@ -2,7 +2,7 @@
 
 BEGIN {
     chdir 't' if -d 't';
-    @INC = '../lib';
+    @INC = @('../lib');
 }
 
 use strict;
@@ -10,12 +10,12 @@ use File::Spec;
 my($blib, $blib_arch, $blib_lib, @blib_dirs);
 
 sub _cleanup {
-    rmdir foreach reverse (@_);
+    rmdir foreach reverse < @_;
     unlink "stderr" unless $^O eq 'MacOS';
 }
 
 sub _mkdirs {
-    for my $dir (@_) {
+    for my $dir (< @_) {
         next if -d $dir;
         mkdir $dir or die "Can't mkdir $dir: $!" if ! -d $dir;
     }
@@ -29,24 +29,24 @@ BEGIN {
 	$blib = ":blib:";
 	$blib_lib = ":blib:lib:";
 	$blib_arch = ":blib:lib:$MacPerl::Architecture:";
-	@blib_dirs = ($blib, $blib_lib, $blib_arch); # order
+	@blib_dirs = @($blib, $blib_lib, $blib_arch); # order
     }
     else
     {
 	$blib = "blib";
 	$blib_arch = "blib/arch";
 	$blib_lib = "blib/lib";
-	@blib_dirs = ($blib, $blib_arch, $blib_lib);
+	@blib_dirs = @($blib, $blib_arch, $blib_lib);
     }
-    _cleanup( @blib_dirs );
+    _cleanup( < @blib_dirs );
 }
 
 use Test::More tests => 7;
 
 eval 'use blib;';
-ok( $@->{description} =~ m/Cannot find blib/, 'Fails if blib directory not found' );
+like( $@->message, qr/Cannot find blib/, 'Fails if blib directory not found' );
 
-_mkdirs( @blib_dirs );
+_mkdirs( < @blib_dirs );
 
 {
     my $warnings = '';
@@ -55,7 +55,7 @@ _mkdirs( @blib_dirs );
     is( $warnings, '',  'use blib is nice and quiet' );
 }
 
-is( @INC, 3, '@INC now has 3 elements' );
+is( nelems(@INC), 3, '@INC now has 3 elements' );
 is( @INC[2],    '../lib',       'blib added to the front of @INC' );
 
 if ($^O eq 'VMS') {
@@ -74,4 +74,4 @@ elsif ($^O ne 'MacOS')
 ok( grep(m|\Q$blib_lib\E$|, @INC[[0,1]])  == 1,     "  $blib_lib in \@INC");
 ok( grep(m|\Q$blib_arch\E$|, @INC[[0,1]]) == 1,     "  $blib_arch in \@INC");
 
-END { _cleanup( @blib_dirs ); }
+END { _cleanup( < @blib_dirs ); }

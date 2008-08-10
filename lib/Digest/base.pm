@@ -5,18 +5,18 @@ use vars qw($VERSION);
 $VERSION = "1.00";
 
 # subclass is supposed to implement at least these
-sub new;
-sub clone;
-sub add;
-sub digest;
+sub new { die "not implemented by subclass" }
+sub clone { die "not implemented by subclass" }
+sub add { die "not implemented by subclass" }
+sub digest { die "not implemented by subclass" }
 
 sub reset {
     my $self = shift;
-    $self->new(@_);  # ugly
+    $self->new(< @_);  # ugly
 }
 
 sub addfile {
-    my ($self, $handle) = @_;
+    my ($self, $handle) = < @_;
 
     my $n;
     my $buf = "";
@@ -36,13 +36,13 @@ sub add_bits {
     my $self = shift;
     my $bits;
     my $nbits;
-    if (@_ == 1) {
+    if ((nelems @_) == 1) {
 	my $arg = shift;
 	$bits = pack("B*", $arg);
 	$nbits = length($arg);
     }
     else {
-	($bits, $nbits) = @_;
+	($bits, $nbits) = < @_;
     }
     if (($nbits % 8) != 0) {
 	require Carp;
@@ -53,13 +53,13 @@ sub add_bits {
 
 sub hexdigest {
     my $self = shift;
-    return unpack("H*", $self->digest(@_));
+    return unpack("H*", $self->digest(< @_));
 }
 
 sub b64digest {
     my $self = shift;
     require MIME::Base64;
-    my $b64 = MIME::Base64::encode($self->digest(@_), "");
+    my $b64 = MIME::Base64::encode($self->digest(< @_), "");
     $b64 =~ s/=+$//;
     return $b64;
 }

@@ -33,8 +33,6 @@
 # across an exec (though native Windows file handles are).
 
 BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
     use Config;
     if (!%Config{'d_fcntl'}) {
         print("1..0 # Skip: fcntl() is not available\n");
@@ -57,7 +55,7 @@ skip_all("VMS")      if $Is_VMS;
 skip_all("Win32")    if $Is_Win32;
 
 sub make_tmp_file {
-    my ($fname, $fcontents) = @_;
+    my ($fname, $fcontents) = < @_;
     local *FHTMP;
     open   FHTMP, ">", "$fname"  or die "open  '$fname': $!";
     print  FHTMP $fcontents  or die "print '$fname': $!";
@@ -85,7 +83,7 @@ my $line = ~< *INHERIT;
 close INHERIT or die qq{close $fd: $!};
 print $line
 CHILD_PROG
-$Child_prog =~ tr/\n//d;
+$Child_prog =~ s/\n//g;
 
 plan(tests => 22);
 
@@ -104,7 +102,7 @@ sub test_not_inherited {
     # at least not on Tru64.
     # cmp_ok( $rc, '!=', 0,
     #     "child return code=$rc (non-zero means cannot inherit fd=$expected_fd)" );
-    cmp_ok( $out =~ tr/\n//, '==', 1,
+    cmp_ok( $out =~ m/(\n)/g, '==', 1,
         "child stdout: has 1 newline (rc=$rc, should be non-zero)" );
     is( $out, "childfd=$expected_fd\n", 'child stdout: fd' );
 }
@@ -117,9 +115,9 @@ sub test_inherited {
     my $rc  = $? >> 8;
     cmp_ok( $rc, '==', 0,
         "child return code=$rc (zero means inherited fd=$expected_fd ok)" );
-    my @lines = split(m/^/, $out);
-    cmp_ok( $out =~ tr/\n//, '==', 2, 'child stdout: has 2 newlines' );
-    cmp_ok( scalar(@lines),  '==', 2, 'child stdout: split into 2 lines' );
+    my @lines = @( split(m/^/, $out) );
+    cmp_ok( (nelems @($out =~ m/(\n)/g)), '==', 2, 'child stdout: has 2 newlines' );
+    cmp_ok( scalar(nelems @lines),  '==', 2, 'child stdout: split into 2 lines' );
     is( @lines[0], "childfd=$expected_fd\n", 'child stdout: fd' );
     is( @lines[1], "tmpfile1 line 1\n",      'child stdout: line 1' );
 }

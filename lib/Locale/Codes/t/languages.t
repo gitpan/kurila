@@ -5,7 +5,7 @@
 
 BEGIN {
 	chdir 't' if -d 't';
-	@INC = '../lib';
+	@INC = @( '../lib' );
 }
 
 use Locale::Language;
@@ -17,8 +17,8 @@ no utf8; # we contain Latin-1
 # If it evaluates to FALSE, then "not ok N" is printed for the test,
 # otherwise "ok N".
 #-----------------------------------------------------------------------
-@TESTS =
-(
+our @TESTS =
+@(
 	#================================================
 	# TESTS FOR code2language
 	#================================================
@@ -97,10 +97,10 @@ no utf8; # we contain Latin-1
  'language2code("Zulu")      eq "zu"',       # last in DATA segment
 );
 
-print "1..", int(@TESTS), "\n";
+print "1..", int(nelems @TESTS), "\n";
 
-$testid = 1;
-foreach $test (@TESTS)
+my $testid = 1;
+foreach my $test (< @TESTS)
 {
     eval "print (($test) ? \"ok $testid\\n\" : \"not ok $testid\\n\" )";
     print "not ok $testid\n" if $@;

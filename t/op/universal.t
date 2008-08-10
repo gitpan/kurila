@@ -8,7 +8,7 @@ BEGIN {
     require "./test.pl";
 }
 
-plan tests => 110;
+plan tests => 101;
 
 $a = \%();
 bless $a, "Bob";
@@ -18,11 +18,10 @@ package Human;
 sub eat {}
 
 package Female;
-our @ISA=qw(Human);
+our @ISA= @(qw(Human) );
 
 package Alice;
-our @ISA=qw(Bob Female);
-sub sing;
+our @ISA= @(qw(Bob Female) );
 sub drink { return "drinking " . @_[1]  }
 sub new { bless \%() }
 
@@ -48,12 +47,8 @@ package main;
 $a = Alice->new();
 
 ok $a->isa("Alice");
-ok $a->isa("main::Alice");    # check that alternate class names work
-
-ok(("main::Alice"->new)->isa("Alice"));
 
 ok $a->isa("Bob");
-ok $a->isa("main::Bob");
 
 ok $a->isa("Female");
 
@@ -69,9 +64,6 @@ ok $a->can("eat");
 ok ! $a->can("sleep");
 ok my $ref = $a->can("drink");        # returns a coderef
 is $a->?$ref("tea"), "drinking tea"; # ... which works
-ok $ref = $a->can("sing");
-eval { $a->?$ref() };
-ok $@;                                # ... but not if no actual subroutine
 
 ok (!Cedric->isa('Programmer'));
 
@@ -89,15 +81,15 @@ ok (Cedric->isa('Programmer'));
 ok $a->isa('Programmer');
 ok $a->isa("Female");
 
-@Cedric::ISA = qw(Bob);
+@Cedric::ISA = @( qw(Bob) );
 
 ok (!Cedric->isa('Programmer'));
 
 my $b = 'abc';
-my @refs = qw(SCALAR SCALAR     LVALUE      GLOB ARRAY HASH CODE);
-my @vals = (  \$b,   \3.14, \vec($b,1,1), \*b,  \@(),  \%(), sub {} );
-for (my $p=0; $p +< @refs; $p++) {
-    for (my $q=0; $q +< @vals; $q++) {
+my @refs = @( qw(SCALAR SCALAR     LVALUE      GLOB ARRAY HASH CODE) );
+my @vals = @(  \$b,   \3.14, \vec($b,1,1), \*b,  \@(),  \%(), sub {} );
+for (my $p=0; $p +< nelems @refs; $p++) {
+    for (my $q=0; $q +< nelems @vals; $q++) {
         is UNIVERSAL::isa(@vals[$p], @refs[$q]), ($p==$q or $p+$q==1);
     };
 };
@@ -109,12 +101,12 @@ ok $a->can("VERSION");
 ok $a->can("can");
 ok ! $a->can("export_tags");	# a method in Exporter
 
-cmp_ok eval { $a->VERSION }, '==', 2.718;
+cmp_ok try { $a->VERSION }, '==', 2.718;
 
 dies_like( sub { $a->VERSION(2.719) }, 
            qr/^Alice version 2.719 required--this is only version 2.718/ );
 
-ok (eval { $a->VERSION(2.718) });
+ok (try { $a->VERSION(2.718) });
 is $@, '';
 
 my $subs = join ' ', sort grep { defined &{Symbol::fetch_glob("UNIVERSAL::$_")} } keys %UNIVERSAL::;
@@ -130,7 +122,7 @@ ok ! UNIVERSAL::can(\%(), "can");
 
 ok UNIVERSAL::isa(Alice => "UNIVERSAL");
 
-cmp_ok UNIVERSAL::can(Alice => "can"), '==', \&UNIVERSAL::can;
+cmp_ok UNIVERSAL::can(Alice => "can"), '\==', \&UNIVERSAL::can;
 
 # now use UNIVERSAL.pm and see what changes
 eval "use UNIVERSAL";
@@ -154,28 +146,15 @@ ok ! UNIVERSAL::isa("\x[ffffff]\0", 'HASH');
     package Pickup;
     use UNIVERSAL qw( isa can VERSION );
 
-    ::ok isa "Pickup", 'UNIVERSAL';
-    ::cmp_ok can( "Pickup", "can" ), '==', \&UNIVERSAL::can;
-    ::ok VERSION "UNIVERSAL" ;
-}
-
-{
-    # test isa() and can() on magic variables
-    "Human" =~ m/(.*)/;
-    ok $1->isa("Human");
-    ok $1->can("eat");
-    package HumanTie;
-    sub TIESCALAR { bless \%() }
-    sub FETCH { "Human" }
-    tie my($x), "HumanTie";
-    ::ok $x->isa("Human");
-    ::ok $x->can("eat");
+    main::ok isa "Pickup", 'UNIVERSAL';
+    main::cmp_ok can( "Pickup", "can" ), '\==', \&UNIVERSAL::can;
+    main::ok VERSION "UNIVERSAL" ;
 }
 
 # bugid 3284
 # a second call to isa('UNIVERSAL') when @ISA is null failed due to caching
 
-@X::ISA=();
+@X::ISA= @(() );
 my $x = \%(); bless $x, 'X';
 ok $x->isa('UNIVERSAL');
 ok $x->isa('UNIVERSAL');
@@ -183,7 +162,7 @@ ok $x->isa('UNIVERSAL');
 
 # Check that the "historical accident" of UNIVERSAL having an import()
 # method doesn't effect anyone else.
-eval { 'Some::Package'->import("bar") };
+try { 'Some::Package'->import("bar") };
 is $@, '';
 
 
@@ -196,7 +175,7 @@ sub DOES { 1 }
 
 package Bar;
 
-@Bar::ISA = 'Foo';
+@Bar::ISA = @( 'Foo' );
 
 package Baz;
 
@@ -211,10 +190,10 @@ package Pig;
 package Bodine;
 Bodine->isa('Pig');
 *isa = \&UNIVERSAL::isa;
-eval { isa(\%(), 'HASH') };
-::is($@, '', "*isa correctly found");
+try { isa(\%(), 'HASH') };
+main::is($@, '', "*isa correctly found");
 
 package main;
-::dies_like( sub { UNIVERSAL::DOES(\@(), "foo") },
+main::dies_like( sub { UNIVERSAL::DOES(\@(), "foo") },
              qr/Can't call method "DOES" on unblessed reference/,
              'DOES call error message says DOES, not isa' );

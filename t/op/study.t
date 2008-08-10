@@ -3,7 +3,7 @@
 our $Ok_Level = 0;
 my $test = 1;
 sub ok ($;$) {
-    my($ok, $name) = @_;
+    my($ok, $name) = < @_;
 
     local $_;
 
@@ -18,7 +18,7 @@ sub ok ($;$) {
 }
 
 sub nok ($;$) {
-    my($nok, $name) = @_;
+    my($nok, $name) = < @_;
     local $Ok_Level = 1;
     ok( !$nok, $name );
 }
@@ -31,7 +31,7 @@ sub alarm_ok (&) {
     local %SIG{ALRM} = sub { die "timeout\n" };
     
     my $match;
-    eval { 
+    try { 
         alarm(2) if $have_alarm;
         $match = $test->();
         alarm(0) if $have_alarm;

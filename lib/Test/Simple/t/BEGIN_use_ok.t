@@ -7,7 +7,7 @@
 BEGIN {
     if( %ENV{PERL_CORE} ) {
         chdir 't';
-        @INC = ('../lib', 'lib');
+        @INC = @('../lib', 'lib');
     }
     else {
         unshift @INC, 't/lib';
@@ -18,7 +18,7 @@ use Test::More;
 
 my $result;
 BEGIN {
-    eval {
+    try {
         use_ok("Wibble");
     };
     $result = $@;

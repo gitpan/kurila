@@ -12,19 +12,6 @@
 # This file tests several known-error cases relating to STORABLE_attach, in
 # which Storable should (correctly) throw errors.
 
-sub BEGIN {
-    if (%ENV{PERL_CORE}){
-	chdir('t') if -d 't';
-	@INC = ('.', '../lib');
-    } else {
-	unshift @INC, 't';
-    }
-    require Config; Config->import;
-    if (%ENV{PERL_CORE} and %Config{'extensions'} !~ m/\bStorable\b/) {
-        print "1..0 # Skip: Storable was not built\n";
-        exit 0;
-    }
-}
 
 use Storable ();
 use Test::More tests => 9;
@@ -41,11 +28,11 @@ my $thawed = Storable::thaw( $string );
 # is_deeply infinite loops in ciculars, so do it manually
 # is_deeply( $array, $thawed, 'Circular hooked objects work' );
 is( ref($thawed), 'ARRAY', 'Top level ARRAY' );
-is( scalar(@$thawed), 1, 'ARRAY contains one element' );
+is( scalar(nelems @$thawed), 1, 'ARRAY contains one element' );
 isa_ok( $thawed->[0], 'Foo' );
-is( scalar(keys %{$thawed->[0]}), 1, 'Foo contains one element' );
+is( nkeys(%{$thawed->[0]}), 1, 'Foo contains one element' );
 isa_ok( $thawed->[0]->{Foo}, 'Bar' );
-is( scalar(keys %{$thawed->[0]->{Foo}}), 1, 'Bar contains one element' );
+is( nkeys(%{$thawed->[0]->{Foo}}), 1, 'Bar contains one element' );
 isa_ok( $thawed->[0]->{Foo}->{Bar}, 'Foo' );
 is( $thawed->[0], $thawed->[0]->{Foo}->{Bar}, 'Circular is... well... circular' );
 
@@ -58,19 +45,19 @@ is_deeply( \@Foo::order, \@( 'Bar', 'Foo' ), 'thaw order is correct (depth first
 
 package Foo;
 
-@order = ();
+our @order = @( () );
 
 sub STORABLE_freeze {
-	my ($self, $clone) = @_;
+	my ($self, $clone) = < @_;
 	my $class = ref $self;
 	
 	# print "# Freezing $class\n";
 
-	return ($class, $self->{$class});
+	return  @($class, $self->{$class});
 }
 
 sub STORABLE_thaw {
-	my ($self, $clone, $string, @refs) = @_;
+	my ($self, $clone, $string, < @refs) = < @_;
 	my $class = ref $self;
 
 	# print "# Thawing $class\n";
@@ -85,7 +72,7 @@ sub STORABLE_thaw {
 package Bar;
 
 BEGIN {
-@ISA = 'Foo';
+our @ISA = @( 'Foo' );
 }
 
 1;

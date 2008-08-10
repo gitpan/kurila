@@ -49,6 +49,7 @@ Perl_av_reify
 Perl_av_shift
 Perl_av_store
 Perl_av_undef
+Perl_av_tmprefcnt
 Perl_av_unshift
 Perl_block_gimme
 Perl_call_list
@@ -75,9 +76,9 @@ Perl_sv_setpvf_mg_nocontext
 Perl_fprintf_nocontext
 Perl_printf_nocontext
 Perl_cv_ckproto
-Perl_gv_const_sv
 Perl_cv_const_sv
 Perl_cv_undef
+Perl_cv_tmprefcnt
 Perl_cx_dump
 Perl_filter_add
 Perl_filter_del
@@ -111,7 +112,6 @@ Perl_dowantarray
 Perl_dump_all
 Perl_dump_eval
 Perl_dump_fds
-Perl_dump_form
 Perl_gv_dump
 Perl_op_dump
 Perl_pmop_dump
@@ -123,20 +123,19 @@ Perl_form
 Perl_vform
 Perl_free_tmps
 Perl_gp_free
+Perl_gp_tmprefcnt
 Perl_gp_ref
 Perl_gv_AVadd
 Perl_gv_HVadd
 Perl_gv_IOadd
 Perl_gv_check
-Perl_gv_efullname
 Perl_gv_efullname3
-Perl_gv_efullname4
 Perl_gv_fetchfile
 Perl_gv_fetchfile_flags
 Perl_gv_fetchmeth
 Perl_gv_fetchmethod
 Perl_gv_fetchpv
-Perl_gv_fullname4
+Perl_gv_fullname3
 Perl_gv_init
 Perl_gv_name_set
 Perl_gv_stashpv
@@ -166,6 +165,7 @@ Perl_hv_store
 Perl_hv_store_ent
 Perl_hv_store_flags
 Perl_hv_undef
+Perl_hv_tmprefcnt
 Perl_ibcmp
 Perl_ibcmp_locale
 Perl_ibcmp_utf8
@@ -251,6 +251,7 @@ Perl_mg_clear
 Perl_mg_copy
 Perl_mg_find
 Perl_mg_free
+Perl_mg_tmprefcnt
 Perl_mg_get
 Perl_mg_length
 Perl_mg_magical
@@ -288,7 +289,6 @@ Perl_newCONDOP
 Perl_newCONSTSUB
 Perl_newFORM
 Perl_newFOROP
-Perl_newGIVENOP
 Perl_newLOGOP
 Perl_newLOOPEX
 Perl_newLOOPOP
@@ -311,6 +311,7 @@ Perl_newGVREF
 Perl_newHVREF
 Perl_newHV
 Perl_newHVhv
+Perl_hv_sethv
 Perl_newIO
 Perl_newLISTOP
 Perl_newPADOP
@@ -335,7 +336,6 @@ Perl_newSVrv
 Perl_newSVsv
 Perl_newSV_type
 Perl_newUNOP
-Perl_newWHENOP
 Perl_newWHILEOP
 Perl_new_stackinfo
 Perl_scan_vstring
@@ -349,6 +349,7 @@ Perl_vstringify
 Perl_vcmp
 Perl_ninstr
 Perl_op_free
+Perl_op_tmprefcnt
 Perl_find_rundefsvoffset
 Perl_pad_sv
 Perl_reentrant_size
@@ -370,7 +371,6 @@ Perl_get_hv
 Perl_get_cv
 Perl_get_cvn_flags
 Perl_init_i18nl10n
-Perl_new_collate
 Perl_new_ctype
 Perl_new_numeric
 Perl_set_numeric_local
@@ -387,6 +387,7 @@ Perl_regdump
 Perl_pregexec
 Perl_pregfree
 Perl_pregfree2
+Perl_preg_tmprefcnt
 Perl_reg_temp_copy
 Perl_regfree_internal
 Perl_regdupe_internal
@@ -484,7 +485,6 @@ Perl_sv_uv
 Perl_sv_nv
 Perl_sv_pvn
 Perl_sv_pvutf8n
-Perl_sv_pvbyten
 Perl_sv_true
 Perl_sv_backoff
 Perl_sv_bless
@@ -496,8 +496,6 @@ Perl_sv_catsv
 Perl_sv_chop
 Perl_sv_clear
 Perl_sv_cmp
-Perl_sv_cmp_locale
-Perl_sv_collxfrm
 Perl_sv_compile_2op
 Perl_getcwd_sv
 Perl_sv_dec
@@ -525,9 +523,7 @@ Perl_sv_pos_u2b
 Perl_sv_pos_b2u
 Perl_sv_pvn_force
 Perl_sv_pvutf8n_force
-Perl_sv_pvbyten_force
 Perl_sv_recode_to_utf8
-Perl_sv_cat_decode
 Perl_sv_reftype
 Perl_sv_replace
 Perl_sv_report_used
@@ -642,7 +638,6 @@ Perl_sv_2pvutf8_nolen
 Perl_sv_2pvbyte_nolen
 Perl_sv_pv
 Perl_sv_pvutf8
-Perl_sv_pvbyte
 Perl_sv_utf8_encode
 Perl_sv_utf8_decode
 Perl_sv_force_normal

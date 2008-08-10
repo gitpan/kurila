@@ -1,12 +1,5 @@
 #!./perl -w
 
-BEGIN {
-    unless(grep m/blib/, @INC) {
-	chdir 't' if -d 't';
-	@INC = '../lib';
-    }
-}
-
 use strict;
 use bytes;
 require(%ENV{PERL_CORE} ? "./test.pl" : "./t/test.pl");
@@ -36,7 +29,7 @@ if( $^O =~ m/MSWin32/ ) {
     my $fh = $Class->new;
 
     isa_ok( $fh,                $Class );
-    ok( $fh->open($File),       "   Opened '$File'" );
+    ok( < $fh->open($File),       "   Opened '$File'" );
     
     my $cont = do { local $/; ~< $fh };
     unlike( $cont, qr/$Expect/, "   Content match fails without binmode" );

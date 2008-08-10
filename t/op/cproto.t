@@ -2,16 +2,16 @@
 # Tests to ensure that we don't unexpectedly change prototypes of builtins
 
 BEGIN { require './test.pl'; }
-plan tests => 228;
+plan tests => 225;
 
 while ( ~< *DATA) {
     chomp;
-    (my $keyword, my $proto, local $TODO) = split " ", $_, 3;
+    (my $keyword, my $proto, local our $TODO) = split " ", $_, 3;
     if ($proto eq 'undef') {
 	ok( !defined prototype "CORE::".$keyword, $keyword );
     }
     elsif ($proto eq 'unknown') {
-	eval { prototype "CORE::".$keyword };
+	try { prototype "CORE::".$keyword };
 	like( $@->{description}, qr/Can't find an opnumber for/, $keyword );
     }
     else {
@@ -42,7 +42,6 @@ close (;*)
 closedir (*)
 cmp unknown
 connect (*$)
-continue ()
 cos (_)
 crypt ($$)
 defined undef
@@ -100,7 +99,6 @@ getservbyport ($$)
 getservent ()
 getsockname (*)
 getsockopt (*$$)
-given undef
 glob undef
 gmtime (;$)
 goto undef
@@ -111,7 +109,7 @@ index ($$;$)
 int (_)
 ioctl (*$$)
 join ($@)
-keys (\%)
+keys ($)
 kill (@)
 last undef
 lc (_)
@@ -245,7 +243,6 @@ wait ()
 waitpid ($$)
 wantarray ()
 warn (@)
-when undef
 while undef
 x unknown
 xor ($$)

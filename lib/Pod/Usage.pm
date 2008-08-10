@@ -428,10 +428,10 @@ use Exporter;
 use File::Spec;
 
 use vars qw(@ISA @EXPORT);
-@EXPORT = qw(&pod2usage);
+@EXPORT = @( qw(&pod2usage) );
 BEGIN {
        require Pod::Text;
-       @ISA = qw( Pod::Text );
+       @ISA = @( qw( Pod::Text ) );
 }
 
 
@@ -445,17 +445,17 @@ sub pod2usage {
     local($_) = shift;
     my %opts;
     ## Collect arguments
-    if (@_ +> 0) {
+    if ((nelems @_) +> 0) {
         ## Too many arguments - assume that this is a hash and
         ## the user forgot to pass a reference to it.
-        %opts = ($_, @_);
+        %opts = %($_, < @_);
     }
     elsif (!defined $_) {
       $_ = "";
     }
     elsif (ref $_) {
         ## User passed a ref to a hash
-        %opts = %{$_}  if (ref($_) eq 'HASH');
+        %opts = %( < %{$_} )  if (ref($_) eq 'HASH');
     }
     elsif (m/^[-+]?\d+$/) {
         ## User passed in the exit value to use
@@ -470,13 +470,13 @@ sub pod2usage {
     ## options that were all uppercase words rather than ones that
     ## looked like Unix command-line options.
     ## to be uppercase keywords)
-    %opts = map {
+    %opts = %( map {
         my $val = %opts{$_};
         s/^(?=\w)/-/;
         m/^-msg/i   and  $_ = '-message';
         m/^-exit/i  and  $_ = '-exitval';
         lc($_) => $val;    
-    } (keys %opts);
+    } (keys %opts) );
 
     ## Now determine default -exitval and -verbose values to use
     if ((! defined %opts{"-exitval"}) && (! defined %opts{"-verbose"})) {
@@ -505,8 +505,8 @@ sub pod2usage {
                             : (($^O eq 'MacOS' || $^O eq 'VMS') ? ',' :  ":");
         my $pathspec = %opts{"-pathlist"} || %ENV{PATH} || %ENV{PERL5LIB};
 
-        my @paths = (ref $pathspec) ? @$pathspec : split($pathsep, $pathspec);
-        for my $dirname (@paths) {
+        my @paths = @( (ref $pathspec) ? < @$pathspec : split($pathsep, $pathspec) );
+        for my $dirname (< @paths) {
             local $_ = File::Spec->catfile($dirname, $basename) if length $dirname;
             last if (-e $_) && (%opts{"-input"} = $_);
         }
@@ -535,7 +535,7 @@ sub pod2usage {
     if ( !%opts{"-noperldoc"}
              and  %opts{"-verbose"} +>= 2 
              and  !ref(%opts{"-input"})
-             and  %opts{"-output"} == \*STDOUT )
+             and  %opts{"-output"} \== \*STDOUT )
     {
        ## spit out the entire PODs. Might as well invoke perldoc
        my $progpath = File::Spec->catfile(%Config{scriptdir}, "perldoc");
@@ -561,22 +561,22 @@ sub pod2usage {
 sub new {
     my $this = shift;
     my $class = ref($this) || $this;
-    my %params = @_;
-    my $self = \%(%params);
+    my %params = %( < @_ );
+    my $self = \%(< %params);
     bless $self, $class;
     if ($self->can('initialize')) {
         $self->initialize();
     } else {
         $self = $self->SUPER::new();
-        %$self = (%$self, %params);
+        %$self = %(< %$self, < %params);
     }
     return $self;
 }
 
 sub select {
-    my ($self, @res) = @_;
+    my ($self, < @res) = < @_;
     if (@ISA[0]->can('select')) {
-        $self->SUPER::select(@_);
+        $self->SUPER::select(< @_);
     } else {
         $self->{USAGE_SELECT} = \@res;
     }
@@ -589,23 +589,23 @@ sub seq_i { return @_[1] }
 # Pod::Select did as well as the work done below by preprocess_paragraph.
 # Note that the below is very, very specific to Pod::Text.
 sub _handle_element_end {
-    my ($self, $element) = @_;
+    my ($self, $element) = < @_;
     if ($element eq 'head1') {
-        %$self{USAGE_HEAD1} = %$self{PENDING}[-1][1];
+        %$self{USAGE_HEAD1} = %$self{PENDING}->[-1]->[1];
         if ($self->{USAGE_OPTIONS}->{-verbose} +< 2) {
-            %$self{PENDING}[-1][1] =~ s/^\s*SYNOPSIS\s*$/USAGE/;
+            %$self{PENDING}->[-1]->[1] =~ s/^\s*SYNOPSIS\s*$/USAGE/;
         }
     } elsif ($element eq 'head2') {
-        %$self{USAGE_HEAD2} = %$self{PENDING}[-1][1];
+        %$self{USAGE_HEAD2} = %$self{PENDING}->[-1]->[1];
     }
     if ($element eq 'head1' || $element eq 'head2') {
         %$self{USAGE_SKIPPING} = 1;
         my $heading = %$self{USAGE_HEAD1};
         $heading .= '/' . %$self{USAGE_HEAD2} if defined %$self{USAGE_HEAD2};
-        if (!%$self{USAGE_SELECT} || !@{ %$self{USAGE_SELECT} }) {
+        if (!%$self{USAGE_SELECT} || !nelems @{ %$self{USAGE_SELECT} }) {
            %$self{USAGE_SKIPPING} = 0;
         } else {
-          for (@{ %$self{USAGE_SELECT} }) {
+          for (< @{ %$self{USAGE_SELECT} }) {
               if ($heading =~ m/^$_\s*$/) {
                   %$self{USAGE_SKIPPING} = 0;
                   last;
@@ -616,11 +616,11 @@ sub _handle_element_end {
         # Try to do some lowercasing instead of all-caps in headings, and use
         # a colon to end all headings.
         if($self->{USAGE_OPTIONS}->{-verbose} +< 2) {
-            local $_ = %$self{PENDING}[-1][1];
+            local $_ = %$self{PENDING}->[-1]->[1];
             s{([A-Z])([A-Z]+)}{{((length($2) +> 2) ? $1 : lc($1)) . lc($2)}}g;
             s/\s*$/:/  unless (m/:\s*$/);
             $_ .= "\n";
-            %$self{PENDING}[-1][1] = $_;
+            %$self{PENDING}->[-1]->[1] = $_;
         }
     }
     if (%$self{USAGE_SKIPPING}) {

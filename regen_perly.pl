@@ -36,14 +36,14 @@ use strict;
 
 my $bison = 'bison';
 
-if (@ARGV +>= 2 and @ARGV[0] eq '-b') {
+if ((nelems @ARGV) +>= 2 and @ARGV[0] eq '-b') {
     shift;
     $bison = shift;
 }
 
 my $y_file = shift || 'perly.y';
 
-usage unless @ARGV==0 && $y_file =~ m/\.y$/;
+usage unless (nelems @ARGV)==0 && $y_file =~ m/\.y$/;
 
 (my $h_file    = $y_file) =~ s/\.y$/.h/;
 (my $act_file  = $y_file) =~ s/\.y$/.act/;
@@ -86,7 +86,7 @@ die "failed to read $tmpc_file: length mismatch\n"
     unless length $clines == -s $tmpc_file;
 close CTMPFILE;
 
-my ($actlines, $tablines) = extract($clines);
+my ($actlines, $tablines) = < extract($clines);
 
 $tablines .= make_type_tab($y_file, $tablines);
 
@@ -113,7 +113,7 @@ chmod 0644, $h_file;
 open H_FILE, ">", "$h_file" or die "Can't open $h_file: $!\n";
 my $endcore_done = 0;
 while ( ~< *TMPH_FILE) {
-    print H_FILE "#ifdef PERL_CORE\n" if $. == 1;
+    print H_FILE "#ifdef PERL_CORE\n" if iohandle::input_line_number(\*TMPH_FILE) == 1;
     if (!$endcore_done and m/YYSTYPE_IS_DECLARED/) {
 	print H_FILE "#endif /* PERL_CORE */\n";
 	$endcore_done = 1;
@@ -137,6 +137,7 @@ sub extract {
     my $actlines;
 
     $clines =~ m@
+       (
 	(?:
 	    ^/* YYFINAL[^\n]+\n		#optional comment
 	)?
@@ -145,9 +146,10 @@ sub extract {
 	yystos\[\]\s*=			# start of last table
 	.*?
 	}\s*;				# end of last table
+       )
     @xms
 	or die "Can't extract tables from $tmpc_file\n";
-    $tablines = $&;
+    $tablines = $1;
 
 
     $clines =~ m@
@@ -180,7 +182,7 @@ sub extract {
     $actlines =~ s/yyvsp\[(.*?)\]/ps[$1].val/g
 	or die "Can't convert value stack name\n";
 
-    return $actlines. "\n", $tablines. "\n";
+    return @($actlines. "\n", $tablines. "\n");
 }
 
 # Generate a table, yy_type_tab[], that specifies for each token, what
@@ -215,14 +217,14 @@ sub extract {
 # perly.y
 
 sub make_type_tab {
-    my ($y_file, $tablines) = @_;
+    my ($y_file, $tablines) = < @_;
     my %tokens;
     my %types;
     my $default_token;
     open my $fh, '<', $y_file or die "Can't open $y_file: $!\n";
     while ( ~< $fh) {
 	if (m/(\$\d+)\s*=/) {
-	    warn "$y_file:$.: dangerous assignment to $1: $_";
+	    warn "$y_file:{iohandle::input_line_number($fh)}: dangerous assignment to $1: $_";
 	}
 
 	if (m/__DEFAULT__/) {
@@ -269,15 +271,15 @@ sub make_type_tab {
 
 
 sub my_system {
-    system(@_);
+    system(< @_);
     if ($? == -1) {
-	die "failed to execute command '@_': $!\n";
+	die "failed to execute command '{join ' ', <@_}': $!\n";
     }
     elsif ($? ^&^ 127) {
-	die sprintf "command '@_' died with signal \%d\n",
+	die sprintf "command '{join ' ', <@_}' died with signal \%d\n",
 	    ($? ^&^ 127);
     }
     elsif ($? >> 8) {
-	die sprintf "command '@_' exited with value \%d\n", $? >> 8;
+	die sprintf "command '{join ' ', <@_}' exited with value \%d\n", $? >> 8;
     }
 }

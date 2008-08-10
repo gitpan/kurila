@@ -4,8 +4,8 @@ use strict;
 
 our $VERSION = "1.10";
 
-my %err = ();
-my %wsa = ();
+my %err = %( () );
+my %wsa = %( () );
 
 # Symbian cross-compiling environment.
 my $IsSymbian = exists %ENV{SDK} && -d "%ENV{SDK}\\epoc32";
@@ -16,14 +16,14 @@ unlink "Errno.pm" if -f "Errno.pm";
 open OUT, ">", "Errno.pm" or die "Cannot open Errno.pm: $!";
 select OUT;
 my $file;
-my @files = get_files();
+my @files = @( < get_files() );
 if (%Config{gccversion} ne '' && $^O eq 'MSWin32') {
     # MinGW complains "warning: #pragma system_header ignored outside include
     # file" if the header files are processed individually, so include them
     # all in .c file and process that instead.
     open INCS, ">", 'includes.c' or
 	die "Cannot open includes.c";
-    foreach $file (@files) {
+    foreach $file (< @files) {
 	next if $file eq 'errno.c';
 	next unless -f $file;
 	print INCS qq[#include "$file"\n];
@@ -33,7 +33,7 @@ if (%Config{gccversion} ne '' && $^O eq 'MSWin32') {
     unlink 'includes.c';
 }
 else {
-    foreach $file (@files) {
+    foreach $file (< @files) {
 	process_file($file);
     }
 }
@@ -41,7 +41,7 @@ write_errno_pm();
 unlink "errno.c" if -f "errno.c";
 
 sub process_file {
-    my($file) = @_;
+    my($file) = < @_;
 
     # for win32 perl under cygwin, we need to get a windows pathname
     if ($^O eq 'MSWin32' && %Config{cc} =~ m/\B-mno-cygwin\b/ &&
@@ -115,7 +115,7 @@ sub default_cpp {
 }
 
 sub get_files {
-    my %file = ();
+    my %file = %( () );
     # VMS keeps its include files in system libraries (well, except for Gcc)
     if ($^O eq 'VMS') {
 	if (%Config{vms_cc_type} eq 'decc') {
@@ -213,7 +213,7 @@ sub get_files {
 	}
 	close(CPPO);
     }
-    return keys %file;
+    return @(keys %file);
 }
 
 sub write_errno_pm {
@@ -221,7 +221,7 @@ sub write_errno_pm {
 
     # quick sanity check
 
-    die "No error definitions found" unless keys %err;
+    die "No error definitions found" unless %err;
 
     # create the CPP input
 
@@ -271,7 +271,7 @@ sub write_errno_pm {
 		or die "Cannot exec $cpp";
 	}
 
-	%err = ();
+	%err = %( () );
 
 	while( ~< *CPPO) {
 	    my($name,$expr);
@@ -300,13 +300,13 @@ sub write_errno_pm {
 
     if ($^O eq 'beos') {
 	if (open(C, ">", "errno.c")) {
-	    my @allerrs = keys %err;
+	    my @allerrs = @( keys %err );
 	    print C <<EOF;
 #include <errno.h>
 #include <stdio.h>
 int main() \{
 EOF
-            for (@allerrs) {
+            for (< @allerrs) {
 		print C qq[printf("$_ \%d\n", $_);]
 	    }
             print C "\}\n";
@@ -346,20 +346,20 @@ use strict;
 
 \$VERSION = "$VERSION";
 \$VERSION = eval \$VERSION;
-\@ISA = qw(Exporter);
+\@ISA = \@( qw(Exporter) );
 
 EDQ
    
     my $len = 0;
-    my @err = sort { %err{$a} <+> %err{$b} } keys %err;
-    map { $len = length if length +> $len } @err;
+    my @err = @( sort { %err{$a} <+> %err{$b} } keys %err );
+    map { $len = length if length +> $len } < @err;
 
-    my $j = "\@EXPORT_OK = qw(" . join(" ",keys %err) . ");\n";
+    my $j = "\@EXPORT_OK = \@( qw(" . join(" ",keys %err) . ") );\n";
     $j =~ s/(.{50,70})\s/$1\n\t/g;
     print $j,"\n";
 
 print <<'ESQ';
-%EXPORT_TAGS = (
+%EXPORT_TAGS = %(
     POSIX => \@(qw(
 ESQ
 
@@ -381,20 +381,32 @@ ESQ
     $k =~ s/(.{50,70})\s/$1\n\t/g;
     print "\t",$k,"\n    ))\n);\n\n";
 
-    foreach $err (@err) {
-	printf "sub \%s () \{ \%d \}\n",,$err,%err{$err};
+    foreach $err (< @err) {
+	printf "sub \%s () \{ \%d \}\n",$err,%err{$err};
     }
+
+    print <<'ESQ';
+my %name2no = %(
+ESQ
+
+    foreach $err (< @err) {
+	printf "    \%s => \%d,\n",$err,%err{$err};
+    }
+
+    print <<'ESQ';
+);
+ESQ
 
     print <<'ESQ';
 
 sub TIEHASH { bless \@() }
 
 sub FETCH {
-    my ($self, $errname) = @_;
+    my ($self, $errname) = < @_;
     my $proto = prototype("Errno::$errname");
     my $errno = "";
-    if (defined($proto) && $proto eq "") {
-	$errno = &{*{Symbol::fetch_glob($errname)}};
+    if ( exists %name2no{$errname}) {
+        $errno = %name2no{$errname};
         $errno = 0 unless $! == $errno;
     }
     return $errno;
@@ -408,24 +420,18 @@ sub STORE {
 *DELETE = \&STORE;
 
 sub NEXTKEY {
-    my($k,$v);
-    while(($k,$v) = each %Errno::) {
-	my $proto = prototype("Errno::$k");
-	last if (defined($proto) && $proto eq "");
-    }
+    my($k,$v) = each %name2no;
     $k
 }
 
 sub FIRSTKEY {
-    my $s = scalar keys %Errno::;	# initialize iterator
+    keys %name2no;	# initialize iterator
     goto &NEXTKEY;
 }
 
 sub EXISTS {
-    my ($self, $errname) = @_;
-    my $r = ref $errname;
-    my $proto = !$r || $r eq 'CODE' ? prototype($errname) : undef;
-    defined($proto) && $proto eq "";
+    my ($self, $errname) = < @_;
+    return exists %name2no{$errname};
 }
 
 tie %!, __PACKAGE__;

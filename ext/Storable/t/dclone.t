@@ -8,15 +8,7 @@
 
 sub BEGIN {
     if (%ENV{PERL_CORE}){
-	chdir('t') if -d 't';
-	@INC = ('.', '../lib', '../ext/Storable/t');
-    } else {
-	unshift @INC, 't';
-    }
-    require Config; Config->import;
-    if (%ENV{PERL_CORE} and %Config{'extensions'} !~ m/\bStorable\b/) {
-        print "1..0 # Skip: Storable was not built\n";
-        exit 0;
+	push @INC, '../ext/Storable/t';
     }
     require 'st-dump.pl';
 }
@@ -28,25 +20,25 @@ print "1..12\n";
 
 $a = 'toto';
 $b = \$a;
-$c = bless \%(), 'CLASS';
+our $c = bless \%(), 'CLASS';
 $c->{attribute} = 'attrval';
-%a = ('key', 'value', 1, 0, $a, $b, 'cvar', \$c);
-@a = ('first', undef, 3, -4, -3.14159, 456, 4.5,
+our %a = %('key', 'value', 1, 0, $a, $b, 'cvar', \$c);
+our @a = @('first', undef, 3, -4, -3.14159, 456, 4.5,
 	$b, \$a, $a, $c, \$c, \%a);
 
-print "not " unless defined ($aref = dclone(\@a));
+print "not " unless defined (our $aref = dclone(\@a));
 print "ok 1\n";
 
-$dumped = &dump(\@a);
+our $dumped = &dump(\@a);
 print "ok 2\n";
 
-$got = &dump($aref);
+our $got = &dump($aref);
 print "ok 3\n";
 
 print "not " unless $got eq $dumped; 
 print "ok 4\n";
 
-package FOO; @ISA = qw(Storable);
+package FOO; our @ISA = @( qw(Storable) );
 
 sub make {
 	my $self = bless \%();
@@ -56,8 +48,8 @@ sub make {
 
 package main;
 
-$foo = FOO->make;
-print "not " unless defined($r = $foo->dclone);
+our $foo = FOO->make;
+print "not " unless defined(our $r = $foo->dclone);
 print "ok 5\n";
 
 print "not " unless &dump($foo) eq &dump($r);
@@ -66,21 +58,21 @@ print "ok 6\n";
 # Ensure refs to "undef" values are properly shared during cloning
 my $hash;
 push @{%$hash{''}}, \%$hash{a};
-print "not " unless %$hash{''}[0] == \%$hash{a};
+print "not " unless %$hash{''}->[0] \== \%$hash{a};
 print "ok 7\n";
 
 my $cloned = dclone(dclone($hash));
-print "not " unless %$cloned{''}[0] == \%$cloned{a};
+print "not " unless %$cloned{''}->[0] \== \%$cloned{a};
 print "ok 8\n";
 
 %$cloned{a} = "blah";
-print "not " unless %$cloned{''}[0] == \%$cloned{a};
+print "not " unless %$cloned{''}->[0] \== \%$cloned{a};
 print "ok 9\n";
 
 # [ID 20020221.007] SEGV in Storable with empty string scalar object
 package TestString;
 sub new {
-    my ($type, $string) = @_;
+    my ($type, $string) = < @_;
     return bless(\$string, $type);
 }
 package main;
@@ -93,12 +85,12 @@ print ref $clone eq ref $empty_string_obj &&
 
 
 # Do not fail if Tie::Hash and/or Tie::StdHash is not available
-if (eval { require Tie::Hash; scalar keys %{Symbol::stash("Tie::StdHash")} }) {
+if (try { require Tie::Hash; scalar keys %{Symbol::stash("Tie::StdHash")} }) {
     tie my %tie, "Tie::StdHash" or die $!;
     %tie{array} = \@(1,2,3,4);
     %tie{hash} = \%(1,2,3,4);
     my $clone_array = dclone %tie{array};
-    print "not " unless "@$clone_array" eq "@{%tie{array}}";
+    print "not " unless "{join ' ', <@$clone_array}" eq "{join ' ', <@{%tie{array}}}";
     print "ok 11\n";
     my $clone_hash = dclone %tie{hash};
     print "not " unless $clone_hash->{1} eq %tie{hash}{1};

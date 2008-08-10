@@ -59,7 +59,7 @@ sub import
      $dir = getcwd;
  }
  if ($^O eq 'VMS') { ($dir = VMS::Filespec::unixify($dir)) =~ s-/\z--; }
- if (@_)
+ if ((nelems @_))
   {
    $dir = shift;
    $dir =~ s/blib\z//;

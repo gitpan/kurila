@@ -3,12 +3,11 @@
 
 BEGIN {
   if(%ENV{PERL_CORE}) {
-    chdir 't' if -d 't';
     # The ../../../../../lib is for finding lib/utf8.pm
     # when running under all-utf8 settings (pod/find.t)
     # does not directly require lib/utf8.pm but regular
     # expressions will need that.
-    @INC = qw(../lib ../../../../../lib);
+    @INC = @( qw(../lib ../../../../../lib) );
   }
 }
 
@@ -33,16 +32,17 @@ my $VERBOSE = %ENV{PERL_CORE} ? 0 : (%ENV{TEST_VERBOSE} || 0);
 my $lib_dir = %ENV{PERL_CORE} ? 
   'File::Spec'->catdir('pod', 'testpods', 'lib')
   : 'File::Spec'->catdir($THISDIR,'lib');
+our $Qlib_dir;
 if ($^O eq 'VMS') {
     $lib_dir = %ENV{PERL_CORE} ?
-      VMS::Filespec::unixify('File::Spec'->catdir('pod', 'testpods', 'lib'))
-      : VMS::Filespec::unixify('File::Spec'->catdir($THISDIR,'-','lib','pod'));
+      VMS::Filespec::unixify( <'File::Spec'->catdir('pod', 'testpods', 'lib'))
+      : VMS::Filespec::unixify( <'File::Spec'->catdir($THISDIR,'-','lib','pod'));
     $Qlib_dir = $lib_dir;
     $Qlib_dir =~ s#\/#::#g;
 }
 
 print "### searching $lib_dir\n";
-my %pods = pod_find($lib_dir);
+my %pods = %( < pod_find($lib_dir) );
 my $result = join(',', sort values %pods);
 print "### found $result\n";
 my $compare = %ENV{PERL_CORE} ? 
@@ -67,12 +67,12 @@ if ($^O eq 'VMS') {
     $result =~ s/$undollared/pod::/g;
     $result =~ s/\$//g;
     my $count = 0;
-    my @result = split(m/,/,$result);
-    my @compare = split(m/,/,$compare);
-    foreach(@compare) {
-        $count += grep {m/$_/} @result;
+    my @result = @( split(m/,/,$result) );
+    my @compare = @( split(m/,/,$compare) );
+    foreach(< @compare) {
+        $count += grep {m/$_/} < @result;
     }
-    ok($count/((@result-1)+1)-1,(@compare-1));
+    ok($count/(((nelems @result)-1)+1)-1,((nelems @compare)-1));
 }
 elsif ('File::Spec'->case_tolerant || $^O eq 'dos') {
     ok(lc $result,lc $compare);
@@ -95,7 +95,7 @@ if ($^O eq 'VMS') { # privlib is perl_root:[lib] OK but not under mms
 }
 else {
     $compare = %ENV{PERL_CORE} ?
-      'File::Spec'->catfile('File::Spec'->updir, 'lib','File','Find.pm')
+      'File::Spec'->catfile( 'File::Spec'->updir, 'lib','File','Find.pm')
       : 'File::Spec'->catfile(%Config::Config{privlib},"File","Find.pm");
     ok(_canon($result),_canon($compare));
 }
@@ -118,12 +118,12 @@ ok(_canon($result),_canon($compare));
 # make the path as generic as possible
 sub _canon
 {
-  my ($path) = @_;
+  my ($path) = < @_;
   $path = 'File::Spec'->canonpath($path);
-  my @comp = 'File::Spec'->splitpath($path);
-  my @dir = 'File::Spec'->splitdir(@comp[1]);
-  @comp[1] = 'File::Spec'->catdir(@dir);
-  $path = 'File::Spec'->catpath(@comp);
+  my @comp = @( < 'File::Spec'->splitpath($path) );
+  my @dir = @( < 'File::Spec'->splitdir(@comp[1]) );
+  @comp[1] = 'File::Spec'->catdir(< @dir);
+  $path = 'File::Spec'->catpath(< @comp);
   $path = uc($path) if 'File::Spec'->case_tolerant;
   print "### general path: $path\n" if $VERBOSE;
   $path;

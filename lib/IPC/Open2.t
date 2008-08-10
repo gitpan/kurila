@@ -1,8 +1,6 @@
 #!./perl -w
 
 BEGIN {
-    chdir 't' if -d 't';
-    @INC = '../lib';
     our %Config;
     require Config; Config->import;
     if (!%Config{'d_fork'}
@@ -13,7 +11,7 @@ BEGIN {
 	exit 0;
     }
     # make warnings fatal
-    $^WARN_HOOK = sub { die @_ };
+    $^WARN_HOOK = sub { die < @_ };
 }
 
 use strict;
@@ -23,7 +21,7 @@ use IPC::Open2;
 my $perl = './perl';
 
 sub ok {
-    my ($n, $result, $info) = @_;
+    my ($n, $result, $info) = < @_;
     if ($result) {
 	print "ok $n\n";
     }
@@ -43,8 +41,8 @@ sub cmd_line {
 }
 
 my ($pid, $reaped_pid);
-STDOUT->autoflush;
-STDERR->autoflush;
+(\*STDOUT)->autoflush;
+(\*STDERR)->autoflush;
 
 print "1..7\n";
 

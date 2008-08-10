@@ -22,7 +22,7 @@ $^WARN_HOOK = sub {
 
 require './test.pl';
 
-plan(234);
+plan(232);
 
 run_tests() unless caller;
 
@@ -288,7 +288,7 @@ is($a, 'xxxxefgh');
     $x = "\x{263a}\x{263a}";
     substr($x,0,1, "abcd");
     is($x, "abcd\x{263a}");
-    $x = reverse $x;
+    $x = join '', reverse split m//, $x;
     is($x, "\x{263a}dcba");
 }
 {
@@ -300,17 +300,9 @@ is($a, 'xxxxefgh');
     $x = $x x 2;
     substr($x,0,1, "abcd");
     is($x, "abcd\x[E2]");
-    $x = reverse $x;
+    $x = join '', reverse split m//, $x;
     is($x, "\x[E2]dcba");
 }
-
-# replacement should work on magical values
-require Tie::Scalar;
-my %data;
-tie %data{'a'}, 'Tie::StdScalar';  # makes $data{'a'} magical
-%data{a} = "firstlast";
-is(substr(%data{'a'}, 0, 5, ""), "first");
-is(%data{'a'}, "last");
 
 # And tests for already-UTF8 one
 
@@ -458,7 +450,7 @@ is($x, "\x{100}\x{200}ab");
     my $s = "ab";
     my @r; 
     @r[$_] = \ substr $s, $_, 1 for (0, 1);
-    is(join("", map { $$_ } @r), "ab");
+    is(join("", map { $$_ } < @r), "ab");
 }
 
 # [perl #24605]

@@ -8,25 +8,15 @@
 # This program is free software; you may redistribute it and/or modify it
 # under the same terms as Perl itself.
 
+use TestInit;
+
 BEGIN {
-    chdir 't' if -d 't';
-    if (%ENV{PERL_CORE}) {
-        @INC = '../lib';
-    } else {
-        unshift (@INC, '../blib/lib');
-    }
-    unshift (@INC, '../blib/lib');
     $| = 1;
     print "1..5\n";
 }
 
-END {
-    print "not ok 1\n" unless $loaded;
-}
-
 use Pod::Text;
 
-$loaded = 1;
 print "ok 1\n";
 
 my $n = 2;
@@ -44,7 +34,7 @@ while ( ~< *DATA) {
         print TMP $_;
     }
     close TMP;
-    my $parser = Pod::Text->new (%options) or die "Cannot create parser\n";
+    my $parser = Pod::Text->new (< %options) or die "Cannot create parser\n";
     open (OUT, ">", 'out.tmp') or die "Cannot create out.tmp: $!\n";
     $parser->parse_from_file ('tmp.pod', \*OUT);
     close OUT;

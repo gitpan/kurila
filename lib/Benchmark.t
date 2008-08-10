@@ -1,10 +1,5 @@
 #!./perl -w
 
-BEGIN {
-    chdir 't' if -d 't';
-    @INC = ('../lib');
-}
-
 use warnings;
 use strict;
 use vars qw($foo $bar $baz $ballast);
@@ -39,12 +34,14 @@ isa_ok ($t0, 'Benchmark', "Ensure we can create a benchmark object");
 isa_ok(timeit(5, sub {++$foo}), 'Benchmark', "timeit CODEREF");
 is ($foo, 5, "benchmarked code was run 5 times");
 
-isa_ok(timeit(5, '++$bar'), 'Benchmark', "timeit eval");
+our $bar;
+isa_ok(timeit(5, '++ our $bar'), 'Benchmark', "timeit eval");
 is ($bar, 5, "benchmarked code was run 5 times");
 
 # is coderef called with spurious arguments?
-timeit( 1, sub { $foo = @_ });
-is ($foo, 0, "benchmarked code called without arguments");
+my $foo;
+timeit( 1, sub { $foo = @_[0] });
+is ($foo, undef, "benchmarked code called without arguments");
 
 
 print "# Burning CPU to benchmark things will take time...\n";
@@ -130,59 +127,64 @@ is ($auto, $default, 'timestr ($diff, "auto") matches timestr ($diff)');
           qr/(\d+) +wallclock secs? +\( *\d\.\d+E[-+]?\d\d\d? +usr +\d\.\d+E[-+]?\d\d\d? +sys +\+ +\d\.\d+E[-+]?\d\d\d? +cusr +\d\.\d+E[-+]?\d\d\d? +csys += +\d\.\d+E[-+]?\d\d\d? +CPU\)/, 'timestr ($diff, "all", "E") [sprintf format of "E"]');
 }
 
-my $out = tie *OUT, 'TieOut';
+my $out = "";
+open my $out_fh, '>>', \$out or die;
 
 my $iterations = 3;
 
 $foo = 0;
-select(OUT);
+select($out_fh);
 my $got = timethis($iterations, sub {++$foo});
 select(STDOUT);
 isa_ok($got, 'Benchmark', "timethis CODEREF");
 is ($foo, $iterations, "benchmarked code was run $iterations times");
 
-$got = $out->read();
+$got = $out;
 like ($got, qr/^timethis $iterations/, 'default title');
 like ($got, $Default_Pattern, 'default format is all or noc');
 
+$out = "";
 $bar = 0;
-select(OUT);
+select($out_fh);
 $got = timethis($iterations, '++$bar');
 select(STDOUT);
 isa_ok($got, 'Benchmark', "timethis eval");
 is ($bar, $iterations, "benchmarked code was run $iterations times");
 
-$got = $out->read();
+$got = $out;
 like ($got, qr/^timethis $iterations/, 'default title');
 like ($got, $Default_Pattern, 'default format is all or noc');
 
 my $title = 'lies, damn lies and benchmarks';
 $foo = 0;
-select(OUT);
+$out = "";
+select($out_fh);
 $got = timethis($iterations, sub {++$foo}, $title);
 select(STDOUT);
 isa_ok($got, 'Benchmark', "timethis with title");
 is ($foo, $iterations, "benchmarked code was run $iterations times");
 
-$got = $out->read();
+$got = $out;
 like ($got, qr/^$title:/, 'specify title');
 like ($got, $Default_Pattern, 'default format is all or noc');
 
 # default is auto, which is all or noc. nop can never match the default
 $foo = 0;
-select(OUT);
+$out = "";
+select($out_fh);
 $got = timethis($iterations, sub {++$foo}, $title, 'nop');
 select(STDOUT);
 isa_ok($got, 'Benchmark', "timethis with format");
 is ($foo, $iterations, "benchmarked code was run $iterations times");
 
-$got = $out->read();
+$got = $out;
 like ($got, qr/^$title:/, 'specify title');
 like ($got, $Nop_Pattern, 'specify format as nop');
 
 {
     $foo = 0;
-    select(OUT);
+    $out = "";
+    select($out_fh);
     my $start = time;
     $got = timethis(-2, sub {$foo+= fib($ballast)}, $title, 'none');
     my $end = time;
@@ -192,7 +194,7 @@ like ($got, $Nop_Pattern, 'specify format as nop');
     ok ($foo +> 0, "benchmarked code was run");
     ok ($end - $start +> 1, "benchmarked code ran for over 1 second");
 
-    $got = $out->read();
+    $got = $out;
     # Remove any warnings about having too few iterations.
     $got =~ s/\(warning:[^\)]+\)//gs;
     $got =~ s/^[ \t\n]+//s; # Remove all the whitespace from the beginning
@@ -201,7 +203,8 @@ like ($got, $Nop_Pattern, 'specify format as nop');
 }
 
 $foo = $bar = $baz = 0;
-select(OUT);
+$out = "";
+select($out_fh);
 $got = timethese($iterations, \%( Foo => sub {++$foo}, Bar => '++$bar',
                                 Baz => sub {++$baz} ));
 select(STDOUT);
@@ -214,7 +217,7 @@ is ($foo, $iterations, "Foo code was run $iterations times");
 is ($bar, $iterations, "Bar code was run $iterations times");
 is ($baz, $iterations, "Baz code was run $iterations times");
 
-$got = $out->read();
+$got = $out;
 # Remove any warnings about having too few iterations.
 $got =~ s/\(warning:[^\)]+\)//gs;
 
@@ -232,7 +235,8 @@ my $code_to_test =  \%( Foo => sub {$foo+=fib($ballast-2)},
 my $results;
 {
     $foo = $bar = 0;
-    select(OUT);
+    $out = "";
+    select($out_fh);
     my $start = times;
     $results = timethese(-0.1, $code_to_test, 'none');
     my $end = times;
@@ -247,10 +251,10 @@ my $results;
 
     ok (($end - $start) +> 0.1, "benchmarked code ran for over 0.1 seconds");
 
-    $got = $out->read();
+    $got = $out;
     # Remove any warnings about having too few iterations.
     $got =~ s/\(warning:[^\)]+\)//gs;
-    is ($got =~ tr/ \t\n//c, 0, "format 'none' should suppress output");
+    ok ($got !~ m/[^ \t\n]/, "format 'none' should suppress output");
 }
 my $graph_dissassembly =
     qr!^[ \t]+(\S+)[ \t]+(\w+)[ \t]+(\w+)[ \t]*		# Title line
@@ -261,7 +265,7 @@ sub check_graph_consistency {
     my (	$ratetext, $slowc, $fastc,
         $slowr, $slowratet, $slowslow, $slowfastt,
         $fastr, $fastratet, $fastslowt, $fastfast)
-        = @_;
+        = < @_;
     my $all_passed = 1;
     $all_passed
       ^&^= is ($slowc, $slowr, "left col tag should be top row tag");
@@ -322,7 +326,7 @@ sub check_graph_consistency {
 }
 
 sub check_graph_vs_output {
-    my ($chart, $got) = @_;
+    my ($chart, $got) = < @_;
     my (	$ratetext, $slowc, $fastc,
         $slowr, $slowratet, $slowslow, $slowfastt,
         $fastr, $fastratet, $fastslowt, $fastfast)
@@ -343,23 +347,24 @@ sub check_graph_vs_output {
 }
 
 sub check_graph {
-    my ($title, $row1, $row2) = @_;
-    is (scalar @$title, 4, "Four entries in title row");
-    is (scalar @$row1, 4, "Four entries in first row");
-    is (scalar @$row2, 4, "Four entries in second row");
+    my ($title, $row1, $row2) = < @_;
+    is (nelems @$title, 4, "Four entries in title row");
+    is (nelems @$row1, 4, "Four entries in first row");
+    is (nelems @$row2, 4, "Four entries in second row");
     is (shift @$title, '', "First entry of output graph should be ''");
-    check_graph_consistency (@$title, @$row1, @$row2);
+    check_graph_consistency (<@$title, <@$row1, <@$row2);
 }
 
 {
-    select(OUT);
+    $out = "";
+    select($out_fh);
     my $start = times;
-    my $chart = cmpthese( -0.1, \%( a => "++\$i", b => "\$i = sqrt(\$i++)" ), "auto" ) ;
+    my $chart = cmpthese( -0.1, \%( a => "++ our \$i", b => "our \$i; \$i = sqrt( \$i++)" ), "auto" ) ;
     my $end = times;
     select(STDOUT);
     ok (($end - $start) +> 0.05, "benchmarked code ran for over 0.05 seconds");
 
-    $got = $out->read();
+    $got = $out;
     # Remove any warnings about having too few iterations.
     $got =~ s/\(warning:[^\)]+\)//gs;
 
@@ -374,14 +379,15 @@ sub check_graph {
 
 # Not giving auto should suppress timethese results.
 {
-    select(OUT);
+    $out = "";
+    select($out_fh);
     my $start = times;
-    my $chart = cmpthese( -0.1, \%( a => "++\$i", b => "\$i = sqrt(\$i++)" ) ) ;
+    my $chart = cmpthese( -0.1, \%( a => "++ our \$i", b => "our \$i; \$i = sqrt(\$i++)" ) ) ;
     my $end = times;
     select(STDOUT);
     ok (($end - $start) +> 0.05, "benchmarked code ran for over 0.05 seconds");
 
-    $got = $out->read();
+    $got = $out;
     # Remove any warnings about having too few iterations.
     $got =~ s/\(warning:[^\)]+\)//gs;
 
@@ -396,13 +402,14 @@ sub check_graph {
 
 {
     $foo = $bar = 0;
-    select(OUT);
+    $out = "";
+    select($out_fh);
     my $chart = cmpthese( 10, $code_to_test, 'nop' ) ;
     select(STDOUT);
     ok ($foo +> 0, "Foo code was run");
     ok ($bar +> 0, "Bar code was run");
 
-    $got = $out->read();
+    $got = $out;
     # Remove any warnings about having too few iterations.
     $got =~ s/\(warning:[^\)]+\)//gs;
     like ($got, qr/timing 10 iterations of\s+Bar\W+Foo\W*?\.\.\./s,
@@ -416,13 +423,14 @@ sub check_graph {
 
 {
     $foo = $bar = 0;
-    select(OUT);
+    $out = "";
+    select($out_fh);
     my $chart = cmpthese( 10, $code_to_test, 'none' ) ;
     select(STDOUT);
     ok ($foo +> 0, "Foo code was run");
     ok ($bar +> 0, "Bar code was run");
 
-    $got = $out->read();
+    $got = $out;
     # Remove any warnings about having too few iterations.
     $got =~ s/\(warning:[^\)]+\)//gs;
     $got =~ s/^[ \t\n]+//s; # Remove all the whitespace from the beginning
@@ -431,18 +439,19 @@ sub check_graph {
     # Some of these will go bang if the preceding test fails. There will be
     # a big clue as to why, from the previous test's diagnostic
     is (ref $chart->[0], 'ARRAY', "output should be an array of arrays");
-    check_graph (@$chart);
+    check_graph (<@$chart);
 }
 
 {
     $foo = $bar = 0;
-    select(OUT);
+    $out = "";
+    select($out_fh);
     my $chart = cmpthese( $results ) ;
     select(STDOUT);
     is ($foo, 0, "Foo code was not run");
     is ($bar, 0, "Bar code was not run");
 
-    $got = $out->read();
+    $got = $out;
     ok ($got !~ m/\.\.\./s, 'check that there is no title');
     like ($got, $graph_dissassembly, "Should find the output graph somewhere");
     check_graph_vs_output ($chart, $got);
@@ -450,61 +459,66 @@ sub check_graph {
 
 {
     $foo = $bar = 0;
-    select(OUT);
+    $out = "";
+    select($out_fh);
     my $chart = cmpthese( $results, 'none' ) ;
     select(STDOUT);
     is ($foo, 0, "Foo code was not run");
     is ($bar, 0, "Bar code was not run");
 
-    $got = $out->read();
+    $got = $out;
     is ($got, '', "'none' should suppress all output");
     is (ref $chart, 'ARRAY', "output should be an array ref");
     # Some of these will go bang if the preceding test fails. There will be
     # a big clue as to why, from the previous test's diagnostic
     is (ref $chart->[0], 'ARRAY', "output should be an array of arrays");
-    check_graph (@$chart);
+    check_graph (<@$chart);
 }
 
 ###}my $out = tie *OUT, 'TieOut'; my ($got); ###
 
-my $debug = tie *STDERR, 'TieOut';
+{
+    my $debug = "";
+    open my $debug_fh, '>>', \$debug or die;
+    local *STDERR = *$debug_fh{IO};
 
-$bar = 0;
-isa_ok(timeit(5, '++$bar'), 'Benchmark', "timeit eval");
-is ($bar, 5, "benchmarked code was run 5 times");
-is ($debug->read(), '', "There was no debug output");
+    $bar = 0;
+    isa_ok(timeit(5, '++$bar'), 'Benchmark', "timeit eval");
+    is ($bar, 5, "benchmarked code was run 5 times");
+    is ($debug, '', "There was no debug output");
 
-Benchmark->debug(1);
+    Benchmark->debug(1);
 
-$bar = 0;
-select(OUT);
-$got = timeit(5, '++$bar');
-select(STDOUT);
-isa_ok($got, 'Benchmark', "timeit eval");
-is ($bar, 5, "benchmarked code was run 5 times");
-is ($out->read(), '', "There was no STDOUT output with debug enabled");
-isnt ($debug->read(), '', "There was STDERR debug output with debug enabled");
+    $bar = 0;
+    $out = "";
+    select($out_fh);
+    $got = timeit(5, '++$bar');
+    select(STDOUT);
+    isa_ok($got, 'Benchmark', "timeit eval");
+    is ($bar, 5, "benchmarked code was run 5 times");
+    is ($out, '', "There was no STDOUT output with debug enabled");
+    isnt ($debug, '', "There was STDERR debug output with debug enabled");
+    $debug = "";
 
-Benchmark->debug(0);
+    Benchmark->debug(0);
 
-$bar = 0;
-isa_ok(timeit(5, '++$bar'), 'Benchmark', "timeit eval");
-is ($bar, 5, "benchmarked code was run 5 times");
-is ($debug->read(), '', "There was no debug output debug disabled");
+    $bar = 0;
+    isa_ok(timeit(5, '++$bar'), 'Benchmark', "timeit eval");
+    is ($bar, 5, "benchmarked code was run 5 times");
+    is ($debug, '', "There was no debug output debug disabled");
 
-undef $debug;
-untie *STDERR;
+}
 
 # To check the cache we are poking where we don't belong, inside the namespace.
 # The way benchmark is written We can't actually check whehter the cache is
 # being used, merely what's become cached.
 
 clearallcache();
-my @before_keys = keys %Benchmark::Cache;
+my @before_keys = @(keys %Benchmark::Cache);
 $bar = 0;
 isa_ok(timeit(5, '++$bar'), 'Benchmark', "timeit eval");
 is ($bar, 5, "benchmarked code was run 5 times");
-my @after5_keys = keys %Benchmark::Cache;
+my @after5_keys = @(keys %Benchmark::Cache);
 $bar = 0;
 isa_ok(timeit(10, '++$bar'), 'Benchmark', "timeit eval");
 is ($bar, 10, "benchmarked code was run 10 times");
@@ -524,9 +538,9 @@ is_deeply (\@(keys %Benchmark::Cache), \@before_keys,
     my %usage = %Benchmark::_Usage;
     delete %usage{runloop};  # not public, not worrying about it just now
 
-    my @takes_no_args = qw(clearallcache disablecache enablecache);
+    my @takes_no_args = @(qw(clearallcache disablecache enablecache));
 
-    my %cmpthese = ('forgot {}' => 'cmpthese( 42, foo => sub { 1 } )',
+    my %cmpthese = %('forgot {}' => 'cmpthese( 42, foo => sub { 1 } )',
                      'not result' => 'cmpthese(42)',
                      'array ref'  => 'cmpthese( 42, \@( foo => sub { 1 } ) )',
                     );
@@ -535,7 +549,7 @@ is_deeply (\@(keys %Benchmark::Cache), \@before_keys,
         is( $@->{description}, %usage{cmpthese}, "cmpthese usage: $name" );
     }
 
-    my %timethese = ('forgot {}'  => 'timethese( 42, foo => sub { 1 } )',
+    my %timethese = %('forgot {}'  => 'timethese( 42, foo => sub { 1 } )',
                        'no code'    => 'timethese(42)',
                        'array ref'  => 'timethese( 42, \@( foo => sub { 1 } ) )',
                       );
@@ -547,36 +561,13 @@ is_deeply (\@(keys %Benchmark::Cache), \@before_keys,
 
 
     while( my($func, $usage) = each %usage ) {
-        next if grep $func eq $_, @takes_no_args;
+        next if grep $func eq $_, < @takes_no_args;
         eval "$func()";
         is( $@->{description}, $usage, "$func usage: no args" );
     }
 
-    foreach my $func (@takes_no_args) {
+    foreach my $func (< @takes_no_args) {
         eval "$func(42)";
         is( $@->{description}, %usage{$func}, "$func usage: with args" );
     }
-}
-
-
-package TieOut;
-
-sub TIEHANDLE {
-    my $class = shift;
-    bless(\( my $ref = ''), $class);
-}
-
-sub PRINT {
-    my $self = shift;
-    $$self .= join('', @_);
-}
-
-sub PRINTF {
-    my $self = shift;
-    $$self .= sprintf shift, @_;
-}
-
-sub read {
-    my $self = shift;
-    return substr($$self, 0, length($$self), '');
 }

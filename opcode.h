@@ -43,8 +43,6 @@ EXTCONST char* const PL_op_name[] = {
 	"gv",
 	"gelem",
 	"padsv",
-	"padav",
-	"padhv",
 	"padany",
 	"pushre",
 	"rv2gv",
@@ -52,10 +50,10 @@ EXTCONST char* const PL_op_name[] = {
 	"rv2cv",
 	"anoncode",
 	"prototype",
-	"refgen",
 	"srefgen",
 	"ref",
 	"bless",
+	"anonscalar",
 	"backtick",
 	"glob",
 	"readline",
@@ -67,7 +65,6 @@ EXTCONST char* const PL_op_name[] = {
 	"qr",
 	"subst",
 	"substcont",
-	"trans",
 	"sassign",
 	"aassign",
 	"chop",
@@ -162,6 +159,7 @@ EXTCONST char* const PL_op_name[] = {
 	"each",
 	"values",
 	"keys",
+	"nkeys",
 	"delete",
 	"exists",
 	"rv2hv",
@@ -175,6 +173,9 @@ EXTCONST char* const PL_op_name[] = {
 	"lslice",
 	"anonlist",
 	"anonhash",
+	"listlast",
+	"expand",
+	"nelems",
 	"splice",
 	"push",
 	"pop",
@@ -200,7 +201,6 @@ EXTCONST char* const PL_op_name[] = {
 	"method",
 	"entersub",
 	"leavesub",
-	"leavesublv",
 	"caller",
 	"warn",
 	"die",
@@ -223,12 +223,6 @@ EXTCONST char* const PL_op_name[] = {
 	"goto",
 	"exit",
 	"method_named",
-	"entergiven",
-	"leavegiven",
-	"enterwhen",
-	"leavewhen",
-	"break",
-	"continue",
 	"open",
 	"close",
 	"pipe_op",
@@ -404,8 +398,6 @@ EXTCONST char* const PL_op_desc[] = {
 	"glob value",
 	"glob elem",
 	"private variable",
-	"private array",
-	"private hash",
 	"private value",
 	"push regexp",
 	"ref-to-glob cast",
@@ -413,10 +405,10 @@ EXTCONST char* const PL_op_desc[] = {
 	"subroutine dereference",
 	"anonymous subroutine",
 	"subroutine prototype",
-	"reference constructor",
 	"single ref constructor",
 	"reference-type operator",
 	"bless",
+	"anonymous scalar ($())",
 	"quoted execution (``, qx)",
 	"glob",
 	"<HANDLE>",
@@ -428,7 +420,6 @@ EXTCONST char* const PL_op_desc[] = {
 	"pattern quote (qr//)",
 	"substitution (s///)",
 	"substitution iterator",
-	"transliteration (tr///)",
 	"scalar assignment",
 	"list assignment",
 	"chop",
@@ -523,6 +514,7 @@ EXTCONST char* const PL_op_desc[] = {
 	"each",
 	"values",
 	"keys",
+	"numer of keys",
 	"delete",
 	"exists",
 	"hash dereference",
@@ -534,8 +526,11 @@ EXTCONST char* const PL_op_desc[] = {
 	"join or string",
 	"list",
 	"list slice",
-	"anonymous list (%())",
-	"anonymous hash (@())",
+	"anonymous list (@())",
+	"anonymous hash (%())",
+	"listlast",
+	"expand",
+	"numer of elements",
 	"splice",
 	"push",
 	"pop",
@@ -561,7 +556,6 @@ EXTCONST char* const PL_op_desc[] = {
 	"method lookup",
 	"subroutine entry",
 	"subroutine exit",
-	"lvalue subroutine return",
 	"caller",
 	"warn",
 	"die",
@@ -584,12 +578,6 @@ EXTCONST char* const PL_op_desc[] = {
 	"goto",
 	"exit",
 	"method with known name",
-	"given()",
-	"leave given block",
-	"when()",
-	"leave when block",
-	"break",
-	"continue",
 	"open",
 	"close",
 	"pipe",
@@ -709,8 +697,8 @@ EXTCONST char* const PL_op_desc[] = {
 	"eval hints",
 	"eval \"string\"",
 	"eval \"string\" exit",
-	"eval {block}",
-	"eval {block} exit",
+	"try {block}",
+	"try {block} exit",
 	"gethostbyname",
 	"gethostbyaddr",
 	"gethostent",
@@ -777,8 +765,6 @@ EXT Perl_ppaddr_t PL_ppaddr[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_pp_gv),
 	MEMBER_TO_FPTR(Perl_pp_gelem),
 	MEMBER_TO_FPTR(Perl_pp_padsv),
-	MEMBER_TO_FPTR(Perl_pp_padav),
-	MEMBER_TO_FPTR(Perl_pp_padhv),
 	MEMBER_TO_FPTR(Perl_unimplemented_op),	/* Perl_pp_padany */
 	MEMBER_TO_FPTR(Perl_pp_pushre),
 	MEMBER_TO_FPTR(Perl_pp_rv2gv),
@@ -786,10 +772,10 @@ EXT Perl_ppaddr_t PL_ppaddr[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_pp_rv2cv),
 	MEMBER_TO_FPTR(Perl_pp_anoncode),
 	MEMBER_TO_FPTR(Perl_pp_prototype),
-	MEMBER_TO_FPTR(Perl_pp_refgen),
 	MEMBER_TO_FPTR(Perl_pp_srefgen),
 	MEMBER_TO_FPTR(Perl_pp_ref),
 	MEMBER_TO_FPTR(Perl_pp_bless),
+	MEMBER_TO_FPTR(Perl_pp_anonscalar),
 	MEMBER_TO_FPTR(Perl_pp_backtick),
 	MEMBER_TO_FPTR(Perl_pp_glob),
 	MEMBER_TO_FPTR(Perl_pp_readline),
@@ -801,7 +787,6 @@ EXT Perl_ppaddr_t PL_ppaddr[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_pp_qr),
 	MEMBER_TO_FPTR(Perl_pp_subst),
 	MEMBER_TO_FPTR(Perl_pp_substcont),
-	MEMBER_TO_FPTR(Perl_pp_trans),
 	MEMBER_TO_FPTR(Perl_pp_sassign),
 	MEMBER_TO_FPTR(Perl_pp_aassign),
 	MEMBER_TO_FPTR(Perl_pp_chop),
@@ -896,9 +881,10 @@ EXT Perl_ppaddr_t PL_ppaddr[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_pp_each),
 	MEMBER_TO_FPTR(Perl_do_kv),	/* Perl_pp_values */
 	MEMBER_TO_FPTR(Perl_do_kv),	/* Perl_pp_keys */
+	MEMBER_TO_FPTR(Perl_pp_nkeys),
 	MEMBER_TO_FPTR(Perl_pp_delete),
 	MEMBER_TO_FPTR(Perl_pp_exists),
-	MEMBER_TO_FPTR(Perl_pp_rv2av),	/* Perl_pp_rv2hv */
+	MEMBER_TO_FPTR(Perl_pp_rv2hv),
 	MEMBER_TO_FPTR(Perl_pp_helem),
 	MEMBER_TO_FPTR(Perl_pp_hslice),
 	MEMBER_TO_FPTR(Perl_pp_unpack),
@@ -909,6 +895,9 @@ EXT Perl_ppaddr_t PL_ppaddr[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_pp_lslice),
 	MEMBER_TO_FPTR(Perl_pp_anonlist),
 	MEMBER_TO_FPTR(Perl_pp_anonhash),
+	MEMBER_TO_FPTR(Perl_pp_listlast),
+	MEMBER_TO_FPTR(Perl_pp_expand),
+	MEMBER_TO_FPTR(Perl_pp_nelems),
 	MEMBER_TO_FPTR(Perl_pp_splice),
 	MEMBER_TO_FPTR(Perl_pp_push),
 	MEMBER_TO_FPTR(Perl_pp_shift),	/* Perl_pp_pop */
@@ -934,7 +923,6 @@ EXT Perl_ppaddr_t PL_ppaddr[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_pp_method),
 	MEMBER_TO_FPTR(Perl_pp_entersub),
 	MEMBER_TO_FPTR(Perl_pp_leavesub),
-	MEMBER_TO_FPTR(Perl_pp_leavesublv),
 	MEMBER_TO_FPTR(Perl_pp_caller),
 	MEMBER_TO_FPTR(Perl_pp_warn),
 	MEMBER_TO_FPTR(Perl_pp_die),
@@ -957,12 +945,6 @@ EXT Perl_ppaddr_t PL_ppaddr[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_pp_goto),
 	MEMBER_TO_FPTR(Perl_pp_exit),
 	MEMBER_TO_FPTR(Perl_pp_method_named),
-	MEMBER_TO_FPTR(Perl_pp_entergiven),
-	MEMBER_TO_FPTR(Perl_pp_leavegiven),
-	MEMBER_TO_FPTR(Perl_pp_enterwhen),
-	MEMBER_TO_FPTR(Perl_pp_leavewhen),
-	MEMBER_TO_FPTR(Perl_pp_break),
-	MEMBER_TO_FPTR(Perl_pp_continue),
 	MEMBER_TO_FPTR(Perl_pp_open),
 	MEMBER_TO_FPTR(Perl_pp_close),
 	MEMBER_TO_FPTR(Perl_pp_pipe_op),
@@ -1147,8 +1129,6 @@ EXT Perl_check_t PL_check[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* gv */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* gelem */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* padsv */
-	MEMBER_TO_FPTR(Perl_ck_null),	/* padav */
-	MEMBER_TO_FPTR(Perl_ck_null),	/* padhv */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* padany */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* pushre */
 	MEMBER_TO_FPTR(Perl_ck_rvconst),	/* rv2gv */
@@ -1156,10 +1136,10 @@ EXT Perl_check_t PL_check[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_ck_rvconst),	/* rv2cv */
 	MEMBER_TO_FPTR(Perl_ck_anoncode),	/* anoncode */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* prototype */
-	MEMBER_TO_FPTR(Perl_ck_spair),	/* refgen */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* srefgen */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* ref */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* bless */
+	MEMBER_TO_FPTR(Perl_ck_fun),	/* anonscalar */
 	MEMBER_TO_FPTR(Perl_ck_open),	/* backtick */
 	MEMBER_TO_FPTR(Perl_ck_glob),	/* glob */
 	MEMBER_TO_FPTR(Perl_ck_readline),	/* readline */
@@ -1171,7 +1151,6 @@ EXT Perl_check_t PL_check[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_ck_match),	/* qr */
 	MEMBER_TO_FPTR(Perl_ck_match),	/* subst */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* substcont */
-	MEMBER_TO_FPTR(Perl_ck_match),	/* trans */
 	MEMBER_TO_FPTR(Perl_ck_sassign),	/* sassign */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* aassign */
 	MEMBER_TO_FPTR(Perl_ck_spair),	/* chop */
@@ -1266,6 +1245,7 @@ EXT Perl_check_t PL_check[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* each */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* values */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* keys */
+	MEMBER_TO_FPTR(Perl_ck_fun),	/* nkeys */
 	MEMBER_TO_FPTR(Perl_ck_delete),	/* delete */
 	MEMBER_TO_FPTR(Perl_ck_exists),	/* exists */
 	MEMBER_TO_FPTR(Perl_ck_rvconst),	/* rv2hv */
@@ -1279,6 +1259,9 @@ EXT Perl_check_t PL_check[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* lslice */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* anonlist */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* anonhash */
+	MEMBER_TO_FPTR(Perl_ck_null),	/* listlast */
+	MEMBER_TO_FPTR(Perl_ck_fun),	/* expand */
+	MEMBER_TO_FPTR(Perl_ck_fun),	/* nelems */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* splice */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* push */
 	MEMBER_TO_FPTR(Perl_ck_shift),	/* pop */
@@ -1304,7 +1287,6 @@ EXT Perl_check_t PL_check[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_ck_method),	/* method */
 	MEMBER_TO_FPTR(Perl_ck_subr),	/* entersub */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* leavesub */
-	MEMBER_TO_FPTR(Perl_ck_null),	/* leavesublv */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* caller */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* warn */
 	MEMBER_TO_FPTR(Perl_ck_die),	/* die */
@@ -1327,12 +1309,6 @@ EXT Perl_check_t PL_check[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* goto */
 	MEMBER_TO_FPTR(Perl_ck_exit),	/* exit */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* method_named */
-	MEMBER_TO_FPTR(Perl_ck_null),	/* entergiven */
-	MEMBER_TO_FPTR(Perl_ck_null),	/* leavegiven */
-	MEMBER_TO_FPTR(Perl_ck_null),	/* enterwhen */
-	MEMBER_TO_FPTR(Perl_ck_null),	/* leavewhen */
-	MEMBER_TO_FPTR(Perl_ck_null),	/* break */
-	MEMBER_TO_FPTR(Perl_ck_null),	/* continue */
 	MEMBER_TO_FPTR(Perl_ck_open),	/* open */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* close */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* pipe_op */
@@ -1452,7 +1428,7 @@ EXT Perl_check_t PL_check[] /* or perlvars.h */
 	MEMBER_TO_FPTR(Perl_ck_svconst),	/* hintseval */
 	MEMBER_TO_FPTR(Perl_ck_eval),	/* entereval */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* leaveeval */
-	MEMBER_TO_FPTR(Perl_ck_null),	/* entertry */
+	MEMBER_TO_FPTR(Perl_ck_try),	/* entertry */
 	MEMBER_TO_FPTR(Perl_ck_null),	/* leavetry */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* ghbyname */
 	MEMBER_TO_FPTR(Perl_ck_fun),	/* ghbyaddr */
@@ -1511,8 +1487,6 @@ EXTCONST U32 PL_opargs[] = {
 	0x00000c44,	/* gv */
 	0x00022440,	/* gelem */
 	0x00000044,	/* padsv */
-	0x00000040,	/* padav */
-	0x00000040,	/* padhv */
 	0x00000040,	/* padany */
 	0x00000a40,	/* pushre */
 	0x00000244,	/* rv2gv */
@@ -1520,10 +1494,10 @@ EXTCONST U32 PL_opargs[] = {
 	0x00000240,	/* rv2cv */
 	0x00000c00,	/* anoncode */
 	0x00003604,	/* prototype */
-	0x00004201,	/* refgen */
 	0x00002206,	/* srefgen */
 	0x0001368c,	/* ref */
 	0x00122804,	/* bless */
+	0x00002c00,	/* anonscalar */
 	0x00013688,	/* backtick */
 	0x00012808,	/* glob */
 	0x0001d608,	/* readline */
@@ -1535,7 +1509,6 @@ EXTCONST U32 PL_opargs[] = {
 	0x00000a04,	/* qr */
 	0x00002a54,	/* subst */
 	0x00000654,	/* substcont */
-	0x00003014,	/* trans */
 	0x00000004,	/* sassign */
 	0x00044408,	/* aassign */
 	0x0000560d,	/* chop */
@@ -1629,7 +1602,8 @@ EXTCONST U32 PL_opargs[] = {
 	0x00046801,	/* aslice */
 	0x00009600,	/* each */
 	0x00009608,	/* values */
-	0x00009608,	/* keys */
+	0x00003608,	/* keys */
+	0x00002208,	/* nkeys */
 	0x00003600,	/* delete */
 	0x00003614,	/* exists */
 	0x00000248,	/* rv2hv */
@@ -1643,6 +1617,9 @@ EXTCONST U32 PL_opargs[] = {
 	0x00448400,	/* lslice */
 	0x00004801,	/* anonlist */
 	0x00004801,	/* anonhash */
+	0x00004805,	/* listlast */
+	0x00002200,	/* expand */
+	0x00002208,	/* nelems */
 	0x05326801,	/* splice */
 	0x0004691d,	/* push */
 	0x00017604,	/* pop */
@@ -1668,7 +1645,6 @@ EXTCONST U32 PL_opargs[] = {
 	0x00000240,	/* method */
 	0x00004249,	/* entersub */
 	0x00000200,	/* leavesub */
-	0x00000200,	/* leavesublv */
 	0x00013608,	/* caller */
 	0x0000481d,	/* warn */
 	0x0000485d,	/* die */
@@ -1683,7 +1659,7 @@ EXTCONST U32 PL_opargs[] = {
 	0x00000000,	/* iter */
 	0x00001240,	/* enterloop */
 	0x00000400,	/* leaveloop */
-	0x00004841,	/* return */
+	0x00012841,	/* return */
 	0x00001a44,	/* last */
 	0x00001a44,	/* next */
 	0x00001a44,	/* redo */
@@ -1691,12 +1667,6 @@ EXTCONST U32 PL_opargs[] = {
 	0x00001a44,	/* goto */
 	0x00013644,	/* exit */
 	0x00000c40,	/* method_named */
-	0x00000640,	/* entergiven */
-	0x00000200,	/* leavegiven */
-	0x00000640,	/* enterwhen */
-	0x00000200,	/* leavewhen */
-	0x00000000,	/* break */
-	0x00000000,	/* continue */
 	0x0052c81d,	/* open */
 	0x0001d614,	/* close */
 	0x000cc814,	/* pipe_op */
@@ -1816,7 +1786,7 @@ EXTCONST U32 PL_opargs[] = {
 	0x00000c04,	/* hintseval */
 	0x00003640,	/* entereval */
 	0x00002200,	/* leaveeval */
-	0x00000600,	/* entertry */
+	0x00000640,	/* entertry */
 	0x00000800,	/* leavetry */
 	0x00003600,	/* ghbyname */
 	0x00022800,	/* ghbyaddr */

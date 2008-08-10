@@ -104,15 +104,15 @@ locale setting is used.  Implies a true value for C<Decode>.
 =cut
 
 sub import {
-    my ($class, %args) = @_;
+    my ($class, < %args) = < @_;
 
     %args{Class}    ||= caller;
     %args{Style}    ||= 'maketext';
     %args{Export}   ||= 'loc';
     %args{Subclass} ||= 'I18N';
 
-    my ($loc, $loc_lang) = $class->load_loc(%args);
-    $loc ||= $class->default_loc(%args);
+    my ($loc, $loc_lang) = < $class->load_loc(< %args);
+    $loc ||= $class->default_loc(< %args);
 
     no strict 'refs';
     *{Symbol::fetch_glob(caller(0) . "::%args{Export}")} = $loc if %args{Export};
@@ -121,17 +121,17 @@ sub import {
 
 my %Loc;
 
-sub reload_loc { %Loc = () }
+sub reload_loc { %Loc = %( () ) }
 
 sub load_loc {
-    my ($class, %args) = @_;
+    my ($class, < %args) = < @_;
 
     my $pkg = join('::', grep { defined and length } %args{Class}, %args{Subclass});
     return %Loc{$pkg} if exists %Loc{$pkg};
 
-    eval { require Locale::Maketext::Lexicon; 1 }   or return;
+    try { require Locale::Maketext::Lexicon; 1 }   or return;
     $Locale::Maketext::Lexicon::VERSION +> 0.20	    or return;
-    eval { require File::Spec; 1 }		    or return;
+    try { require File::Spec; 1 }		    or return;
 
     my $path = %args{Path} || $class->auto_path(%args{Class}) or return;
     my $pattern = File::Spec->catfile($path, '*.[pm]o');
@@ -158,11 +158,11 @@ sub load_loc {
 	1;
     " or die $@;
     
-    my $lh = eval { $pkg->get_handle } or return;
+    my $lh = try { $pkg->get_handle } or return;
     my $style = lc(%args{Style});
     if ($style eq 'maketext') {
 	%Loc{$pkg} = sub {
-	    $lh->maketext(@_)
+	    $lh->maketext(< @_)
 	};
     }
     elsif ($style eq 'gettext') {
@@ -183,21 +183,21 @@ sub load_loc {
                    : $2 ? "\[$2,"._unescape($3)."]"
                         : "[_$4]"
             }}gx;
-	    return $lh->maketext($str, @_);
+	    return $lh->maketext($str, < @_);
 	};
     }
     else {
 	die "Unknown Style: $style";
     }
 
-    return %Loc{$pkg}, sub {
-	$lh = $pkg->get_handle(@_);
-	$lh = $pkg->get_handle(@_);
-    };
+    return @(%Loc{$pkg}, sub {
+	$lh = $pkg->get_handle(< @_);
+	$lh = $pkg->get_handle(< @_);
+    });
 }
 
 sub default_loc {
-    my ($self, %args) = @_;
+    my ($self, < %args) = < @_;
     my $style = lc(%args{Style});
     if ($style eq 'maketext') {
 	return sub {
@@ -206,7 +206,7 @@ sub default_loc {
                      {$1\%$2}g;
             $str =~ s{((?<!~)(?:~~)*)\[([A-Za-z#*]\w*),([^\]]+)\]} 
                      {{"$1\%$2(" . _escape($3) . ')'}}g;
-	    _default_gettext($str, @_);
+	    _default_gettext($str, < @_);
 	};
     }
     elsif ($style eq 'gettext') {
@@ -267,13 +267,13 @@ sub _unescape {
 }
 
 sub auto_path {
-    my ($self, $calldir) = @_;
+    my ($self, $calldir) = < @_;
     $calldir =~ s#::#/#g;
     my $path = %INC{$calldir . '.pm'} or return;
 
     # Try absolute path name.
     if ($^O eq 'MacOS') {
-	(my $malldir = $calldir) =~ tr#/#:#;
+	(my $malldir = $calldir) =~ s!/!:!g;
 	$path =~ s#^(.*)$malldir\.pm\z#$1auto:$malldir:#s;
     } else {
 	$path =~ s#^(.*)$calldir\.pm\z#$1auto/$calldir/#;
@@ -283,7 +283,7 @@ sub auto_path {
 
     # If that failed, try relative path with normal @INC searching.
     $path = "auto/$calldir/";
-    foreach my $inc (@INC) {
+    foreach my $inc (< @INC) {
 	return "$inc/$path" if -d "$inc/$path";
     }
 

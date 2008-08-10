@@ -3,7 +3,7 @@
 
 BEGIN {
     chdir 't' if -d 't';
-    @INC = '.'; 
+    @INC = @( '.' ); 
     push @INC, '../lib';
 }    
 
@@ -23,7 +23,7 @@ tie %a, 'Tie::SubstrHash', 3, 3, 3;
 print "not " unless %a{abc} == 123;
 print "ok 1\n";
 
-print "not " unless keys %a == 2;
+print "not " unless nkeys %a == 2;
 print "ok 2\n";
 
 delete %a{abc};
@@ -34,15 +34,15 @@ print "ok 3\n";
 print "not " unless (values %a)[[0]] == 234;
 print "ok 4\n";
 
-eval { %a{abcd} = 123 };
+try { %a{abcd} = 123 };
 print "not " unless $@ && $@->{description} =~ m/Key "abcd" is not 3 characters long/;
 print "ok 5\n";
 
-eval { %a{abc} = 1234 };
+try { %a{abc} = 1234 };
 print "not " unless $@ && $@->{description} =~ m/Value "1234" is not 3 characters long/;
 print "ok 6\n";
 
-eval { $a = %a{abcd}; $a++  };
+try { $a = %a{abcd}; $a++  };
 print "not " unless $@ && $@->{description} =~ m/Key "abcd" is not 3 characters long/;
 print "ok 7\n";
 
@@ -51,13 +51,13 @@ print "ok 7\n";
 print "not " unless %a{cde} == 345;
 print "ok 8\n";
 
-eval { %a{def} = 456 };
+try { %a{def} = 456 };
 print "not " unless $@ && $@->{description} =~ m/Table is full \(3 elements\)/;
 print "ok 9\n";
 
-%a = ();
+%a = %( () );
 
-print "not " unless keys %a == 0;
+print "not " unless nkeys %a == 0;
 print "ok 10\n";
 
 # Tests 11..16 by Linc Madison.

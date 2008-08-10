@@ -3,7 +3,7 @@
 BEGIN {
     if( %ENV{PERL_CORE} ) {
         chdir 't';
-        @INC = ('../lib', 'lib');
+        @INC = @('../lib', 'lib');
     }
 }
 
@@ -11,7 +11,9 @@ use lib 't/lib';
 use Test::More tests => 1;
 use Dev::Null;
 
-tie *STDOUT, "Dev::Null" or die $!;
+my $str = "";
+open my $dummy_fh, '>>', \$str or die;
+*STDOUT = *$dummy_fh{IO};
 
 print "not ok 1\n";     # this should not print.
 pass 'STDOUT can be mucked with';

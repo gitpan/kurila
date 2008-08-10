@@ -95,16 +95,16 @@ you reload the C<Foo> module afterwards.
 use strict;
 
 require Exporter;
-our @ISA = qw(Exporter);
-our @EXPORT = qw(gensym ungensym qualify qualify_to_ref);
-our @EXPORT_OK = qw(delete_package geniosym);
+our @ISA = @( qw(Exporter) );
+our @EXPORT = @( qw(gensym ungensym qualify qualify_to_ref) );
+our @EXPORT_OK = @( qw(delete_package geniosym) );
 
 our $VERSION = '1.06';
 
 my $genpkg = "Symbol";
 my $genseq = 0;
 
-my %global = map {$_ => 1} qw(ARGV ARGVOUT ENV INC SIG STDERR STDIN STDOUT);
+my %global = %( map {$_ => 1} qw(ARGV ARGVOUT ENV INC SIG STDERR STDIN STDOUT) );
 
 #
 # Note that we never _copy_ the glob; we just make a ref to it.
@@ -130,18 +130,16 @@ sub geniosym () {
 sub ungensym ($) {}
 
 sub qualify ($;$) {
-    my ($name) = @_;
+    my ($name) = < @_;
     ref \$name eq "GLOB" and Carp::confess("glob..." . ref $name);
     if (!ref($name) && index($name, '::') == -1 && index($name, "'") == -1) {
 	my $pkg;
 	# Global names: special character, "^xyz", or other. 
 	if ($name =~ m/^(([^a-z])|(\^[a-z_]+))\z/i || %global{$name}) {
-	    # RGS 2001-11-05 : translate leading ^X to control-char
-	    $name =~ s/^\^([a-z_])/{eval 'qq(\c'.$1.')'}/i;
-	    $pkg = "main";
+	    $pkg = "";
 	}
 	else {
-	    $pkg = (@_ +> 1) ? @_[1] : caller;
+	    $pkg = ((nelems @_) +> 1) ? @_[1] : caller;
 	}
 	$name = $pkg . "::" . $name;
     }
@@ -149,7 +147,7 @@ sub qualify ($;$) {
 }
 
 sub qualify_to_ref ($) {
-    return \*{ Symbol::fetch_glob( qualify @_[0], @_ +> 1 ? @_[1] : caller ) };
+    return \*{ Symbol::fetch_glob( qualify @_[0], (nelems @_) +> 1 ? @_[1] : caller ) };
 }
 
 #
@@ -158,18 +156,15 @@ sub qualify_to_ref ($) {
 sub delete_package ($) {
     my $pkg = shift;
 
-    no strict 'refs';
-
     # expand to full symbol table name if needed
 
     unless ($pkg =~ m/^main::.*::$/) {
         $pkg = "main$pkg"	if	$pkg =~ m/^::/;
-        $pkg = "main::$pkg"	unless	$pkg =~ m/^main::/;
         $pkg .= '::'		unless	$pkg =~ m/::$/;
     }
 
-    my($stem, $leaf) = $pkg =~ m/(.*::)(\w+::)$/;
-    my $stem_symtab = *{Symbol::qualify_to_ref($stem)}{HASH};
+    my($stem, $leaf) = $pkg =~ m/(.*)::(\w+::)$/;
+    my $stem_symtab = Symbol::stash($stem);
     return unless defined $stem_symtab and exists $stem_symtab->{$leaf};
 
 
@@ -182,7 +177,7 @@ sub delete_package ($) {
 
     # delete the symbol table
 
-    %$leaf_symtab = ();
+    %$leaf_symtab = %( () );
     delete $stem_symtab->{$leaf};
 }
 

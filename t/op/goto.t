@@ -118,7 +118,7 @@ FORL2: for($y=1; 1;) {
 # Does goto work correctly within a try block?
 #  (BUG ID 20000313.004) - [perl #2359]
 $ok = 0;
-eval {
+try {
   my $variable = 1;
   goto LABEL20;
   LABEL20: $ok = 1 if $variable;
@@ -224,7 +224,7 @@ sub i_return_a_label {
     $count++;
     return "returned_label";
 }
-eval { goto +i_return_a_label; };
+try { goto +i_return_a_label; };
 $ok = 0;
 
 returned_label:
@@ -237,7 +237,7 @@ ok($ok, 'skipped to returned_label');
 
 $r = runperl(
     prog =>
-	'sub f { return if $d; $d=1; my $a=sub {goto &f}; &$a; f() } f(); print qq(ok\n)',
+	'our $d; sub f { return if $d; $d=1; my $a=sub {goto &f}; &$a; f() } f(); print qq(ok\n)',
     stderr => 1
     );
 is($r, "ok\n", 'avoid pad without an @_');
@@ -254,7 +254,7 @@ is(curr_test(), 5, 'eval "goto $x"');
 
 sub two {
     my ($pack, $file, $line) = caller;	# Should indicate original call stats.
-    is("@_ $pack $file $line", "1 2 3 main $::FILE $::LINE",
+    is("{join ' ', <@_} $pack $file $line", "1 2 3 main $::FILE $::LINE",
 	'autoloading mechanism.');
 }
 
@@ -272,7 +272,7 @@ $::LINE = __LINE__ + 1;
 
 {
     my $wherever = 'NOWHERE';
-    eval { goto $wherever };
+    try { goto $wherever };
     like($@->{description}, qr/Can't find label NOWHERE/, 'goto NOWHERE sets $@');
 }
 
@@ -280,8 +280,8 @@ $::LINE = __LINE__ + 1;
 {
   my $i;
   package Foo;
-  sub DESTROY	{ my $s = shift; ::is($s->[0], $i, "destroy $i"); }
-  sub show	{ ::is(+@_, 5, "show $i",); }
+  sub DESTROY	{ my $s = shift; main::is($s->[0], $i, "destroy $i"); }
+  sub show	{ main::is(+nelems @_, 5, "show $i",); }
   sub start	{ push @_, 1, "foo", \%(); goto &show; }
   for (1..3)	{ $i = $_; start(bless(\@($_)), 'bar'); }
 }
@@ -296,7 +296,7 @@ moretests:
 # test goto duplicated labels.
 {
     my $z = 0;
-    eval {
+    try {
 	$z = 0;
 	for (0..1) {
 	  L4: # not outer scope
@@ -393,7 +393,7 @@ is(recurse1(500), 500, 'recursive goto &foo');
 
 # [perl #32039] Chained goto &sub drops data too early. 
 
-sub a32039 { @_=("foo"); goto &b32039; }
+sub a32039 { @_=@("foo"); goto &b32039; }
 sub b32039 { goto &c32039; }
 sub c32039 { is(@_[0], 'foo', 'chained &goto') }
 a32039();
@@ -423,7 +423,7 @@ a32039();
 sub null { 1 };
 eval 'goto &null';
 like($@->{description}, qr/Can't goto subroutine from an eval-string/, 'eval string');
-eval { goto &null };
+try { goto &null };
 like($@->{description}, qr/Can't goto subroutine from an eval-block/, 'eval block');
 
 # [perl #36521] goto &foo in warn handler could defeat recursion avoider

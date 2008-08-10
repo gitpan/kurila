@@ -9,51 +9,60 @@ package Math::Trig;
 
 use strict;
 
-use Math::Complex;
-use Math::Complex qw(:trig :pi);
-
 use vars qw($VERSION $PACKAGE @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS);
 
-@ISA = qw(Exporter);
+@ISA = @( qw(Exporter) );
 
 $VERSION = 1.16;
 
-my @angcnv = qw(rad2deg rad2grad
+my @angcnv = @( qw(rad2deg rad2grad
 		deg2rad deg2grad
-		grad2rad grad2deg);
+		grad2rad grad2deg) );
 
-my @areal = qw(asin_real acos_real);
+my @areal = @( qw(asin_real acos_real) );
 
-@EXPORT = (@{%Math::Complex::EXPORT_TAGS{'trig'}},
-	   @angcnv, @areal);
+@EXPORT = @(< @angcnv, < @areal);
 
-my @rdlcnv = qw(cartesian_to_cylindrical
+my @rdlcnv = @( qw(cartesian_to_cylindrical
 		cartesian_to_spherical
 		cylindrical_to_cartesian
 		cylindrical_to_spherical
 		spherical_to_cartesian
-		spherical_to_cylindrical);
+		spherical_to_cylindrical) );
 
-my @greatcircle = qw(
+my @greatcircle = @( qw(
 		     great_circle_distance
 		     great_circle_direction
 		     great_circle_bearing
 		     great_circle_waypoint
 		     great_circle_midpoint
 		     great_circle_destination
-		    );
+		    ) );
 
-my @pi = qw(pi pi2 pi4 pip2 pip4);
+my @pi = @( qw(pi pi2 pi4 pip2 pip4) );
 
-@EXPORT_OK = (@rdlcnv, @greatcircle, @pi, 'Inf');
+@EXPORT_OK = @(< @rdlcnv, < @greatcircle, < @pi, 'tan' );
 
 # See e.g. the following pages:
 # http://www.movable-type.co.uk/scripts/LatLong.html
 # http://williams.best.vwh.net/avform.htm
 
-%EXPORT_TAGS = ('radial' => \@( @rdlcnv ),
-	        'great_circle' => \@( @greatcircle ),
-	        'pi'     => \@( @pi ));
+%EXPORT_TAGS = %('radial' => \@( < @rdlcnv ),
+	        'great_circle' => \@( < @greatcircle ),
+	        'pi'     => \@( < @pi ));
+
+sub tan {
+    my ($z) = < @_;
+    my $cz = cos($z);
+    die "Division by zero in tan($z)" if $cz == 0;
+    return sin($z) / $cz;
+}
+
+sub pi () { 4 * CORE::atan2(1, 1) }
+sub pi2 () { 2 * pi }
+sub pi4 () { 4 * pi }
+sub pip2 () { pi / 2 }
+sub pip4 () { pi / 4 }
 
 sub _DR  () { pi2/360 }
 sub _RD  () { 360/pi2 }
@@ -98,59 +107,61 @@ sub grad2rad ($;$) { my $d = _GR * @_[0]; @_[1] ? $d : rad2rad($d) }
 #
 
 sub acos_real {
+    my $z = @_[0];
     return 0  if @_[0] +>=  1;
     return pi if @_[0] +<= -1;
-    return acos(@_[0]);
+    return CORE::atan2(CORE::sqrt(1-$z*$z), $z);
 }
 
 sub asin_real {
+    my $z = @_[0];
     return  &pip2 if @_[0] +>=  1;
     return -&pip2 if @_[0] +<= -1;
-    return asin(@_[0]);
+    return CORE::atan2($z, CORE::sqrt(1-$z*$z));
 }
 
 sub cartesian_to_spherical {
-    my ( $x, $y, $z ) = @_;
+    my ( $x, $y, $z ) = < @_;
 
     my $rho = sqrt( $x * $x + $y * $y + $z * $z );
 
-    return ( $rho,
+    return  @( $rho,
              atan2( $y, $x ),
              $rho ? acos_real( $z / $rho ) : 0 );
 }
 
 sub spherical_to_cartesian {
-    my ( $rho, $theta, $phi ) = @_;
+    my ( $rho, $theta, $phi ) = < @_;
 
-    return ( $rho * cos( $theta ) * sin( $phi ),
+    return  @( $rho * cos( $theta ) * sin( $phi ),
              $rho * sin( $theta ) * sin( $phi ),
              $rho * cos( $phi   ) );
 }
 
 sub spherical_to_cylindrical {
-    my ( $x, $y, $z ) = spherical_to_cartesian( @_ );
+    my ( $x, $y, $z ) = < spherical_to_cartesian( < @_ );
 
-    return ( sqrt( $x * $x + $y * $y ), @_[1], $z );
+    return  @( sqrt( $x * $x + $y * $y ), @_[1], $z );
 }
 
 sub cartesian_to_cylindrical {
-    my ( $x, $y, $z ) = @_;
+    my ( $x, $y, $z ) = < @_;
 
-    return ( sqrt( $x * $x + $y * $y ), atan2( $y, $x ), $z );
+    return  @( sqrt( $x * $x + $y * $y ), atan2( $y, $x ), $z );
 }
 
 sub cylindrical_to_cartesian {
-    my ( $rho, $theta, $z ) = @_;
+    my ( $rho, $theta, $z ) = < @_;
 
-    return ( $rho * cos( $theta ), $rho * sin( $theta ), $z );
+    return  @( $rho * cos( $theta ), $rho * sin( $theta ), $z );
 }
 
 sub cylindrical_to_spherical {
-    return ( cartesian_to_spherical( cylindrical_to_cartesian( @_ ) ) );
+    return  @( < cartesian_to_spherical( < cylindrical_to_cartesian( < @_ ) ) );
 }
 
 sub great_circle_distance {
-    my ( $theta0, $phi0, $theta1, $phi1, $rho ) = @_;
+    my ( $theta0, $phi0, $theta1, $phi1, $rho ) = < @_;
 
     $rho = 1 unless defined $rho; # Default to the unit sphere.
 
@@ -163,7 +174,7 @@ sub great_circle_distance {
 }
 
 sub great_circle_direction {
-    my ( $theta0, $phi0, $theta1, $phi1 ) = @_;
+    my ( $theta0, $phi0, $theta1, $phi1 ) = < @_;
 
     my $distance = &great_circle_distance;
 
@@ -183,7 +194,7 @@ sub great_circle_direction {
 *great_circle_bearing = \&great_circle_direction;
 
 sub great_circle_waypoint {
-    my ( $theta0, $phi0, $theta1, $phi1, $point ) = @_;
+    my ( $theta0, $phi0, $theta1, $phi1, $point ) = < @_;
 
     $point = 0.5 unless defined $point;
 
@@ -193,7 +204,7 @@ sub great_circle_waypoint {
 
     my $sd = sin($d);
 
-    return ($theta0, $phi0) if $sd == 0;
+    return  @($theta0, $phi0) if $sd == 0;
 
     my $A = sin((1 - $point) * $d) / $sd;
     my $B = sin(     $point  * $d) / $sd;
@@ -208,7 +219,7 @@ sub great_circle_waypoint {
     my $theta = atan2($y, $x);
     my $phi   = acos_real($z);
     
-    return ($theta, $phi);
+    return  @($theta, $phi);
 }
 
 sub great_circle_midpoint {
@@ -216,7 +227,7 @@ sub great_circle_midpoint {
 }
 
 sub great_circle_destination {
-    my ( $theta0, $phi0, $dir0, $dst ) = @_;
+    my ( $theta0, $phi0, $dir0, $dst ) = < @_;
 
     my $lat0 = pip2 - $phi0;
 
@@ -229,7 +240,7 @@ sub great_circle_destination {
 
     $dir1 -= pi2 if $dir1 +> pi2;
 
-    return ($theta1, $phi1, $dir1);
+    return  @($theta1, $phi1, $dir1);
 }
 
 1;

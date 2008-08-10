@@ -3,7 +3,7 @@
 BEGIN {
     if( %ENV{PERL_CORE} ) {
         chdir 't';
-        @INC = ('../lib', 'lib');
+        @INC = @('../lib', 'lib');
     }
     else {
         unshift @INC, 't/lib';
@@ -13,7 +13,7 @@ BEGIN {
 use strict;
 
 require Test::Simple::Catch;
-my($out, $err) = Test::Simple::Catch::caught();
+my($out, $err) = < Test::Simple::Catch::caught();
 local %ENV{HARNESS_ACTIVE} = 0;
 
 require Test::Builder;
@@ -21,7 +21,7 @@ my $TB = Test::Builder->create;
 $TB->level(0);
 
 sub try_cmp_ok {
-    my($left, $cmp, $right) = @_;
+    my($left, $cmp, $right) = < @_;
     
     my %expect;
     %expect{ok}    = eval "\$left $cmp \$right";
@@ -32,7 +32,8 @@ sub try_cmp_ok {
     my $ok = cmp_ok($left, $cmp, $right);
     $TB->is_num(!!$ok, !!%expect{ok});
     
-    my $diag = $err->read;
+    my $diag = $$err;
+    $$err = "";
     if( !$ok and %expect{error} ) {
         $diag =~ s/^# //mg;
         $TB->like( $diag, "/\Q%expect{error}\E/" );
@@ -49,7 +50,7 @@ sub try_cmp_ok {
 use Test::More;
 Test::More->builder->no_ending(1);
 
-my @Tests = (
+my @Tests = @(
     \@(1, '==', 1),
     \@(1, '==', 2),
     \@("a", "eq", "b"),
@@ -60,7 +61,7 @@ my @Tests = (
 
 # These don't work yet.
 if( 0 ) {
-#if( eval { require overload } ) {
+#if( try { require overload } ) {
     require MyOverload;
     
     my $cmp = Overloaded::Compare->new("foo", 42);
@@ -74,9 +75,9 @@ if( 0 ) {
     );
 }
 
-plan tests => scalar @Tests;
-$TB->plan(tests => @Tests * 2);
+plan tests => scalar nelems @Tests;
+$TB->plan(tests => (nelems @Tests) * 2);
 
-for my $test (@Tests) {
-    try_cmp_ok(@$test);
+for my $test (< @Tests) {
+    try_cmp_ok(< @$test);
 }

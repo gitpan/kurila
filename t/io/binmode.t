@@ -1,14 +1,12 @@
 #!./perl -w
 
 BEGIN {
-    chdir 't' if -d 't';
-    @INC = qw(. ../lib);
     require './test.pl';
 }
 
 use Config;
 BEGIN {
-    eval {require Errno; Errno->import;};
+    try {require Errno; Errno->import;};
 }
 plan(tests => 9);
 
