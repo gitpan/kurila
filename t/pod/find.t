@@ -7,7 +7,7 @@ BEGIN {
     # when running under all-utf8 settings (pod/find.t)
     # does not directly require lib/utf8.pm but regular
     # expressions will need that.
-    @INC = @( qw(../lib ../../../../../lib) );
+    @INC = qw(../lib ../../../../../lib);
   }
 }
 
@@ -20,7 +20,7 @@ BEGIN {
   use File::Spec;
 }
 
-use Pod::Find qw(pod_find pod_where);
+use Pod::Find < qw(pod_find pod_where);
 use File::Spec;
 
 # load successful
@@ -67,10 +67,10 @@ if ($^O eq 'VMS') {
     $result =~ s/$undollared/pod::/g;
     $result =~ s/\$//g;
     my $count = 0;
-    my @result = @( split(m/,/,$result) );
-    my @compare = @( split(m/,/,$compare) );
-    foreach(< @compare) {
-        $count += grep {m/$_/} < @result;
+    my @result = split(m/,/,$result);
+    my @compare = split(m/,/,$compare);
+    foreach( @compare) {
+        $count += grep {m/$_/} @result;
     }
     ok($count/(((nelems @result)-1)+1)-1,((nelems @compare)-1));
 }
@@ -105,13 +105,13 @@ my $searchpod = 'Stuff';
 print "### searching for $searchpod.pod\n";
 $result = pod_where(
   \%( -dirs => \@( 'File::Spec'->catdir(
-    %ENV{PERL_CORE} ? () : qw(t), 'pod', 'testpods', 'lib', 'Pod') ),
+    %ENV{PERL_CORE} ? () : < qw(t), 'pod', 'testpods', 'lib', 'Pod') ),
     -verbose => $VERBOSE ), $searchpod)
   || "undef - $searchpod.pod not found!";
 print "### found $result\n";
 
 $compare = 'File::Spec'->catfile(
-    %ENV{PERL_CORE} ? () : qw(t),
+    %ENV{PERL_CORE} ? () : < qw(t),
     'pod', 'testpods', 'lib', 'Pod' ,'Stuff.pm');
 ok(_canon($result),_canon($compare));
 
@@ -120,8 +120,8 @@ sub _canon
 {
   my ($path) = < @_;
   $path = 'File::Spec'->canonpath($path);
-  my @comp = @( < 'File::Spec'->splitpath($path) );
-  my @dir = @( < 'File::Spec'->splitdir(@comp[1]) );
+  my @comp = 'File::Spec'->splitpath($path);
+  my @dir = 'File::Spec'->splitdir(@comp[1]);
   @comp[1] = 'File::Spec'->catdir(< @dir);
   $path = 'File::Spec'->catpath(< @comp);
   $path = uc($path) if 'File::Spec'->case_tolerant;

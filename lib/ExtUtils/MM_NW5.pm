@@ -25,9 +25,9 @@ use File::Basename;
 our $VERSION = '6.44';
 
 require ExtUtils::MM_Win32;
-our @ISA = @( qw(ExtUtils::MM_Win32) );
+our @ISA = qw(ExtUtils::MM_Win32);
 
-use ExtUtils::MakeMaker qw( &neatvalue );
+use ExtUtils::MakeMaker < qw( &neatvalue );
 
 %ENV{EMXSHELL} = 'sh'; # to run `commands`
 

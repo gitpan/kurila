@@ -8,8 +8,8 @@ use warnings::register;
 our(@ISA, @EXPORT, $VERSION);
 
 require Exporter;
-@ISA = @( qw(Exporter) );
-@EXPORT = @( qw(struct) );
+@ISA = qw(Exporter);
+@EXPORT = qw(struct);
 
 $VERSION = '0.63';
 
@@ -45,18 +45,18 @@ sub struct {
     my $base_type = ref @_[1];
     if ( $base_type eq 'HASH' ) {
         $class = shift;
-        @decls = @( < %{shift()} );
+        @decls = @: < %{shift()};
         _usage_error() if (nelems @_);
     }
     elsif ( $base_type eq 'ARRAY' ) {
         $class = shift;
-        @decls = @( < @{shift()} );
+        @decls = @{shift()};
         _usage_error() if (nelems @_);
     }
     else {
         $base_type = 'ARRAY';
-        $class = (caller())[[0]];
-        @decls = @( < @_ );
+        $class = @(caller())[0];
+        @decls = @_;
     }
 
     _usage_error() if (nelems @decls) % 2 == 1;
@@ -143,7 +143,7 @@ sub struct {
 
     my( $pre, $pst, $sel );
     $cnt = 0;
-    foreach $name (< @methods){
+    foreach $name ( @methods){
         if ( do { no strict 'refs'; defined &{Symbol::fetch_glob($class . "::$name")} } ) {
             warnings::warnif("function '$name' already defined, overrides struct accessor method");
         }
@@ -177,7 +177,7 @@ sub struct {
             elsif( defined %classes{$name} ){
                 $out .= "    die '$name argument is wrong class' if \@_ && ! UNIVERSAL::isa(\@_[0], '%classes{$name}');\n";
             }
-            $out .= "    die 'Too many args to $name' if \@_ +> 1;\n";
+            $out .= "    die 'Too many args to $name' if nelems(\@_) +> 1;\n";
             $out .= "    \@_ ? ($pre\$r->$elem$sel = shift$pst) : $pre\$r->$elem$sel$pst;\n";
             $out .= "  \}\n";
         }

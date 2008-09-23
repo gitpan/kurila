@@ -129,7 +129,7 @@ sub dump_array {
 	my ($aref) = < @_;
 	my $items = nelems @{$aref};
 	$dumped .= "ARRAY items=$items\n";
-	foreach my $item (< @{$aref}) {
+	foreach my $item ( @{$aref}) {
 		unless (defined $item) {
 			$dumped .= 'ITEM_UNDEF' . "\n";
 			next;
@@ -142,7 +142,7 @@ sub dump_array {
 # Dump hash table
 sub dump_hash {
 	my ($href) = < @_;
-	my $items = nelems(@(keys %{$href}));
+	my $items = nelems(keys %{$href});
 	$dumped .= "HASH items=$items\n";
 	foreach my $key (sort keys %{$href}) {
 		$dumped .= 'KEY ';

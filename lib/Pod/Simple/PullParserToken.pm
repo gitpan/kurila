@@ -7,7 +7,7 @@ use strict;
 
 sub new {  # Class->new('type', stuff...);  ## Overridden in derived classes anyway
   my $class = shift;
-  return bless \@(< @_), ref($class) || $class;
+  return bless \$(@_), ref($class) || $class;
 }
 
 sub type { @_[0]->[0] }  # Can't change the type of an object

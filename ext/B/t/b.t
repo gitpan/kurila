@@ -11,13 +11,13 @@ BEGIN {
 $|  = 1;
 use warnings;
 use strict;
-use Test::More tests => 58;
+use Test::More tests => 56;
 
 BEGIN { use_ok( 'B' ); }
 
 
 package Testing::Symtable;
-use vars qw($This @That %wibble $moo %moo);
+use vars < qw($This @That %wibble $moo %moo);
 my $not_a_sym = 'moo';
 
 sub moo { 42 }
@@ -31,7 +31,7 @@ package Testing::Symtable::Bar;
 sub hock { "yarrow" }
 
 package main;
-use vars qw(%Subs);
+use vars < qw(%Subs);
 local %Subs = %( () );
 B::walksymtable(\%Testing::Symtable::, 'find_syms', sub { @_[0] =~ m/Foo/ },
                 'Testing::Symtable::');
@@ -42,14 +42,13 @@ sub B::GV::find_syms {
     %main::Subs{$symbol->STASH->NAME . '::' . $symbol->NAME}++;
 }
 
-my @syms = @( map { 'Testing::Symtable::'.$_ } qw(This That wibble moo car
-                                               BEGIN) );
+my @syms = map { 'Testing::Symtable::'.$_ } qw(This That wibble moo car
+                                               BEGIN);
 push @syms, "Testing::Symtable::Foo::yarrow";
 
 # Make sure we hit all the expected symbols.
 {
-    local $TODO = 1;
-    is( join('#', sort keys %Subs), join('#', sort < @syms), 'all symbols found' );
+    is( join('#', sort keys %Subs), join('#', sort @syms), 'all symbols found' );
 }
 
 # Make sure we only hit them each once.
@@ -139,7 +138,6 @@ is(ref $gv_ref, "B::GV", "Test B::GV return from svref_2object");
 ok(! $gv_ref->is_empty(), "Test is_empty()");
 is($gv_ref->NAME(), "gv", "Test NAME()");
 is($gv_ref->SAFENAME(), "gv", "Test SAFENAME()");
-like($gv_ref->FILE(), qr/b\.t$/, "Testing FILE()");
 
 # The following return B::SPECIALs.
 is(ref B::sv_yes(), "B::SPECIAL", "B::sv_yes()");
@@ -164,15 +162,4 @@ is(B::opnumber("chop"), 34, "Testing opnumber with opname (chop)");
     my $sg = B::sub_generation();
     *UNIVERSAL::hand_waving = sub { };
     ok( $sg +< B::sub_generation(), "sub_generation increments" );
-}
-
-{
-    my $ag = B::amagic_generation();
-    {
-
-        package Whatever;
-        require overload;
-        overload->import( '""' => sub {"What? You want more?!"} );
-    }
-    ok( $ag +< B::amagic_generation(), "amagic_generation increments" );
 }

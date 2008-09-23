@@ -125,7 +125,7 @@ SKIP: {
     open my $f, ">", "$filename" or skip( "Can't write temp file $filename: $!",4 );
     print $f <<'SWTESTPM';
 package swtest;
-sub import { print map "<$_>", <@_ }
+sub import { print < map "<$_>", @_ }
 1;
 SWTESTPM
     close $f or die "Could not close: $!";
@@ -223,7 +223,7 @@ SWTESTPM
 {
     local $TODO = '';   # these ones should work on VMS
 
-    my (undef, $v) = split m/-/, $^V;
+    my (undef, $v) = < split m/-/, $^V;
     like( runperl( switches => \@('-v') ),
 	  qr/This is kurila, v$v (?:DEVEL\w+ )?built for \Q%Config{archname}\E.+Copyright.+Gerard Goossen.+Artistic License.+GNU General Public License/s,
           '-v looks okay' );
@@ -281,10 +281,10 @@ __EOF__
     chomp(my @bak = @( ~< *BAK ));
     close BAK;
 
-    is(join(":", < @file),
+    is(join(":", @file),
        "bar yada dada:bada bar bing:king kong bar",
        "-i new file");
-    is(join(":", < @bak),
+    is(join(":", @bak),
        "foo yada dada:bada foo bing:king kong foo",
        "-i backup file");
 }

@@ -7,15 +7,12 @@ BEGIN {
 # don't make this lexical
 our $i = 1;
 
-my @fjles_to_delete = @( qw (bleah.pm bleah.do bleah.flg urkkk.pm urkkk.pmc
-krunch.pm krunch.pmc whap.pm whap.pmc) );
+my @fjles_to_delete = qw (bleah.pm bleah.do bleah.flg urkkk.pm urkkk.pmc
+krunch.pm krunch.pmc whap.pm whap.pmc cirlceA.pm circleB.pm);
 
 
-my $Is_EBCDIC = (ord('A') == 193) ? 1 : 0;
-my $Is_UTF8   = ($^OPEN || "") =~ m/:utf8/;
-my $total_tests = 30;
+my $total_tests = 27;
 
-if ($Is_EBCDIC || $Is_UTF8) { $total_tests -= 3; }
 print "1..$total_tests\n";
 
 sub do_require {
@@ -38,21 +35,6 @@ eval 'require 5.005';
 print "not " unless $@;
 print "ok ",$i++,"\n";
 
-print "not " unless (v5.5.1 cmp v5.5) +> 0;
-print "ok ",$i++,"\n";
-
-{
-    print "not " unless v5.5.640 eq "v5.5.640";
-    print "ok ",$i++,"\n";
-
-    print "not " unless v7.15 eq "v7.15";
-    print "ok ",$i++,"\n";
-
-    print "not "
-      unless v1.20.300.4000.50000.600000 eq "v1.20.300.4000.50000.600000";
-    print "ok ",$i++,"\n";
-}
-
 # interaction with pod (see the eof)
 write_file('bleah.pm', "print 'ok $i\n'; 1;\n");
 require "bleah.pm";
@@ -65,7 +47,7 @@ print "ok ",$i++,"\n";
 
 my $flag_file = 'bleah.flg';
 # run-time error in require
-for my $expected_compile (1,0) {
+for my $expected_compile (@(1,0)) {
     write_file($flag_file, 1);
     print "not " unless -e $flag_file;
     print "ok ",$i++,"\n";
@@ -202,6 +184,15 @@ EOT
     print "ok ", ++$i, " [perl #49472]\n";
 }
 
+# circular require
+
+write_file("circleA.pm", 'BEGIN { require circleB } 1;');
+write_file("circleB.pm", 'require circleA; 1;');
+try { require circleA; };
+print "not " unless $@ && $@->message =~ m/Circular dependency: circleA.pm is still being compiled/;
+print "ok ", ++$i, " circular require\n";
+
+
 ##########################################
 # What follows are UTF-8 specific tests. #
 # Add generic tests before this point.   #
@@ -209,15 +200,13 @@ EOT
 
 # UTF-encoded things - skipped on EBCDIC machines and on UTF-8 input
 
-if ($Is_EBCDIC || $Is_UTF8) { exit; }
-
 require utf8;
 my $utf8 = utf8::chr(0xFEFF);
 
 $i++; do_require(qq({$utf8}print "ok $i\n"; 1;\n));
 
 END {
-    foreach my $file (< @fjles_to_delete) {
+    foreach my $file ( @fjles_to_delete) {
 	1 while unlink $file;
     }
 }

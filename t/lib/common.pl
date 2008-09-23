@@ -25,18 +25,18 @@ my @prgs = @( () ) ;
 my @w_files = @( () ) ;
 
 if ((nelems @ARGV))
-  { print "ARGV = [{join ' ', <@ARGV}]\n" ;
+  { print "ARGV = [{join ' ',@ARGV}]\n" ;
     if ($Is_MacOS) {
-      @w_files = @( map { s#^#:lib:$pragma_name:#; $_ } < @ARGV )
+      @w_files = map { s#^#:lib:$pragma_name:#; $_ } @ARGV
     } else {
-      @w_files = @( map { s#^#./lib/$pragma_name/#; $_ } < @ARGV )
+      @w_files = map { s#^#./lib/$pragma_name/#; $_ } @ARGV
     }
   }
 else
-  { @w_files = @( sort <glob(catfile(curdir(), "lib", $pragma_name, "*")) ) }
+  { @w_files = sort glob(catfile(curdir(), "lib", $pragma_name, "*")) }
 
 my $files = 0;
-foreach my $file (< @w_files) {
+foreach my $file ( @w_files) {
 
     next if $file =~ m/(~|\.orig|\.got|,v)$/;
     next if $file =~ m/perlio$/ && !('PerlIO::Layer'->find( 'perlio'));
@@ -55,7 +55,7 @@ foreach my $file (< @w_files) {
     {
         local $/ = undef;
         $files++;
-        @prgs = @(< @prgs, $file, split "\n########\n", ~< *F) ;
+        @prgs = @(< @prgs, $file, < split "\n########\n", ~< *F) ;
     }
     close F ;
 }
@@ -66,7 +66,7 @@ plan tests => (scalar(nelems @prgs)-$files);
 
 my $out_file;
 my $file;
-for (< @prgs){
+for ( @prgs){
     unless (m/\n/)
      {
       print "# From $_\n";
@@ -85,7 +85,7 @@ for (< @prgs){
     if (s/^(\s*-\w+)//){
         $switch = $1;
     }
-    my($prog,$expected) = split(m/\nEXPECT(?:\n|$)/, $_, 2);
+    my($prog,$expected) = < split(m/\nEXPECT(?:\n|$)/, $_, 2);
 
     my ($todo, $todo_reason);
     $todo = $prog =~ s/^#\s*TODO\s*(.*)\n//m and $todo_reason = $1;
@@ -99,10 +99,10 @@ for (< @prgs){
 	$todo_reason = $temp;
     }
     if ( $prog =~ m/--FILE--/) {
-        my(@files) = @( split(m/\n--FILE--\s*([^\s\n]*)\s*\n/, $prog) ) ;
+        my @files = split(m/\n--FILE--\s*([^\s\n]*)\s*\n/, $prog) ;
 	shift @files ;
 	die "Internal error: test $_ didn't split into pairs, got " .
-		scalar(nelems @files) . "[" . join("\%\%\%\%", < @files) ."]\n"
+		scalar(nelems @files) . "[" . join("\%\%\%\%", @files) ."]\n"
 	    if (nelems @files) % 2 ;
 	while ((nelems @files) +> 2) {
 	    my $filename = shift @files ;
@@ -141,7 +141,7 @@ for (< @prgs){
     $results =~ s/\n+$//;
     # allow expected output to be written as if $prog is on STDIN
     $results =~ s/tmp\d+/-/g;
-    $results =~ s|at \.\./lib/warnings\.pm line \d*\.|at .../warnings.pm line xxx.|g;
+    $results =~ s|at \.\./lib/warnings\.pm line \d+ character \d+\.|at .../warnings.pm line xxx.|g;
     if ($^O eq 'VMS') {
         # some tests will trigger VMS messages that won't be expected
         $results =~ s/\n?%[A-Z]+-[SIWEF]-[A-Z]+,.*//;
@@ -207,9 +207,9 @@ for (< @prgs){
     our $TODO = $todo ? $todo_reason : 0;
     ok($ok);
 
-    foreach (< @temps)
+    foreach ( @temps)
 	{ unlink $_ if $_ }
-    foreach (< @temp_path)
+    foreach ( @temp_path)
 	{ rmtree $_ if -d $_ }
 }
 
@@ -218,10 +218,10 @@ sub randomMatch
     my $got = shift ;
     my $expected = shift;
 
-    my @got = @( sort split "\n", $got ) ;
-    my @expected = @( sort split "\n", $expected ) ;
+    my @got = sort split "\n", $got ;
+    my @expected = sort split "\n", $expected ;
 
-   return "{join ' ', <@got}" eq "{join ' ', <@expected}";
+   return "{join ' ',@got}" eq "{join ' ',@expected}";
 
 }
 

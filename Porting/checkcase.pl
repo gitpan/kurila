@@ -18,7 +18,7 @@ my $failed;
 
 foreach (values %files) {
     if ((nelems @$_) +> 1) {
-	print join(", ", < @$_), "\n";
+	print join(", ", @$_), "\n";
 	$failed++;
     }
 }

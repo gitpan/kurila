@@ -11,8 +11,6 @@ our (%h, @keys, @values, $i, $key, $value, $size, $newsize, $total,
 
 %h{'abc'} = 'ABC';
 %h{'def'} = 'DEF';
-%h{'jkl','mno'} = "JKL\034MNO";
-%h{'a',2,3,4,5} = join("\034",'A',2,3,4,5);
 %h{'a'} = 'A';
 %h{'b'} = 'B';
 %h{'c'} = 'C';
@@ -40,11 +38,11 @@ our (%h, @keys, @values, $i, $key, $value, $size, $newsize, $total,
 %h{'y'} = 'Y';
 %h{'z'} = 'Z';
 
-@keys = @( keys %h );
-@values = @( values %h );
+@keys = keys %h;
+@values = values %h;
 
-is (((nelems @keys)-1), 29, "keys");
-is (((nelems @values)-1), 29, "values");
+is (((nelems @keys)-1), 27, "keys");
+is (((nelems @values)-1), 27, "values");
 
 $i = 0;		# stop -w complaints
 
@@ -56,13 +54,13 @@ while (($key,$value) = each(%h)) {
     }
 }
 
-is ($i, 30, "each count");
+is ($i, 28, "each count");
 
-@keys = @('blurfl', keys(%h), 'dyick');
-is (((nelems @keys)-1), 31, "added a key");
+@keys = @('blurfl', < keys(%h), 'dyick');
+is (((nelems @keys)-1), 29, "added a key");
 
 # test scalar each
-%hash = %( 1..20 );
+%hash = %( < 1..20 );
 $total = 0;
 $total += $key while $key = each %hash;
 is ($total, 100, "test scalar each");
@@ -86,8 +84,8 @@ is ($total, 100, "test values keys resets iterator");
 
 $i = 0;
 %h = %(a => 'A', b => 'B', c=> 'C', d => 'D', abc => 'ABC');
-@keys = @( keys(%h) );
-@values = @( values(%h) );
+@keys = keys(%h);
+@values = values(%h);
 while (($key, $value) = each(%h)) {
 	if ($key eq @keys[$i] && $value eq @values[$i] && $key eq lc($value)) {
 		$i++;
@@ -112,7 +110,7 @@ our @tests = @(&next_test, &next_test, &next_test);
 use utf8;
 %u = %("\x{12}", "f", "\x{123}", "fo", "\x{1234}",  "foo");
 %u{"\x{12345}"}  = "bar";
-%u{["\x{10FFFD}"]} = "zap";
+ <%u{[@("\x{10FFFD}")]} = "zap";
 
 my %u2;
 foreach (keys %u) {

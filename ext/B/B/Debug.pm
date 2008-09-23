@@ -3,7 +3,7 @@ package B::Debug;
 our $VERSION = '1.05_02';
 
 use strict;
-use B qw(peekop class walkoptree walkoptree_exec
+use B < qw(peekop class walkoptree walkoptree_exec
          main_start main_root cstring sv_undef @specialsv_name);
 # <=5.008 had @specialsv_name exported from B::Asmdata
 BEGIN {
@@ -97,12 +97,10 @@ sub B::COP::debug {
     my ($op) = < @_;
     $op->B::OP::debug();
     my $cop_io = class($op->io) eq 'SPECIAL' ? '' : $op->io->as_string;
-    printf <<'EOT', $op->label, $op->stashpv, $op->file, $op->cop_seq, $op->line, ${$op->warnings}, cstring($cop_io);
+    printf <<'EOT', $op->label, $op->stashpv, $op->cop_seq, ${$op->warnings}, cstring($cop_io);
 	cop_label	"%s"
 	cop_stashpv	"%s"
-	cop_file	"%s"
 	cop_seq		%d
-	cop_line	%d
 	cop_warnings	0x%x
 	cop_io		%s
 EOT
@@ -237,8 +235,8 @@ EOT
 sub B::AV::debug {
     my ($av) = < @_;
     $av->B::SV::debug;
-    my(@array) = @( < $av->ARRAY );
-    print "\tARRAY\t\t(", join(", ", map("0x" . $$_, < @array)), ")\n";
+    my(@array) = $av->ARRAY;
+    print "\tARRAY\t\t(", join(", ", map("0x" . $$_, @array)), ")\n";
     printf <<'EOT', scalar(nelems @array), < $av->MAX, < $av->OFF;
 	FILL		%d
 	MAX		%d

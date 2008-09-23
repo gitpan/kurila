@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-use Test;
+use Test::More;
 
 # Grab all of the plain routines from File::Spec
 use File::Spec < @File::Spec::EXPORT_OK ;
@@ -705,14 +705,14 @@ plan tests => scalar (nelems @tests) + 1;
 
 {
     package File::Spec::FakeWin32;
-    use vars qw(@ISA);
-    @ISA = @( qw(File::Spec::Win32) );
+    use vars < qw(@ISA);
+    @ISA = qw(File::Spec::Win32);
 
     sub _cwd { 'C:\one\two' }
 
     # Some funky stuff to override Cwd::getdcwd() for testing purposes,
     # in the limited scope of the rel2abs() method.
-    if ($Cwd::VERSION && $Cwd::VERSION +> v2.17) {  # Avoid a 'used only once' warning
+    if ($Cwd::VERSION) {  # Avoid a 'used only once' warning
 	local $^W;
 	*rel2abs = sub {
 	    my $self = shift;
@@ -730,10 +730,10 @@ plan tests => scalar (nelems @tests) + 1;
 }
 
 
-ok("Win32->can('_cwd')", "Win32->can('_cwd')");
+is("Win32->can('_cwd')", "Win32->can('_cwd')");
 
 # Test out the class methods
-for ( < @tests ) {
+for (  @tests ) {
    tryfunc( < @$_ ) ;
 }
 
@@ -743,6 +743,7 @@ for ( < @tests ) {
 # an expected result. Works with functions that return scalars or arrays.
 #
 sub tryfunc {
+  SKIP: {
     my $function = shift ;
     my $expected = shift ;
     my $platform = shift ;
@@ -754,7 +755,7 @@ sub tryfunc {
 
     $function =~ s/^([^\$].*->)/File::Spec::$1/;
     my $got = eval $function;
-    $got = join ',', <$got if (ref \$got) eq "ARRAY";
+    $got = join ',',$got if (ref \$got) eq "ARRAY";
 
     if ( $@ ) {
       if ( $@->{description} =~ m/^\Q$skip_exception/ ) {
@@ -762,10 +763,11 @@ sub tryfunc {
       }
       else {
         die if $@;
-	ok $@, '', $function;
+	is $@, '', $function;
       }
       return;
     }
 
-    ok $got, $expected, $function;
+    is $got, $expected, $function;
+}
 }

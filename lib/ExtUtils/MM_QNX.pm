@@ -4,7 +4,7 @@ use strict;
 our $VERSION = '6.44';
 
 require ExtUtils::MM_Unix;
-our @ISA = @( qw(ExtUtils::MM_Unix) );
+our @ISA = qw(ExtUtils::MM_Unix);
 
 
 =head1 NAME
@@ -34,8 +34,8 @@ Add .err files corresponding to each .c file.
 sub extra_clean_files {
     my $self = shift;
 
-    my @errfiles = @( < @{$self->{C}} );
-    for ( < @errfiles ) {
+    my @errfiles = @{$self->{C}};
+    for (  @errfiles ) {
 	s/.c$/.err/;
     }
 

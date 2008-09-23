@@ -1,6 +1,6 @@
 package Module::CoreList;
 use strict;
-use vars qw/$VERSION %released %patchlevel %version %families/;
+use vars < qw/$VERSION %released %patchlevel %version %families/;
 $VERSION = '2.14';
 
 =head1 NAME
@@ -95,7 +95,7 @@ sub import {
 }
 
 END {
-    print "---INC---\n", join "\n" => keys %INC
+    print "---INC---\n", join "\n", keys %INC
       if $dumpinc;
 }
 
@@ -104,38 +104,38 @@ sub first_release_raw {
     my ($discard, $module, $version) = < @_;
 
     my @perls = @( $version
-        ? grep { exists %version{$_}->{ $module } &&
+        ? < grep { exists %version{$_}->{ $module } &&
                         %version{$_}->{ $module } +>= $version } keys %version
-        : grep { exists %version{$_}->{ $module }             } keys %version );
+        : < grep { exists %version{$_}->{ $module }             } keys %version );
 
     return @perls;
 }
 
 sub first_release_by_date {
-    my @perls = @( < &first_release_raw );
+    my @perls = &first_release_raw;
     return unless (nelems @perls);
-    return (sort { %released{$a} cmp %released{$b} } < @perls)[[0]];
+    return (sort { %released{$a} cmp %released{$b} } @perls)[0];
 }
 
 sub first_release {
-    my @perls = @( < &first_release_raw );
+    my @perls = &first_release_raw;
     return unless (nelems @perls);
-    return (sort { $a cmp $b } < @perls)[[0]];
+    return (sort { $a cmp $b } @perls)[0];
 }
 
 sub find_modules {
     my $discard = shift;
     my $regex = shift;
-    my @perls = @( < @_ );
-    @perls = @( keys %version ) unless (nelems @perls);
+    my @perls = @_;
+    @perls = keys %version unless (nelems @perls);
 
     my %mods;
-    foreach (< @perls) {
+    foreach ( @perls) {
         while (my ($k, $v) = each %{%version{$_}}) {
             %mods{$k}++ if $k =~ $regex;
         }
     }
-    return @( sort keys %mods)
+    return sort keys %mods
 }
 
 sub find_version {

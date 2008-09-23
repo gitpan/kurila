@@ -31,7 +31,6 @@ Perl_realloc
 Perl_mfree
 Perl_get_context
 Perl_set_context
-Perl_amagic_call
 Perl_Gv_AMupdate
 Perl_gv_handler
 Perl_apply_attrs_string
@@ -59,6 +58,7 @@ Perl_cast_iv
 Perl_cast_uv
 Perl_my_chsize
 Perl_croak
+Perl_croak_at
 Perl_vcroak
 Perl_croak_nocontext
 Perl_die_nocontext
@@ -587,9 +587,12 @@ Perl_vivify_defelem
 Perl_seed
 Perl_report_uninit
 Perl_warn
+Perl_warn_at
 Perl_vwarn
 Perl_warner
+Perl_warner_at
 Perl_vwarner
+Perl_vwarner_at
 Perl_whichsig
 Perl_yylex
 Perl_dump_mstats

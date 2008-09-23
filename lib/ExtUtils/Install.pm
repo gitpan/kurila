@@ -1,16 +1,16 @@
 package ExtUtils::Install;
 use strict;
 
-use vars qw(@ISA @EXPORT $VERSION $MUST_REBOOT %Config);
+use vars < qw(@ISA @EXPORT $VERSION $MUST_REBOOT %Config);
 
-use Config qw(%Config);
-use Cwd qw(cwd);
+use Config < qw(%Config);
+use Cwd < qw(cwd);
 use Exporter;
 use ExtUtils::Packlist;
-use File::Basename qw(dirname);
-use File::Compare qw(compare);
+use File::Basename < qw(dirname);
+use File::Compare < qw(compare);
 use File::Copy;
-use File::Find qw(find);
+use File::Find < qw(find);
 use File::Path;
 use File::Spec;
 
@@ -112,7 +112,7 @@ my $Curdir = File::Spec->curdir;
 my $Updir  = File::Spec->updir;
 
 sub _estr(@) {
-    return join "\n",'!' x 72,< @_,'!' x 72,'';
+    return join "\n", @('!' x 72,< @_,'!' x 72,'');
 }
 
 {my %warned;
@@ -304,7 +304,7 @@ sub _get_install_skip {
     if ( ! defined $skip ) {
         print "Looking for install skip list\n"
             if $verbose+>2;
-        for my $file ( 'INSTALL.SKIP', %ENV{EU_INSTALL_SITE_SKIPFILE} ) {
+        for my $file (@( 'INSTALL.SKIP', %ENV{EU_INSTALL_SITE_SKIPFILE}) ) {
             next unless $file;
             print "\tChecking for $file\n"
                 if $verbose+>2;
@@ -338,7 +338,7 @@ sub _get_install_skip {
             if $verbose+>1;
         $skip= \@();
     }
-    warn "Got {join ' ', <@{\@(0+nelems @$skip)}} skip patterns.\n"
+    warn "Got {join ' ',@{\@(0+nelems @$skip)}} skip patterns.\n"
         if $verbose+>3;
     return $skip
 }
@@ -394,7 +394,7 @@ sub _can_write_dir {
         unless defined $dir and length $dir;
 
     my ($vol, $dirs, $file) = < File::Spec->splitpath($dir,1);
-    my @dirs = @( < File::Spec->splitdir($dirs) );
+    my @dirs = File::Spec->splitdir($dirs);
     unshift @dirs, File::Spec->curdir
         unless File::Spec->file_name_is_absolute($dir);
 
@@ -463,7 +463,7 @@ sub _mkpath {
             _choke < @msg;
         }
     } elsif ($show and $dry_run) {
-        print "$_\n" for < @make;
+        print "$_\n" for  @make;
     }
     
 }
@@ -729,7 +729,7 @@ sub install { #XXX OS-SPECIFIC
         # File::Find seems to always be Unixy except on MacPerl :(
         my $current_directory= $Is_MacPerl ? $Curdir : '.';
         find(sub {
-            my ($mode,$size,$atime,$mtime) = (stat)[[2,7,8,9]];
+            my ($mode,$size,$atime,$mtime) = < @(stat)[[@:2,7,8,9]];
 
             return if !-f _;
             my $origfile = $_;
@@ -740,7 +740,7 @@ sub install { #XXX OS-SPECIFIC
             my $sourcedir  = File::Spec->catdir($source, $File::Find::dir);
             my $sourcefile = File::Spec->catfile($sourcedir, $origfile);
 
-            for my $pat (< @{$skip || \@()}) {
+            for my $pat ( @{$skip || \@()}) {
                 if ( $sourcefile=~m/$pat/ ) {
                     print "Skipping $targetfile (filtered)\n"
                         if $verbose+>1;
@@ -777,7 +777,7 @@ sub install { #XXX OS-SPECIFIC
     foreach my $targetdir (sort keys %check_dirs) {
         _mkpath( $targetdir, 0, 0755, $verbose, $dry_run );
     }
-    foreach my $found (< @found_files) {
+    foreach my $found ( @found_files) {
         my ($diff, $ffd, $origfile, $mode, $size, $atime, $mtime,
             $targetdir, $targetfile, $sourcedir, $sourcefile)= < @$found;
         
@@ -1041,14 +1041,14 @@ sub inc_uninstall {
     my($filepath,$libdir,$verbose,$dry_run,$ignore,$results) = < @_;
     my($dir);
     $ignore||="";
-    my $file = ( <File::Spec->splitpath($filepath))[[2]];
+    my $file = (File::Spec->splitpath($filepath))[2];
     my %seen_dir = %( () );
     
-    my @PERL_ENV_LIB = @( split %Config{path_sep}, defined %ENV{'PERL5LIB'}
-      ? %ENV{'PERL5LIB'} : %ENV{'PERLLIB'} || '' );
+    my @PERL_ENV_LIB = split %Config{path_sep}, defined %ENV{'PERL5LIB'}
+      ? %ENV{'PERL5LIB'} : %ENV{'PERLLIB'} || '';
         
     my @dirs=@( < @PERL_ENV_LIB, 
-               < @INC, 
+               < @INC, < 
                %Config{[qw(archlibexp
                           privlibexp
                           sitearchexp
@@ -1056,7 +1056,7 @@ sub inc_uninstall {
     
     #warn join "\n","---",@dirs,"---";
     my $seen_ours;
-    foreach $dir ( < @dirs ) {
+    foreach $dir (  @dirs ) {
         my $canonpath = File::Spec->canonpath($dir);
         next if $canonpath eq $Curdir;
         next if %seen_dir{$canonpath}++;

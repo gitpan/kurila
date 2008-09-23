@@ -3748,9 +3748,6 @@ Gid_t getegid (void);
 #define PERL_MAGIC_overload_elem  'a' /* %OVERLOAD hash element */
 #define PERL_MAGIC_overload_table 'c' /* Holds overload table (AMT) on stash */
 #define PERL_MAGIC_bm		  'B' /* Boyer-Moore (fast string search) */
-#define PERL_MAGIC_regdata	  'D' /* Regex match position data
-					(@+ and @- vars) */
-#define PERL_MAGIC_regdatum	  'd' /* Regex match position data element */
 #define PERL_MAGIC_env		  'E' /* %ENV hash */
 #define PERL_MAGIC_envelem	  'e' /* %ENV hash element */
 #define PERL_MAGIC_fm		  'f' /* Formline ('compiled' format) */
@@ -3759,7 +3756,6 @@ Gid_t getegid (void);
 #define PERL_MAGIC_hintselem	  'h' /* %^H hash element */
 #define PERL_MAGIC_isa		  'I' /* @ISA array */
 #define PERL_MAGIC_isaelem	  'i' /* @ISA array element */
-#define PERL_MAGIC_nkeys	  'k' /* scalar(keys()) lvalue */
 #define PERL_MAGIC_dbfile	  'L' /* Debugger %_<filename */
 #define PERL_MAGIC_dbline	  'l' /* Debugger %_<filename element */
 #define PERL_MAGIC_shared	  'N' /* Shared between threads */
@@ -4532,7 +4528,6 @@ enum {		/* pass one of these to get_vtbl */
     want_vtbl_isaelem,
     want_vtbl_glob,
     want_vtbl_mglob,
-    want_vtbl_nkeys,
     want_vtbl_taint,
     want_vtbl_vec,
     want_vtbl_pos,
@@ -4540,10 +4535,6 @@ enum {		/* pass one of these to get_vtbl */
     want_vtbl_uvar,
     want_vtbl_defelem,
     want_vtbl_regexp,
-    want_vtbl_amagic,
-    want_vtbl_amagicelem,
-    want_vtbl_regdata,
-    want_vtbl_regdatum,
     want_vtbl_backref,
     want_vtbl_utf8,
     want_vtbl_symtab,
@@ -4962,18 +4953,6 @@ MGVTBL_SET(
 );
 
 MGVTBL_SET(
-    PL_vtbl_nkeys,
-    MEMBER_TO_FPTR(Perl_magic_getnkeys),
-    MEMBER_TO_FPTR(Perl_magic_setnkeys),
-    0,
-    0,
-    0,
-    0,
-    0,
-    0
-);
-
-MGVTBL_SET(
     PL_vtbl_taint,
     MEMBER_TO_FPTR(Perl_magic_gettaint),
     MEMBER_TO_FPTR(Perl_magic_settaint),
@@ -5070,54 +5049,6 @@ MGVTBL_SET(
 );
 
 MGVTBL_SET(
-    PL_vtbl_regdata,
-    0,
-    0,
-    MEMBER_TO_FPTR(Perl_magic_regdata_cnt),
-    0,
-    0,
-    0,
-    0,
-    0
-);
-
-MGVTBL_SET(
-    PL_vtbl_regdatum,
-    MEMBER_TO_FPTR(Perl_magic_regdatum_get),
-    MEMBER_TO_FPTR(Perl_magic_regdatum_set),
-    0,
-    0,
-    0,
-    0,
-    0,
-    0
-);
-
-MGVTBL_SET(
-    PL_vtbl_amagic,
-    0,
-    MEMBER_TO_FPTR(Perl_magic_setamagic),
-    0,
-    0,
-    MEMBER_TO_FPTR(Perl_magic_setamagic),
-    0,
-    0,
-    0
-);
-
-MGVTBL_SET(
-    PL_vtbl_amagicelem,
-    0,
-    MEMBER_TO_FPTR(Perl_magic_setamagic),
-    0,
-    0,
-    MEMBER_TO_FPTR(Perl_magic_setamagic),
-    0,
-    0,
-    0
-);
-
-MGVTBL_SET(
     PL_vtbl_backref,
     0,
     0,
@@ -5188,15 +5119,6 @@ typedef struct am_table_short AMTS;
 #define AMGfallNO	2
 #define AMGfallYES	3
 
-#define AMTf_AMAGIC		1
-#define AMTf_OVERLOADED		2
-#define AMT_AMAGIC(amt)		((amt)->flags & AMTf_AMAGIC)
-#define AMT_AMAGIC_on(amt)	((amt)->flags |= AMTf_AMAGIC)
-#define AMT_AMAGIC_off(amt)	((amt)->flags &= ~AMTf_AMAGIC)
-#define AMT_OVERLOADED(amt)	((amt)->flags & AMTf_OVERLOADED)
-#define AMT_OVERLOADED_on(amt)	((amt)->flags |= AMTf_OVERLOADED)
-#define AMT_OVERLOADED_off(amt)	((amt)->flags &= ~AMTf_OVERLOADED)
-
 #define StashHANDLER(stash,meth)	gv_handler((stash),CAT2(meth,_amg))
 
 /*
@@ -5233,7 +5155,7 @@ typedef struct am_table_short AMTS;
 #define PERLDB_ALL		(PERLDBf_SUB	| PERLDBf_LINE	|	\
 				 PERLDBf_NOOPT	| PERLDBf_INTER	|	\
 				 PERLDBf_SUBLINE| PERLDBf_SINGLE|	\
-				 PERLDBf_NAMEEVAL| PERLDBf_NAMEANON )
+				 PERLDBf_NAMEANON )
 					/* No _NONAME, _GOTO, _ASSERTION */
 #define PERLDBf_SUB		0x01	/* Debug sub enter/exit */
 #define PERLDBf_LINE		0x02	/* Keep line # */
@@ -5244,7 +5166,6 @@ typedef struct am_table_short AMTS;
 #define PERLDBf_SINGLE		0x20	/* Start with single-step on */
 #define PERLDBf_NONAME		0x40	/* For _SUB: no name of the subr */
 #define PERLDBf_GOTO		0x80	/* Report goto: call DB::goto */
-#define PERLDBf_NAMEEVAL	0x100	/* Informative names for evals */
 #define PERLDBf_NAMEANON	0x200	/* Informative names for anon subs */
 
 #define PERLDB_SUB	(PL_perldb && (PL_perldb & PERLDBf_SUB))
@@ -5255,7 +5176,6 @@ typedef struct am_table_short AMTS;
 #define PERLDB_SINGLE	(PL_perldb && (PL_perldb & PERLDBf_SINGLE))
 #define PERLDB_SUB_NN	(PL_perldb && (PL_perldb & (PERLDBf_NONAME)))
 #define PERLDB_GOTO	(PL_perldb && (PL_perldb & PERLDBf_GOTO))
-#define PERLDB_NAMEEVAL	(PL_perldb && (PL_perldb & PERLDBf_NAMEEVAL))
 #define PERLDB_NAMEANON	(PL_perldb && (PL_perldb & PERLDBf_NAMEANON))
 #define PERLDB_ASSERTION (PL_perldb && (PL_perldb & PERLDBf_ASSERTION))
 

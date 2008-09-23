@@ -84,7 +84,7 @@ use warnings;
 
 my %Opts;
 
-GetOptions(\%Opts, qw[ help|?! man! v|version:f a! d ] );
+GetOptions(\%Opts, < qw[ help|?! man! v|version:f a! d ] );
 
 pod2usage(1) if %Opts{help};
 pod2usage(-verbose=>2) if %Opts{man};
@@ -120,7 +120,7 @@ if ( !nelems @ARGV ) {
 while ((nelems @ARGV)) {
 	my ($mod, $ver);
 	if (@ARGV[0] =~ m/=/) {
-	    ($mod, $ver) = split m/=/, shift @ARGV;
+	    ($mod, $ver) = < split m/=/, shift @ARGV;
 	} else {
 	    $mod = shift @ARGV;
 	    $ver = ((nelems @ARGV) && @ARGV[0] =~ m/^\d/) ? shift @ARGV : "";
@@ -138,9 +138,9 @@ while ((nelems @ARGV)) {
 		warn "\n$mod  is a bad regex: $errmsg\n";
 		next;
 	    }
-	    my @mod = @( < Module::CoreList->find_modules($re) );
+	    my @mod = Module::CoreList->find_modules($re);
 	    if ((nelems @mod)) {
-		module_version($_, $ver) for < @mod;
+		module_version($_, $ver) for  @mod;
 	    } else {
 		$ver ^|^= '';
 		print "\n$mod $ver has no match in CORE (or so I think)\n";

@@ -101,7 +101,7 @@ sub walk_table (&@) {
 	    @args = @( $_ );
 	}
 	else {
-	    @args = @( split m/\s*\|\s*/, $_ );
+	    @args = split m/\s*\|\s*/, $_;
 	}
 	my @outs = @( $function->(< @args) );
 	print $F < @outs;
@@ -191,7 +191,7 @@ sub write_protos {
 	}
 	if ((nelems @args)) {
 	    my $n;
-	    for my $arg ( < @args ) {
+	    for my $arg (  @args ) {
 		++$n;
 		if ( $arg =~ m/\*/ && $arg !~ m/\b(NN|NULLOK)\b/ ) {
 		    warn "$func: $arg needs NN or NULLOK\n";
@@ -219,7 +219,7 @@ sub write_protos {
 		    push @names_of_nn, $1;
 		}
 	    }
-	    $ret .= join ", ", < @args;
+	    $ret .= join ", ", @args;
 	}
 	else {
 	    $ret .= "void" if !$has_context;
@@ -249,18 +249,18 @@ sub write_protos {
 				$prefix, $pat, $prefix, $args;
 	}
 	if ( (nelems @nonnull) ) {
-	    my @pos = @( map { $has_context ? "pTHX_$_" : $_ } < @nonnull );
-	    push @attrs, map { sprintf( "__attribute__nonnull__(\%s)", $_ ) } < @pos;
+	    my @pos = map { $has_context ? "pTHX_$_" : $_ } @nonnull;
+	    push @attrs, < map { sprintf( "__attribute__nonnull__(\%s)", $_ ) } @pos;
 	}
 	if ( (nelems @attrs) ) {
 	    $ret .= "\n";
-	    $ret .= join( "\n", map { "\t\t\t$_" } < @attrs );
+	    $ret .= join( "\n", map { "\t\t\t$_" } @attrs );
 	}
 	$ret .= ";";
 	$ret = "/* $ret */" if $commented_out;
 	if ((nelems @names_of_nn)) {
 	    $ret .= "\n#define PERL_ARGS_ASSERT_\U$plain_func\E\t\\\n\t"
-		. join '; ', map "assert($_)", < @names_of_nn;
+		. join '; ', map "assert($_)", @names_of_nn;
 	}
 	$ret .= (nelems @attrs) ? "\n\n" : "\n";
     }
@@ -297,7 +297,7 @@ walk_table(\&write_global_sym, "global.sym", undef, "# ex: set ro:\n");
 #       warnhook
 #       hints
 #       copline
-my @extvars = @( qw(sv_undef sv_yes sv_no na dowarn
+my @extvars = qw(sv_undef sv_yes sv_no na dowarn
 		 curcop compiling
 		 tainting tainted stack_base stack_sp sv_arenaroot
 		 no_modify
@@ -312,7 +312,7 @@ my @extvars = @( qw(sv_undef sv_yes sv_no na dowarn
 		 dirty
 		 perl_destruct_level
 		 ppaddr
-                ) );
+                );
 
 sub readsyms (\%$) {
     my ($syms, $file) = < @_;
@@ -470,7 +470,7 @@ print $em <<'END';
 
 END
 
-my @az = @('a'..'z');
+my @az ='a'..'z';
 
 $ifdef_state = '';
 walk_table {
@@ -722,7 +722,7 @@ print $em <<'END';
 
 END
 
-for $sym (sort < @extvars) {
+for $sym (sort @extvars) {
     print $em hide($sym,"PL_$sym");
 }
 
@@ -948,7 +948,7 @@ rename_if_different('perlapi.c-new', 'perlapi.c');
 # functions that take va_list* for implementing vararg functions
 # NOTE: makedef.pl must be updated if you add symbols to %vfuncs
 # XXX %vfuncs currently unused
-my %vfuncs = %( qw(
+my %vfuncs = %( < qw(
     Perl_croak			Perl_vcroak
     Perl_warn			Perl_vwarn
     Perl_warner			Perl_vwarner

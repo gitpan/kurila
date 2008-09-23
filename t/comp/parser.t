@@ -4,7 +4,7 @@
 # (including weird syntax errors)
 
 BEGIN { require "./test.pl"; }
-plan( tests => 84 );
+plan( tests => 83 );
 
 eval '%@x=0;';
 like( $@->{description}, qr/^Can't coerce HASH to string in repeat/, '%@x=0' );
@@ -31,15 +31,15 @@ like( $@->{description}, qr/^Can't modify constant item in list assignment/,
     'bareword in list assignment' );
 
 eval 'tie FOO, "Foo";';
-like( $@->{description}, qr/^Can't modify constant item in tie /,
+like( $@->{description}, qr/^Can't modify constant item in tie/,
     'tying a bareword causes a segfault in 5.6.1' );
 
 eval 'undef foo';
-like( $@->{description}, qr/^Can't modify constant item in undef operator /,
+like( $@->{description}, qr/^Can't modify constant item in undef operator/,
     'undefing constant causes a segfault in 5.6.1 [ID 20010906.019]' );
 
 eval 'read(our $bla, FILE, 1);';
-like( $@->{description}, qr/^Can't modify constant item in read /,
+like( $@->{description}, qr/^Can't modify constant item in read/,
     'read($var, FILE, 1) segfaults on 5.6.1 [ID 20011025.054]' );
 
 # This used to dump core (bug #17920)
@@ -77,7 +77,7 @@ is( $@, '', 'PL_lex_brackstack' );
     is("{$a}\{", "A\{", "interpolation, qq//");
     is("{$a}[", "A[", "interpolation, qq//");
     my @b=@("B");
-    is("{join ' ', < @b}\{", "B\{", "interpolation, qq//");
+    is("{join ' ', @b}\{", "B\{", "interpolation, qq//");
     is(''.qr/$a(?:)\{/, '(?-uxism:A(?:)\{)', "interpolation, qr//");
     my $c = "A\{";
     $c =~ m/$a(?:){/p;
@@ -87,7 +87,7 @@ is( $@, '', 'PL_lex_brackstack' );
     $c =~ s/foo/{$a}\{/;
     is($c, 'A{', "interpolation, s//.../");
     is(<<"{$a}{", "A\{ A[ B\{\n", "interpolation, here doc");
-{$a}\{ {$a}[ {join ' ', < @b}\{
+{$a}\{ {$a}[ {join ' ', @b}\{
 {$a}{
 }
 
@@ -192,9 +192,6 @@ is($@, "", 'BEGIN 1' );
 
 eval q[ BEGIN { my $x; $x = 1 } ] for 1..10;
 is($@, "", 'BEGIN 2' );
-
-eval q[ BEGIN { \&foo1 } ] for 1..10;
-is($@, "", 'BEGIN 3' );
 
 eval q[ sub foo2 { } ] for 1..10;
 is($@, "", 'BEGIN 4' );

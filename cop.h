@@ -138,14 +138,11 @@ struct cop {
     BASEOP
     /* On LP64 putting this here takes advantage of the fact that BASEOP isn't
        an exact multiple of 8 bytes to save structure padding.  */
-    line_t      cop_line;       /* line # of this command */
     char *	cop_label;	/* label for this construct */
 #ifdef USE_ITHREADS
     char *	cop_stashpv;	/* package line was compiled in */
-    char *	cop_file;	/* file name the following line # is from */
 #else
     HV *	cop_stash;	/* package line was compiled in */
-    GV *	cop_filegv;	/* file the following line # is from */
 #endif
     U32		cop_hints;	/* hints bits from pragmata */
     U32		cop_seq;	/* parse sequence number */
@@ -157,28 +154,7 @@ struct cop {
 };
 
 #ifdef USE_ITHREADS
-#  define CopFILE(c)		((c)->cop_file)
-#  define CopFILEGV(c)		(CopFILE(c) \
-				 ? gv_fetchfile(CopFILE(c)) : NULL)
 				 
-#  ifdef NETWARE
-#    define CopFILE_set(c,pv)	((c)->cop_file = savepv(pv))
-#    define CopFILE_setn(c,pv,l)  ((c)->cop_file = savepv((pv),(l)))
-#  else
-#    define CopFILE_set(c,pv)	((c)->cop_file = savesharedpv(pv))
-#    define CopFILE_setn(c,pv,l)  ((c)->cop_file = savesharedpvn((pv),(l)))
-#  endif
-
-#  define CopFILESV(c)		(CopFILE(c) \
-				 ? GvSV(gv_fetchfile(CopFILE(c))) : NULL)
-#  define CopFILEAV(c)		(CopFILE(c) \
-				 ? GvAV(gv_fetchfile(CopFILE(c))) : NULL)
-#  ifdef DEBUGGING
-#    define CopFILEAVx(c)	(assert(CopFILE(c)), \
-				   GvAV(gv_fetchfile(CopFILE(c))))
-#  else
-#    define CopFILEAVx(c)	(GvAV(gv_fetchfile(CopFILE(c))))
-#  endif
 #  define CopSTASHPV(c)		((c)->cop_stashpv)
 
 #  ifdef NETWARE
@@ -204,19 +180,6 @@ struct cop {
 #    define CopLABEL_alloc(pv)	((pv)?savesharedpv(pv):NULL)
 #  endif
 #else
-#  define CopFILEGV(c)		((c)->cop_filegv)
-#  define CopFILEGV_set(c,gv)	((c)->cop_filegv = (GV*)SvREFCNT_inc(gv))
-#  define CopFILE_set(c,pv)	CopFILEGV_set((c), gv_fetchfile(pv))
-#  define CopFILE_setn(c,pv,l)	CopFILEGV_set((c), gv_fetchfile_flags((pv),(l),0))
-#  define CopFILESV(c)		(CopFILEGV(c) ? GvSV(CopFILEGV(c)) : NULL)
-#  define CopFILEAV(c)		(CopFILEGV(c) ? GvAV(CopFILEGV(c)) : NULL)
-#  ifdef DEBUGGING
-#    define CopFILEAVx(c)	(assert(CopFILEGV(c)), GvAV(CopFILEGV(c)))
-#  else
-#    define CopFILEAVx(c)	(GvAV(CopFILEGV(c)))
-# endif
-#  define CopFILE(c)		(CopFILEGV(c) && GvSV(CopFILEGV(c)) \
-				    ? SvPVX_const(GvSV(CopFILEGV(c))) : NULL)
 #  define CopSTASH(c)		((c)->cop_stash)
 #  define CopLABEL(c)		((c)->cop_label)
 #  define CopSTASH_set(c,hv)	((c)->cop_stash = (hv))
@@ -233,17 +196,6 @@ struct cop {
 #endif /* USE_ITHREADS */
 
 #define CopSTASH_ne(c,hv)	(!CopSTASH_eq(c,hv))
-#define CopLINE(c)		((c)->cop_line)
-#define CopLINE_inc(c)		(++CopLINE(c))
-#define CopLINE_dec(c)		(--CopLINE(c))
-#define CopLINE_set(c,l)	(CopLINE(c) = (l))
-
-/* OutCopFILE() is CopFILE for output (caller, die, warn, etc.) */
-#ifdef MACOS_TRADITIONAL
-#  define OutCopFILE(c) MacPerl_MPWFileName(CopFILE(c))
-#else
-#  define OutCopFILE(c) CopFILE(c)
-#endif
 
 /* FIXME NATIVE_HINTS if this is changed from op_private (see perl.h)  */
 #define CopHINTS_get(c)		((c)->cop_hints + 0)
@@ -475,6 +427,7 @@ struct block {
     U16		blku_u16;	/* used by block_sub and block_eval (so far) */
     I32		blku_oldsp;	/* stack pointer to copy stuff down to */
     COP *	blku_oldcop;	/* old curcop pointer */
+    OP *	blku_oldop;	/* old op pointer */
     I32		blku_oldmarksp;	/* mark stack index */
     I32		blku_oldscopesp;	/* scope stack index */
     PMOP *	blku_oldpm;	/* values of pattern match vars */
@@ -487,6 +440,7 @@ struct block {
 };
 #define blk_oldsp	cx_u.cx_blk.blku_oldsp
 #define blk_oldcop	cx_u.cx_blk.blku_oldcop
+#define blk_oldop	cx_u.cx_blk.blku_oldop
 #define blk_oldmarksp	cx_u.cx_blk.blku_oldmarksp
 #define blk_oldscopesp	cx_u.cx_blk.blku_oldscopesp
 #define blk_oldpm	cx_u.cx_blk.blku_oldpm
@@ -501,12 +455,13 @@ struct block {
 	cx->cx_type		= t,					\
 	cx->blk_oldsp		= sp - PL_stack_base,			\
 	cx->blk_oldcop		= PL_curcop,				\
+	cx->blk_oldop		= PL_op,				\
 	cx->blk_oldmarksp	= PL_markstack_ptr - PL_markstack,	\
 	cx->blk_oldscopesp	= PL_scopestack_ix,			\
 	cx->blk_oldpm		= PL_curpm,				\
 	cx->blk_gimme		= (U8)gimme;				\
-	DEBUG_l( PerlIO_printf(Perl_debug_log, "Entering block %ld, type %s, gimme %d\n",	\
-			       (long)cxstack_ix, PL_block_type[CxTYPE(cx)], gimme); )
+	DEBUG_l( PerlIO_printf(Perl_debug_log, "Entering block %ld, type %s\n",	\
+			       (long)cxstack_ix, PL_block_type[CxTYPE(cx)]); )
 
 /* Exit a block (RETURN and LAST). */
 #define POPBLOCK(cx,pm) cx = &cxstack[cxstack_ix--],			\
@@ -517,8 +472,8 @@ struct block {
 	pm		 = cx->blk_oldpm,				\
 	gimme		 = cx->blk_gimme;				\
 	DEBUG_SCOPE("POPBLOCK");					\
-	DEBUG_l( PerlIO_printf(Perl_debug_log, "Leaving block %ld, type %s, gimme %d\n",		\
-			       (long)cxstack_ix+1,PL_block_type[CxTYPE(cx)], gimme); )
+	DEBUG_l( PerlIO_printf(Perl_debug_log, "Leaving block %ld, type %s\n",		\
+			       (long)cxstack_ix+1,PL_block_type[CxTYPE(cx)]); )
 
 /* Continue a block elsewhere (NEXT and REDO). */
 #define TOPBLOCK(cx) cx  = &cxstack[cxstack_ix],			\

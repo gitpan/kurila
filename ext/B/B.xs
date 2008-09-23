@@ -257,7 +257,6 @@ BOOT:
 #define B_unitcheck_av()	PL_unitcheckav_save
 #define B_begin_av()	PL_beginav_save
 #define B_end_av()	PL_endav
-#define B_amagic_generation()	PL_amagic_generation
 #define B_sub_generation()	PL_sub_generation
 #define B_defstash()	PL_defstash
 #define B_curstash()	PL_curstash
@@ -297,9 +296,6 @@ B_regex_padav()
 
 B::CV
 B_main_cv()
-
-long 
-B_amagic_generation()
 
 long
 B_sub_generation()
@@ -843,18 +839,6 @@ U32
 GvCVGEN(gv)
 	B::GV	gv
 
-U32
-GvLINE(gv)
-	B::GV	gv
-
-char *
-GvFILE(gv)
-	B::GV	gv
-
-B::GV
-GvFILEGV(gv)
-	B::GV	gv
-
 MODULE = B	PACKAGE = B::GV
 
 U32
@@ -945,10 +929,6 @@ CvCONST(cv)
 
 B::GV
 CvGV(cv)
-	B::CV	cv
-
-char *
-CvFILE(cv)
 	B::CV	cv
 
 long

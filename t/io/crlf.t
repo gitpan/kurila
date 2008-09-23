@@ -50,7 +50,7 @@ if ('PerlIO::Layer'->find( 'perlio')) {
     # Try also pushing :utf8 first so that there are other layers
     # in between (this should not matter: CRLF layers still should
     # not accumulate).
-    for my $utf8 ('', ':utf8') {
+    for my $utf8 (@('', ':utf8')) {
 	for my $binmode (1..2) {
 	    open(FOO, ">", "$file");
 	    # require PerlIO; print PerlIO::get_layers(FOO), "\n";
@@ -62,7 +62,7 @@ if ('PerlIO::Layer'->find( 'perlio')) {
 	    binmode(FOO);
 	    my $foo = scalar ~< *FOO;
 	    close FOO;
-	    print join(" ", "#", map { sprintf('%02x', $_) } unpack("C*", $foo)),
+	    print join(" ", @( "#", < map { sprintf('%02x', $_) } @( unpack("C*", $foo)))),
 	    "\n";
 	    ok($foo =~ m/\x0d\x0a$/);
 	    ok($foo !~ m/\x0d\x0d/);

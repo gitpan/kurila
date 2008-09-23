@@ -44,7 +44,7 @@ BEGIN {
     my $self = $0;
     unless (-f $self) {
         my ($vol, $dirs, $file) = < File::Spec->splitpath($self);
-        my @dirs = @( < File::Spec->splitdir($dirs) );
+        my @dirs = File::Spec->splitdir($dirs);
         unshift(@dirs, File::Spec->updir);
         $dirs = File::Spec->catdir(< @dirs);
         $self = File::Spec->catpath($vol, $dirs, $file);
@@ -80,20 +80,20 @@ BEGIN {
     # Just checking modify time stamp, access time stamp is set
     # to the beginning of the day in Win95.
     # There's a small chance of a 1 second flutter here.
-    my $stamp = (stat(@ARGV[0]))[[9]];
+    my $stamp = @(stat(@ARGV[0]))[9];
     cmp_ok( abs($now - $stamp), '+<=', 1, 'checking modify time stamp' ) ||
       diag "mtime == $stamp, should be $now";
 
-    @ARGV = @( qw(newfile) );
+    @ARGV = qw(newfile);
     touch();
 
-    my $new_stamp = (stat('newfile'))[[9]];
+    my $new_stamp = @(stat('newfile'))[9];
     cmp_ok( abs($new_stamp - $stamp), '+>=', 2,  'newer file created' );
 
     @ARGV = @('newfile', $Testfile);
     eqtime();
 
-    $stamp = (stat($Testfile))[[9]];
+    $stamp = @(stat($Testfile))[9];
     cmp_ok( abs($new_stamp - $stamp), '+<=', 1, 'eqtime' );
 
     # eqtime use to clear the contents of the file being equalized!
@@ -117,31 +117,31 @@ BEGIN {
         @ARGV = @( '0100', $Testfile );
         ExtUtils::Command::chmod();
 
-        is( ((stat($Testfile))[[2]] ^&^ 07777) ^&^ 0700,
+        is( (@(stat($Testfile))[2] ^&^ 07777) ^&^ 0700,
             0100, 'change a file to execute-only' );
 
         # change a file to read-only
         @ARGV = @( '0400', $Testfile );
         ExtUtils::Command::chmod();
 
-        is( ((stat($Testfile))[[2]] ^&^ 07777) ^&^ 0700,
+        is( (@(stat($Testfile))[2] ^&^ 07777) ^&^ 0700,
             ($^O eq 'vos' ? 0500 : 0400), 'change a file to read-only' );
 
         # change a file to write-only
         @ARGV = @( '0200', $Testfile );
         ExtUtils::Command::chmod();
 
-        is( ((stat($Testfile))[[2]] ^&^ 07777) ^&^ 0700,
+        is( (@(stat($Testfile))[2] ^&^ 07777) ^&^ 0700,
             ($^O eq 'vos' ? 0700 : 0200), 'change a file to write-only' );
     }
 
     # change a file to read-write
     @ARGV = @( '0600', $Testfile );
-    my @orig_argv = @( < @ARGV );
+    my @orig_argv = @ARGV;
     ExtUtils::Command::chmod();
     is_deeply( \@ARGV, \@orig_argv, 'chmod preserves @ARGV' );
 
-    is( ((stat($Testfile))[[2]] ^&^ 07777) ^&^ 0700,
+    is( (@(stat($Testfile))[2] ^&^ 07777) ^&^ 0700,
         ($^O eq 'vos' ? 0700 : 0600), 'change a file to read-write' );
 
 
@@ -161,21 +161,21 @@ BEGIN {
         @ARGV = @( '0100', 'testdir' );
         ExtUtils::Command::chmod();
 
-        is( ((stat('testdir'))[[2]] ^&^ 07777) ^&^ 0700,
+        is( (@(stat('testdir'))[2] ^&^ 07777) ^&^ 0700,
             0100, 'change a dir to execute-only' );
 
         # change a dir to read-only
         @ARGV = @( '0400', 'testdir' );
         ExtUtils::Command::chmod();
 
-        is( ((stat('testdir'))[[2]] ^&^ 07777) ^&^ 0700,
+        is( (@(stat('testdir'))[2] ^&^ 07777) ^&^ 0700,
             ($^O eq 'vos' ? 0500 : 0400), 'change a dir to read-only' );
 
         # change a dir to write-only
         @ARGV = @( '0200', 'testdir' );
         ExtUtils::Command::chmod();
 
-        is( ((stat('testdir'))[[2]] ^&^ 07777) ^&^ 0700,
+        is( (@(stat('testdir'))[2] ^&^ 07777) ^&^ 0700,
             ($^O eq 'vos' ? 0700 : 0200), 'change a dir to write-only' );
 
         @ARGV = @('testdir');
@@ -198,7 +198,7 @@ BEGIN {
     @ARGV = @( $test_dir );
     # copy a file to a nested subdirectory
     unshift @ARGV, $Testfile;
-    @orig_argv = @( < @ARGV );
+    @orig_argv = @ARGV;
     cp();
     is_deeply( \@ARGV, \@orig_argv, 'cp preserves @ARGV' );
 
@@ -212,7 +212,7 @@ BEGIN {
 
     # move a file to a subdirectory
     @ARGV = @( $Testfile, 'ecmddir' );
-    @orig_argv = @( < @ARGV );
+    @orig_argv = @ARGV;
     ok( mv() );
     is_deeply( \@ARGV, \@orig_argv, 'mv preserves @ARGV' );
 
@@ -254,7 +254,7 @@ BEGIN {
     File::Spec->catfile( 'ecmddir', 'temp2', $Testfile ) ) );
     rm_f();
 
-    ok( ! -e $_, "removed $_ successfully" ) for (< @ARGV);
+    ok( ! -e $_, "removed $_ successfully" ) for @( (< @ARGV));
 
     # rm_f dir
     @ARGV = @( my $dir = File::Spec->catfile( 'ecmddir' ) );
@@ -280,13 +280,13 @@ BEGIN {
     ExtUtils::Command::dos2unix();
 
     open(FILE, "<", 'd2utest/foo');
-    is( join('', ~< *FILE), "stuff\012and thing\012", 'dos2unix' );
+    is( join('', @( ~< *FILE)), "stuff\012and thing\012", 'dos2unix' );
     close FILE;
 
     open(FILE, "<", 'd2utest/bar');
     binmode(FILE);
     ok( -B 'd2utest/bar' );
-    is( join('', ~< *FILE), $bin, 'dos2unix preserves binaries');
+    is( join('', @( ~< *FILE)), $bin, 'dos2unix preserves binaries');
     close FILE;
 }
 

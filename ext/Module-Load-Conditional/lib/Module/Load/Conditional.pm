@@ -3,26 +3,26 @@ package Module::Load::Conditional;
 use strict;
 
 use Module::Load;
-use Params::Check                       qw[check];
+use Params::Check <                       qw[check];
 use Locale::Maketext::Simple Style  => 'gettext';
 
 use Carp        ();
 use File::Spec  ();
 use FileHandle  ();
-use version     qw[qv];
+use version <     qw[qv];
 
 use constant ON_VMS  => $^O eq 'VMS';
 
 BEGIN {
-    use vars        qw[ $VERSION @ISA $VERBOSE $CACHE @EXPORT_OK 
+    use vars <        qw[ $VERSION @ISA $VERBOSE $CACHE @EXPORT_OK 
                         $FIND_VERSION $ERROR $CHECK_INC_HASH];
     use Exporter;
-    @ISA            = @( qw[Exporter] );
+    @ISA            = qw[Exporter];
     $VERSION        = '0.22';
     $VERBOSE        = 0;
     $FIND_VERSION   = 1;
     $CHECK_INC_HASH = 0;
-    @EXPORT_OK      = @( qw[check_install can_load requires] );
+    @EXPORT_OK      = qw[check_install can_load requires];
 }
 
 =pod
@@ -158,8 +158,8 @@ sub check_install {
         return;
     }
 
-    my $file     = File::Spec->catfile( split m/::/, $args->{module} ) . '.pm';
-    my $file_inc = File::Spec::Unix->catfile( 
+    my $file     = File::Spec->catfile( < split m/::/, $args->{module} ) . '.pm';
+    my $file_inc = File::Spec::Unix->catfile( < 
                         split m/::/, $args->{module} 
                     ) . '.pm';
 
@@ -188,7 +188,7 @@ sub check_install {
     ### so scan the dirs
     unless( $filename ) {
 
-        DIR: for my $dir ( < @INC ) {
+        DIR: for my $dir (  @INC ) {
     
             my $fh;
     
@@ -200,7 +200,7 @@ sub check_install {
                     ($fh) = $dir->($dir, $file);
     
                 } elsif (UNIVERSAL::isa($dir, 'ARRAY')) {
-                    ($fh) = $dir->[0]->($dir, $file, %{$dir}{[1..((nelems @{$dir})-1)]})
+                    ($fh) = $dir->[0]->($dir, $file, < %{$dir}{[1..((nelems @{$dir})-1)]})
     
                 } elsif (UNIVERSAL::can($dir, 'INC')) {
                     ($fh) = $dir->INC->($dir, $file);
@@ -281,7 +281,7 @@ sub check_install {
         ### ie ones containing _ as well. This addresses bug report
         ### #29348: Version compare logic doesn't handle alphas?
         $href->{uptodate} = 
-            qv( $args->{version} ) +<= qv( $href->{version} ) ? 1 : 0;
+            version->new( $args->{version} )->vcmp( $href->{version} ) +<= 0;
     }
 
     return $href;
@@ -338,7 +338,7 @@ sub _parse_version {
 
         print( $@ ? "Error: $@\n" : "Result: $rv\n" ) if $verbose;
 
-        return $rv;
+        return version->new($rv);
     }
     
     ### unable to find a version in this string
@@ -429,7 +429,7 @@ sub can_load {
             ### #29348: Version compare logic doesn't handle alphas?
             if (    !$args->{nocache}
                     && defined $CACHE->{$mod}->{usable}
-                    && (qv($CACHE->{$mod}->{version}||0) +>= qv($href->{$mod}))
+                    && (qv($CACHE->{$mod}->{version}||0)->vcmp(qv($href->{$mod})) +>= 0)
             ) {
                 $error = loc( q[Already tried to use '%1', which was unsuccessful], $mod);
                 last BLOCK;
@@ -453,7 +453,7 @@ sub can_load {
             push @load, $mod;
         }
 
-        for my $mod ( < @load ) {
+        for my $mod (  @load ) {
 
             if ( $CACHE->{$mod}->{uptodate} ) {
 
@@ -517,14 +517,13 @@ sub requires {
         return undef;
     }
 
-    my $lib = join " ", map { qq["-I$_"] } < @INC;
+    my $lib = join " ", map { qq["-I$_"] } @INC;
     my $cmd = qq[$^X $lib -M$who -e"print(join(qq[\\n],keys(\%INC)))"];
 
-    return @(  sort
-                grep { !m/^$who$/  }
-                map  { chomp; s|/|::|g; $_ }
-                grep { s|\.pm$||i; }
-            `$cmd`);
+    return  sort grep { !m/^$who$/  }
+ map  { chomp; s|/|::|g; $_ }
+ grep { s|\.pm$||i; }
+ @(            `$cmd`);
 }
 
 1;

@@ -21,15 +21,14 @@ if ($^O =~ m/os2/i) {
 
 # for dlsyms, overridden in tests
 BEGIN {
-	package ExtUtils::MM_OS2;
-	use subs 'system', 'unlink';
+    package ExtUtils::MM_OS2;
 }
 
 # for maybe_command
 use File::Spec;
 
 use_ok( 'ExtUtils::MM_OS2' );
-ok( grep( 'ExtUtils::MM_OS2',  < @MM::ISA), 
+ok( grep( 'ExtUtils::MM_OS2', @MM::ISA), 
 	'ExtUtils::MM_OS2 should be parent of MM' );
 
 # dlsyms
@@ -83,11 +82,13 @@ SKIP: {
 	my @sysfail = @( 1, 0, 1 );
 	my ($sysargs, $unlinked);
 
+	*ExtUtils::MM_OS2::system = 1;
 	*ExtUtils::MM_OS2::system = sub {
 		$sysargs = shift;
 		return shift @sysfail;
 	};
 
+	*ExtUtils::MM_OS2::unlink = 1;
 	*ExtUtils::MM_OS2::unlink = sub {
 		$unlinked++;
 	};

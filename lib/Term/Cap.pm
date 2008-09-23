@@ -16,8 +16,8 @@ sub croak
 
 use strict;
 
-use vars qw($VERSION $VMS_TERMCAP);
-use vars qw($termpat $state $first $entry);
+use vars < qw($VERSION $VMS_TERMCAP);
+use vars < qw($termpat $state $first $entry);
 
 $VERSION = '1.12';
 
@@ -107,7 +107,7 @@ output the string to $FH if specified.
 if ( $^O eq 'VMS' )
 {
     chomp( my @entry = @( ~< *DATA ) );
-    $VMS_TERMCAP = join '', < @entry;
+    $VMS_TERMCAP = join '', @entry;
 }
 
 # Returns a list of termcap files to check.
@@ -130,7 +130,7 @@ sub termcap_path
     {
 
         # Add the users $TERMPATH
-        push( @termcap_path, split( m/(:|\s+)/, %ENV{TERMPATH} ) );
+        push( @termcap_path, < split( m/(:|\s+)/, %ENV{TERMPATH} ) );
     }
     else
     {
@@ -142,7 +142,7 @@ sub termcap_path
     }
 
     # return the list of those termcaps that exist
-    return grep { defined $_ && -f $_ } < @termcap_path;
+    return grep { defined $_ && -f $_ } @termcap_path;
 }
 
 =item B<Tgetent>
@@ -683,12 +683,12 @@ sub Trequire
 {    ## public
     my $self = shift;
     my ( $cap, @undefined );
-    foreach $cap (< @_)
+    foreach $cap ( @_)
     {
         push( @undefined, $cap )
           unless defined $self->{ '_' . $cap } && $self->{ '_' . $cap };
     }
-    croak "Terminal does not support: ({join ' ', <@undefined})" if (nelems @undefined);
+    croak "Terminal does not support: ({join ' ',@undefined})" if (nelems @undefined);
 }
 
 =back

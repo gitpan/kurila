@@ -213,7 +213,7 @@ substr($txt, -1, undef, "X");
 is($txt, "FoX");
 
 # with lexicals (and in re-entered scopes)
-for (0,1) {
+for (@(0,1)) {
   my $txt;
   unless ($_) {
     $txt = "Foo";
@@ -449,8 +449,8 @@ is($x, "\x{100}\x{200}ab");
 { 
     my $s = "ab";
     my @r; 
-    @r[$_] = \ substr $s, $_, 1 for (0, 1);
-    is(join("", map { $$_ } < @r), "ab");
+    @r[$_] = \ substr $s, $_, 1 for @( (0, 1));
+    is(join("", map { $$_ } @r), "ab");
 }
 
 # [perl #24605]
@@ -464,7 +464,7 @@ is($x, "\x{100}\x{200}ab");
 {
     is(ref \substr($x,1,3), "SCALAR", "not an lvalue");
     my $x = "abcdef";
-    for (substr($x,1,3)) {
+    for (@(substr($x,1,3))) {
 	is($_, 'bcd');
 	$_ = 'XX';
 	is($_, 'XX');

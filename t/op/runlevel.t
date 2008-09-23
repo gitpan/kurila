@@ -9,16 +9,16 @@
 require './test.pl';
 
 undef $/;
-our @prgs = @( split "\n########\n", ~< *DATA );
+our @prgs = split "\n########\n", ~< *DATA;
 
 plan(tests => nelems @prgs);
 
-for (< @prgs){
+for ( @prgs){
     my $switch = "";
     if (s/^\s*(-\w+)//){
        $switch = $1;
     }
-    my($prog,$expected) = split(m/\nEXPECT\n/, $_);
+    my($prog,$expected) = < split(m/\nEXPECT\n/, $_);
 
     fresh_perl_is( $prog, $expected, \%( switch => $switch, stderr => 1, ) );
 }
@@ -26,10 +26,10 @@ for (< @prgs){
 __END__
 our @a = @(1, 2, 3);
 {
-  @a = @( sort { last ; } < @a );
+  @a = sort { last ; } @a;
 }
 EXPECT
-Can't "last" outside a loop block at - line 3.
+Can't "last" outside a loop block at - line 3 character 15.
 ########
 sub warnhook {
   print "WARNHOOK\n";
@@ -42,58 +42,38 @@ EXPECT
 WARNHOOK
 END
 ########
-package TEST;
- 
-use overload
-     "\"\""   =>  \&str
-;
- 
-sub str {
-  eval('die("test\n")');
-  return "STR";
-}
- 
-package main;
- 
-our $bar = bless \%(), 'TEST';
-print "$bar\n";
-print "OK\n";
-EXPECT
-STR
-OK
-########
 sub foo {
   goto bar if $a == 0 || $b == 0;
   $a <+> $b;
 }
 our @a = @(3, 2, 0, 1);
-@a = @( sort foo < @a );
-print join(', ', < @a)."\n";
+@a = sort foo @a;
+print join(', ', @a)."\n";
 exit;
 bar:
 print "bar reached\n";
 EXPECT
-Can't "goto" out of a pseudo block at - line 2.
-    main::foo called at - line 6.
+Can't "goto" out of a pseudo block at - line 2 character 3.
+    main::foo called at - line 6 character 6.
 ########
 our @a = @(3, 2, 1);
-@a = @( sort { eval('die("no way")') ;  $a <+> $b} < @a );
-print join(", ", < @a)."\n";
+@a = sort { eval('die("no way")') ;  $a <+> $b} @a;
+print join(", ", @a)."\n";
 EXPECT
 1, 2, 3
 ########
 our @a = @(1, 2, 3);
 foo:
 {
-  @a = @( sort { last foo; } < @a );
+  @a = sort { last foo; } @a;
 }
 EXPECT
-Label not found for "last foo" at - line 2.
+Label not found for "last foo" at - line 4 character 15.
 ########
 our @a = @(1, 2, 3);
 foo:
 {
-  @a = @( sort { exit(0) } < @a );
+  @a = sort { exit(0) } @a;
 }
 END { print "foobar\n" }
 EXPECT
@@ -101,7 +81,7 @@ foobar
 ########
 package TH;
 sub TIEHASH { bless \%(), 'TH' }
-sub STORE { try { print "{ join ' ', @_[[1,2]]}\n" }; die "bar\n" }
+sub STORE { try { print "{ join ' ', @_[[1..2]]}\n" }; die "bar\n" }
 tie our %h, 'TH';
 try { %h{A} = 1; print "never\n"; };
 print $@->{description};
@@ -122,7 +102,7 @@ sub d {
     my $i = 0; my @a;
     while (do { { package DB; @a = @( caller($i++) ) } } ) {
         @a = @DB::args;
-        for (<@a) { print "$_\n"; $_ = '' }
+        for (@a) { print "$_\n"; $_ = '' }
     }
 }
 EXPECT

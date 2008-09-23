@@ -2,10 +2,7 @@ use strict;
 use Test::More 'no_plan';
 
 ### use && import ###
-BEGIN {
-    use_ok( 'Params::Check' );
-    Params::Check->import(qw|check last_error allow|);
-}    
+use Params::Check < qw|check last_error allow|;
 
 ### verbose is good for debugging ###
 $Params::Check::VERBOSE = $Params::Check::VERBOSE = @ARGV[0] ? 1 : 0;
@@ -34,7 +31,7 @@ use constant TRUE   => sub { 1 };
     }        
 
     ### check if the subs for allow get what you expect ###
-    for my $thing (1,'foo',\@(1)) {
+    for my $thing (@(1,'foo',\@(1))) {
         allow( $thing, 
            sub { is_deeply(+shift,$thing,  "Allow coderef gets proper args") } 
         );
@@ -82,7 +79,7 @@ use constant TRUE   => sub { 1 };
 ### preserve case tests ###
 {   my $tmpl = \%( Foo => \%( default => 1 ) );
     
-    for (1,0) {
+    for (@(1,0)) {
         local $Params::Check::PRESERVE_CASE = $_;
         
         my $expect = $_ ? \%( Foo => 42 ) : \%( Foo => 1 );
@@ -122,7 +119,7 @@ use constant TRUE   => sub { 1 };
     );
 
     ### with/without store duplicates ###
-    for( 1, 0 ) {
+    for(@( 1, 0) ) {
         local   $Params::Check::NO_DUPLICATES = $_;
         
         my $expect = $_ ? undef : 42;
@@ -154,7 +151,7 @@ use constant TRUE   => sub { 1 };
     );
 
     ### check for strict_type global, and in the template key ###
-    for my $aref (< @list) {
+    for my $aref ( @list) {
 
         my $tmpl = \%( foo => $aref->[0] );
         local   $Params::Check::STRICT_TYPE = $aref->[1];
@@ -201,7 +198,7 @@ use constant TRUE   => sub { 1 };
     );
 
     ### check for strict_type global, and in the template key ###
-    for my $aref (< @list) {
+    for my $aref ( @list) {
 
         my $tmpl = \%( foo => $aref->[0] );
         local   $Params::Check::ONLY_ALLOW_DEFINED = $aref->[1];
@@ -223,7 +220,7 @@ use constant TRUE   => sub { 1 };
 
 ### check + allow tests ###
 {   ### check if the subs for allow get what you expect ###
-    for my $thing (1,'foo',\@(1)) {
+    for my $thing (@(1,'foo',\@(1))) {
         my $tmpl = \%(
             foo => \%( allow =>
                     sub { is_deeply(+shift,$thing,  
@@ -239,7 +236,7 @@ use constant TRUE   => sub { 1 };
 ### invalid key tests 
 {   my $tmpl = \%( foo => \%( allow => sub { 0 } ) );
     
-    for my $val ( 1, 'foo', \@(), bless(\%(),__PACKAGE__) ) {
+    for my $val (@( 1, 'foo', \@(), bless(\%(),__PACKAGE__)) ) {
         my $rv      = check( $tmpl, \%( foo => $val ) );
         my $text    = "Key 'foo' ({dump::view($val)}) is of invalid type";
         my $re      = quotemeta $text;
@@ -316,7 +313,7 @@ use constant TRUE   => sub { 1 };
         gender      => 'M',
         married     => 1,
         age         => 21,
-        id_list     => \@(1..3),
+        id_list     => \(1..3),
         phone       => '555-8844',
     );
 
@@ -356,7 +353,7 @@ use constant TRUE   => sub { 1 };
     my $clear   = sub { check( \%(), \%() ) if shift; 1; };
 
     ### recursively call check() or not?
-    for my $recurse ( 0, 1 ) {         
+    for my $recurse (@( 0, 1) ) {         
   
         check(  
             \%( a => \%( defined => 1 ),

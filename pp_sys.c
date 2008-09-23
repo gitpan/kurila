@@ -366,7 +366,6 @@ PP(pp_glob)
     dVAR;
     OP *result;
     GV* gv;
-    tryAMAGICunTARGET(iter, -1);
 
     /* Note that we only ever get here if File::Glob fails to load
      * without at the same time croaking, for some reason, or if
@@ -416,8 +415,12 @@ PP(pp_warn)
     if (SP - MARK >= 1) {
 	ENTER;
 	PUSHMARK(MARK);
+	XPUSHs(PL_op->op_location);
+	PUTBACK;
 	call_sv(PL_errorcreatehook, G_SCALAR);
+	SPAGAIN;
 	tmpsv = POPs;
+	PUTBACK;
 	LEAVE;
     }
     else {
@@ -432,6 +435,7 @@ PP(pp_warn)
 	ENTER;
 	PUSHMARK(SP);
 	XPUSHs(sv_2mortal(newSVpvs("Warning: something's wrong")));
+	XPUSHs(PL_op->op_location);
 	PUTBACK;
 	call_sv(PL_errorcreatehook, G_SCALAR);
 	SPAGAIN;
@@ -455,20 +459,33 @@ PP(pp_die)
     if (SP - MARK >= 1) {
 	ENTER;
 	PUSHMARK(MARK);
+	XPUSHs(PL_op->op_location);
+	PUTBACK;
 	call_sv(PL_errorcreatehook, G_SCALAR);
+	SPAGAIN;
 	tmpsv = POPs;
+	PUTBACK;
 	LEAVE;
     }
     else {
 	SV * const error = ERRSV;
 	if (sv_isobject(error)) {
 	    tmpsv = error;
+	    SV** desc = hv_fetchs( (HV*)SvRV(tmpsv), "notes", TRUE );
+	    if (desc) {
+		if ( ! SvPOK(*desc) )
+		    sv_setpvn(*desc, "", 0);
+		sv_catpv( *desc, "reraised at " );
+		sv_catpv( *desc, SvPV_nolen_const( loc_desc( PL_op->op_location ) ) );
+		sv_catpv( *desc, "\n" );
+	    }
 	}
     }
     if ( ! tmpsv ) {
 	ENTER;
 	PUSHMARK(SP);
 	XPUSHs(newSVpvs_flags("Died", SVs_TEMP));
+	XPUSHs(PL_op->op_location);
 	PUTBACK;
 	call_sv(PL_errorcreatehook, G_SCALAR);
 	SPAGAIN;
@@ -605,7 +622,6 @@ PP(pp_fileno)
     GV *gv;
     IO *io;
     PerlIO *fp;
-    MAGIC  *mg;
 
     if (MAXARG < 1)
 	RETPUSHUNDEF;
@@ -1370,7 +1386,7 @@ PP(pp_send)
 
 	if (IN_CODEPOINTS) {
 		/* The SV really is UTF-8.  */
-		if (SvGMAGICAL(bufsv) || SvAMAGIC(bufsv)) {
+		if (SvGMAGICAL(bufsv)) {
 		    /* Don't call sv_len_utf8 again because it will call magic
 		       or overloading a second time, and we might get back a
 		       different result.  */
@@ -1415,7 +1431,7 @@ PP(pp_send)
 	    length = blen_chars - offset;
 	if (IN_CODEPOINTS) {
 	    /* Here we convert length from characters to bytes.  */
-	    if (SvGMAGICAL(bufsv) || SvAMAGIC(bufsv)) {
+	    if (SvGMAGICAL(bufsv)) {
 		/* Either we had to convert the SV, or the SV is magical, or
 		   the SV has overloading, in which case we can't or mustn't
 		   or mustn't call it again.  */
@@ -1534,7 +1550,6 @@ PP(pp_tell)
 {
     dVAR; dSP; dTARGET;
     GV *gv;
-    IO *io;
 
     if (MAXARG == 0)
 	Perl_croak(aTHX_ "tell called without handle");
@@ -1559,7 +1574,6 @@ PP(pp_sysseek)
 #endif
 
     GV * const gv = (GV*)POPs;
-    IO *io;
 
     if (PL_op->op_type == OP_SEEK)
 	PUSHs(boolSV(do_seek(gv, offset, whence)));

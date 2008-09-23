@@ -11,16 +11,16 @@ BEGIN {
   else { *DEBUG = sub () {0}; }
 }
 
-foreach my $class (
+foreach my $class (@(
   'Pod::Simple::TranscodeSmart',
   'Pod::Simple::TranscodeDumb',
-  '',
+  '',)
 ) {
   $class or die "Couldn't load any encoding classes";
   DEBUG and print "About to try loading $class...\n";
   eval "require $class;";
   if($@) {
-    DEBUG and print "Couldn't load $class: $@\n";
+    DEBUG and print "Couldn't load $class: {$@->message}\n";
   } else {
     DEBUG and print "OK, loaded $class.\n";
     @ISA = @($class);

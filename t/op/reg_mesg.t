@@ -110,7 +110,7 @@ my $total = ((nelems @death) + nelems @warning)/2;
 # utf8 is a noop on EBCDIC platforms, it is not fatal
 my $Is_EBCDIC = (ord('A') == 193);
 if ($Is_EBCDIC) {
-    my @utf8_death = @( grep(m/utf8/, < @death) ); 
+    my @utf8_death = grep(m/utf8/, @death); 
     $total = $total - nelems @utf8_death;
 }
 
@@ -136,7 +136,7 @@ while ((nelems @death))
     $result =~ s/{\#}/$marker2/;
     $result .= " at ";
     if ($@->message !~ m/^\Q$result/) {
-	print "# For $regex, expected:\n#  $result\n# Got:\n#  $@\n#\nnot ";
+	print "# For $regex, expected:\n#  $result\n# Got:\n#  {$@ && $@->message}\n#\nnot ";
     }
     print "ok $count - $regex\n";
 }
@@ -175,7 +175,7 @@ while ((nelems @warning))
 # For $regex, expected:
 #   $result
 # Got:
-#   $warning
+#   {$warning->message}
 #
 not ok $count
 EOM

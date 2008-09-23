@@ -239,7 +239,7 @@ sub make_type_tab {
 	next unless m/^%(token|type)/;
 	s/^%(token|type)\s+<(\w+)>\s+//
 	    or die "$y_file: unparseable token/type line: $_";
-	%tokens{$_} = $2 for (split ' ', $_);
+	%tokens{$_} = $2 for @( ( <split ' ', $_));
 	%types{$2} = 1;
     }
     die "$y_file: no __DEFAULT__ token defined\n" unless $default_token;
@@ -273,13 +273,13 @@ sub make_type_tab {
 sub my_system {
     system(< @_);
     if ($? == -1) {
-	die "failed to execute command '{join ' ', <@_}': $!\n";
+	die "failed to execute command '{join ' ',@_}': $!\n";
     }
     elsif ($? ^&^ 127) {
-	die sprintf "command '{join ' ', <@_}' died with signal \%d\n",
+	die sprintf "command '{join ' ',@_}' died with signal \%d\n",
 	    ($? ^&^ 127);
     }
     elsif ($? >> 8) {
-	die sprintf "command '{join ' ', <@_}' exited with value \%d\n", $? >> 8;
+	die sprintf "command '{join ' ',@_}' exited with value \%d\n", $? >> 8;
     }
 }

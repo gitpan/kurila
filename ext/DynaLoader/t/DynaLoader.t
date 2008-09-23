@@ -27,7 +27,7 @@ BEGIN {
     'Fcntl'      => q| ::is( ref Fcntl->can('O_BINARY'),'CODE' ) |,
 );
 
-plan tests => 22 + nelems(@(keys(%modules))) * 3;
+plan tests => 22 + nelems(keys(%modules)) * 3;
 
 # Try to load the module
 use_ok( 'DynaLoader' );
@@ -87,7 +87,7 @@ ok( defined $dlerr, "dl_error() returning an error message: '$dlerr'" );
 # ... dl_findfile()
 SKIP: {
     my @files = @( () );
-    try { @files = @( < DynaLoader::dl_findfile("c") ) };
+    try { @files = DynaLoader::dl_findfile("c") };
     is( $@, '', "calling dl_findfile()" );
     # Some platforms are known to not have a "libc"
     # (not at least by that name) that the dl_findfile()
@@ -98,7 +98,7 @@ SKIP: {
     # looks pretty much Unix-like.
     skip "dl_findfile test not appropriate on $^O", 1
 	unless -d '/usr' && -f '/bin/ls';
-    cmp_ok( scalar nelems @files, '+>=', 1, "array should contain one result result or more: libc => ({join ' ', <@files})" );
+    cmp_ok( scalar nelems @files, '+>=', 1, "array should contain one result result or more: libc => ({join ' ',@files})" );
 }
 
 # Now try to load well known XS modules
@@ -117,11 +117,11 @@ for my $module (sort keys %modules) {
 }
 
 # checking internal consistency
-is( nelems @DynaLoader::dl_librefs, nelems(@( keys %modules)), "checking number of items in \@dl_librefs" );
-is( nelems @DynaLoader::dl_modules, nelems(@( keys %modules)), "checking number of items in \@dl_modules" );
+is( nelems @DynaLoader::dl_librefs, nelems( keys %modules), "checking number of items in \@dl_librefs" );
+is( nelems @DynaLoader::dl_modules, nelems( keys %modules), "checking number of items in \@dl_modules" );
 
-my @loaded_modules = @( < @DynaLoader::dl_modules );
-for my $libref (reverse < @DynaLoader::dl_librefs) {
+my @loaded_modules = @DynaLoader::dl_modules;
+for my $libref (reverse @DynaLoader::dl_librefs) {
   SKIP: {
     skip "unloading unsupported on $^O", 2 if ($^O eq 'VMS' || $^O eq 'darwin');
     my $module = pop @loaded_modules;

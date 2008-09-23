@@ -40,12 +40,12 @@ sub import {
   return export $pkg, $callpkg, < @_
     if $Verbose or $Debug or (nelems @$fail) +> 1;
   my $export_cache = (%Cache{$pkg} ||= \%());
-  my $args = (nelems @_) or @_ = @( < @$exports );
+  my $args = (nelems @_) or @_ = @$exports;
 
   local $_;
   if ($args and not %$export_cache) {
     s/^&//, $export_cache->{$_} = 1
-      foreach (< @$exports, < @{*{Symbol::fetch_glob("$pkg\::EXPORT_OK")}});
+      foreach @( (< @$exports, < @{*{Symbol::fetch_glob("$pkg\::EXPORT_OK")}}));
   }
   my $heavy;
   # Try very hard not to use {} and hence have to  enter scope on the foreach
@@ -53,14 +53,14 @@ sub import {
   if ($args or $fail) {
     ($heavy = (m/\W/ or $args and not exists $export_cache->{$_}
                or (nelems @$fail) and $_ eq $fail->[0])) and last
-                 foreach (< @_);
+                 foreach @_;
   } else {
     ($heavy = m/\W/) and last
-      foreach (< @_);
+      foreach @( (< @_));
   }
   return export $pkg, $callpkg, ($args ? < @_ : ()) if $heavy;
   # shortcut for the common case of no type character
-  *{Symbol::fetch_glob("$callpkg\::$_")} = \&{*{Symbol::fetch_glob("$pkg\::$_")}} foreach < @_;
+  *{Symbol::fetch_glob("$callpkg\::$_")} = \&{*{Symbol::fetch_glob("$pkg\::$_")}} foreach  @_;
 }
 
 # Default methods
@@ -546,5 +546,4 @@ a sample list of such modules.
 This library is free software. You can redistribute it
 and/or modify it under the same terms as Perl itself.
 
->>>>>>> eb7c9bc0060810071e601f18c06cc64d575afc2b:lib/Exporter.pm
 =cut

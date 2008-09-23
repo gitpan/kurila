@@ -2,7 +2,7 @@
 
 # use strict;
 
-print "1..50\n";
+print "1..51\n";
 
 my $test = 1;
 
@@ -186,6 +186,9 @@ $a = 2147483648;
 $c=$a--;
 ok ($a == 2147483647, $a);
 
+try { my $x = qw|aap noot mies|; $x++ };
+ok($@->message =~ m/increment \(\+\+\) does not work on a ARRAY/);
+
 {
     use integer;
     my $x = 0;
@@ -219,16 +222,16 @@ EOC
 
     if ($warn) {
 	unless (ok (scalar nelems @warnings == 2, scalar nelems @warnings)) {
-	    print STDERR "# $_" foreach < @warnings;
+	    print STDERR "# $_" foreach  @warnings;
 	}
-	foreach (< @warnings) {
+	foreach ( @warnings) {
 	    unless (ok (m/Lost precision when incrementing \d+/, $_)) {
 		print STDERR "# $_"
 	    }
 	}
     } else {
 	unless (ok (scalar nelems @warnings == 0)) {
-	    print STDERR "# {join ' ', <@$_}" foreach < @warnings;
+	    print STDERR "# {join ' ',@$_}" foreach  @warnings;
 	}
     }
 }
@@ -257,11 +260,11 @@ for my $n (47..113) {
 	    unless $start_p == $check;
     }
 
-    foreach my $warn (0, 1) {
-	foreach (\@('++$i', 'pre-inc'), \@('$i++', 'post-inc')) {
+    foreach my $warn (@(0, 1)) {
+	foreach (@(\@('++$i', 'pre-inc'), \@('$i++', 'post-inc'))) {
 	    check_some_code($start_p, $warn, < @$_);
 	}
-	foreach (\@('--$i', 'pre-dec'), \@('$i--', 'post-dec')) {
+	foreach (@(\@('--$i', 'pre-dec'), \@('$i--', 'post-dec'))) {
 	    check_some_code($start_n, $warn, < @$_);
 	}
     }

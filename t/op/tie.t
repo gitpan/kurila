@@ -12,14 +12,14 @@
 $|=1;
 
 undef $/;
-our @prgs = @( split m/^########\n/m, ~< *DATA );
+our @prgs = split m/^########\n/m, ~< *DATA;
 
 BEGIN { require './test.pl'; }
 plan(tests => scalar nelems @prgs);
 my $i;
-for (< @prgs){
+for ( @prgs){
     ++$i;
-    my($prog,$expected) = split(m/\nEXPECT\n/, $_, 2);
+    my($prog,$expected) = < split(m/\nEXPECT\n/, $_, 2);
     print("not ok $i # bad test format\n"), next
         unless defined $expected;
     my ($testname) = $prog =~ m/^# (.*)\n/m;
@@ -46,15 +46,14 @@ use Tie::Hash ;
  use base 'Tie::StdHash';
  sub UNTIE
   {
-   warn "Untied";
+   print STDERR "Untied\n";
   }
 }
 our %h;
 tie %h, 'Tie::HashUntie';
 untie %h;
 EXPECT
-Untied at - line 8.
-    Tie::HashUntie::UNTIE called at - line 13.
+Untied
 ########
 
 # standard behaviour, with 1 extra reference
@@ -103,7 +102,7 @@ use Tie::Hash ;
 our $a = tie our %h, 'Tie::StdHash';
 untie %h;
 EXPECT
-untie attempted while 1 inner references still exist at - line 6.
+untie attempted while 1 inner references still exist at - line 6 character 1.
 ########
 
 # strict behaviour, with 1 extra references via tied generating an error
@@ -113,7 +112,7 @@ tie our %h, 'Tie::StdHash';
 our $a = tied %h;
 untie %h;
 EXPECT
-untie attempted while 1 inner references still exist at - line 7.
+untie attempted while 1 inner references still exist at - line 7 character 1.
 ########
 
 # strict behaviour, with 1 extra references which are destroyed
@@ -142,7 +141,7 @@ $a = tie our %h, 'Tie::StdHash';
 $b = tied %h ;
 untie %h;
 EXPECT
-untie attempted while 2 inner references still exist at - line 7.
+untie attempted while 2 inner references still exist at - line 7 character 1.
 ########
 
 # strict behaviour, check scope of strictness.
@@ -169,7 +168,7 @@ sub Self::TIEHASH { bless @_[1], @_[0] }
     tie %c, 'Self', \%c;
 }
 EXPECT
-Self-ties of arrays and hashes are not supported at - line 6.
+Self-ties of arrays and hashes are not supported at - line 6 character 5.
 ########
 
 # correct unlocalisation of tied hashes (patch #16431)
@@ -185,9 +184,7 @@ EXPECT
 # An attempt at lvalueable barewords broke this
 tie FH, 'main';
 EXPECT
-Can't modify constant item in tie at - line 3, near "'main';"
-Bareword "FH" not allowed while "strict subs" in use at - line 3, at EOF
-Execution of - aborted due to compilation errors. at - line 3.
+Can't modify constant item in tie at - line 3 character 5.
 ########
 
 # localizing tied hash slices
@@ -260,12 +257,12 @@ our %h;
 our %i;
 %h{b}=1;
 delete %h{b};
-print nelems(@(keys %h)), "\n";
+print nelems(keys %h), "\n";
 tie %h, 'main';
 %i{a}=1;
 %h = %i;
 untie %h;
-print nelems(@(keys %h)), "\n";
+print nelems(keys %h), "\n";
 EXPECT
 0
 0

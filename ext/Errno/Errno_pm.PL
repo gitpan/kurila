@@ -16,14 +16,14 @@ unlink "Errno.pm" if -f "Errno.pm";
 open OUT, ">", "Errno.pm" or die "Cannot open Errno.pm: $!";
 select OUT;
 my $file;
-my @files = @( < get_files() );
+my @files = get_files();
 if (%Config{gccversion} ne '' && $^O eq 'MSWin32') {
     # MinGW complains "warning: #pragma system_header ignored outside include
     # file" if the header files are processed individually, so include them
     # all in .c file and process that instead.
     open INCS, ">", 'includes.c' or
 	die "Cannot open includes.c";
-    foreach $file (< @files) {
+    foreach $file ( @files) {
 	next if $file eq 'errno.c';
 	next unless -f $file;
 	print INCS qq[#include "$file"\n];
@@ -33,7 +33,7 @@ if (%Config{gccversion} ne '' && $^O eq 'MSWin32') {
     unlink 'includes.c';
 }
 else {
-    foreach $file (< @files) {
+    foreach $file ( @files) {
 	process_file($file);
     }
 }
@@ -213,7 +213,7 @@ sub get_files {
 	}
 	close(CPPO);
     }
-    return @(keys %file);
+    return keys %file;
 }
 
 sub write_errno_pm {
@@ -300,13 +300,13 @@ sub write_errno_pm {
 
     if ($^O eq 'beos') {
 	if (open(C, ">", "errno.c")) {
-	    my @allerrs = @( keys %err );
+	    my @allerrs = keys %err;
 	    print C <<EOF;
 #include <errno.h>
 #include <stdio.h>
 int main() \{
 EOF
-            for (< @allerrs) {
+            for ( @allerrs) {
 		print C qq[printf("$_ \%d\n", $_);]
 	    }
             print C "\}\n";
@@ -346,21 +346,21 @@ use strict;
 
 \$VERSION = "$VERSION";
 \$VERSION = eval \$VERSION;
-\@ISA = \@( qw(Exporter) );
+\@ISA = qw(Exporter);
 
 EDQ
    
     my $len = 0;
-    my @err = @( sort { %err{$a} <+> %err{$b} } keys %err );
-    map { $len = length if length +> $len } < @err;
+    my @err = sort { %err{$a} <+> %err{$b} } keys %err;
+    map { $len = length if length +> $len } @err;
 
-    my $j = "\@EXPORT_OK = \@( qw(" . join(" ",keys %err) . ") );\n";
+    my $j = "\@EXPORT_OK = qw(" . join(" ",keys %err) . ");\n";
     $j =~ s/(.{50,70})\s/$1\n\t/g;
     print $j,"\n";
 
 print <<'ESQ';
 %EXPORT_TAGS = %(
-    POSIX => \@(qw(
+    POSIX => \qw(
 ESQ
 
     my $k = join(" ", grep { exists %err{$_} } 
@@ -379,9 +379,9 @@ ESQ
 	EUSERS EWOULDBLOCK EXDEV));
 
     $k =~ s/(.{50,70})\s/$1\n\t/g;
-    print "\t",$k,"\n    ))\n);\n\n";
+    print "\t",$k,"\n    )\n);\n\n";
 
-    foreach $err (< @err) {
+    foreach $err ( @err) {
 	printf "sub \%s () \{ \%d \}\n",$err,%err{$err};
     }
 
@@ -389,7 +389,7 @@ ESQ
 my %name2no = %(
 ESQ
 
-    foreach $err (< @err) {
+    foreach $err ( @err) {
 	printf "    \%s => \%d,\n",$err,%err{$err};
     }
 

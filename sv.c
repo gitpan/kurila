@@ -176,7 +176,6 @@ Perl_offer_nice_chunk(pTHX_ void *const chunk, const U32 chunk_size)
 	SvARENA_CHAIN(p) = (void *)PL_sv_root;		\
 	SvFLAGS(p) = SVTYPEMASK;			\
 	VALGRIND_MAKE_MEM_UNDEFINED(p, sizeof(SV));     \
-        VALGRIND_MEMPOOL_FREE(&PL_sv_arenaroot, p);            \
 	VALGRIND_MAKE_MEM_DEFINED(&SvARENA_CHAIN(p), sizeof(void*));	\
 	VALGRIND_MAKE_MEM_NOACCESS(&SvARENA_CHAIN(p), sizeof(void*));	\
 	VALGRIND_MAKE_MEM_DEFINED(&SvFLAGS(p), sizeof(U32));	\
@@ -229,10 +228,11 @@ S_new_SV(pTHX)
 	uproot_SV(sv);
     else
 	sv = S_more_sv(aTHX);
-    VALGRIND_MEMPOOL_ALLOC(&PL_sv_arenaroot, sv, sizeof(SV));
+    VALGRIND_MAKE_MEM_UNDEFINED(sv, sizeof(SV));
     SvANY(sv) = 0;
     SvREFCNT(sv) = 1;
     SvFLAGS(sv) = 0;
+    SvLOCATION(sv) = NULL;
     
     return sv;
 }
@@ -1710,13 +1710,7 @@ Perl_sv_2iv_flags(pTHX_ register SV *const sv, const I32 flags)
     } else if (SvTHINKFIRST(sv)) {
 	if (SvROK(sv)) {
 	return_rok:
-	    if (SvAMAGIC(sv)) {
-		SV * const tmpstr=AMG_CALLun(sv,numer);
-		if (tmpstr && (!SvROK(tmpstr) || (SvRV(tmpstr) != SvRV(sv)))) {
-		    return SvIV(tmpstr);
-		}
-	    }
-	    Perl_croak(aTHX_ "Can't coerce reference to number");
+	    Perl_croak(aTHX_ "%s used as a number", Ddesc(sv));
 	}
 	if (SvIsCOW(sv)) {
 	    sv_force_normal_flags(sv, 0);
@@ -1823,13 +1817,7 @@ Perl_sv_2uv_flags(pTHX_ register SV *const sv, const I32 flags)
     } else if (SvTHINKFIRST(sv)) {
 	if (SvROK(sv)) {
 	return_rok:
-	    if (SvAMAGIC(sv)) {
-		SV *const tmpstr = AMG_CALLun(sv,numer);
-		if (tmpstr && (!SvROK(tmpstr) || (SvRV(tmpstr) != SvRV(sv)))) {
-		    return SvUV(tmpstr);
-		}
-	    }
-	    return PTR2UV(SvRV(sv));
+	    Perl_croak(aTHX_ "%s used as a number", Ddesc(sv));
 	}
 	if (SvIsCOW(sv)) {
 	    sv_force_normal_flags(sv, 0);
@@ -1971,13 +1959,7 @@ Perl_sv_2nv(pTHX_ register SV *const sv)
     } else if (SvTHINKFIRST(sv)) {
 	if (SvROK(sv)) {
 	return_rok:
-	    if (SvAMAGIC(sv)) {
-		SV *const tmpstr = AMG_CALLun(sv,numer);
-                if (tmpstr && (!SvROK(tmpstr) || (SvRV(tmpstr) != SvRV(sv)))) {
-		    return SvNV(tmpstr);
-		}
-	    }
-	    return PTR2NV(SvRV(sv));
+	    Perl_croak(aTHX_ "%s used as a number", Ddesc(sv));
 	}
 	if (SvIsCOW(sv)) {
 	    sv_force_normal_flags(sv, 0);
@@ -2120,8 +2102,8 @@ Perl_sv_2nv(pTHX_ register SV *const sv)
 #endif /* NV_PRESERVES_UV */
     }
     else  {
-	if (isGV_with_GP(sv)) {
-	    Perl_croak(aTHX_ "Tried to use glob as number");
+	if ( SvOK(sv) ) {
+	    Perl_croak(aTHX_ "%s used as a number", Ddesc(sv));
 	}
 
 	if (!PL_localizing && !(SvFLAGS(sv) & SVs_PADTMP) && ckWARN(WARN_UNINITIALIZED))
@@ -2162,11 +2144,6 @@ Perl_sv_2num(pTHX_ register SV *const sv)
     PERL_ARGS_ASSERT_SV_2NUM;
 
     if (SvROK(sv)) {
-	if (SvAMAGIC(sv)) {
-	    SV * const tmpsv = AMG_CALLun(sv,numer);
-	    if (tmpsv && (!SvROK(tmpsv) || (SvRV(tmpsv) != SvRV(sv))))
-		return sv_2num(tmpsv);
-	}
 	Perl_croak(aTHX_ "Reference can't be used as a number");
     }
     if (SvAVOK(sv))
@@ -2286,29 +2263,6 @@ Perl_sv_2pv_flags(pTHX_ register SV *const sv, STRLEN *const lp, const I32 flags
     } else if (SvTHINKFIRST(sv)) {
 	if (SvROK(sv)) {
 	return_rok:
-            if (SvAMAGIC(sv)) {
-		SV *const tmpstr = AMG_CALLun(sv,string);
-		if (tmpstr && (!SvROK(tmpstr) || (SvRV(tmpstr) != SvRV(sv)))) {
-		    /* Unwrap this:  */
-		    /* char *pv = lp ? SvPV(tmpstr, *lp) : SvPV_nolen(tmpstr);
-		     */
-
-		    char *pv;
-		    if ((SvFLAGS(tmpstr) & (SVf_POK)) == SVf_POK) {
-			if (flags & SV_CONST_RETURN) {
-			    pv = (char *) SvPVX_const(tmpstr);
-			} else {
-			    pv = (flags & SV_MUTABLE_RETURN)
-				? SvPVX_mutable(tmpstr) : SvPVX(tmpstr);
-			}
-			if (lp)
-			    *lp = SvCUR(tmpstr);
-		    } else {
-			pv = sv_2pv_flags(tmpstr, lp, flags);
-		    }
-		    return pv;
-		}
-	    }
 	    {
 		const SV *const referent = (SV*)SvRV(sv);
 
@@ -2473,11 +2427,6 @@ Perl_sv_2bool(pTHX_ register SV *const sv)
     if (!SvOK(sv))
 	return 0;
     if (SvROK(sv)) {
-	if (SvAMAGIC(sv)) {
-	    SV * const tmpsv = AMG_CALLun(sv,bool_);
-	    if (tmpsv && (!SvROK(tmpsv) || (SvRV(tmpsv) != SvRV(sv))))
-		return (bool)SvTRUE(tmpsv);
-	}
 	return SvRV(sv) != 0;
     }
     if (SvPOKp(sv)) {
@@ -2507,19 +2456,6 @@ Perl_sv_2bool(pTHX_ register SV *const sv)
 }
 
 /*
-=for apidoc sv_utf8_upgrade
-
-Obsolete function which used to:
-Converts the PV of an SV to its UTF-8-encoded form.
-
-=for apidoc sv_utf8_upgrade_flags
-
-Obsolete function which used to:
-Converts the PV of an SV to its UTF-8-encoded form.
-
-=for apidoc sv_utf8_downgrade
-
-Obsolete function which used to:
 
 =for apidoc sv_setsv
 
@@ -2556,14 +2492,6 @@ copy-ish functions and macros use this underneath.
 */
 
 static void
-S_glob_assign_glob(pTHX_ SV *const dstr, SV *const sstr, const int dtype)
-{
-    PERL_ARGS_ASSERT_GLOB_ASSIGN_GLOB;
-
-    Perl_croak(aTHX_ "glob to glob assignment have been removed");
-}
-
-static void
 S_glob_assign_ref(pTHX_ SV *const dstr, SV *const sstr)
 {
     SV * const sref = SvREFCNT_inc(SvRV(sstr));
@@ -2583,7 +2511,6 @@ S_glob_assign_ref(pTHX_ SV *const dstr, SV *const sstr)
 
     if (intro) {
 	GvINTRO_off(dstr);	/* one-shot flag */
-	GvLINE(dstr) = CopLINE(PL_curcop);
 	GvEGV(dstr) = (GV*)dstr;
     }
     GvMULTI_on(dstr);
@@ -2678,9 +2605,9 @@ void
 Perl_sv_setsv_flags(pTHX_ SV *dstr, register SV* sstr, const I32 flags)
 {
     dVAR;
-    register U32 sflags;
-    register int dtype;
-    register svtype stype;
+    U32 sflags;
+    svtype dtype;
+    svtype stype;
 
     PERL_ARGS_ASSERT_SV_SETSV_FLAGS;
 
@@ -2700,8 +2627,6 @@ Perl_sv_setsv_flags(pTHX_ SV *dstr, register SV* sstr, const I32 flags)
     }
     stype = SvTYPE(sstr);
     dtype = SvTYPE(dstr);
-
-    (void)SvAMAGIC_off(dstr);
 
     /* clear the destination sv if it will be upgraded to a hash or an array */
     if ( (dtype == SVt_PVHV || dtype == SVt_PVAV || stype == SVt_PVAV || stype == SVt_PVHV)
@@ -2733,6 +2658,8 @@ Perl_sv_setsv_flags(pTHX_ SV *dstr, register SV* sstr, const I32 flags)
 		break;
 	    case SVt_PVGV:
 		goto end_of_first_switch;
+	    default:
+		break;
 	    }
 	    (void)SvIOK_only(dstr);
 	    SvIV_set(dstr,  SvIVX(sstr));
@@ -2764,6 +2691,8 @@ Perl_sv_setsv_flags(pTHX_ SV *dstr, register SV* sstr, const I32 flags)
 		break;
 	    case SVt_PVGV:
 		goto end_of_first_switch;
+	    default:
+		break;
 	    }
 	    SvNV_set(dstr, SvNVX(sstr));
 	    (void)SvNOK_only(dstr);
@@ -2809,7 +2738,7 @@ Perl_sv_setsv_flags(pTHX_ SV *dstr, register SV* sstr, const I32 flags)
     case SVt_PVLV:
     case SVt_PVGV:
 	if (isGV_with_GP(sstr) && dtype <= SVt_PVGV) {
-	    glob_assign_glob(dstr, sstr, dtype);
+	    Perl_croak(aTHX_ "glob to glob assignment have been removed");
 	    return;
 	}
 	/* SvVALID means that this PVGV is playing at being an FBM.  */
@@ -2821,7 +2750,7 @@ Perl_sv_setsv_flags(pTHX_ SV *dstr, register SV* sstr, const I32 flags)
 	    if (SvTYPE(sstr) != stype) {
 		stype = SvTYPE(sstr);
 		if (isGV_with_GP(sstr) && stype == SVt_PVGV && dtype <= SVt_PVGV) {
-		    glob_assign_glob(dstr, sstr, dtype);
+		    Perl_croak(aTHX_ "glob to glob assignment have been removed");
 		    return;
 		}
 	    }
@@ -2886,7 +2815,7 @@ Perl_sv_setsv_flags(pTHX_ SV *dstr, register SV* sstr, const I32 flags)
 		GvMULTI_on(dstr);
 		return;
 	    }
-	    glob_assign_glob(dstr, sstr, dtype);
+	    Perl_croak(aTHX_ "glob to glob assignment have been removed");
 	    return;
 	}
 
@@ -3879,23 +3808,11 @@ Perl_sv_magic(pTHX_ register SV *const sv, SV *const obj, const int how,
     case PERL_MAGIC_sv:
 	vtable = &PL_vtbl_sv;
 	break;
-    case PERL_MAGIC_overload:
-        vtable = &PL_vtbl_amagic;
-        break;
-    case PERL_MAGIC_overload_elem:
-        vtable = &PL_vtbl_amagicelem;
-        break;
     case PERL_MAGIC_overload_table:
         vtable = &PL_vtbl_ovrld;
         break;
     case PERL_MAGIC_bm:
 	vtable = &PL_vtbl_bm;
-	break;
-    case PERL_MAGIC_regdata:
-	vtable = &PL_vtbl_regdata;
-	break;
-    case PERL_MAGIC_regdatum:
-	vtable = &PL_vtbl_regdatum;
 	break;
     case PERL_MAGIC_env:
 	vtable = &PL_vtbl_env;
@@ -3911,9 +3828,6 @@ Perl_sv_magic(pTHX_ register SV *const sv, SV *const obj, const int how,
 	break;
     case PERL_MAGIC_isaelem:
 	vtable = &PL_vtbl_isaelem;
-	break;
-    case PERL_MAGIC_nkeys:
-	vtable = &PL_vtbl_nkeys;
 	break;
     case PERL_MAGIC_dbfile:
 	vtable = NULL;
@@ -4424,36 +4338,29 @@ Perl_sv_clear_body(pTHX_ SV *const sv)
     if (SvOBJECT(sv)) {
 	if (PL_defstash) {		/* Still have a symbol table? */
 	    dSP;
-	    HV* stash;
-	    do {	
-		CV* destructor;
-		stash = SvSTASH(sv);
-		destructor = StashHANDLER(stash,DESTROY);
-		if (destructor) {
-		    SV* const tmpref = newRV(sv);
-	            SvREADONLY_on(tmpref);   /* DESTROY() could be naughty */
-		    ENTER;
-		    PUSHSTACKi(PERLSI_DESTROY);
-		    EXTEND(SP, 2);
-		    PUSHMARK(SP);
-		    PUSHs(tmpref);
-		    PUTBACK;
-		    call_sv((SV*)destructor, G_DISCARD|G_EVAL|G_KEEPERR|G_VOID);
+	    GV* destructor = gv_fetchmethod(SvSTASH(sv), "DESTROY");
+	    if (destructor) {
+		SV* const tmpref = newRV(sv);
+		SvREADONLY_on(tmpref);   /* DESTROY() could be naughty */
+		ENTER;
+		PUSHSTACKi(PERLSI_DESTROY);
+		EXTEND(SP, 2);
+		PUSHMARK(SP);
+		PUSHs(tmpref);
+		PUTBACK;
+		call_sv((SV*)GvCV(destructor), G_DISCARD|G_EVAL|G_KEEPERR|G_VOID);
 		
-		
-		    POPSTACK;
-		    SPAGAIN;
-		    LEAVE;
-		    if(SvREFCNT(tmpref) < 2) {
-		        /* tmpref is not kept alive! */
-		        SvREFCNT(sv)--;
-			SvRV_set(tmpref, NULL);
-			SvROK_off(tmpref);
-		    }
-		    SvREFCNT_dec(tmpref);
+		POPSTACK;
+		SPAGAIN;
+		LEAVE;
+		if(SvREFCNT(tmpref) < 2) {
+		    /* tmpref is not kept alive! */
+		    SvREFCNT(sv)--;
+		    SvRV_set(tmpref, NULL);
+		    SvROK_off(tmpref);
 		}
-	    } while (SvOBJECT(sv) && SvSTASH(sv) != stash);
-
+		SvREFCNT_dec(tmpref);
+	    }
 
 	    if (SvREFCNT(sv)) {
 		if (PL_in_clean_objs)
@@ -4603,6 +4510,7 @@ Perl_sv_clear(pTHX_ register SV *const sv)
     Perl_sv_clear_body(aTHX_ sv);
     SvFLAGS(sv) &= SVf_BREAK;
     SvFLAGS(sv) |= SVTYPEMASK;
+    SVcpNULL(SvLOCATION(sv));
 }
 
 /*
@@ -5759,8 +5667,6 @@ Perl_sv_inc(pTHX_ register SV *const sv)
 		Perl_croak(aTHX_ PL_no_modify);
 	}
 	if (SvROK(sv)) {
-	    if (SvAMAGIC(sv) && AMG_CALLun(sv,inc))
-		return;
 	    Perl_croak(aTHX_ "Can't coerce reference to number");
 	}
     }
@@ -5922,8 +5828,6 @@ Perl_sv_dec(pTHX_ register SV *const sv)
 		Perl_croak(aTHX_ PL_no_modify);
 	}
 	if (SvROK(sv)) {
-	    if (SvAMAGIC(sv) && AMG_CALLun(sv,dec))
-		return;
 	    Perl_croak(aTHX_ "Can't coerce reference to number");
 	}
     }
@@ -6554,9 +6458,6 @@ Perl_sv_2cv(pTHX_ SV *sv, GV **const gvp, const I32 lref)
     default:
 	SvGETMAGIC(sv);
 	if (SvROK(sv)) {
-	    SV * const *sp = &sv;	/* Used in tryAMAGICunDEREF macro. */
-	    tryAMAGICunDEREF(to_cv);
-
 	    sv = SvRV(sv);
 	    if (SvTYPE(sv) == SVt_PVCV) {
 		cv = (CV*)sv;
@@ -6582,20 +6483,10 @@ Perl_sv_2cv(pTHX_ SV *sv, GV **const gvp, const I32 lref)
 	}
     fix_gv:
 	if (lref && !GvCVu(gv)) {
-	    SV *tmpsv;
-	    ENTER;
-	    tmpsv = newSV(0);
+	    SV* tmpsv = sv_2mortal(newSV(0));
 	    gv_efullname3(tmpsv, gv, NULL);
-	    /* XXX this is probably not what they think they're getting.
-	     * It has the same effect as "sub name;", i.e. just a forward
-	     * declaration! */
-	    newSUB(start_subparse(0),
-		   newSVOP(OP_CONST, 0, tmpsv),
-		   NULL, NULL);
-	    LEAVE;
-	    if (!GvCVu(gv))
-		Perl_croak(aTHX_ "Unable to create sub named \"%"SVf"\"",
-			   SVfARG(sv));
+	    Perl_croak(aTHX_ "Unknown named sub \"%"SVf"\"",
+		       SVfARG(tmpsv));
 	}
 	return GvCVu(gv);
     }
@@ -6837,7 +6728,6 @@ Perl_newSVrv(pTHX_ SV *const rv, const char *const classname)
     new_SV(sv);
 
     SV_CHECK_THINKFIRST_COW_DROP(rv);
-    (void)SvAMAGIC_off(rv);
 
     if (SvTYPE(rv) >= SVt_PVMG) {
 	const U32 refcnt = SvREFCNT(rv);
@@ -7023,11 +6913,6 @@ Perl_sv_bless(pTHX_ SV *const sv, HV *const stash)
 	++PL_sv_objcount;
     SvUPGRADE(tmpRef, SVt_PVMG);
     SvSTASH_set(tmpRef, (HV*)SvREFCNT_inc_simple(stash));
-
-    if (Gv_AMG(stash))
-	SvAMAGIC_on(sv);
-    else
-	(void)SvAMAGIC_off(sv);
 
     if(SvSMAGICAL(tmpRef))
         if(mg_find(tmpRef, PERL_MAGIC_ext) || mg_find(tmpRef, PERL_MAGIC_uvar))
@@ -8642,7 +8527,6 @@ Perl_parser_dup(pTHX_ const yy_parser *const proto, CLONE_PARAMS *const param)
     parser->lex_casestack = savepvn(proto->lex_casestack,
 		    (proto->lex_casemods < 12 ? 12 : proto->lex_casemods));
     parser->lex_defer	= proto->lex_defer;
-    parser->lex_dojoin	= proto->lex_dojoin;
     parser->lex_expect	= proto->lex_expect;
     parser->lex_flags	= proto->lex_flags;
     parser->lex_inwhat	= proto->lex_inwhat;
@@ -8842,20 +8726,7 @@ Perl_mg_dup(pTHX_ MAGIC *mg, CLONE_PARAMS *const param)
 	nmg->mg_len	= mg->mg_len;
 	nmg->mg_ptr	= mg->mg_ptr;	/* XXX random ptr? */
 	if (mg->mg_ptr && mg->mg_type != PERL_MAGIC_regex_global) {
-	    if (mg->mg_len > 0) {
-		nmg->mg_ptr	= SAVEPVN(mg->mg_ptr, mg->mg_len);
-		if (mg->mg_type == PERL_MAGIC_overload_table &&
-			AMT_AMAGIC((AMT*)mg->mg_ptr))
-		{
-		    const AMT * const amtp = (AMT*)mg->mg_ptr;
-		    AMT * const namtp = (AMT*)nmg->mg_ptr;
-		    I32 i;
-		    for (i = 1; i < NofAMmeth; i++) {
-			namtp->table[i] = cv_dup_inc(amtp->table[i], param);
-		    }
-		}
-	    }
-	    else if (mg->mg_len == HEf_SVKEY)
+	    if (mg->mg_len == HEf_SVKEY)
 		nmg->mg_ptr	= (char*)sv_dup_inc((SV*)mg->mg_ptr, param);
 	}
 	if ((mg->mg_flags & MGf_DUP) && mg->mg_virtual && mg->mg_virtual->svt_dup) {
@@ -9361,8 +9232,6 @@ Perl_sv_dup(pTHX_ const SV *sstr, CLONE_PARAMS* param)
 		PAD_DUP(CvPADLIST(dstr), CvPADLIST(sstr), param);
 		CvOUTSIDE(dstr)	=
 		    cv_dup_inc(CvOUTSIDE(dstr), param);
-		if (!CvISXSUB(dstr))
-		    CvFILE(dstr) = SAVEPV(CvFILE(dstr));
 		break;
 	    }
 	}
@@ -10344,8 +10213,6 @@ perl_clone_using(PerlInterpreter *proto_perl, UV flags,
 
     PL_hints		= proto_perl->Ihints;
 
-    PL_amagic_generation	= proto_perl->Iamagic_generation;
-
 #ifdef USE_LOCALE_NUMERIC
     PL_numeric_name	= SAVEPV(proto_perl->Inumeric_name);
     PL_numeric_standard	= proto_perl->Inumeric_standard;
@@ -11188,8 +11055,9 @@ do_sv_tmprefcnt(pTHX_ SV *const sv)
 	av_tmprefcnt((AV*)sv);
 	break;
     case SVt_PVLV:
-	if (LvTYPE(sv) != 't') /* unless tie: unrefcnted fake SV**  */
+	if (LvTYPE(sv) != 't' && LvTYPE(sv) != 'T') /* unless tie: unrefcnted fake SV**  */
 	    SvTMPREFCNT_inc(LvTARG(sv));
+	break;
     case SVt_PVGV:
 	if (isGV_with_GP(sv)) {
 	    gp_tmprefcnt((GV*)sv);

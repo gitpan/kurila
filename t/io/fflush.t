@@ -38,7 +38,7 @@ $runperl .= qq{ "-I../lib"};
 my @delete;
 
 END {
-    for (< @delete) {
+    for ( @delete) {
 	unlink $_ or warn "unlink $_: $!";
     }
 }

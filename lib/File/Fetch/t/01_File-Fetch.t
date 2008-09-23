@@ -1,8 +1,8 @@
 
 use Test::More 'no_plan';
 
-use Cwd             qw[cwd];
-use File::Basename  qw[basename];
+use Cwd <             qw[cwd];
+use File::Basename <  qw[basename];
 use Data::Dumper;
 
 use_ok('File::Fetch');
@@ -112,7 +112,7 @@ push @map, (
 
 
 ### parse uri tests ###
-for my $entry (<@map ) {
+for my $entry (@map ) {
     my $uri = $entry->{'uri'};
 
     my $href = File::Fetch->_parse_uri( $uri );
@@ -125,7 +125,7 @@ for my $entry (<@map ) {
 }
 
 ### File::Fetch->new tests ###
-for my $entry (<@map) {
+for my $entry (@map) {
     my $ff = File::Fetch->new( uri => $entry->{uri} );
 
     ok( $ff,                    "Object for uri '$entry->{uri}'" );
@@ -162,8 +162,8 @@ for my $entry (<@map) {
 }
 
 ### http:// tests ###
-{   for my $uri ( 'http://www.cpan.org/index.html',
-                  'http://www.cpan.org/index.html?q=1&y=2'
+{   for my $uri (@( 'http://www.cpan.org/index.html',
+                  'http://www.cpan.org/index.html?q=1&y=2')
     ) {
         for (qw[lwp wget curl lynx]) {
             _fetch_uri( http => $uri, $_ );

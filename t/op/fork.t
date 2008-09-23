@@ -22,7 +22,7 @@ $|=1;
 our (@prgs, $tmpfile, $CAT, $status, $i);
 
 undef $/;
-@prgs = @( split "\n########\n", ~< *DATA );
+@prgs = split "\n########\n", ~< *DATA;
 print "1..", scalar nelems @prgs, "\n";
 
 $tmpfile = "forktmp000";
@@ -31,15 +31,15 @@ END { close TEST; unlink $tmpfile if $tmpfile; }
 
 $CAT = (($^O eq 'MSWin32') ? '.\perl -e "print ~< *ARGV"' : (($^O eq 'NetWare') ? 'perl -e "print ~< *ARGV"' : 'cat'));
 
-for (< @prgs){
+for ( @prgs){
     my $switch;
     if (s/^\s*(-\w.*)//){
 	$switch = $1;
     }
-    my($prog,$expected) = split(m/\nEXPECT\n/, $_);
+    my($prog,$expected) = < split(m/\nEXPECT\n/, $_);
     $expected =~ s/\n+$//;
     # results can be in any order, so sort 'em
-    my @expected = @( sort split m/\n/, $expected );
+    my @expected = sort split m/\n/, $expected;
     open TEST, ">", "$tmpfile" or die "Cannot open $tmpfile: $!";
     print TEST $prog, "\n";
     close TEST or die "Cannot close $tmpfile: $!";
@@ -62,8 +62,8 @@ for (< @prgs){
     $results =~ s/^(syntax|parse) error/syntax error/mig;
     $results =~ s/^\n*Process terminated by SIG\w+\n?//mg
 	if $^O eq 'os2';
-    my @results = @( sort split m/\n/, $results );
-    if ( "{join ' ', <@results}" ne "{join ' ', <@expected}" ) {
+    my @results = sort split m/\n/, $results;
+    if ( "{join ' ',@results}" ne "{join ' ',@expected}" ) {
 	print STDERR "PROG: $switch\n$prog\n";
 	print STDERR "EXPECTED:\n$expected\n";
 	print STDERR "GOT:\n$results\n";
@@ -168,8 +168,8 @@ parent
 child
 ########
 $| = 1;
-my @a = @(1..3);
-for (<@a) {
+my @a = 1..3;
+for (@a) {
     if (fork) {
 	print "parent $_\n";
 	$_ = "[$_]";
@@ -179,7 +179,7 @@ for (<@a) {
 	$_ = "-$_-";
     }
 }
-print "{join ' ', <@a}\n";
+print "{join ' ', @a}\n";
 EXPECT
 parent 1
 child 1
@@ -205,7 +205,7 @@ child 3
 -1- -2- -3-
 ########
 $| = 1;
-foreach my $c (1,2,3) {
+foreach my $c (@(1,2,3)) {
     if (fork) {
 	print "parent $c\n";
     }
@@ -331,8 +331,8 @@ else {
     sleep 1; die "child died";
 }
 EXPECT
-parent died at - line 2.
-child died at - line 5.
+parent died at - line 2 character 5.
+child died at - line 5 character 14.
 ########
 if (my $pid = fork) {
     try { die "parent died" };
@@ -343,10 +343,10 @@ else {
     print $@->message;
 }
 EXPECT
-parent died at - line 2.
-    (eval) called at - line 6.
-child died at - line 6.
-    (eval) called at - line 2.
+parent died at - line 2 character 11.
+    (eval) called at - line 2 character 5.
+child died at - line 6 character 20.
+    (eval) called at - line 6 character 14.
 ########
 my $pid;
 if (eval q{$pid = fork}) {
@@ -358,10 +358,10 @@ else {
     print $@->message;
 }
 EXPECT
-parent died at (eval 2) line 1.
-    (eval) called at - line 3.
-child died at (eval 2) line 1.
-    (eval) called at - line 7.
+parent died at (eval 2) line 1 character 2.
+    (eval) called at - line 3 character 5.
+child died at (eval 2) line 1 character 2.
+    (eval) called at - line 7 character 14.
 ########
 BEGIN {
     $| = 1;
@@ -473,7 +473,7 @@ EXPECT
 # [perl #39145] Perl_dounwind() crashing with Win32's fork() emulation
 sub { @_ = @(3); fork ? die "1" : die "1" }->(2);
 EXPECT
-1 at - line 2.
-    main::__ANON__ called at - line 2.
-1 at - line 2.
-    main::__ANON__ called at - line 2.
+1 at - line 2 character 35.
+    main::__ANON__ called at - line 2 character 44.
+1 at - line 2 character 25.
+    main::__ANON__ called at - line 2 character 44.

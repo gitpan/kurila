@@ -76,42 +76,44 @@
      DO = 291,
      NOAMP = 292,
      ANONARY = 293,
-     ANONHSH = 294,
-     ANONSCALAR = 295,
-     LOCAL = 296,
-     MY = 297,
-     MYSUB = 298,
-     REQUIRE = 299,
-     COLONATTR = 300,
-     PREC_LOW = 301,
-     DOROP = 302,
-     OROP = 303,
-     ANDOP = 304,
-     NOTOP = 305,
-     ASSIGNOP = 306,
-     DORDOR = 307,
-     OROR = 308,
-     ANDAND = 309,
-     BITOROP = 310,
-     BITANDOP = 311,
-     SHIFTOP = 312,
-     MATCHOP = 313,
-     SREFGEN = 314,
-     UMINUS = 315,
-     POWOP = 316,
-     POSTDEC = 317,
-     POSTINC = 318,
-     PREDEC = 319,
-     PREINC = 320,
-     ASLICE = 321,
-     HSLICE = 322,
-     DEREFAMP = 323,
-     DEREFSTAR = 324,
-     DEREFHSH = 325,
-     DEREFARY = 326,
-     DEREFSCL = 327,
-     ARROW = 328,
-     PEG = 329
+     ANONARYL = 294,
+     ANONHSH = 295,
+     ANONSCALAR = 296,
+     ANONSCALARL = 297,
+     LOCAL = 298,
+     MY = 299,
+     MYSUB = 300,
+     REQUIRE = 301,
+     COLONATTR = 302,
+     PREC_LOW = 303,
+     DOROP = 304,
+     OROP = 305,
+     ANDOP = 306,
+     NOTOP = 307,
+     ASSIGNOP = 308,
+     DORDOR = 309,
+     OROR = 310,
+     ANDAND = 311,
+     BITOROP = 312,
+     BITANDOP = 313,
+     SHIFTOP = 314,
+     MATCHOP = 315,
+     SREFGEN = 316,
+     UMINUS = 317,
+     POWOP = 318,
+     POSTDEC = 319,
+     POSTINC = 320,
+     PREDEC = 321,
+     PREINC = 322,
+     ASLICE = 323,
+     HSLICE = 324,
+     DEREFAMP = 325,
+     DEREFSTAR = 326,
+     DEREFHSH = 327,
+     DEREFARY = 328,
+     DEREFSCL = 329,
+     ARROW = 330,
+     PEG = 331
    };
 #endif
 /* Tokens.  */
@@ -151,42 +153,44 @@
 #define DO 291
 #define NOAMP 292
 #define ANONARY 293
-#define ANONHSH 294
-#define ANONSCALAR 295
-#define LOCAL 296
-#define MY 297
-#define MYSUB 298
-#define REQUIRE 299
-#define COLONATTR 300
-#define PREC_LOW 301
-#define DOROP 302
-#define OROP 303
-#define ANDOP 304
-#define NOTOP 305
-#define ASSIGNOP 306
-#define DORDOR 307
-#define OROR 308
-#define ANDAND 309
-#define BITOROP 310
-#define BITANDOP 311
-#define SHIFTOP 312
-#define MATCHOP 313
-#define SREFGEN 314
-#define UMINUS 315
-#define POWOP 316
-#define POSTDEC 317
-#define POSTINC 318
-#define PREDEC 319
-#define PREINC 320
-#define ASLICE 321
-#define HSLICE 322
-#define DEREFAMP 323
-#define DEREFSTAR 324
-#define DEREFHSH 325
-#define DEREFARY 326
-#define DEREFSCL 327
-#define ARROW 328
-#define PEG 329
+#define ANONARYL 294
+#define ANONHSH 295
+#define ANONSCALAR 296
+#define ANONSCALARL 297
+#define LOCAL 298
+#define MY 299
+#define MYSUB 300
+#define REQUIRE 301
+#define COLONATTR 302
+#define PREC_LOW 303
+#define DOROP 304
+#define OROP 305
+#define ANDOP 306
+#define NOTOP 307
+#define ASSIGNOP 308
+#define DORDOR 309
+#define OROR 310
+#define ANDAND 311
+#define BITOROP 312
+#define BITANDOP 313
+#define SHIFTOP 314
+#define MATCHOP 315
+#define SREFGEN 316
+#define UMINUS 317
+#define POWOP 318
+#define POSTDEC 319
+#define POSTINC 320
+#define PREDEC 321
+#define PREINC 322
+#define ASLICE 323
+#define HSLICE 324
+#define DEREFAMP 325
+#define DEREFSTAR 326
+#define DEREFHSH 327
+#define DEREFARY 328
+#define DEREFSCL 329
+#define ARROW 330
+#define PEG 331
 
 
 
@@ -195,21 +199,25 @@
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 typedef union YYSTYPE
 {
-    I32	ival; /* __DEFAULT__ (marker for regen_perly.pl;
+    I32 ionlyval;
+    char *pval; /* __DEFAULT__ (marker for regen_perly.pl;
 				must always be 1st union member) */
-    char *pval;
     OP *opval;
     GV *gvval;
-#ifdef PERL_IN_MADLY_C
-    MADTOKEN* p_tkval;
-    MADTOKEN* i_tkval;
-#else
-    char *p_tkval;
-    I32	i_tkval;
-#endif
+    struct {
+        I32 ival;
+        SV *location;
 #ifdef PERL_MAD
-    MADTOKEN* tkval;
+        MADTOKEN* madtoken;
 #endif
+    } i_tkval;
+    struct {
+        char *pval;
+        SV *location;
+#ifdef PERL_MAD
+        MADTOKEN* madtoken;
+#endif
+    } p_tkval;
 }
 /* Line 1489 of yacc.c.  */
 	YYSTYPE;

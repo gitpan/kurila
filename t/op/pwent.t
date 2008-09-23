@@ -87,11 +87,11 @@ setpwent();
 while ( ~< *PW) {
     chomp;
     # LIMIT -1 so that users with empty shells don't fall off
-    my @s = @( split m/:/, $_, -1 );
+    my @s = split m/:/, $_, -1;
     my ($name_s, $passwd_s, $uid_s, $gid_s, $gcos_s, $home_s, $shell_s);
     (my $v) = %Config{osvers} =~ m/^(\d+)/;
     if ($^O eq 'darwin' && $v +< 9) {
-       ($name_s, $passwd_s, $uid_s, $gid_s, $gcos_s, $home_s, $shell_s) = @s[[0,1,2,3,7,8,9]];
+       ($name_s, $passwd_s, $uid_s, $gid_s, $gcos_s, $home_s, $shell_s) = < @s[[@(0,1,2,3,7,8,9)]];
     } else {
        ($name_s, $passwd_s, $uid_s, $gid_s, $gcos_s, $home_s, $shell_s) = < @s;
     }
@@ -134,7 +134,7 @@ while ( ~< *PW) {
 
 endpwent();
 
-print "# max = $max, n = $n, perfect = ", nelems(@(keys %perfect)), "\n";
+print "# max = $max, n = $n, perfect = ", nelems(keys %perfect), "\n";
 
 my $not;
 if ( ! %perfect && $n) {
@@ -184,7 +184,7 @@ for (1..$max) {
 }
 endpwent();
 
-print "not " unless "{join ' ', <@pw1}" eq "{join ' ', <@pw2}";
+print "not " unless "{join ' ',@pw1}" eq "{join ' ',@pw2}";
 print "ok ", $tst++, "\n";
 
 close(PW);

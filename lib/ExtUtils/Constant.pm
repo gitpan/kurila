@@ -1,5 +1,5 @@
 package ExtUtils::Constant;
-use vars qw (@ISA $VERSION @EXPORT_OK %EXPORT_TAGS);
+use vars < qw (@ISA $VERSION @EXPORT_OK %EXPORT_TAGS);
 $VERSION = 0.20;
 
 =head1 NAME
@@ -94,17 +94,17 @@ use warnings;
 use strict;
 
 use Exporter;
-use ExtUtils::Constant::Utils qw(C_stringify);
-use ExtUtils::Constant::XS qw(%XS_Constant %XS_TypeSet);
+use ExtUtils::Constant::Utils < qw(C_stringify);
+use ExtUtils::Constant::XS < qw(%XS_Constant %XS_TypeSet);
 
 @ISA = @( 'Exporter' );
 
-%EXPORT_TAGS = %( 'all' => \@( qw(
+%EXPORT_TAGS = %( 'all' => \ qw(
 	XS_constant constant_types C_stringify
 	C_constant WriteConstants WriteMakefileSnippet
-) ) );
+) );
 
-@EXPORT_OK = @( < @{ %EXPORT_TAGS{'all'} } );
+@EXPORT_OK = @{ %EXPORT_TAGS{'all'} };
 
 =item constant_types
 
@@ -156,7 +156,7 @@ sub XS_constant {
 
   if (!ref $what) {
     # Convert line of the form IV,UV,NV to hash
-    $what = \%( map {$_ => 1} split m/,\s*/, ($what) );
+    $what = \%( < map {$_ => 1} split m/,\s*/, ($what) );
   }
   my $params = ExtUtils::Constant::XS->params ($what);
   my $type;

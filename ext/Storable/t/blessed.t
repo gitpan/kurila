@@ -13,7 +13,7 @@ sub BEGIN {
     require 'st-dump.pl';
 }
 
-use Storable qw(freeze thaw);
+use Storable < qw(freeze thaw);
 
 %::immortals
   = %(u => \undef,
@@ -107,7 +107,7 @@ ok 10, $good;
 
 package RETURNS_IMMORTALS;
 
-sub make { my $self = shift; bless \@( < @_), $self }
+sub make { my $self = shift; bless \ @_, $self }
 
 sub STORABLE_freeze {
   # Some reference some number of times.
@@ -126,8 +126,8 @@ sub STORABLE_thaw {
 	my $expect = %::immortals{$what};
 	die "'$x' did not give a reference" unless ref $expect;
 	my $fail;
-	foreach (< @refs) {
-	  $fail++ if $_ != $expect;
+	foreach ( @refs) {
+	  $fail++ if $_ \!= $expect;
 	}
 	main::ok ++$test, !$fail;
 }

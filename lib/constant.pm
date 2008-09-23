@@ -2,15 +2,15 @@ package constant;
 use strict;
 use warnings::register;
 
-use vars qw($VERSION %declared);
+use vars < qw($VERSION %declared);
 $VERSION = '1.15';
 
 #=======================================================================
 
 # Some names are evil choices.
-my %keywords = %( map +($_, 1), qw{ BEGIN INIT CHECK UNITCHECK END DESTROY } );
+my %keywords = %( < map +($_, 1), qw{ BEGIN INIT CHECK UNITCHECK END DESTROY } );
 
-my %forced_into_main = %( map +($_, 1),
+my %forced_into_main = %( < map +($_, 1),
     qw{ STDIN STDOUT STDERR ARGV ARGVOUT ENV INC SIG } );
 
 my %forbidden = %(< %keywords, < %forced_into_main);
@@ -90,7 +90,7 @@ sub import {
 		my $scalar = $multiple ? $constants->{$name} : @_[0];
                 *{Symbol::fetch_glob($full_name)} = sub () { $scalar };
 	    } elsif ((nelems @_)) {
-		my @list = @( < @_ );
+		my @list = @_;
 		*{Symbol::fetch_glob($full_name)} = sub () { @list };
 	    } else {
 		*{Symbol::fetch_glob($full_name)} = sub () { };

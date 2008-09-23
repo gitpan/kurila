@@ -63,7 +63,6 @@
 #define PL_StdIO		(vTHX->IStdIO)
 #define PL_Sv			(vTHX->ISv)
 #define PL_Xpv			(vTHX->IXpv)
-#define PL_amagic_generation	(vTHX->Iamagic_generation)
 #define PL_an			(vTHX->Ian)
 #define PL_argvgv		(vTHX->Iargvgv)
 #define PL_argvout_stack	(vTHX->Iargvout_stack)
@@ -176,7 +175,6 @@
 #define PL_mess_sv		(vTHX->Imess_sv)
 #define PL_min_intro_pending	(vTHX->Imin_intro_pending)
 #define PL_minus_E		(vTHX->Iminus_E)
-#define PL_minus_F		(vTHX->Iminus_F)
 #define PL_minus_a		(vTHX->Iminus_a)
 #define PL_minus_c		(vTHX->Iminus_c)
 #define PL_minus_l		(vTHX->Iminus_l)
@@ -257,7 +255,6 @@
 #define PL_slabs		(vTHX->Islabs)
 #define PL_sort_RealCmp		(vTHX->Isort_RealCmp)
 #define PL_sortcop		(vTHX->Isortcop)
-#define PL_splitstr		(vTHX->Isplitstr)
 #define PL_srand_called		(vTHX->Isrand_called)
 #define PL_stack_base		(vTHX->Istack_base)
 #define PL_stack_max		(vTHX->Istack_max)
@@ -355,7 +352,6 @@
 #define PL_IStdIO		PL_StdIO
 #define PL_ISv			PL_Sv
 #define PL_IXpv			PL_Xpv
-#define PL_Iamagic_generation	PL_amagic_generation
 #define PL_Ian			PL_an
 #define PL_Iargvgv		PL_argvgv
 #define PL_Iargvout_stack	PL_argvout_stack
@@ -468,7 +464,6 @@
 #define PL_Imess_sv		PL_mess_sv
 #define PL_Imin_intro_pending	PL_min_intro_pending
 #define PL_Iminus_E		PL_minus_E
-#define PL_Iminus_F		PL_minus_F
 #define PL_Iminus_a		PL_minus_a
 #define PL_Iminus_c		PL_minus_c
 #define PL_Iminus_l		PL_minus_l
@@ -549,7 +544,6 @@
 #define PL_Islabs		PL_slabs
 #define PL_Isort_RealCmp	PL_sort_RealCmp
 #define PL_Isortcop		PL_sortcop
-#define PL_Isplitstr		PL_splitstr
 #define PL_Isrand_called	PL_srand_called
 #define PL_Istack_base		PL_stack_base
 #define PL_Istack_max		PL_stack_max

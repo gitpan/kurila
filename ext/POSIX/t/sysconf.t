@@ -9,30 +9,29 @@ BEGIN {
 use strict;
 use File::Spec;
 use POSIX;
-use Scalar::Util qw(looks_like_number);
+use Scalar::Util < qw(looks_like_number);
 
-sub check(@) {
-    @( grep { eval "&$_;1" or $@->{description}!~m/vendor has not defined POSIX macro/ } < @_ )
+sub check(@) { grep { eval "&$_;1" or $@->{description}!~m/vendor has not defined POSIX macro/ } @_
 }       
 
-my @path_consts = @( < check qw(
+my @path_consts = check < qw(
     _PC_CHOWN_RESTRICTED _PC_LINK_MAX _PC_NAME_MAX
     _PC_NO_TRUNC _PC_PATH_MAX
-) );
+);
 
-my @path_consts_terminal = @( < check qw(
+my @path_consts_terminal = check < qw(
     _PC_MAX_CANON _PC_MAX_INPUT _PC_VDISABLE
-) );
+);
 
-my @path_consts_fifo = @( < check qw(
+my @path_consts_fifo = check < qw(
     _PC_PIPE_BUF
-) );
+);
 
-my @sys_consts = @( < check qw(
+my @sys_consts = check < qw(
     _SC_ARG_MAX _SC_CHILD_MAX _SC_CLK_TCK _SC_JOB_CONTROL
     _SC_NGROUPS_MAX _SC_OPEN_MAX _SC_PAGESIZE _SC_SAVED_IDS
     _SC_STREAM_MAX _SC_VERSION _SC_TZNAME_MAX
-) );
+);
 
 my $tests = 2 * 3 * (nelems @path_consts) +
             2 * 3 * (nelems @path_consts_terminal) +
@@ -79,7 +78,7 @@ SKIP: {
         or skip "could not open test directory '$testdir' ($!)",
 	  3 * nelems @path_consts;
 
-    for my $constant (< @path_consts) {
+    for my $constant ( @path_consts) {
 	    $! = 0;
             $r = try { fpathconf( $fd, eval "$constant()" ) };
             _check_and_report( $@, $r, "calling fpathconf($fd, $constant) " );
@@ -89,7 +88,7 @@ SKIP: {
 }
 
 # testing pathconf() on a non-terminal file
-for my $constant (< @path_consts) {
+for my $constant ( @path_consts) {
 	$! = 0;
         $r = try { pathconf( $testdir, eval "$constant()" ) };
         _check_and_report( $@, $r, qq[calling pathconf("$testdir", $constant)] );
@@ -108,7 +107,7 @@ SKIP: {
     my $fd = fileno(TTY);
 
     # testing fpathconf() on a terminal file
-    for my $constant (< @path_consts_terminal) {
+    for my $constant ( @path_consts_terminal) {
 	$! = 0;
 	$r = try { fpathconf( $fd, eval "$constant()" ) };
 	_check_and_report( $@, $r, qq[calling fpathconf($fd, $constant) ($TTY)] );
@@ -116,7 +115,7 @@ SKIP: {
     
     close(TTY);
     # testing pathconf() on a terminal file
-    for my $constant (< @path_consts_terminal) {
+    for my $constant ( @path_consts_terminal) {
 	$! = 0;
 	$r = try { pathconf( $TTY, eval "$constant()" ) };
 	_check_and_report( $@, $r, qq[calling pathconf($TTY, $constant)] );
@@ -133,7 +132,7 @@ SKIP: {
       my $fd = POSIX::open($fifo, O_RDWR)
 	  or skip("could not open $fifo ($!)", 3 * nelems @path_consts_fifo);
 
-      for my $constant (< @path_consts_fifo) {
+      for my $constant ( @path_consts_fifo) {
 	  $! = 0;
 	  $r = try { fpathconf( $fd, eval "$constant()" ) };
 	  _check_and_report( $@, $r, "calling fpathconf($fd, $constant) ($fifo)" );
@@ -143,7 +142,7 @@ SKIP: {
   }
 
   # testing pathconf() on a fifo file
-  for my $constant (< @path_consts_fifo) {
+  for my $constant ( @path_consts_fifo) {
       $! = 0;
       $r = try { pathconf( $fifo, eval "$constant()" ) };
       _check_and_report( $@, $r, qq[calling pathconf($fifo, $constant)] );
@@ -162,7 +161,7 @@ SKIP: {
         
 }
 # testing sysconf()
-for my $constant (< @sys_consts) {
+for my $constant ( @sys_consts) {
 	$! = 0;
 	$r = try { sysconf( eval "$constant()" ) };
 	_check_and_report( $@, $r, "calling sysconf($constant)" );

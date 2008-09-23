@@ -51,9 +51,9 @@ sub walk_table (&@) {
 	    @args = @( $_ );
 	}
 	else {
-	    @args = @( split m/\s*\|\s*/, $_ );
+	    @args = split m/\s*\|\s*/, $_;
 	}
-	s/\b(NN|NULLOK)\b\s+//g for < @args;
+	s/\b(NN|NULLOK)\b\s+//g for  @args;
 	print $F < $function->(< @args);
     }
     print $F $trailer if $trailer;
@@ -82,7 +82,7 @@ FUNC:
 	if ($in =~ m/^=for\s+apidoc\s+(.*?)\s*\n/) {
 	    my $proto = $1;
 	    $proto = "||$proto" unless $proto =~ m/\|/;
-	    my($flags, $ret, $name, < @args) = split m/\|/, $proto;
+	    my($flags, $ret, $name, < @args) = < split m/\|/, $proto;
 	    my $docs = "";
 DOC:
 	    while (defined($doc = ~< $fh)) {
@@ -138,7 +138,7 @@ removed without notice.\n\n" if $flags =~ m/x/;
 	print $fh "\t$ret\t$name\n\n";
     } else { # full usage
 	print $fh "\t$ret\t$name";
-	print $fh "(" . join(", ", < @args) . ")";
+	print $fh "(" . join(", ", @args) . ")";
 	print $fh "\n\n";
     }
     print $fh "=for hackers\nFound in file $file\n\n";
@@ -174,7 +174,7 @@ my $MANIFEST = do {
   ~< *FH;
 };
 
-for $file (($MANIFEST =~ m/^(\S+\.c)\t/gm), ($MANIFEST =~ m/^(\S+\.h)\t/gm)) {
+for $file (@(($MANIFEST =~ m/^(\S+\.c)\t/gm), ($MANIFEST =~ m/^(\S+\.h)\t/gm))) {
     open F, "<", $file or die "Cannot open $file for docs: $!\n";
     $curheader = "Functions in file $file\n";
     autodoc(\*F,$file);

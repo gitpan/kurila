@@ -73,7 +73,7 @@ for my $name (sort {%fac{$a} <+> %fac{$b}} keys %fac) {
 
 # write the Sys::Syslog::Win32 module
 open my $out, '>', "Win32.pm" or die "fatal: Can't write Win32.pm: $!";
-my $template = join '', ~< *DATA;
+my $template = join '', @( ~< *DATA);
 $template =~ s/__CONSTANT__/$hash/;
 $template =~ s/__F2C__/$f2c/;
 $template =~ s/__NAME_VER__/$name/;

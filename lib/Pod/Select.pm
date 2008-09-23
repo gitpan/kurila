@@ -9,7 +9,7 @@
 
 package Pod::Select;
 
-use vars qw($VERSION);
+use vars < qw($VERSION);
 $VERSION = 1.35;  ## Current version of this package
 
 #############################################################################
@@ -238,10 +238,10 @@ C</=item mine/../=(item|back)/>
 use strict;
 #use diagnostics;
 use Pod::Parser v1.04;
-use vars qw(@ISA @EXPORT $MAX_HEADING_LEVEL);
+use vars < qw(@ISA @EXPORT $MAX_HEADING_LEVEL);
 
-@ISA = @( qw(Pod::Parser) );
-@EXPORT = @( qw(&podselect) );
+@ISA = qw(Pod::Parser);
+@EXPORT = qw(&podselect);
 
 ## Maximum number of heading levels supported for '=headN' directives
 *MAX_HEADING_LEVEL = \3;
@@ -267,7 +267,7 @@ reference to the object itself as an implicit first parameter.
 ## 
 ## =end _PRIVATE_
 
-use vars qw(%myData @section_headings);
+use vars < qw(%myData @section_headings);
 
 sub _init_headings {
     my $self = shift;
@@ -303,7 +303,7 @@ level, then C<undef> is returned.
 sub curr_headings {
     my $self = shift;
     $self->_init_headings()  unless (defined $self->{_SECTION_HEADINGS});
-    my @headings = @( < @{ $self->{_SECTION_HEADINGS} } );
+    my @headings = @{ $self->{_SECTION_HEADINGS} };
     return ((nelems @_) +> 0  and  @_[0] =~ m/^\d+$/) ? @headings[@_[0] - 1] : @headings;
 }
 
@@ -332,11 +332,11 @@ This method should I<not> normally be overridden by subclasses.
 
 =cut
 
-use vars qw(@selected_sections);
+use vars < qw(@selected_sections);
 
 sub select {
     my $self = shift;
-    my @sections = @( < @_ );
+    my @sections = @_;
     local *myData = $self;
     local $_;
 
@@ -366,7 +366,7 @@ sub select {
 
     ## Compile each spec
     my $spec;
-    for $spec (< @sections) {
+    for $spec ( @sections) {
         if ( defined($_ = &_compile_section_spec($spec)) ) {
             ## Store them in our sections array
             push(@selected_sections, $_);
@@ -439,7 +439,7 @@ This method should I<not> normally be overridden by subclasses.
 
 sub match_section {
     my $self = shift;
-    my (@headings) = @( < @_ );
+    my (@headings) = @_;
     local *myData = $self;
 
     ## Return true if no restrictions were explicitly specified
@@ -448,14 +448,14 @@ sub match_section {
     return  1  unless ((defined $selections) && ((nelems @{$selections}) +> 0));
 
     ## Default any unspecified sections to the current one
-    my @current_headings = @( < $self->curr_headings() );
+    my @current_headings = $self->curr_headings();
     for (my $i = 0; $i +< $MAX_HEADING_LEVEL; ++$i) {
         (defined @headings[$i])  or  @headings[$i] = @current_headings[$i];
     }
 
     ## Look for a match against the specified section expressions
     my ($section_spec, $regex, $negated, $match);
-    for $section_spec ( < @{$selections} ) {
+    for $section_spec (  @{$selections} ) {
         ##------------------------------------------------------
         ## Each portion of this spec must match in order for
         ## the spec to be matched. So we will start with a 
@@ -579,14 +579,14 @@ filenames are given).
 =cut 
 
 sub podselect {
-    my(@argv) = @( < @_ );
+    my(@argv) = @_;
     my %defaults = %( () );
     my $pod_parser = Pod::Select->new(< %defaults);
     my $num_inputs = 0;
     my $output = ">&STDOUT";
     my %opts;
     local $_;
-    for (< @argv) {
+    for ( @argv) {
         if (ref($_)) {
         next unless (ref($_) eq 'HASH');
             %opts = %(< %defaults, < %{$_});
@@ -597,13 +597,13 @@ sub podselect {
             ## looked like Unix command-line options.
             ## to be uppercase keywords)
             ##-------------------------------------------------------------
-            %opts = %( map {
+            %opts = %( < map {
                 my ($key, $val) = (lc $_, %opts{$_});
                 $key =~ s/^(?=\w)/-/;
                 $key =~ m/^-se[cl]/  and  $key  = '-sections';
                 #! $key eq '-range'    and  $key .= 's';
                 ($key => $val);    
-            } (keys %opts) );
+            } @( ( <keys %opts)) );
 
             ## Process the options
             (exists %opts{'-output'})  and  $output = %opts{'-output'};
@@ -673,7 +673,7 @@ sub _compile_section_spec {
     s|\\/|\002|g;   ## handle escaped forward slashes
 
     ## Parse the regexs for the heading titles
-    @regexs = @( split('/', $_, $MAX_HEADING_LEVEL) );
+    @regexs = split('/', $_, $MAX_HEADING_LEVEL);
 
     ## Set default regex for ommitted levels
     for (my $i = 0; $i +< $MAX_HEADING_LEVEL; ++$i) {
@@ -682,7 +682,7 @@ sub _compile_section_spec {
     }
     ## Modify the regexs as needed and validate their syntax
     my $bad_regexs = 0;
-    for (< @regexs) {
+    for ( @regexs) {
         $_ .= '.+'  if ($_ eq '!');
         s|\001|\\\\|g;       ## restore escaped backward slashes
         s|\002|\\/|g;        ## restore escaped forward slashes
@@ -699,7 +699,7 @@ sub _compile_section_spec {
             $_ = '!' . $_  if ($negated);
         }
     }
-    return  (! $bad_regexs) ? \@( < @regexs ) : undef;
+    return  (! $bad_regexs) ? \ @regexs : undef;
 }
 
 ##---------------------------------------------------------------------------

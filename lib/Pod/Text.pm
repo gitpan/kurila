@@ -27,15 +27,15 @@ package Pod::Text;
 
 use strict;
 use utf8;
-use vars qw(@ISA @EXPORT $VERSION);
+use vars < qw(@ISA @EXPORT $VERSION);
 
 use Exporter ();
 use Pod::Simple ();
 
-@ISA = @( qw(Pod::Simple Exporter) );
+@ISA = qw(Pod::Simple Exporter);
 
 # We have to export pod2text for backward compatibility.
-@EXPORT = @( qw(pod2text) );
+@EXPORT = qw(pod2text);
 
 # Don't use the CVS revision as the version, since this module is also in Perl
 # core and too many things could munge CVS magic revision strings.  This
@@ -74,7 +74,7 @@ sub new {
     }
 
     # The =for and =begin targets that we accept.
-    $self->accept_targets (qw/text TEXT/);
+    $self->accept_targets ( <qw/text TEXT/);
 
     # Ensure that contiguous blocks of code are merged together.  Otherwise,
     # some of the guesswork heuristics don't work right.
@@ -85,7 +85,7 @@ sub new {
     # problems if we ever clash with Pod::Simple's own internal class
     # variables.
     my %opts = %( < @_ );
-    my @opts = @( map { ("opt_$_", %opts{$_}) } keys %opts );
+    my @opts = map { ("opt_$_", %opts{$_}) } keys %opts;
     %$self = %(< %$self, < @opts);
 
     # Initialize various things from our parameters.
@@ -567,7 +567,7 @@ sub pod2text {
     # we need to turn the first argument into a file handle.  Magic open will
     # handle the <&STDIN case automagically.
     if (defined @_[1]) {
-        my @fhs = @( < @_ );
+        my @fhs = @_;
         local *IN;
         unless (open (IN, "<", @fhs[0])) {
             die ("Can't open @fhs[0] for reading: $!\n");

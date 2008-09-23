@@ -1,24 +1,10 @@
 # -*-perl-*-
 
 use strict;
-use Test qw($ntest plan ok $TESTOUT $TESTERR);
-use vars qw($mycnt);
-
-BEGIN { plan test => 6, onfail => \&myfail }
-
-$mycnt = 0;
+use Test < qw($ntest plan ok $TESTOUT $TESTERR);
+use vars < qw($mycnt);
 
 my $why = "zero != one";
-# sneak in a test that Test::Harness wont see
-open J, ">", "junk";
-$TESTOUT = *J{IO};
-$TESTERR = *J{IO};
-ok(0, 1, $why);
-$TESTOUT = *STDOUT{IO};
-$TESTERR = *STDERR{IO};
-close J;
-unlink "junk";
-$ntest = 1;
 
 sub myfail {
     my ($f) = < @_;
@@ -31,3 +17,18 @@ sub myfail {
     ok(%$t{result}, 0);
     ok(%$t{expected}, 1);
 }
+
+BEGIN { plan test => 6, onfail => \&myfail }
+
+$mycnt = 0;
+
+# sneak in a test that Test::Harness wont see
+open J, ">", "junk";
+$TESTOUT = *J{IO};
+$TESTERR = *J{IO};
+ok(0, 1, $why);
+$TESTOUT = *STDOUT{IO};
+$TESTERR = *STDERR{IO};
+close J;
+unlink "junk";
+$ntest = 1;

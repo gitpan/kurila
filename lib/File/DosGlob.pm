@@ -18,7 +18,7 @@ sub doglob {
     my @retval = @( () );
     #print "doglob: ", join('|', @_), "\n";
   OUTER:
-    for my $pat (< @_) {
+    for my $pat ( @_) {
 	my @matched = @( () );
 	my @globdirs = @( () );
 	my $head = '.';
@@ -42,8 +42,8 @@ sub doglob {
 	    #print "div: |$head|$sepchr|$tail|\n";
 	    push (@retval, $pat), next OUTER if $tail eq '';
 	    if ($head =~ m/[*?]/) {
-		@globdirs = @( < doglob('d', $head) );
-		push(@retval, < doglob($cond, map {"$_$sepchr$tail"} < @globdirs)),
+		@globdirs = doglob('d', $head);
+		push(@retval, < doglob($cond, < map {"$_$sepchr$tail"} @globdirs)),
 		    next OUTER if (nelems @globdirs);
 	    }
 	    $head .= $sepchr if $head eq '' or $head =~ m/^[A-Za-z]:\z/s;
@@ -74,7 +74,7 @@ sub doglob {
 	#print "regex: '$pat', head: '$head'\n";
 	my $matchsub = sub { @_[0] =~ m|^$pat\z|is };
       INNER:
-	for my $e (< @leaves) {
+	for my $e ( @leaves) {
 	    next INNER if $e eq '.' or $e eq '..';
 	    next INNER if $cond eq 'd' and ! -d "$head$e";
 	    push(@matched, "$head$e"), next INNER if &$matchsub($e);
@@ -104,7 +104,7 @@ sub doglob_Mac {
 
 	#print "doglob_Mac: ", join('|', @_), "\n";
   OUTER:
-    for my $arg (< @_) {
+    for my $arg ( @_) {
         local $_ = $arg;
 	my @matched = @( () );
 	my @globdirs = @( () );
@@ -138,8 +138,8 @@ sub doglob_Mac {
 		$tmp_head =~ s/(\\*)([*?])/{$2 x ((length($1) + 1) % 2)}/g;
 	
 		if ($tmp_head =~ m/[*?]/) { # if there are wildcards ...	
-		@globdirs = @( < doglob_Mac('d', $head) );
-		push(@retval, < doglob_Mac($cond, map {"$_$sepchr$tail"} < @globdirs)),
+		@globdirs = doglob_Mac('d', $head);
+		push(@retval, < doglob_Mac($cond, < map {"$_$sepchr$tail"} @globdirs)),
 		    next OUTER if (nelems @globdirs);
 	    }
 		
@@ -184,7 +184,7 @@ sub doglob_Mac {
 	my $matchsub = eval 'sub { $_[0] =~ m|^' . $_ . '\z|ios }';
 	warn($@), next OUTER if $@;
       INNER:
-	for my $e (< @leaves) {
+	for my $e ( @leaves) {
 	    next INNER if $e eq '.' or $e eq '..';
 	    next INNER if $cond eq 'd' and ! -d "$not_esc_head$e";
 		
@@ -220,12 +220,12 @@ sub _expand_volume {
 	
 	require MacPerl; # to be verbose
 	
-	my @pat = @( < @_ );
+	my @pat = @_;
 	my @new_pat = @( () );
-	my @FSSpec_Vols = @( < MacPerl::Volumes() );
+	my @FSSpec_Vols = MacPerl::Volumes();
 	my @mounted_volumes = @( () );
 
-	foreach my $spec_vol (< @FSSpec_Vols) {		
+	foreach my $spec_vol ( @FSSpec_Vols) {		
 		# push all mounted volumes into array
      	push @mounted_volumes, < MacPerl::MakePath($spec_vol);
 	}
@@ -244,7 +244,7 @@ sub _expand_volume {
 			$vol_pat =~ s/(\\*)([*?])/{$1 . ('.' x ((length($1) + 1) % 2)) . $2}/g;
 			#print "volume regex: '$vol_pat' \n";
 				
-			foreach my $volume (< @mounted_volumes) {
+			foreach my $volume ( @mounted_volumes) {
 				if ($volume =~ m|^$vol_pat\z|ios) {
 					#
 					# On Mac OS, the two glob metachars '*' and '?' and the  
@@ -268,9 +268,9 @@ sub _expand_volume {
 # from the pattern, unless it's a volume name pattern like "*HD:"
 #
 sub _preprocess_pattern {
-	my @pat = @( < @_ );
+	my @pat = @_;
 	
-	foreach my $p (< @pat) {
+	foreach my $p ( @pat) {
 		my $proceed;
 		# resolve any updirs, e.g. "*HD:t?p::a*" -> "*HD:a*"
 		do {
@@ -289,7 +289,7 @@ sub _preprocess_pattern {
 # metachars '*', '?' and '\'.
 #
 sub _un_escape {
-	foreach (< @_) {
+	foreach ( @_) {
 		s/\\([*?\\])/$1/g;
 	}
 	return @_;
@@ -315,7 +315,7 @@ sub glob {
     # extract patterns
     if ($pat =~ m/\s/) {
 	require Text::ParseWords;
-	@pat = @( < Text::ParseWords::parse_line('\s+',0,$pat) );
+	@pat = Text::ParseWords::parse_line('\s+',0,$pat);
     }
     else {
 	push @pat, $pat;
@@ -327,7 +327,7 @@ sub glob {
     # This was just the esiest way, not nearly the best.
     REHASH: {
 	my @appendpat = @( () );
-	for (< @pat) {
+	for ( @pat) {
 	    # There must be a "," I.E. abc{efg} is not what we want.
 	    while ( m/^(.*)(?<!\\)\{(.*?)(?<!\\)\,.*?(?<!\\)\}(.*)$/ ) {
 		my ($start, $match, $end) = ($1, $2, $3);
@@ -354,13 +354,13 @@ sub glob {
 		) {
 	    #print "LOOP\n";
 	    #FIXME: Max loop, no way! :")
-	    for ( < @appendpat ) {
+	    for (  @appendpat ) {
 	        push @pat, $_;
 	    }
 	    goto REHASH;
 	}
     }
-    for ( < @pat ) {
+    for (  @pat ) {
 	s/\\{/\{/g;
 	s/\\}/\}/g;
 	s/\\,/,/g;
@@ -375,12 +375,12 @@ sub glob {
     if (%iter{$cxix} == 0) {
 	if ($^O eq 'MacOS') {
 		# first, take care of updirs and trailing colons
-		@pat = @( < _preprocess_pattern(< @pat) );
+		@pat = _preprocess_pattern(< @pat);
 		# expand volume names
-		@pat = @( < _expand_volume(< @pat) );
-		%entries{$cxix} = (nelems @pat) ? \@( <_un_escape( < doglob_Mac(1,< @pat) )) : \@();
+		@pat = _expand_volume(< @pat);
+		%entries{$cxix} = (nelems @pat) ? \_un_escape( < doglob_Mac(1,< @pat) ) : \@();
 	} else {
-		%entries{$cxix} = \@( <doglob(1,< @pat));
+		%entries{$cxix} = \doglob(1,< @pat);
     }
 	}
 

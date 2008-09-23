@@ -581,11 +581,7 @@ typedef MAGIC   *B__MAGIC;
 #define OP_desc(o)	(char *)PL_op_desc[o->op_type]
 #define OP_targ(o)	o->op_targ
 #define OP_type(o)	o->op_type
-#if PERL_VERSION >= 9
-#  define OP_opt(o)	o->op_opt
-#else
-#  define OP_seq(o)	o->op_seq
-#endif
+#define OP_opt(o)	o->op_opt
 #define OP_flags(o)	o->op_flags
 #define OP_private(o)	o->op_private
 #define OP_spare(o)	o->op_spare
@@ -670,10 +666,11 @@ OP_free(o)
         sv_setiv(SvRV(ST(0)), 0);
 
 void
-OP_new(class, type, flags)
+OP_new(class, type, flags, location)
     SV * class
     SV * type
     I32 flags
+    SV * location
     SV** sparepad = NO_INIT
     OP *o = NO_INIT
     OP *saveop = NO_INIT
@@ -683,7 +680,7 @@ OP_new(class, type, flags)
         saveop = PL_op;
         PL_curpad = AvARRAY(PL_comppad);
         typenum = op_name_to_num(type);
-        o = newOP(typenum, flags);
+        o = newOP(typenum, flags, newSVsv(location));
 #ifdef PERL_CUSTOM_OPS
         if (typenum == OP_CUSTOM)
             o->op_ppaddr = custom_op_ppaddr(SvPV_nolen(type));
@@ -694,11 +691,12 @@ OP_new(class, type, flags)
         sv_setiv(newSVrv(ST(0), "B::OP"), PTR2IV(o));
 
 void
-OP_newstate(class, flags, label, oldo)
+OP_newstate(class, flags, label, oldo, location)
     SV * class
     I32 flags
     char * label
     B::OP oldo
+    SV* location
     SV** sparepad = NO_INIT
     OP *o = NO_INIT
     OP *saveop = NO_INIT
@@ -706,7 +704,7 @@ OP_newstate(class, flags, label, oldo)
         sparepad = PL_curpad;
         saveop = PL_op;
         PL_curpad = AvARRAY(PL_comppad);
-        o = newSTATEOP(flags, label, oldo);
+        o = newSTATEOP(flags, label, oldo, newSVsv(location));
         PL_curpad = sparepad;
         PL_op = saveop;
             ST(0) = sv_newmortal();
@@ -735,11 +733,12 @@ UNOP_set_first(o, first)
         o->op_first = first;
     
 void
-UNOP_new(class, type, flags, sv_first)
+UNOP_new(class, type, flags, sv_first, location)
     SV * class
     SV * type
     I32 flags
     SV * sv_first
+    SV * location
     OP *first = NO_INIT
     OP *o = NO_INIT
     I32 typenum = NO_INIT
@@ -763,7 +762,7 @@ UNOP_new(class, type, flags, sv_first)
 
         PL_curpad = AvARRAY(PL_comppad);
         typenum = op_name_to_num(type);
-        o = newUNOP(typenum, flags, first);
+        o = newUNOP(typenum, flags, first, newSVsv(location));
 #ifdef PERL_CUSTOM_OPS
         if (typenum == OP_CUSTOM)
             o->op_ppaddr = custom_op_ppaddr(SvPV_nolen(type));
@@ -789,12 +788,13 @@ BINOP_set_last(o, last)
         o->op_last = last;
 
 void
-BINOP_new(class, type, flags, sv_first, sv_last)
+BINOP_new(class, type, flags, sv_first, sv_last, location)
     SV * class
     SV * type
     I32 flags
     SV * sv_first
     SV * sv_last
+    SV * location
     OP *first = NO_INIT
     OP *last = NO_INIT
     OP *o = NO_INIT
@@ -833,9 +833,9 @@ BINOP_new(class, type, flags, sv_first, sv_last)
         PL_curpad = AvARRAY(PL_comppad);
         
         if (typenum == OP_SASSIGN || typenum == OP_AASSIGN) 
-            o = newASSIGNOP(flags, first, 0, last);
+            o = newASSIGNOP(flags, first, 0, last, newSVsv(location));
         else {
-            o = newBINOP(typenum, flags, first, last);
+            o = newBINOP(typenum, flags, first, last, newSVsv(location));
 #ifdef PERL_CUSTOM_OPS
             if (typenum == OP_CUSTOM)
                 o->op_ppaddr = custom_op_ppaddr(SvPV_nolen(type));
@@ -851,12 +851,13 @@ BINOP_new(class, type, flags, sv_first, sv_last)
 MODULE = B::OP    PACKAGE = B::LISTOP             PREFIX = LISTOP_
 
 void
-LISTOP_new(class, type, flags, sv_first, sv_last)
+LISTOP_new(class, type, flags, sv_first, sv_last, location)
     SV * class
     SV * type
     I32 flags
     SV * sv_first
     SV * sv_last
+    SV * location
     OP *first = NO_INIT
     OP *last = NO_INIT
     OP *o = NO_INIT
@@ -893,7 +894,7 @@ LISTOP_new(class, type, flags, sv_first, sv_last)
         I32 typenum = op_name_to_num(type);
 
         PL_curpad = AvARRAY(PL_comppad);
-        o = newLISTOP(typenum, flags, first, last);
+        o = newLISTOP(typenum, flags, first, last, newSVsv(location));
 #ifdef PERL_CUSTOM_OPS
         if (typenum == OP_CUSTOM)
             o->op_ppaddr = custom_op_ppaddr(SvPV_nolen(type));
@@ -907,12 +908,13 @@ LISTOP_new(class, type, flags, sv_first, sv_last)
 MODULE = B::OP    PACKAGE = B::LOGOP              PREFIX = LOGOP_
 
 void
-LOGOP_new(class, type, flags, sv_first, sv_last)
+LOGOP_new(class, type, flags, sv_first, sv_last, location)
     SV * class
     SV * type
     I32 flags
     SV * sv_first
     SV * sv_last
+    SV * location
     OP *first = NO_INIT
     OP *last = NO_INIT
     OP *o = NO_INIT
@@ -948,7 +950,7 @@ LOGOP_new(class, type, flags, sv_first, sv_last)
         OP* saveop   = PL_op;
         I32 typenum  = op_name_to_num(type);
         PL_curpad = AvARRAY(PL_comppad);
-        o = newLOGOP(typenum, flags, first, last);
+        o = newLOGOP(typenum, flags, first, last, newSVsv(location));
 #ifdef PERL_CUSTOM_OPS
         if (typenum == OP_CUSTOM)
             o->op_ppaddr = custom_op_ppaddr(SvPV_nolen(type));
@@ -960,12 +962,13 @@ LOGOP_new(class, type, flags, sv_first, sv_last)
         sv_setiv(newSVrv(ST(0), "B::LOGOP"), PTR2IV(o));
 
 void
-LOGOP_newcond(class, flags, sv_first, sv_last, sv_else)
+LOGOP_newcond(class, flags, sv_first, sv_last, sv_else, location)
     SV * class
     I32 flags
     SV * sv_first
     SV * sv_last
     SV * sv_else
+    SV * location
     OP *first = NO_INIT
     OP *last = NO_INIT
     OP *elseo = NO_INIT
@@ -1014,7 +1017,7 @@ LOGOP_newcond(class, flags, sv_first, sv_last, sv_else)
         SV**sparepad = PL_curpad;
         OP* saveop   = PL_op;
         PL_curpad = AvARRAY(PL_comppad);
-        o = newCONDOP(flags, first, last, elseo);
+        o = newCONDOP(flags, first, last, elseo, newSVsv(location));
         PL_curpad = sparepad;
         PL_op = saveop;
         }
@@ -1053,11 +1056,12 @@ SVOP_set_sv(o, ...)
         OLD_PAD;
 
 void
-SVOP_new(class, type, flags, sv)
+SVOP_new(class, type, flags, sv, location)
     SV * class
     SV * type
     I32 flags
     SV * sv
+    SV * location
     SV** sparepad = NO_INIT
     OP *o = NO_INIT
     OP *saveop = NO_INIT
@@ -1076,7 +1080,7 @@ SVOP_new(class, type, flags, sv)
             "First character to GVSV was not dollar");
         } else
             param = newSVsv(sv);
-        o = newSVOP(typenum, flags, param);
+        o = newSVOP(typenum, flags, param, newSVsv(location));
 #ifdef PERL_CUSTOM_OPS
         if (typenum == OP_CUSTOM)
             o->op_ppaddr = custom_op_ppaddr(SvPV_nolen(type));
@@ -1121,11 +1125,12 @@ LOOP_set_lastop(o, lastop)
 MODULE = B::OP    PACKAGE = B::COP                PREFIX = COP_
 
 B::COP
-COP_new(class, flags, name, sv_first)
+COP_new(class, flags, name, sv_first, location)
     SV * class
     char * name
     I32 flags
     SV * sv_first
+    SV * location
     OP *first = NO_INIT
     OP *o = NO_INIT
     CODE:
@@ -1146,7 +1151,7 @@ COP_new(class, flags, name, sv_first)
         SV**sparepad = PL_curpad;
         OP* saveop = PL_op;
         PL_curpad = AvARRAY(PL_comppad);
-        o = newSTATEOP(flags, name, first);
+        o = newSTATEOP(flags, name, first, newSVsv(location));
         PL_curpad = sparepad;
         PL_op = saveop;
         }
@@ -1252,19 +1257,9 @@ U16
 OP_type(o)
 	B::OP		o
 
-#if PERL_VERSION >= 9
-
 U8
 OP_opt(o)
 	B::OP		o
-
-#else
-
-U16
-OP_seq(o)
-	B::OP		o
-
-#endif
 
 U8
 OP_flags(o)
@@ -1274,13 +1269,17 @@ U8
 OP_private(o)
 	B::OP		o
 
-#if PERL_VERSION >= 9
-
 U8
 OP_spare(o)
 	B::OP		o
 
-#endif
+SV*
+OP_location(o)
+        B::OP           o
+    CODE:
+        RETVAL = SvREFCNT_inc(o->op_location ? o->op_location : &PL_sv_undef);
+    OUTPUT:
+        RETVAL
 
 void
 OP_oplist(o)
@@ -1467,10 +1466,7 @@ LOOP_lastop(o)
 #define COP_label(o)	o->cop_label
 #define COP_stashpv(o)	CopSTASHPV(o)
 #define COP_stash(o)	CopSTASH(o)
-#define COP_file(o)	CopFILE(o)
-#define COP_filegv(o)	CopFILEGV(o)
 #define COP_cop_seq(o)	o->cop_seq
-#define COP_line(o)	CopLINE(o)
 #define COP_hints(o)	CopHINTS_get(o)
 #if PERL_VERSION < 9
 #  define COP_warnings(o)  o->cop_warnings
@@ -1491,21 +1487,8 @@ B::HV
 COP_stash(o)
 	B::COP	o
 
-char *
-COP_file(o)
-	B::COP	o
-
-B::GV
-COP_filegv(o)
-       B::COP  o
-
-
 U32
 COP_cop_seq(o)
-	B::COP	o
-
-U32
-COP_line(o)
 	B::COP	o
 
 #define COP_hints_hash(o) o->cop_hints_hash
@@ -1559,7 +1542,7 @@ Cvnewsub_simple(class, name, block)
     OP* o = NO_INIT
 
     CODE:
-        o = newSVOP(OP_CONST, 0, name);
+        o = newSVOP(OP_CONST, 0, name, NULL);
         mycv = newSUB(start_subparse(0), o, Nullop, block);
         /*op_free(o); */
         RETVAL = mycv;

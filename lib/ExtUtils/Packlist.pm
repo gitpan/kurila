@@ -2,7 +2,7 @@ package ExtUtils::Packlist;
 
 use strict;
 use Config;
-use vars qw($VERSION $Relocations);
+use vars < qw($VERSION $Relocations);
 $VERSION = '1.43';
 $VERSION = eval $VERSION;
 
@@ -124,7 +124,7 @@ while (defined($line = ~< $fh))
    if ($key =~ m/^(.*?)( \w+=.*)$/)
       {
       $key = $1;
-      $data = \%( map { split('=', $_) } split(' ', $2));
+      $data = \%( < map { < split('=', $_) } split(' ', $2));
 
       if (%Config{userelocatableinc} && $data->{relocate_as})
       {

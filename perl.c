@@ -604,7 +604,6 @@ perl_destruct(pTHXx)
 	PerlIO_cleanup(aTHX);
 #endif
 
-	CopFILE_free(&PL_compiling);
 	CopSTASH_free(&PL_compiling);
 
 	/* The exit() function will do everything that needs doing. */
@@ -807,7 +806,6 @@ perl_destruct(pTHXx)
     PL_compiling.cop_warnings = NULL;
     SvREFCNT_dec(PL_compiling.cop_hints_hash);
     PL_compiling.cop_hints_hash = NULL;
-    CopFILE_free(&PL_compiling);
     CopSTASH_free(&PL_compiling);
 
     /* Prepare to destruct main symbol table.  */
@@ -1609,7 +1607,7 @@ S_parse_body(pTHX_ char **env, XSINIT_t xsinit)
 		else {
 		    ++s;
 		    opts_prog = Perl_newSVpvf(aTHX_
-					      "Config::config_vars(qw%c%s%c)",
+					      "Config::config_vars(<qw%c%s%c)",
 					      0, s, 0);
 		    s += strlen(s);
 		}
@@ -1894,6 +1892,7 @@ S_parse_body(pTHX_ char **env, XSINIT_t xsinit)
 #endif
 
     lex_start(linestr_sv, rsfp, TRUE);
+    SVcpSTEAL(PL_parser->lex_filename, newSVpv(PL_origfilename, 0));
     PL_subname = newSVpvs("main");
 
     if (add_read_e_script)
@@ -1917,11 +1916,11 @@ S_parse_body(pTHX_ char **env, XSINIT_t xsinit)
 	    Perl_croak(aTHX_ "%s had compilation errors.", PL_origfilename);
 	else {
 	    Perl_croak(aTHX_ "Execution of %s aborted due to compilation errors.",
-		       PL_origfilename);
+		PL_origfilename);
 	}
     }
 #endif
-    CopLINE_set(PL_curcop, 0);
+    PL_parser->lex_line_number = 0;
     if (PL_e_script) {
 	SvREFCNT_dec(PL_e_script);
 	PL_e_script = NULL;
@@ -1931,8 +1930,6 @@ S_parse_body(pTHX_ char **env, XSINIT_t xsinit)
 	my_unexec();
 
     if (isWARN_ONCE) {
-	SAVECOPFILE(PL_curcop);
-	SAVECOPLINE(PL_curcop);
 	gv_check(PL_defstash);
     }
 
@@ -2176,7 +2173,7 @@ Perl_get_cvn_flags(pTHX_ const char *name, STRLEN len, I32 flags)
     if ((flags & ~GV_NOADD_MASK) && !GvCVu(gv)) {
 	SV *const sv = newSVpvn(name,len);
     	return newSUB(start_subparse(0),
-		      newSVOP(OP_CONST, 0, sv),
+		      newSVOP(OP_CONST, 0, sv, NULL),
 		      NULL, NULL);
     }
     if (gv)
@@ -2306,6 +2303,7 @@ Perl_call_sv(pTHX_ SV *sv, VOL I32 flags)
     if (!(flags & G_NOARGS))
 	myop.op_flags |= OPf_STACKED;
     myop.op_flags |= OP_GIMME_REVERSE(flags);
+    myop.op_location = SvLOCATION(sv);
     SAVEOP();
     PL_op = (OP*)&myop;
 
@@ -2773,7 +2771,7 @@ Perl_moreswitches(pTHX_ const char *s)
 		sv_catpvn(sv, start, s-start);
 		/* Don't use NUL as q// delimiter here, this string goes in the
 		 * environment. */
-		Perl_sv_catpvf(aTHX_ sv, " split(m/,/,q{%s});", ++s);
+		Perl_sv_catpvf(aTHX_ sv, " < split(m/,/,q{%s});", ++s);
 	    }
 	    s = end;
 	    my_setenv("PERL5DB", SvPV_nolen_const(sv));
@@ -2915,7 +2913,7 @@ Perl_moreswitches(pTHX_ const char *s)
 	    } else {
 		sv_catpvn(sv, start, s-start);
 		/* Use NUL as q''-delimiter.  */
-		sv_catpvs(sv, " split(m/,/,q\0");
+		sv_catpvs(sv, " < split(m/,/,q\0");
 		++s;
 		sv_catpvn(sv, s, end - s);
 		sv_catpvs(sv,  "\0)");
@@ -3271,8 +3269,6 @@ S_open_script(pTHX_ const char *scriptname, bool dosearch,
 	}
     }
 
-    CopFILE_free(PL_curcop);
-    CopFILE_set(PL_curcop, PL_origfilename);
     if (*PL_origfilename == '-' && PL_origfilename[1] == '\0')
 	scriptname = (char *)"";
     if (fdscript >= 0) {
@@ -3359,7 +3355,7 @@ S_open_script(pTHX_ const char *scriptname, bool dosearch,
 	    Perl_croak(aTHX_ "Can't open "BIT_BUCKET": %s\n", Strerror(errno));
 	else
 	    Perl_croak(aTHX_ "Can't open perl script \"%s\": %s\n",
-		    CopFILE(PL_curcop), Strerror(errno));
+		    PL_origfilename, Strerror(errno));
     }
     return fdscript;
 }
@@ -4714,7 +4710,6 @@ Perl_call_list(pTHX_ I32 oldscope, AV *paramList)
 {
     dVAR;
     SV *atsv;
-    volatile const line_t oldline = PL_curcop ? CopLINE(PL_curcop) : 0;
     CV *cv;
     int ret;
     dJMPENV;
@@ -4761,7 +4756,6 @@ Perl_call_list(pTHX_ I32 oldscope, AV *paramList)
 	    atsv = ERRSV;
 	    if (SvTRUE(atsv)) {
 		PL_curcop = &PL_compiling;
-		CopLINE_set(PL_curcop, oldline);
 		while (PL_scopestack_ix > oldscope)
 		    LEAVE;
 		JMPENV_POP;
@@ -4801,7 +4795,6 @@ Perl_call_list(pTHX_ I32 oldscope, AV *paramList)
 		LEAVE;
 	    FREETMPS;
 	    PL_curcop = &PL_compiling;
-	    CopLINE_set(PL_curcop, oldline);
 	    JMPENV_POP;
 	    if (PL_statusvalue && !(PL_exit_flags & PERL_EXIT_EXPECTED)) {
 		if (paramList == PL_beginav)
@@ -4818,7 +4811,6 @@ Perl_call_list(pTHX_ I32 oldscope, AV *paramList)
 	case 3:
 	    if (PL_restartop) {
 		PL_curcop = &PL_compiling;
-		CopLINE_set(PL_curcop, oldline);
 		JMPENV_JUMP(3);
 	    }
 	    PerlIO_printf(Perl_error_log, "panic: restartop\n");

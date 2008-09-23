@@ -14,7 +14,7 @@ print "ok 1\n";
 # old style as reference
 our %x;
 local(%x);
-my @z = @( qw(list edit send abort gripe listen) );
+my @z = qw(list edit send abort gripe listen);
 abbrev(\%x, < @z);
 my $r = join ':', sort keys %x; 
 print "not " if exists %x{'l'}   ||

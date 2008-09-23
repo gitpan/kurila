@@ -1173,8 +1173,6 @@ void
 Perl_write_to_stderr(pTHX_ const char* message, int msglen)
 {
     dVAR;
-    IO *io;
-    MAGIC *mg;
 
     PERL_ARGS_ASSERT_WRITE_TO_STDERR;
 
@@ -1222,16 +1220,18 @@ Perl_vdie_common(pTHX_ SV *msv, bool warn)
 	return FALSE;
     }
     if ( *hook == PERL_DIEHOOK_FATAL ) {
-	const COP *cop = PL_curcop;
-	if (CopLINE(cop)) {
+	if (PL_op && PL_op->op_location) {
+	    AV *loc = (AV*)PL_op->op_location;
 	    const char* message = "recursive die at ";
 	    char buffer[20];
-	    char* filename = OutCopFILE(cop);
+	    STRLEN filename_len;
+	    const char* filename = SvPV_const(*av_fetch(loc, 0, 0), filename_len);
+	    IV linenr = SvIV(*av_fetch(loc, 1, 0));
 	    int blen;
 	    write_to_stderr("recursive die at ", strlen(message));
-	    write_to_stderr(filename, strlen(filename));
-	    blen = snprintf(&buffer, 20, " line %"IVdf".\n", (IV)CopLINE(cop));
-	    write_to_stderr(&buffer, blen);
+	    write_to_stderr(filename, filename_len);
+	    blen = snprintf((char*)&buffer, 20, " line %"IVdf".\n", linenr);
+	    write_to_stderr((char*)&buffer, blen);
 	}
 	else {
 	    const char* message = "recursive die at unknown location\n";
@@ -1239,6 +1239,7 @@ Perl_vdie_common(pTHX_ SV *msv, bool warn)
 	}
 	return FALSE;
     }
+
 
     ENTER;
     SAVESPTR(*hook);
@@ -1268,7 +1269,7 @@ Perl_vdie_common(pTHX_ SV *msv, bool warn)
 }
 
 STATIC SV*
-S_vdie_croak_common(pTHX_ const char* pat, va_list* args)
+S_vdie_croak_common(pTHX_ SV* location, const char* pat, va_list* args)
 {
     dVAR;
     SV * msv;
@@ -1290,10 +1291,13 @@ S_vdie_croak_common(pTHX_ const char* pat, va_list* args)
 	    PUSHMARK(SP);
 
 	    XPUSHs(msv);
+	    XPUSHs(location);
 
 	    PUTBACK;
 	    call_sv(PL_errorcreatehook, G_SCALAR);
+	    SPAGAIN;
 	    msv = TOPs;
+	    PUTBACK;
 	    POPSTACK;
 	    LEAVE;
 	}
@@ -1309,7 +1313,19 @@ Perl_vdie(pTHX_ const char* pat, va_list *args)
     dVAR;
     SV* msv;
 
-    msv = vdie_croak_common(pat, args);
+    SV* location = NULL;
+    if (PL_op) {
+	location = PL_op->op_location;
+    }
+    else if (PL_compcv) {
+	AV* locav = av_2mortal(newAV());
+	av_push(locav, newSVsv(PL_parser->lex_filename));
+	av_push(locav, newSViv(PL_parser->lex_line_number));
+	av_push(locav, newSViv((PL_parser->bufptr - PL_parser->linestart +
+		    PL_parser->lex_charoffset) + 1));
+	location = AvSV(locav);
+    }
+    msv = vdie_croak_common(location, pat, args);
     die_where(msv);
     /* NOTREACHED */
 }
@@ -1383,8 +1399,21 @@ Perl_croak(pTHX_ const char *pat, ...)
     va_end(args);
 }
 
+
 void
-Perl_vwarn(pTHX_ const char* pat, va_list *args)
+Perl_croak_at(pTHX_ SV* location, const char *pat, ...)
+{
+    SV* msv;
+    va_list args;
+    va_start(args, pat);
+    msv = vdie_croak_common(location, pat, &args);
+    die_where(msv);
+    /* NOTREACHED */
+    va_end(args);
+}
+
+void
+Perl_vwarn_at(pTHX_ SV* location, const char* pat, va_list *args)
 {
     SV* msv;
 
@@ -1404,7 +1433,10 @@ Perl_vwarn(pTHX_ const char* pat, va_list *args)
 	    ENTER;
 	    PUSHSTACKi(PERLSI_WARNHOOK);
 	    PUSHMARK(SP);
+
 	    XPUSHs(msv);
+	    XPUSHs(location);
+
 	    PUTBACK;
 	    call_sv(PL_errorcreatehook, G_SCALAR);
 	    SPAGAIN;
@@ -1446,7 +1478,7 @@ Perl_warn(pTHX_ const char *pat, ...)
     va_list args;
     PERL_ARGS_ASSERT_WARN;
     va_start(args, pat);
-    vwarn(pat, &args);
+    vwarner(0, pat, &args);
     va_end(args);
 }
 
@@ -1474,16 +1506,49 @@ Perl_warner(pTHX_ U32  err, const char* pat,...)
 }
 
 void
+Perl_warner_at(pTHX_ SV* location, U32  err, const char* pat,...)
+{
+    va_list args;
+    PERL_ARGS_ASSERT_WARNER;
+    va_start(args, pat);
+    vwarner_at(location, err, pat, &args);
+    va_end(args);
+}
+
+void
 Perl_vwarner(pTHX_ U32  err, const char* pat, va_list* args)
+{
+    SV* location;
+    if (PL_op) {
+	location = PL_op->op_location;
+    }
+    else if (PL_compcv) {
+	AV* res = av_2mortal(newAV());
+	av_push(res, newSVsv(PL_parser->lex_filename));
+	av_push(res, newSViv(PL_parser->lex_line_number));
+	av_push(res, newSViv((PL_parser->bufptr - PL_parser->linestart +
+		    PL_parser->lex_charoffset) + 1));
+	location = (SV*)res;
+    }
+    else {
+	location = NULL;
+    }
+    Perl_vwarner_at(aTHX_ location, err, pat, args);
+}
+
+void
+Perl_vwarner_at(pTHX_ SV* location, U32  err, const char* pat, va_list* args)
 {
     dVAR;
     PERL_ARGS_ASSERT_VWARNER;
     if (PL_warnhook == PERL_WARNHOOK_FATAL || ckDEAD(err)) {
-	vdie(pat, args);
+	SV* msv;
+	msv = vdie_croak_common(location, pat, args);
+	die_where(msv);
 	/* NOTREACHED */
     }
     else {
-	Perl_vwarn(aTHX_ pat, args);
+	Perl_vwarn_at(aTHX_ location, pat, args);
     }
 }
 
@@ -3418,9 +3483,6 @@ Perl_get_vtbl(pTHX_ int vtbl_id)
     case want_vtbl_mglob:
 	result = &PL_vtbl_mglob;
 	break;
-    case want_vtbl_nkeys:
-	result = &PL_vtbl_nkeys;
-	break;
     case want_vtbl_taint:
 	result = &PL_vtbl_taint;
 	break;
@@ -3441,18 +3503,6 @@ Perl_get_vtbl(pTHX_ int vtbl_id)
 	break;
     case want_vtbl_regexp:
 	result = &PL_vtbl_regexp;
-	break;
-    case want_vtbl_regdata:
-	result = &PL_vtbl_regdata;
-	break;
-    case want_vtbl_regdatum:
-	result = &PL_vtbl_regdatum;
-	break;
-    case want_vtbl_amagic:
-	result = &PL_vtbl_amagic;
-	break;
-    case want_vtbl_amagicelem:
-	result = &PL_vtbl_amagicelem;
 	break;
     case want_vtbl_backref:
 	result = &PL_vtbl_backref;

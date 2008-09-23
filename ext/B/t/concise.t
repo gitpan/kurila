@@ -11,7 +11,7 @@ BEGIN {
 
 use strict;
 
-plan tests => 153;
+plan tests => 151;
 
 require_ok("B::Concise");
 
@@ -46,19 +46,19 @@ like($out, qr/print/, "'-exec' option output has print opcode");
 ######## API tests v.60 
 
 use Config;	# used for perlio check
-B::Concise->import(qw( set_style set_style_standard add_callback 
+B::Concise->import( <qw( set_style set_style_standard add_callback 
 		       add_style walk_output reset_sequence ));
 
 ## walk_output argument checking
 
 # test that walk_output rejects non-HANDLE args
-foreach my $foo ("string", \@(), \%()) {
+foreach my $foo (@("string", \@(), \%())) {
     try {  walk_output($foo) };
     isnt ($@ && $@->message, '', "walk_output() rejects arg {dump::view($foo)}");
     $@=''; # clear the fail for next test
 }
 # test accessor mode when arg undefd or 0
-foreach my $foo (undef, 0) {
+foreach my $foo (@(undef, 0)) {
     my $handle = walk_output($foo);
     is ($handle, \*STDOUT, "walk_output set to STDOUT (default)");
 }
@@ -77,7 +77,7 @@ SKIP: {
     skip("no perlio in this build", 4)
         unless %Config::Config{useperlio};
 
-    foreach my $foo (\*STDOUT, \*STDERR) {
+    foreach my $foo (@(\*STDOUT, \*STDERR)) {
 	try {  walk_output($foo) };
 	is ($@, '', "walk_output() accepts STD* " . ref $foo);
     }
@@ -138,11 +138,11 @@ SKIP: {
     
     set_style_standard('concise');  # MUST CALL before output needed
     
-    my @options = @( qw(
+    my @options = qw(
 		  -basic -exec -tree -compact -loose -vt -ascii
 		  -base10 -bigendian -littleendian
-		  ) );
-    foreach my $opt (< @options) {
+		  );
+    foreach my $opt ( @options) {
 	my ($out) = < render($opt, $func);
 	isnt($out, '', "got output with option $opt");
     }
@@ -170,7 +170,7 @@ SKIP: {
     if (0) {
 	# pending STASH splaying
 	
-	foreach my $ref (\@(), \%()) {
+	foreach my $ref (@(\@(), \%())) {
 	    my $typ = ref $ref;
 	    walk_output(\my $out);
 	    try { B::Concise::compile('-basic', $ref)->() };
@@ -191,16 +191,12 @@ SKIP: {
 
 	sub defd_empty {};
 	($res,$err) = < render('-basic', \&defd_empty);
-	my @lines = @( split(m/\n/, $res) );
+	my @lines = split(m/\n/, $res);
 	is(scalar nelems @lines, 3,
 	   "'sub defd_empty \{\}' seen as 3 liner");
 
 	is(1, $res =~ m/leavesub/ && $res =~ m/(next|db)state/,
 	   "'sub defd_empty \{\}' seen as 2 ops: leavesub,nextstate");
-
-	($res,$err) = < render('-basic', \&not_even_declared);
-	like ($res, qr/coderef CODE\(0x[0-9a-fA-F]+\) has no START/,
-	      "'\&not_even_declared' seen as having no START");
 
 	{
 	    package Bar;
@@ -211,10 +207,6 @@ SKIP: {
 	($res,$err) = < render('-basic', 'Bar::auto_func');
 	like ($res, qr/unknown function \(Bar::auto_func\)/,
 	      "Bar::auto_func seen as unknown function");
-
-	($res,$err) = < render('-basic', \&Bar::auto_func);
-	like ($res, qr/coderef CODE\(0x[0-9a-fA-F]+\) has no START/,
-	      "'\&Bar::auto_func' seen as having no START");
 
 	($res,$err) = < render('-basic', \&Bar::AUTOLOAD);
 	like ($res, qr/in AUTOLOAD body: /, "found body of Bar::AUTOLOAD");
@@ -245,12 +237,12 @@ SKIP: {
 
     # bang at it combinatorically
     my %combos;
-    my @modes = @( qw( -basic -exec ) );
-    my @styles = @( qw( -concise -debug -linenoise -terse ) );
+    my @modes = qw( -basic -exec );
+    my @styles = qw( -concise -debug -linenoise -terse );
 
     # prep samples
-    for my $style (< @styles) {
-	for my $mode (< @modes) {
+    for my $style ( @styles) {
+	for my $mode ( @modes) {
 	    walk_output(\$sample);
 	    reset_sequence();
 	    $walker->($style, $mode);
@@ -258,7 +250,7 @@ SKIP: {
 	}
     }
     # crosscheck that samples are all text-different
-    my @list = @( sort keys %combos );
+    my @list = sort keys %combos;
     for my $i (0..((nelems @list)-1)) {
 	for my $j ($i+1..((nelems @list)-1)) {
 	    isnt (%combos{@list[$i]}, %combos{@list[$j]},
@@ -267,8 +259,8 @@ SKIP: {
     }
     
     # add samples with styles in different order
-    for my $mode (< @modes) {
-	for my $style (< @styles) {
+    for my $mode ( @modes) {
+	for my $style ( @styles) {
 	    reset_sequence();
 	    walk_output(\$sample);
 	    $walker->($mode, $style);
@@ -276,8 +268,8 @@ SKIP: {
 	}
     }
     # test commutativity of flags, ie that AB == BA
-    for my $mode (< @modes) {
-	for my $style (< @styles) {
+    for my $mode ( @modes) {
+	for my $style ( @styles) {
 	    is ( %combos{"$style$mode"},
 		 %combos{"$mode$style"},
 		 "results for $style$mode vs $mode$style are the same" );
@@ -288,11 +280,11 @@ SKIP: {
     %combos = %( () );	# outputs for $mode=any($order) and any($style)
 
     # add more samples with switching modes & sticky styles
-    for my $style (< @styles) {
+    for my $style ( @styles) {
 	walk_output(\$sample);
 	reset_sequence();
 	$walker->($style);
-	for my $mode (< @modes) {
+	for my $mode ( @modes) {
 	    walk_output(\$sample);
 	    reset_sequence();
 	    $walker->($mode);
@@ -300,7 +292,7 @@ SKIP: {
 	}
     }
     # crosscheck that samples are all text-different
-    my @nm = @( sort keys %combos );
+    my @nm = sort keys %combos;
     for my $i (0..((nelems @nm)-1)) {
 	for my $j ($i+1..((nelems @nm)-1)) {
 	    isnt (%combos{@nm[$i]}, %combos{@nm[$j]},
@@ -309,11 +301,11 @@ SKIP: {
     }
     
     # add samples with switching styles & sticky modes
-    for my $mode (< @modes) {
+    for my $mode ( @modes) {
 	walk_output(\$sample);
 	reset_sequence();
 	$walker->($mode);
-	for my $style (< @styles) {
+	for my $style ( @styles) {
 	    walk_output(\$sample);
 	    reset_sequence();
 	    $walker->($style);
@@ -321,8 +313,8 @@ SKIP: {
 	}
     }
     # test commutativity of flags, ie that AB == BA
-    for my $mode (< @modes) {
-	for my $style (< @styles) {
+    for my $mode ( @modes) {
+	for my $style ( @styles) {
 	    is ( %combos{"$style/$mode"},
 		 %combos{"$mode/$style"},
 		 "results for $style/$mode vs $mode/$style are the same" );
@@ -334,8 +326,8 @@ SKIP: {
     %combos = %(< %combos, < %save);
 
     # test commutativity of flags, ie that AB == BA
-    for my $mode (< @modes) {
-	for my $style (< @styles) {
+    for my $mode ( @modes) {
+	for my $style ( @styles) {
 
 	    is ( %combos{"$style$mode"},
 		 %combos{"$style/$mode"},

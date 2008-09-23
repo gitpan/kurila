@@ -22,7 +22,7 @@ my %modules = %(
     'Time::HiRes'=> q| main::can_ok( 'Time::HiRes' => 'usleep'  ) |,
 );
 
-plan tests => nelems(@(keys(%modules))) * 3 + 5;
+plan tests => nelems(keys(%modules)) * 3 + 5;
 
 # Try to load the module
 use_ok( 'XSLoader' );

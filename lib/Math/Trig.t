@@ -13,13 +13,13 @@ use Test::More;
 plan(tests => 69);
 
 use Math::Trig v1.16;
-use Math::Trig v1.16 qw(:pi);
+use Math::Trig v1.16 < qw(:pi);
 
 my $pip2 = pi / 2;
 
 use strict;
 
-use vars qw($x $y $z);
+use vars < qw($x $y $z);
 
 my $eps = 1e-11;
 
@@ -233,11 +233,11 @@ use Math::Trig ':radial';
 
     ok(near($lat, $pip2 - @London[1]));
 
-    my $dir3 = ( <great_circle_destination(< @London, $dir1, $dst1))[[2]];
+    my $dir3 = (great_circle_destination(< @London, $dir1, $dst1))[2];
 
     ok(near($dir3, 2.69379263839118)); # about 154.343 deg
 
-    my $dir4 = ( <great_circle_destination(< @Tokyo,  $dir2, $dst2))[[2]];
+    my $dir4 = (great_circle_destination(< @Tokyo,  $dir2, $dst2))[2];
 
     ok(near($dir4, 3.6993902625701)); # about 211.959 deg
 
@@ -245,7 +245,7 @@ use Math::Trig ':radial';
 }
 
 # E.g. netbsd-alpha core dumps on Inf arith without this.
-local %SIG{FPE} = \%( );
+local %SIG{FPE} = undef;
 
 print "# great_circle_distance with small angles\n";
 

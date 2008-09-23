@@ -1,9 +1,9 @@
 #!./perl -i.inplace
 # note the extra switch, for the test below
 
-use Test::More tests => 39;
+use Test::More tests => 34;
 
-use English qw( -no_match_vars ) ;
+use English < qw( -no_match_vars ) ;
 use Config;
 use Errno;
 
@@ -52,7 +52,7 @@ undef $OUTPUT_FIELD_SEPARATOR;
 our $threads;
 if ($threads) { $" = "\n" } else { $LIST_SEPARATOR = "\n" };
 my @foo = @(8, 9);
-@foo = @( split(m/\n/, join $", < @foo ) );
+@foo = split(m/\n/, join $", @foo );
 is( @foo[0], 8, '$"' );
 is( @foo[1], 9, '$LIST_SEPARATOR' );
 
@@ -79,11 +79,7 @@ ok( $SYSTEM_FD_MAX +>= 2, '$SYSTEM_FD_MAX should be at least 2' );
 is( $INPLACE_EDIT, '.inplace', '$INPLACE_EDIT' );
 
 'aabbcc' =~ m/(.{2}).+(.{2})(?{ 9 })/;
-is( $LAST_PAREN_MATCH, 'cc', '$LAST_PARENT_MATCH' );
 is( $LAST_REGEXP_CODE_RESULT, 9, '$LAST_REGEXP_CODE_RESULT' );
-
-is( @LAST_MATCH_START[1], 0, '@LAST_MATCH_START' );
-is( @LAST_MATCH_END[1], 2, '@LAST_MATCH_END' );
 
 ok( !$PERLDB, '$PERLDB should be false' );
 
@@ -92,16 +88,6 @@ ok( !$PERLDB, '$PERLDB should be false' );
 	like( ~< *DATA, qr/a paragraph./, '$INPUT_RECORD_SEPARATOR' );
 }
 like( ~< *DATA, qr/second paragraph..\z/s, '$INPUT_RECORD_SEPARATOR' );
-
-my %hash;
-$SUBSCRIPT_SEPARATOR = '|';
-%hash{'d','e','f'} = 1;
-$SUBSEP = ',';
-%hash{'a', 'b', 'c'} = 1;
-my @keys = @( sort keys %hash );
-
-is( @keys[0], 'a,b,c', '$SUBSCRIPT_SEPARATOR' );
-is( @keys[1], 'd|e|f', '$SUBSCRIPT_SEPARATOR' );
 
 try { is( $EXCEPTIONS_BEING_CAUGHT, 1, '$EXCEPTIONS_BEING_CAUGHT' ) };
 ok( !$EXCEPTIONS_BEING_CAUGHT, '$EXCEPTIONS_BEING_CAUGHT should be false' );
@@ -112,7 +98,7 @@ ok( %OS_ERROR_FLAGS{ENOENT}, '%OS_ERROR_FLAGS(ENOENT should be set)' );
 
 package C;
 
-use English qw( -no_match_vars ) ;
+use English < qw( -no_match_vars ) ;
 
 "abc" =~ m/b/;
 

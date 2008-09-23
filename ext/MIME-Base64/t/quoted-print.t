@@ -90,7 +90,7 @@ my $notests = (nelems @tests) + 15;
 print "1..$notests\n";
 
 my $testno = 0;
-for (< @tests) {
+for ( @tests) {
     $testno++;
     my ($plain, $encoded) = < @$_;
     if (ord('A') == 193) {  # EBCDIC 8 bit chars are different

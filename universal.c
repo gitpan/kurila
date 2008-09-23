@@ -192,11 +192,6 @@ XS(XS_version_numify);
 XS(XS_version_normal);
 XS(XS_version_vcmp);
 XS(XS_version_boolean);
-#ifdef HASATTRIBUTE_NORETURN
-XS(XS_version_noop) __attribute__noreturn__;
-#else
-XS(XS_version_noop);
-#endif
 XS(XS_version_is_alpha);
 XS(XS_version_qv);
 XS(XS_utf8_valid);
@@ -253,23 +248,13 @@ Perl_boot_core_UNIVERSAL(pTHX)
     newXS("UNIVERSAL::DOES",            XS_UNIVERSAL_DOES,        file);
     newXS("UNIVERSAL::VERSION", 	XS_UNIVERSAL_VERSION, 	  file);
     {
-	/* register the overloading (type 'A') magic */
-	PL_amagic_generation++;
 	/* Make it findable via fetchmethod */
-	newXS("version::()", XS_version_noop, file);
 	newXS("version::new", XS_version_new, file);
-	newXS("version::(\"\"", XS_version_stringify, file);
 	newXS("version::stringify", XS_version_stringify, file);
-	newXS("version::(0+", XS_version_numify, file);
 	newXS("version::numify", XS_version_numify, file);
 	newXS("version::normal", XS_version_normal, file);
-	newXS("version::(cmp", XS_version_vcmp, file);
-	newXS("version::(<+>", XS_version_vcmp, file);
 	newXS("version::vcmp", XS_version_vcmp, file);
-	newXS("version::(bool", XS_version_boolean, file);
 	newXS("version::boolean", XS_version_boolean, file);
-	newXS("version::(nomethod", XS_version_noop, file);
-	newXS("version::noop", XS_version_noop, file);
 	newXS("version::is_alpha", XS_version_is_alpha, file);
 	newXS("version::qv", XS_version_qv, file);
     }
@@ -321,9 +306,9 @@ Perl_boot_core_UNIVERSAL(pTHX)
 
     newXSproto("iohandle::input_line_number", XS_iohandle_input_line_number, file, "$;$");
 
-    PL_errorcreatehook = newRV_noinc(SvREFCNT_inc((SV*)GvCV(gv_fetchmethod(NULL, "error::create"))));
-    PL_diehook = newRV_noinc(SvREFCNT_inc((SV*)GvCV(gv_fetchmethod(NULL, "error::write_to_stderr"))));
-    PL_warnhook = newRV_noinc(SvREFCNT_inc((SV*)GvCV(gv_fetchmethod(NULL, "error::write_to_stderr"))));
+    PL_errorcreatehook = newRV_inc((SV*)GvCV(gv_fetchmethod(NULL, "error::create")));
+    PL_diehook = newRV_inc((SV*)GvCV(gv_fetchmethod(NULL, "error::write_to_stderr")));
+    PL_warnhook = newRV_inc((SV*)GvCV(gv_fetchmethod(NULL, "error::write_to_stderr")));
 }
 
 
@@ -610,8 +595,8 @@ XS(XS_version_vcmp)
      dVAR;
      dXSARGS;
      PERL_UNUSED_ARG(cv);
-     if (items < 1)
-	  Perl_croak(aTHX_ "Usage: version::vcmp(lobj, ...)");
+     if (items != 2)
+	  Perl_croak(aTHX_ "Usage: lobj->vcmp(robj)");
      SP -= items;
      {
 	  SV *	lobj;
@@ -626,7 +611,6 @@ XS(XS_version_vcmp)
 	       SV	*rs;
 	       SV	*rvs;
 	       SV * robj = ST(1);
-	       const IV	 swap = (IV)SvIV(ST(2));
 
 	       if ( ! sv_derived_from(robj, "version") )
 	       {
@@ -634,14 +618,7 @@ XS(XS_version_vcmp)
 	       }
 	       rvs = SvRV(robj);
 
-	       if ( swap )
-	       {
-		    rs = newSViv(vcmp(rvs,lobj));
-	       }
-	       else
-	       {
-		    rs = newSViv(vcmp(lobj,rvs));
-	       }
+	       rs = newSViv(vcmp(lobj,rvs));
 
 	       mPUSHs(rs);
 	  }
@@ -668,22 +645,6 @@ XS(XS_version_boolean)
     }
     else
 	Perl_croak(aTHX_ "lobj is not of type version");
-}
-
-XS(XS_version_noop)
-{
-    dVAR;
-    dXSARGS;
-    PERL_UNUSED_ARG(cv);
-    if (items < 1)
-	Perl_croak(aTHX_ "Usage: version::noop(lobj, ...)");
-    if (sv_derived_from(ST(0), "version"))
-	Perl_croak(aTHX_ "operation not supported with version object");
-    else
-	Perl_croak(aTHX_ "lobj is not of type version");
-#ifndef HASATTRIBUTE_NORETURN
-    XSRETURN_EMPTY;
-#endif
 }
 
 XS(XS_version_is_alpha)
@@ -738,8 +699,12 @@ AV* S_context_info(pTHX_ const PERL_CONTEXT *cx) {
 	av_push(av, &PL_sv_undef);
     else
 	av_push(av, newSVpv(stashname, 0));
-    av_push(av, newSVpv(OutCopFILE(cx->blk_oldcop), 0));
-    av_push(av, newSViv((I32)CopLINE(cx->blk_oldcop)));
+    if (cx->blk_oldop->op_location) {
+	sv_setsv(av, cx->blk_oldop->op_location);
+    } else {
+	av_push(av, newSVpv("unknown location", 0));
+    }
+
     if (CxTYPE(cx) == CXt_SUB) {
 	GV * const cvgv = CvGV(cx->blk_sub.cv);
 	/* So is ccstack[dbcxix]. */
@@ -859,10 +824,11 @@ XS(XS_error_create)
     dXSARGS;
     PERL_UNUSED_ARG(cv);
     if (items > 3)
-	Perl_croak(aTHX_ "Usage: version::new(class, version)");
+	Perl_croak(aTHX_ "Usage: error::create(message, location)");
     SP -= items;
     {
         SV *vs = ST(0);
+	SV *location = ST(1);
 	SV *rv;
 	HV *hv;
 
@@ -871,7 +837,7 @@ XS(XS_error_create)
 /* 		? HvNAME(SvSTASH(SvRV(ST(0)))) */
 /* 		: (char *)SvPV_nolen(ST(0)); */
 
-	if (sv_isobject(vs)) {
+	if (sv_derived_from(vs, "error")) {
 	    XPUSHs(vs);
 	    XSRETURN(1);
 	    return;
@@ -900,15 +866,17 @@ XS(XS_error_create)
 	     * from the sibling of PL_curcop.
 	     */
 
-	    const COP *cop = S_closest_cop(aTHX_ PL_curcop, PL_curcop->op_sibling);
 	    SV *sv = sv_newmortal();
 	    sv_setpvn(sv,"",0);
-	    if (!cop)
-		cop = PL_curcop;
-
-	    if (CopLINE(cop))
-		Perl_sv_catpvf(aTHX_ sv, " at %s line %"IVdf".",
-			       OutCopFILE(cop), (IV)CopLINE(cop));
+	    if ( items >= 2 ) {
+		if (location && SvAVOK(location)) {
+		    Perl_sv_catpvf(aTHX_ sv, " at %s line %"IVdf" character %"IVdf".",
+			SvPVX_const(*av_fetch((AV*)location, 0, FALSE)),
+			SvIV(*av_fetch((AV*)location, 1, FALSE)),
+			SvIV(*av_fetch((AV*)location, 2, FALSE))
+			);
+		}
+	    }
 	    if (PL_dirty)
 		sv_catpvs(sv, " during global destruction");
 
@@ -944,6 +912,7 @@ XS(XS_error_message)
 
 	{
 	    SV **sv;
+
 	    sv = hv_fetchs(err, "description", 0);
 	    if (sv) {
 		sv_catsv(res, *sv);
@@ -971,11 +940,15 @@ XS(XS_error_message)
 			    sv_catsv(res, *v);
 
 			sv_catpv(res, " called at ");
-			v = av_fetch(item, 1, 0);
+			v = av_fetch(item, 0, 0);
 			if (v && SvOK(*v))
 			    sv_catsv(res, *v);
 
 			sv_catpv(res, " line ");
+			v = av_fetch(item, 1, 0);
+			if (v && SvOK(*v))
+			    sv_catsv(res, *v);
+			sv_catpv(res, " character ");
 			v = av_fetch(item, 2, 0);
 			if (v && SvOK(*v))
 			    sv_catsv(res, *v);
@@ -1164,9 +1137,9 @@ XS(XS_Internals_hv_clear_placehold)
 
 XS(XS_Internals_refcnt_check)
 {
-    dXSARGS;
+    PERL_UNUSED_CONTEXT;
+    PERL_UNUSED_ARG(cv);
     refcnt_check();
-    XSRETURN(0);
 }
 
 XS(XS_Regexp_DESTROY)
@@ -1446,10 +1419,6 @@ XS(XS_re_regnames)
     REGEXP * rx;
     U32 flags;
     SV *ret;
-    AV *av;
-    I32 length;
-    I32 i;
-    SV **entry;
     PERL_UNUSED_ARG(cv);
 
     if (items > 1)
@@ -1477,8 +1446,7 @@ XS(XS_re_regnames)
     if (!ret)
         XSRETURN_UNDEF;
 
-    av = (AV*)SvRV(ret);
-    XPUSHs(sv_mortalcopy(av));
+    XPUSHs(sv_mortalcopy(SvRV(ret)));
 
     PUTBACK;
     return;
@@ -1511,8 +1479,6 @@ XS(XS_re_regexp_pattern)
     {
         /* Housten, we have a regex! */
         SV *pattern;
-        STRLEN left = 0;
-        char reflags[6];
 
 	/* Use the string that Perl would return */
 	/* return the pattern in (?msix:..) format */
@@ -1977,32 +1943,6 @@ XS(XS_dump_view)
     }
 
     if (SvROK(sv)) {
-/* 	sv_setpv(retsv, "REF"); */
-
-/*             if (SvAMAGIC(sv)) { */
-/* 		SV *const tmpstr = AMG_CALLun(sv,string); */
-/* 		if (tmpstr && (!SvROK(tmpstr) || (SvRV(tmpstr) != SvRV(sv)))) { */
-/* 		    /\* Unwrap this:  *\/ */
-/* 		    /\* char *pv = lp ? SvPV(tmpstr, *lp) : SvPV_nolen(tmpstr); */
-/* 		     *\/ */
-
-/* 		    char *pv; */
-/* 		    if ((SvFLAGS(tmpstr) & (SVf_POK)) == SVf_POK) { */
-/* 			if (flags & SV_CONST_RETURN) { */
-/* 			    pv = (char *) SvPVX_const(tmpstr); */
-/* 			} else { */
-/* 			    pv = (flags & SV_MUTABLE_RETURN) */
-/* 				? SvPVX_mutable(tmpstr) : SvPVX(tmpstr); */
-/* 			} */
-/* 			if (lp) */
-/* 			    *lp = SvCUR(tmpstr); */
-/* 		    } else { */
-/* 			pv = sv_2pv_flags(tmpstr, lp, flags); */
-/* 		    } */
-/* 		    return pv; */
-/* 		} */
-/* 	    } */
-/* 	    { */
 		STRLEN len;
 		char *retval;
 		char *buffer;

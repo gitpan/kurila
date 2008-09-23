@@ -2,11 +2,11 @@ package Pod::Html;
 use strict;
 require Exporter;
 
-use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
+use vars < qw($VERSION @ISA @EXPORT @EXPORT_OK);
 $VERSION = 1.09;
-@ISA = @( qw(Exporter) );
-@EXPORT = @( qw(pod2html htmlify) );
-@EXPORT_OK = @( qw(anchorify) );
+@ISA = qw(Exporter);
+@EXPORT = qw(pod2html htmlify);
+@EXPORT_OK = qw(anchorify);
 
 use Carp;
 use Config;
@@ -248,7 +248,7 @@ my $Doindex;
 my $Backlink;
 my($Listlevel, @Listtype);
 my $ListNewTerm;
-use vars qw($Ignore);  # need to localize it later.
+use vars < qw($Ignore);  # need to localize it later.
 
 my(%Items_Named, @Items_Seen);
 my($Title, $Header);
@@ -333,7 +333,7 @@ sub clean_data($){
 
         # have a look for all-space lines
       if( @{$dataref}[$i] =~ m/^\s+$/m and $dataref->[$i] !~ m/^\s/ ){
-	    my @chunks = @( split( m/^\s+$/m, @{$dataref}[$i] ) );
+	    my @chunks = split( m/^\s+$/m, @{$dataref}[$i] );
 	    splice( @$dataref, $i, 1, < @chunks );
 	}
     }
@@ -392,18 +392,18 @@ sub pod2html {
     close(POD);
 
     # be eol agnostic
-    for (< @poddata) {
+    for ( @poddata) {
 	if (m/\r/) {
 	    if (m/\r\n/) {
-		@poddata = @( map { s/\r\n/\n/g;
+		@poddata = map { s/\r\n/\n/g;
 				 m/\n\n/ ?
-				     map { "$_\n\n" } split m/\n\n/ :
-				     $_ } < @poddata );
+				     < map { "$_\n\n" } split m/\n\n/ :
+				     $_ } @poddata;
 	    } else {
-		@poddata = @( map { s/\r/\n/g;
+		@poddata = map { s/\r/\n/g;
 				 m/\n\n/ ?
-				     map { "$_\n\n" } split m/\n\n/ :
-				     $_ } < @poddata );
+				     < map { "$_\n\n" } split m/\n\n/ :
+				     $_ } @poddata;
 	    }
 	    last;
 	}
@@ -427,7 +427,7 @@ sub pod2html {
 	TITLE_SEARCH: {
  	    for (my $i = 0; $i +< nelems @poddata; $i++) {
 		if (@poddata[$i] =~ m/^=head1\s*NAME\b/m) {
- 		    for my $para ( @poddata[[$i, $i+1]] ) {
+ 		    for my $para ( @poddata[[@($i, $i+1)]] ) {
 			last TITLE_SEARCH
 			    if ($Title) = $para =~ m/(\S+\s+-+.*\S)/s;
 		    }
@@ -580,10 +580,10 @@ END_OF_INDEX
 		# experimental: check for a paragraph where all lines
 		# have some ...\t...\t...\n pattern
 		if( $text =~ m/\t/ ){
-		    my @lines = @( split( "\n", $text ) );
+		    my @lines = split( "\n", $text );
 		    if( (nelems @lines) +> 1 ){
 			my $all = 2;
-			foreach my $line ( < @lines ){
+			foreach my $line (  @lines ){
 			    if( $line =~ m/\S/ && $line !~ m/\t/ ){
 				$all--;
 				last if $all == 0;
@@ -629,7 +629,7 @@ END_OF_TAIL
 
 sub usage {
     my $podfile = shift;
-    warn "$0: $podfile: {join ' ', <@_}\n" if (nelems @_);
+    warn "$0: $podfile: {join ' ',@_}\n" if (nelems @_);
     die <<END_OF_USAGE;
 Usage:  $0 --help --htmlroot=<name> --infile=<name> --outfile=<name>
            --podpath=<name>:...:<name> --podroot=<name>
@@ -677,7 +677,7 @@ sub parse_command_line {
 	$opt_netscape,$opt_outfile,$opt_podpath,$opt_podroot,$opt_quiet,
 	$opt_recurse,$opt_title,$opt_verbose,$opt_hiddendirs);
 
-    unshift @ARGV, split ' ', %Config{pod2html} if %Config{pod2html};
+    unshift @ARGV, < split ' ', %Config{pod2html} if %Config{pod2html};
     my $result = GetOptions(
 			    'backlink=s' => \$opt_backlink,
 			    'cachedir=s' => \$opt_cachedir,
@@ -705,8 +705,8 @@ sub parse_command_line {
     usage("-") if defined $opt_help;	# see if the user asked for help
     $opt_help = "";			# just to make -w shut-up.
 
-    @Podpath  = @( split(":", $opt_podpath) ) if defined $opt_podpath;
-    @Libpods  = @( split(":", $opt_libpods) ) if defined $opt_libpods;
+    @Podpath  = split(":", $opt_podpath) if defined $opt_podpath;
+    @Libpods  = split(":", $opt_libpods) if defined $opt_libpods;
 
     $Backlink = $opt_backlink if defined $opt_backlink;
     $Cachedir = $opt_cachedir if defined $opt_cachedir;
@@ -738,7 +738,7 @@ my $Saved_Cache_Key;
 
 sub get_cache {
     my($dircache, $itemcache, $podpath, $podroot, $recurse) = < @_;
-    my @cache_key_args = @( < @_ );
+    my @cache_key_args = @_;
 
     # A first-level cache:
     # Don't bother reading the cache files if they still apply
@@ -767,8 +767,8 @@ sub get_cache {
 
 sub cache_key {
     my($dircache, $itemcache, $podpath, $podroot, $recurse) = < @_;
-    return join('!', $dircache, $itemcache, $recurse,
-	< @$podpath, $podroot, stat($dircache), stat($itemcache));
+    return join('!', @( $dircache, $itemcache, $recurse,
+	< @$podpath, $podroot, stat($dircache), stat($itemcache)));
 }
 
 #
@@ -790,7 +790,7 @@ sub load_cache {
     # is it the same podpath?
     $_ = ~< *CACHE;
     chomp($_);
-    $tests++ if (join(":", < @$podpath) eq $_);
+    $tests++ if (join(":", @$podpath) eq $_);
 
     # is it the same podroot?
     $_ = ~< *CACHE;
@@ -819,7 +819,7 @@ sub load_cache {
     # is it the same podpath?
     $_ = ~< *CACHE;
     chomp($_);
-    $tests++ if (join(":", < @$podpath) eq $_);
+    $tests++ if (join(":", @$podpath) eq $_);
 
     # is it the same podroot?
     $_ = ~< *CACHE;
@@ -862,12 +862,12 @@ sub scan_podpath {
     $pwd = getcwd();
     chdir($podroot)
 	|| die "$0: error changing to directory $podroot: $!\n";
-    foreach $dir (< @Podpath) {
+    foreach $dir ( @Podpath) {
 	scan_dir($dir, $recurse);
     }
 
     # scan the pods listed in @Libpods for =item directives
-    foreach $libpod (< @Libpods) {
+    foreach $libpod ( @Libpods) {
 	# if the page isn't defined then we won't know where to find it
 	# on the system.
 	next unless defined %Pages{$libpod} && %Pages{$libpod};
@@ -880,11 +880,11 @@ sub scan_podpath {
 	    $dirname = $1;
 	    opendir(DIR, $dirname) ||
 		die "$0: error opening directory $dirname: $!\n";
-	    @files = @( grep(m/(\.pod|\.pm)\z/ && ! -d $_, readdir(DIR)) );
+	    @files = grep(m/(\.pod|\.pm)\z/ && ! -d $_, @( readdir(DIR)));
 	    closedir(DIR);
 
 	    # scan each .pod and .pm file for =item directives
-	    foreach $pod (< @files) {
+	    foreach $pod ( @files) {
 		open(POD, "<", "$dirname/$pod") ||
 		    die "$0: error opening $dirname/$pod for input: $!\n";
 		@poddata = @( ~< *POD );
@@ -925,7 +925,7 @@ sub scan_podpath {
     open(CACHE, ">", "$Itemcache") ||
 	die "$0: error open $Itemcache for writing: $!\n";
 
-    print CACHE join(":", < @Podpath) . "\n$podroot\n";
+    print CACHE join(":", @Podpath) . "\n$podroot\n";
     foreach my $key (keys %Items) {
 	print CACHE "$key %Items{$key}\n";
     }
@@ -937,7 +937,7 @@ sub scan_podpath {
     open(CACHE, ">", "$Dircache") ||
 	die "$0: error open $Dircache for writing: $!\n";
 
-    print CACHE join(":", < @Podpath) . "\n$podroot\n";
+    print CACHE join(":", @Podpath) . "\n$podroot\n";
     foreach my $key (keys %Pages) {
 	print CACHE "$key %Pages{$key}\n";
     }
@@ -1001,7 +1001,7 @@ sub scan_dir {
 
     # recurse on the subdirectories if necessary
     if ($recurse) {
-	foreach my $subdir (< @subdirs) {
+	foreach my $subdir ( @subdirs) {
 	    scan_dir("$dir/$subdir", $recurse);
 	}
     }
@@ -1022,7 +1022,7 @@ sub scan_headings {
 
     # scan for =head directives, note their name, and build an index
     #  pointing to each of them.
-    foreach my $line (< @data) {
+    foreach my $line ( @data) {
       if ($line =~ m/^=(head)([1-6])\s+(.*)/) {
         ($tag, $which_head, $otitle) = ($1,$2,$3);
 
@@ -1327,7 +1327,7 @@ sub process_pre {
     # insert spaces in place of tabs
     $rest =~ s#(.+)#{
 	    my $line = $1;
-            1 while $line =~ s/(\t+)/{' ' x ((length($1) * 8) - @-[0] % 8)}/;
+            1 while $line =~ s/^(.*?)(\t+)/$1{' ' x ((length($2) * 8 - length($1) % 8))}/;
 	    $line;
 	}#g;
 
@@ -1451,10 +1451,10 @@ sub process_puretext {
     $trail = ($text =~ s/(\s+)\Z//s ? $1 : "");
 
     # split at space/non-space boundaries
-    @words = @( split( m/(?<=\s)(?=\S)|(?<=\S)(?=\s)/, $text ) );
+    @words = split( m/(?<=\s)(?=\S)|(?<=\S)(?=\s)/, $text );
 
     # process each word individually
-    foreach my $word (< @words) {
+    foreach my $word ( @words) {
 	# skip space runs
  	next if $word =~ m/^\s*$/;
 	# see if we can infer a link or a function call
@@ -1509,7 +1509,7 @@ sub process_puretext {
     }
 
     # put everything back together
-    return $lead . join( '', < @words ) . $trail;
+    return $lead . join( '', @words ) . $trail;
 }
 
 
@@ -1557,7 +1557,7 @@ sub process_text1($$;$$){
 
     if( $func eq 'B' ){
 	# B<text> - boldface
-	$res = '<strong>' . process_text1( $lev, $rstr ) . '</strong>';
+	$res = '<strong>' . &process_text1( $lev, $rstr ) . '</strong>';
 
     } elsif( $func eq 'C' ){
 	# C<code> - can be a ref or <code></code>
@@ -1581,11 +1581,11 @@ sub process_text1($$;$$){
 
     } elsif( $func eq 'F' ){
 	# F<filename> - italicize
-	$res = '<em class="file">' . process_text1( $lev, $rstr ) . '</em>';
+	$res = '<em class="file">' . &process_text1( $lev, $rstr ) . '</em>';
 
     } elsif( $func eq 'I' ){
 	# I<text> - italicize
-	$res = '<em>' . process_text1( $lev, $rstr ) . '</em>';
+	$res = '<em>' . &process_text1( $lev, $rstr ) . '</em>';
 
     } elsif( $func eq 'L' ){
 	# L<link> - link
@@ -1701,14 +1701,14 @@ sub process_text1($$;$$){
         # now we have a URL or just plain code
         $$rstr = $linktext . '>' . $$rstr;
         if( defined( $url ) ){
-            $res = "<a href=\"$url\">" . process_text1( $lev, $rstr ) . '</a>';
+            $res = "<a href=\"$url\">" . &process_text1( $lev, $rstr ) . '</a>';
         } else {
-	    $res = '<em>' . process_text1( $lev, $rstr ) . '</em>';
+	    $res = '<em>' . &process_text1( $lev, $rstr ) . '</em>';
         }
 
     } elsif( $func eq 'S' ){
 	# S<text> - non-breaking spaces
-	$res = process_text1( $lev, $rstr );
+	$res = &process_text1( $lev, $rstr );
 	$res =~ s/ /&nbsp;/g;
 
     } elsif( $func eq 'X' ){
@@ -1730,7 +1730,7 @@ sub process_text1($$;$$){
 	    $res .= $lev == 1 ? pure_text( $pt ) : inIS_text( $pt );
 	    return $res if !$3 && $lev +> 1;
             if( $3 ){
-		$res .= process_text1( $lev, $rstr, $3, closing $4 );
+		$res .= &process_text1( $lev, $rstr, $3, closing $4 );
  	    }
 	}
 	if( $lev == 1 ){
@@ -2098,7 +2098,7 @@ sub depod1($;$$){
       # skip to next begin of an interior sequence
       while( $$rstr =~ s/\A(.*?)([BCEFILSXZ])<(<+[^\S\n]+)?//s ){
          # recurse into its text
-	  $res .= $1 . depod1( $rstr, $2, closing $3);
+	  $res .= $1 . &depod1( $rstr, $2, closing $3);
       }
       $res .= $$rstr;
   } elsif( $func eq 'E' ){
@@ -2118,7 +2118,7 @@ sub depod1($;$$){
       while( $$rstr =~ s/\A(.*?)(([BCEFILSXZ])<(<+[^\S\n]+)?|$term)//s ){
 	  $res .= $1;
 	  last unless $3;
-          $res .= depod1( $rstr, $3, closing $4 );
+          $res .= &depod1( $rstr, $3, closing $4 );
       }
       ## If we're here and $2 ne '>': undelimited interior sequence.
       ## Ignored, as this is called without proper indication of where we are.

@@ -62,8 +62,6 @@ PP(pp_rv2gv)
 
     if (SvROK(sv)) {
       wasref:
-	tryAMAGICunDEREF(to_gv);
-
 	sv = SvRV(sv);
 	if (SvTYPE(sv) == SVt_PVIO) {
 	    GV * const gv = (GV*) sv_newmortal();
@@ -130,8 +128,6 @@ PP(pp_rv2sv)
 
     if (SvROK(sv)) {
       wasref:
-	tryAMAGICunDEREF(to_sv);
-
 	sv = SvRV(sv);
     }
     else {
@@ -155,7 +151,8 @@ PP(pp_rv2sv)
 	}
 	else {
 	    if ( SvOK(sv) && ! SvHVOK(sv) )
-		Perl_croak(aTHX_ "Not a HASH reference");
+		Perl_croak(aTHX_ "Expected a HASH ref but got a %s ref",
+		    Ddesc(sv));
 	}
     }
     if (PL_op->op_private & OPpLVAL_INTRO) {
@@ -407,7 +404,7 @@ PP(pp_bless)
 	STRLEN len;
 	const char *ptr;
 
-	if (ssv && !SvGMAGICAL(ssv) && !SvAMAGIC(ssv) && SvROK(ssv))
+	if (ssv && !SvGMAGICAL(ssv) && SvROK(ssv))
 	    Perl_croak(aTHX_ "Attempt to bless into a reference");
 	ptr = SvPV_const(ssv,len);
 	if (len == 0)
@@ -659,7 +656,6 @@ PP(pp_undef)
 	    Newxz(gp, 1, GP);
 	    GvGP(sv) = gp_ref(gp);
 	    GvSV(sv) = newSV(0);
-	    GvLINE(sv) = CopLINE(PL_curcop);
 	    GvEGV(sv) = (GV*)sv;
 	    GvMULTI_on(sv);
 	}
@@ -697,8 +693,8 @@ PP(pp_predec)
 PP(pp_postinc)
 {
     dVAR; dSP; dTARGET;
-    if (SvTYPE(TOPs) >= SVt_PVGV && SvTYPE(TOPs) != SVt_PVLV)
-	DIE(aTHX_ PL_no_modify);
+    if ( SvOK(TOPs) && ! SvPVOK(TOPs) )
+	Perl_croak(aTHX_ "increment (++) does not work on a %s", Ddesc(TOPs));
     sv_setsv(TARG, TOPs);
     if (!SvREADONLY(TOPs) && SvIOK_notUV(TOPs) && !SvNOK(TOPs) && !SvPOK(TOPs)
         && SvIVX(TOPs) != IV_MAX)
@@ -743,7 +739,6 @@ PP(pp_pow)
 #ifdef PERL_PRESERVE_IVUV
     bool is_int = 0;
 #endif
-    tryAMAGICbin(pow,opASSIGN);
     svl = sv_2num(TOPm1s);
     svr = sv_2num(TOPs);
 #ifdef PERL_PRESERVE_IVUV
@@ -906,7 +901,6 @@ PP(pp_pow)
 PP(pp_multiply)
 {
     dVAR; dSP; dATARGET; SV *svl, *svr;
-    tryAMAGICbin(mult,opASSIGN);
     svl = sv_2num(TOPm1s);
     svr = sv_2num(TOPs);
 #ifdef PERL_PRESERVE_IVUV
@@ -1028,7 +1022,6 @@ PP(pp_multiply)
 PP(pp_divide)
 {
     dVAR; dSP; dATARGET; SV *svl, *svr;
-    tryAMAGICbin(div,opASSIGN);
     svl = sv_2num(TOPm1s);
     svr = sv_2num(TOPs);
     /* Only try to do UV divide first
@@ -1149,7 +1142,7 @@ PP(pp_divide)
 
 PP(pp_modulo)
 {
-    dVAR; dSP; dATARGET; tryAMAGICbin(modulo,opASSIGN);
+    dVAR; dSP; dATARGET;
     {
 	UV left  = 0;
 	UV right = 0;
@@ -1279,7 +1272,7 @@ PP(pp_modulo)
 
 PP(pp_repeat)
 {
-  dVAR; dSP; dATARGET; tryAMAGICbin(repeat,opASSIGN);
+  dVAR; dSP; dATARGET;
   {
     register IV count;
     dPOPss;
@@ -1402,7 +1395,6 @@ PP(pp_repeat)
 PP(pp_subtract)
 {
     dVAR; dSP; dATARGET; bool useleft; SV *svl, *svr;
-    tryAMAGICbin(subtr,opASSIGN);
     svl = sv_2num(TOPm1s);
     svr = sv_2num(TOPs);
     useleft = USE_LEFT(svl);
@@ -1520,7 +1512,7 @@ PP(pp_subtract)
 
 PP(pp_left_shift)
 {
-    dVAR; dSP; dATARGET; tryAMAGICbin(lshift,opASSIGN);
+    dVAR; dSP; dATARGET;
     {
       const IV shift = POPi;
       if (PL_op->op_private & HINT_INTEGER) {
@@ -1537,7 +1529,7 @@ PP(pp_left_shift)
 
 PP(pp_right_shift)
 {
-    dVAR; dSP; dATARGET; tryAMAGICbin(rshift,opASSIGN);
+    dVAR; dSP; dATARGET;
     {
       const IV shift = POPi;
       if (PL_op->op_private & HINT_INTEGER) {
@@ -1554,7 +1546,7 @@ PP(pp_right_shift)
 
 PP(pp_lt)
 {
-    dVAR; dSP; tryAMAGICbinSET(lt,0);
+    dVAR; dSP;
 #ifdef PERL_PRESERVE_IVUV
     if (SvIOK(TOPs)) {
 	if (SvIOK(TOPm1s)) {
@@ -1608,16 +1600,6 @@ PP(pp_lt)
 	}
     }
 #endif
-#ifndef NV_PRESERVES_UV
-#ifdef PERL_PRESERVE_IVUV
-    else
-#endif
-    if (SvROK(TOPs) && !SvAMAGIC(TOPs) && SvROK(TOPm1s) && !SvAMAGIC(TOPm1s)) {
-	SP--;
-	SETs(boolSV(SvRV(TOPs) < SvRV(TOPp1s)));
-	RETURN;
-    }
-#endif
     {
 #if defined(NAN_COMPARE_BROKEN) && defined(Perl_isnan)
       dPOPTOPnnrl;
@@ -1634,7 +1616,7 @@ PP(pp_lt)
 
 PP(pp_gt)
 {
-    dVAR; dSP; tryAMAGICbinSET(gt,0);
+    dVAR; dSP;
 #ifdef PERL_PRESERVE_IVUV
     if (SvIOK(TOPs)) {
 	if (SvIOK(TOPm1s)) {
@@ -1689,16 +1671,6 @@ PP(pp_gt)
 	}
     }
 #endif
-#ifndef NV_PRESERVES_UV
-#ifdef PERL_PRESERVE_IVUV
-    else
-#endif
-    if (SvROK(TOPs) && !SvAMAGIC(TOPs) && SvROK(TOPm1s) && !SvAMAGIC(TOPm1s)) {
-        SP--;
-        SETs(boolSV(SvRV(TOPs) > SvRV(TOPp1s)));
-        RETURN;
-    }
-#endif
     {
 #if defined(NAN_COMPARE_BROKEN) && defined(Perl_isnan)
       dPOPTOPnnrl;
@@ -1715,7 +1687,7 @@ PP(pp_gt)
 
 PP(pp_le)
 {
-    dVAR; dSP; tryAMAGICbinSET(le,0);
+    dVAR; dSP;
 #ifdef PERL_PRESERVE_IVUV
     if (SvIOK(TOPs)) {
 	if (SvIOK(TOPm1s)) {
@@ -1770,16 +1742,6 @@ PP(pp_le)
 	}
     }
 #endif
-#ifndef NV_PRESERVES_UV
-#ifdef PERL_PRESERVE_IVUV
-    else
-#endif
-    if (SvROK(TOPs) && !SvAMAGIC(TOPs) && SvROK(TOPm1s) && !SvAMAGIC(TOPm1s)) {
-        SP--;
-        SETs(boolSV(SvRV(TOPs) <= SvRV(TOPp1s)));
-        RETURN;
-    }
-#endif
     {
 #if defined(NAN_COMPARE_BROKEN) && defined(Perl_isnan)
       dPOPTOPnnrl;
@@ -1796,7 +1758,7 @@ PP(pp_le)
 
 PP(pp_ge)
 {
-    dVAR; dSP; tryAMAGICbinSET(ge,0);
+    dVAR; dSP;
 #ifdef PERL_PRESERVE_IVUV
     if (SvIOK(TOPs)) {
 	if (SvIOK(TOPm1s)) {
@@ -1851,16 +1813,6 @@ PP(pp_ge)
 	}
     }
 #endif
-#ifndef NV_PRESERVES_UV
-#ifdef PERL_PRESERVE_IVUV
-    else
-#endif
-    if (SvROK(TOPs) && !SvAMAGIC(TOPs) && SvROK(TOPm1s) && !SvAMAGIC(TOPm1s)) {
-        SP--;
-        SETs(boolSV(SvRV(TOPs) >= SvRV(TOPp1s)));
-        RETURN;
-    }
-#endif
     {
 #if defined(NAN_COMPARE_BROKEN) && defined(Perl_isnan)
       dPOPTOPnnrl;
@@ -1877,14 +1829,7 @@ PP(pp_ge)
 
 PP(pp_ne)
 {
-    dVAR; dSP; tryAMAGICbinSET(ne,0);
-#ifndef NV_PRESERVES_UV
-    if (SvROK(TOPs) && !SvAMAGIC(TOPs) && SvROK(TOPm1s) && !SvAMAGIC(TOPm1s)) {
-        SP--;
-	SETs(boolSV(SvRV(TOPs) != SvRV(TOPp1s)));
-	RETURN;
-    }
-#endif
+    dVAR; dSP;
 #ifdef PERL_PRESERVE_IVUV
     if (SvIOK(TOPs)) {
 	if (SvIOK(TOPm1s)) {
@@ -1951,15 +1896,7 @@ PP(pp_ne)
 
 PP(pp_ncmp)
 {
-    dVAR; dSP; dTARGET; tryAMAGICbin(ncmp,0);
-#ifndef NV_PRESERVES_UV
-    if (SvROK(TOPs) && !SvAMAGIC(TOPs) && SvROK(TOPm1s) && !SvAMAGIC(TOPm1s)) {
-	const UV right = PTR2UV(SvRV(POPs));
-	const UV left = PTR2UV(SvRV(TOPs));
-	SETi((left > right) - (left < right));
-	RETURN;
-    }
-#endif
+    dVAR; dSP; dTARGET;
 #ifdef PERL_PRESERVE_IVUV
     /* Fortunately it seems NaN isn't IOK */
     if (SvIOK(TOPs)) {
@@ -2053,7 +1990,7 @@ PP(pp_ncmp)
 
 PP(pp_seq)
 {
-    dVAR; dSP; tryAMAGICbinSET(seq,0);
+    dVAR; dSP;
     {
       dPOPTOPssrl;
       SETs(boolSV(sv_eq(left, right)));
@@ -2063,7 +2000,7 @@ PP(pp_seq)
 
 PP(pp_sne)
 {
-    dVAR; dSP; tryAMAGICbinSET(sne,0);
+    dVAR; dSP;
     {
       dPOPTOPssrl;
       SETs(boolSV(!sv_eq(left, right)));
@@ -2073,7 +2010,7 @@ PP(pp_sne)
 
 PP(pp_scmp)
 {
-    dVAR; dSP; dTARGET;  tryAMAGICbin(scmp,0);
+    dVAR; dSP; dTARGET;
     {
       dPOPTOPssrl;
       const int cmp = sv_cmp(left, right);
@@ -2084,7 +2021,7 @@ PP(pp_scmp)
 
 PP(pp_bit_and)
 {
-    dVAR; dSP; dATARGET; tryAMAGICbin(band,opASSIGN);
+    dVAR; dSP; dATARGET;
     {
       dPOPTOPssrl;
       SvGETMAGIC(left);
@@ -2112,7 +2049,6 @@ PP(pp_bit_or)
     dVAR; dSP; dATARGET;
     const int op_type = PL_op->op_type;
 
-    tryAMAGICbin_var((op_type == OP_BIT_OR ? bor_amg : bxor_amg), opASSIGN);
     {
       dPOPTOPssrl;
       SvGETMAGIC(left);
@@ -2141,7 +2077,7 @@ PP(pp_bit_or)
 
 PP(pp_negate)
 {
-    dVAR; dSP; dTARGET; tryAMAGICun(neg);
+    dVAR; dSP; dTARGET;
     {
 	SV * const sv = sv_2num(TOPs);
 	const int flags = SvFLAGS(sv);
@@ -2209,14 +2145,14 @@ PP(pp_negate)
 
 PP(pp_not)
 {
-    dVAR; dSP; tryAMAGICunSET(not);
+    dVAR; dSP;
     *PL_stack_sp = boolSV(!SvTRUE(*PL_stack_sp));
     return NORMAL;
 }
 
 PP(pp_complement)
 {
-    dVAR; dSP; dTARGET; tryAMAGICun(compl);
+    dVAR; dSP; dTARGET;
     {
       dTOPss;
       SvGETMAGIC(sv);
@@ -2263,7 +2199,7 @@ PP(pp_complement)
 
 PP(pp_i_multiply)
 {
-    dVAR; dSP; dATARGET; tryAMAGICbin(mult,opASSIGN);
+    dVAR; dSP; dATARGET;
     {
       dPOPTOPiirl;
       SETi( left * right );
@@ -2274,7 +2210,7 @@ PP(pp_i_multiply)
 PP(pp_i_divide)
 {
     IV num;
-    dVAR; dSP; dATARGET; tryAMAGICbin(div,opASSIGN);
+    dVAR; dSP; dATARGET;
     {
       dPOPiv;
       if (value == 0)
@@ -2299,7 +2235,7 @@ PP(pp_i_modulo)
 #endif
 {
      /* This is the vanilla old i_modulo. */
-     dVAR; dSP; dATARGET; tryAMAGICbin(modulo,opASSIGN);
+     dVAR; dSP; dATARGET;
      {
 	  dPOPTOPiirl;
 	  if (!right)
@@ -2321,7 +2257,7 @@ PP(pp_i_modulo_1)
      /* This is the i_modulo with the workaround for the _moddi3 bug
       * in (at least) glibc 2.2.5 (the PERL_ABS() the workaround).
       * See below for pp_i_modulo. */
-     dVAR; dSP; dATARGET; tryAMAGICbin(modulo,opASSIGN);
+     dVAR; dSP; dATARGET;
      {
 	  dPOPTOPiirl;
 	  if (!right)
@@ -2337,7 +2273,7 @@ PP(pp_i_modulo_1)
 
 PP(pp_i_modulo)
 {
-     dVAR; dSP; dATARGET; tryAMAGICbin(modulo,opASSIGN);
+     dVAR; dSP; dATARGET;
      {
 	  dPOPTOPiirl;
 	  if (!right)
@@ -2380,7 +2316,7 @@ PP(pp_i_modulo)
 
 PP(pp_i_add)
 {
-    dVAR; dSP; dATARGET; tryAMAGICbin(add,opASSIGN);
+    dVAR; dSP; dATARGET;
     {
       dPOPTOPiirl_ul;
       SETi( left + right );
@@ -2390,7 +2326,7 @@ PP(pp_i_add)
 
 PP(pp_i_subtract)
 {
-    dVAR; dSP; dATARGET; tryAMAGICbin(subtr,opASSIGN);
+    dVAR; dSP; dATARGET;
     {
       dPOPTOPiirl_ul;
       SETi( left - right );
@@ -2400,7 +2336,7 @@ PP(pp_i_subtract)
 
 PP(pp_i_lt)
 {
-    dVAR; dSP; tryAMAGICbinSET(lt,0);
+    dVAR; dSP;
     {
       dPOPTOPiirl;
       SETs(boolSV(left < right));
@@ -2410,7 +2346,7 @@ PP(pp_i_lt)
 
 PP(pp_i_gt)
 {
-    dVAR; dSP; tryAMAGICbinSET(gt,0);
+    dVAR; dSP;
     {
       dPOPTOPiirl;
       SETs(boolSV(left > right));
@@ -2420,7 +2356,7 @@ PP(pp_i_gt)
 
 PP(pp_i_le)
 {
-    dVAR; dSP; tryAMAGICbinSET(le,0);
+    dVAR; dSP;
     {
       dPOPTOPiirl;
       SETs(boolSV(left <= right));
@@ -2430,7 +2366,7 @@ PP(pp_i_le)
 
 PP(pp_i_ge)
 {
-    dVAR; dSP; tryAMAGICbinSET(ge,0);
+    dVAR; dSP;
     {
       dPOPTOPiirl;
       SETs(boolSV(left >= right));
@@ -2440,7 +2376,7 @@ PP(pp_i_ge)
 
 PP(pp_i_eq)
 {
-    dVAR; dSP; tryAMAGICbinSET(eq,0);
+    dVAR; dSP;
     {
       dPOPTOPiirl;
       SETs(boolSV(left == right));
@@ -2450,7 +2386,7 @@ PP(pp_i_eq)
 
 PP(pp_i_ne)
 {
-    dVAR; dSP; tryAMAGICbinSET(ne,0);
+    dVAR; dSP;
     {
       dPOPTOPiirl;
       SETs(boolSV(left != right));
@@ -2460,7 +2396,7 @@ PP(pp_i_ne)
 
 PP(pp_i_ncmp)
 {
-    dVAR; dSP; dTARGET; tryAMAGICbin(ncmp,0);
+    dVAR; dSP; dTARGET;
     {
       dPOPTOPiirl;
       I32 value;
@@ -2478,7 +2414,7 @@ PP(pp_i_ncmp)
 
 PP(pp_i_negate)
 {
-    dVAR; dSP; dTARGET; tryAMAGICun(neg);
+    dVAR; dSP; dTARGET;
     SETi(-TOPi);
     RETURN;
 }
@@ -2487,7 +2423,7 @@ PP(pp_i_negate)
 
 PP(pp_atan2)
 {
-    dVAR; dSP; dTARGET; tryAMAGICbin(atan2,0);
+    dVAR; dSP; dTARGET;
     {
       dPOPTOPnnrl;
       SETn(Perl_atan2(left, right));
@@ -2524,7 +2460,6 @@ PP(pp_sin)
 	break;
     }
 
-    tryAMAGICun_var(amg_type);
     {
       const NV value = POPn;
       if (neg_report) {
@@ -2584,7 +2519,7 @@ PP(pp_srand)
 
 PP(pp_int)
 {
-    dVAR; dSP; dTARGET; tryAMAGICun(int);
+    dVAR; dSP; dTARGET;
     {
       SV * const sv = sv_2num(TOPs);
       const IV iv = SvIV(sv);
@@ -2625,7 +2560,7 @@ PP(pp_int)
 
 PP(pp_abs)
 {
-    dVAR; dSP; dTARGET; tryAMAGICun(abs);
+    dVAR; dSP; dTARGET;
     {
       SV * const sv = sv_2num(TOPs);
       /* This will cache the NV value if string isn't actually integer  */
@@ -2705,7 +2640,7 @@ PP(pp_length)
     dVAR; dSP; dTARGET;
     SV * const sv = TOPs;
 
-    if (SvGAMAGIC(sv)) {
+    if (SvGMAGICAL(sv)) {
 	/* For an overloaded or magic scalar, we can't know in advance if
 	   it's going to be UTF-8 or not. Also, we can't call sv_len_utf8 as
 	   it likes to cache the length. Maybe that should be a documented
@@ -2878,7 +2813,7 @@ PP(pp_index)
     big_p = SvPV_const(big, biglen);
     little_p = SvPV_const(little, llen);
 
-    if (SvGAMAGIC(big)) {
+    if (SvGMAGICAL(big)) {
 	/* Life just becomes a lot easier if I use a temporary here.
 	   Otherwise I need to avoid calls to sv_pos_u2b(), which (dangerously)
 	   will trigger magic and overloading again, as will fbm_instr()
@@ -2886,7 +2821,7 @@ PP(pp_index)
 	big = newSVpvn_flags(big_p, biglen, SVs_TEMP);
 	big_p = SvPVX(big);
     }
-    if (SvGAMAGIC(little) || (is_index && !SvOK(little))) {
+    if (SvGMAGICAL(little) || (is_index && !SvOK(little))) {
 	/* index && SvOK() is a hack. fbm_instr() calls SvPV_const, which will
 	   warn on undef, and we've already triggered a warning with the
 	   SvPV_const some lines above. We can't remove that, as we need to
@@ -3383,20 +3318,32 @@ PP(pp_quotemeta)
 
 PP(pp_aslice)
 {
-    dVAR; dSP; dMARK; dORIGMARK;
+    dVAR; dSP; dMARK;
     register AV* const av = (AV*)POPs;
+    register AV* slice = (AV*)POPs;
     register const I32 lval = (PL_op->op_flags & OPf_MOD);
+    SV **sliceitem;
+    SV **slicemax;
 
     if (SvTYPE(av) != SVt_PVAV)
 	Perl_croak(aTHX_ "can't take an array slice from an %s", Ddesc((SV*)av));
 
-    if (GIMME == G_SCALAR)
-	Perl_croak(aTHX_ "array slice may not be used in scalar context");
+    if (SvTYPE(slice) != SVt_PVAV)
+	Perl_croak(aTHX_ "array slice indices must be an ARRAY not %s", Ddesc((SV*)slice));
+
+    slice = av_mortalcopy(slice);
+    XPUSHs(AvSV(slice));
+    sliceitem = AvARRAY(slice);
+
+    if ( ! sliceitem )
+	RETURN;
+
+    slicemax = AvARRAY(slice) + av_len(slice);
 
     if (lval && PL_op->op_private & OPpLVAL_INTRO) {
 	register SV **svp;
 	I32 max = -1;
-	for (svp = MARK + 1; svp <= SP; svp++) {
+	for (svp = AvARRAY(slice); svp <= slicemax; svp++) {
 	    const I32 elem = SvIV(*svp);
 	    if (elem > max)
 		max = elem;
@@ -3404,9 +3351,9 @@ PP(pp_aslice)
 	if (max > AvMAX(av))
 	    av_extend(av, max);
     }
-    while (++MARK <= SP) {
+    while (sliceitem <= slicemax) {
 	register SV **svp;
-	I32 elem = SvIV(*MARK);
+	I32 elem = SvIV(*sliceitem);
 	
 	svp = av_fetch(av, elem, lval);
 	if (lval) {
@@ -3415,7 +3362,8 @@ PP(pp_aslice)
 	    if (PL_op->op_private & OPpLVAL_INTRO)
 		save_aelem(av, elem, svp);
 	}
-	*MARK = svp ? *svp : &PL_sv_undef;
+	SVcpREPLACE(*sliceitem, svp ? *svp : &PL_sv_undef );
+        sliceitem++;
     }
 
     RETURN;
@@ -3472,35 +3420,46 @@ PP(pp_delete)
     const I32 discard = (gimme == G_VOID) ? G_DISCARD : 0;
 
     if (PL_op->op_private & OPpSLICE) {
-	dMARK; dORIGMARK;
-	HV * const hv = (HV*)POPs;
-	const U32 hvtype = SvTYPE(hv);
-	if (hvtype == SVt_PVHV) {			/* hash element */
-	    while (++MARK <= SP) {
-		SV * const sv = hv_delete_ent(hv, *MARK, discard, 0);
-		*MARK = sv ? sv : &PL_sv_undef;
+	dMARK;
+	SV * const sv = POPs;
+	SV* slice = POPs;
+	AV* slicecopy;
+	SV** items;
+	I32 avlen;
+
+	assert(SP == MARK); 
+
+	if ( ! SvAVOK(slice) )
+	    Perl_croak(aTHX_ "slice expected an array as slice index, but got %s", Ddesc(slice));
+
+	slicecopy = av_mortalcopy(SvAV(slice));
+	items = AvARRAY(slicecopy);
+	avlen = av_len(slicecopy);
+
+	if (PL_op->op_flags & OPf_SPECIAL) {                  /* array element */
+	    int i;
+
+	    if ( ! SvAVOK(sv) ) 
+		Perl_croak(aTHX_ "array slice expected an array but got a %s", Ddesc(sv));
+
+	    for (i = 0; i <= avlen; i++) {
+		SV * const delsv = av_delete(SvAV(sv), SvIV(items[i]), 0);
+		SVcpREPLACE(items[i], delsv ? delsv : &PL_sv_undef );
 	    }
 	}
-	else if (hvtype == SVt_PVAV) {                  /* array element */
-            if (PL_op->op_flags & OPf_SPECIAL) {
-                while (++MARK <= SP) {
-                    SV * const sv = av_delete((AV*)hv, SvIV(*MARK), discard);
-                    *MARK = sv ? sv : &PL_sv_undef;
-                }
-            }
+	else {			/* hash element */
+	    int i;
+	    if ( ! SvHVOK(sv) )
+		Perl_croak(aTHX_ "hash slice expected an array but got a %s", Ddesc(sv));
+
+	    for (i = 0; i <= avlen; i++) {
+		SV * const delsv = hv_delete_ent(SvHV(sv), items[i], 0, 0);
+		SVcpREPLACE(items[i], delsv ? delsv : &PL_sv_undef );
+	    }
 	}
-	else
-	    DIE(aTHX_ "Not a HASH reference");
-	if (discard)
-	    SP = ORIGMARK;
-	else if (gimme == G_SCALAR) {
-	    MARK = ORIGMARK;
-	    if (SP > MARK)
-		*++MARK = *SP;
-	    else
-		*++MARK = &PL_sv_undef;
-	    SP = MARK;
-	}
+
+	if ( ! discard)
+	    XPUSHs(AvSV(slicecopy));
     }
     else {
 	SV *keysv = POPs;
@@ -3564,9 +3523,12 @@ PP(pp_hslice)
 {
     dVAR; dSP; dMARK; dORIGMARK;
     register HV * const hv = (HV*)POPs;
+    AV * slice = (AV*)POPs;
     register const I32 lval = (PL_op->op_flags & OPf_MOD);
     const bool localizing = PL_op->op_private & OPpLVAL_INTRO;
     bool other_magic = FALSE;
+    SV ** sliceitem;
+    SV ** slicemax;
 
     if (localizing) {
         MAGIC *mg;
@@ -3585,11 +3547,19 @@ PP(pp_hslice)
     if ( ! SvHVOK(hv) )
 	Perl_croak(aTHX_ "Not a HASH");
 
-    if (GIMME == G_SCALAR)
-	Perl_croak(aTHX_ "hash slice may not be used in scalar context");
+    if ( ! SvAVOK(slice) )
+	Perl_croak(aTHX_ "%s expected an ARRAY but got %s", OP_DESC(PL_op), Ddesc(AvSV(slice)));
 
-    while (++MARK <= SP) {
-        SV * const keysv = *MARK;
+    slice = av_mortalcopy(slice);
+    XPUSHs(AvSV(slice));
+
+    sliceitem = AvARRAY(slice);
+    if (!sliceitem)
+	RETURN;
+    slicemax = sliceitem + av_len(slice);
+
+    while (sliceitem <= slicemax) {
+        SV * const keysv = *sliceitem;
         SV **svp;
         HE *he;
         bool preeminent = FALSE;
@@ -3620,12 +3590,8 @@ PP(pp_hslice)
 		}
             }
         }
-        *MARK = svp ? *svp : &PL_sv_undef;
-    }
-    if (GIMME != G_ARRAY) {
-	MARK = ORIGMARK;
-	*++MARK = SP > ORIGMARK ? *SP : &PL_sv_undef;
-	SP = MARK;
+        SVcpREPLACE(*sliceitem, svp ? *svp : newSV(0) );
+	sliceitem++;
     }
     RETURN;
 }
@@ -3794,8 +3760,26 @@ PP(pp_expand)
 	    SP += maxarg;
 	}
 	else if (SvTYPE(sv) == SVt_PVHV) {
-	    *PL_stack_sp = sv;
-	    return do_kv();
+	    HV* const hv = (HV*)sv;
+	    register HE *entry;
+
+	    (void)POPs;			/* XXXX May be optimized away? */
+
+	    (void)hv_iterinit(hv);	/* reset iterator */
+
+	    EXTEND(SP, HvKEYS(hv) * 2);
+
+	    PUTBACK;	/* hv_iternext and hv_iterval might clobber stack_sp */
+	    while ((entry = hv_iternext(hv))) {
+		SV *tmpstr;
+		SPAGAIN;
+		XPUSHs(hv_iterkeysv(entry)); /* won't extend stack */
+		PUTBACK;
+		tmpstr = hv_iterval(hv,entry);
+		SPAGAIN;
+		XPUSHs(tmpstr);
+		PUTBACK;
+	    }
 	}
     }
 
@@ -4068,26 +4052,15 @@ PP(pp_push)
 {
     dVAR; dSP; dMARK; dORIGMARK; dTARGET;
     register AV * const ary = (AV*)*++MARK;
-    const MAGIC * const mg = SvTIED_mg((SV*)ary, PERL_MAGIC_tied);
 
     do_arg_check(MARK);
 
-    if (SvTYPE(ary) != SVt_PVAV) {
-	Perl_croak(aTHX_ "First argument must be an array");
+    if ( ! SvAVOK(ary) ) {
+	Perl_croak(aTHX_ "First argument to %s must be an ARRAY not %s", 
+	    OP_DESC(PL_op), Ddesc(AvSV(ary)));
     }
 
-    if (mg) {
-	*MARK-- = SvTIED_obj((SV*)ary, mg);
-	PUSHMARK(MARK);
-	PUTBACK;
-	ENTER;
-	call_method("PUSH",G_SCALAR|G_DISCARD);
-	LEAVE;
-	SPAGAIN;
-	SP = ORIGMARK;
-	PUSHi( AvFILL(ary) + 1 );
-    }
-    else {
+    {
 	PL_delaymagic = DM_DELAY;
 	for (++MARK; MARK <= SP; MARK++) {
 	    SV * const sv = newSV(0);
@@ -4157,28 +4130,32 @@ PP(pp_unshift)
 PP(pp_reverse)
 {
     dVAR; dSP; dMARK;
-    SV ** const oldsp = SP;
+    SV * const av = sv_mortalcopy(POPs);
+    SV ** ary;
+    SV ** end;
 
-    if (GIMME == G_ARRAY) {
-	MARK++;
-	while (MARK < SP) {
-	    register SV * const tmp = *MARK;
-	    *MARK++ = *SP;
-	    *SP-- = tmp;
+    if ( ! SvAVOK(av) ) {
+	Perl_croak(aTHX_ "%s expected an ARRAY but got %s", OP_DESC(PL_op), Ddesc(av));
+    }
+
+    ary = AvARRAY(av);
+    end = ary + av_len(SvAV(av));
+    
+    if (ary) {
+	while (ary < end) {
+	    register SV * const tmp = *ary;
+	    *ary++ = *end;
+	    *end-- = tmp;
 	}
-	/* safe as long as stack cannot get extended in the above */
-	SP = oldsp;
     }
-    else {
-	Perl_croak(aTHX_ "reverse not in list context");
-    }
+    PUSHs(av);
     RETURN;
 }
 
 PP(pp_split)
 {
     dVAR; dSP; dTARG;
-    AV *ary;
+    AV *av;
     register IV limit = POPi;			/* note, negative is forever */
     SV * const sv = POPs;
     STRLEN len;
@@ -4194,13 +4171,10 @@ PP(pp_split)
     I32 maxiters = slen + 10;
     const char *orig;
     const I32 origlimit = limit;
-    I32 realarray = 0;
     I32 base;
-    const I32 gimme = GIMME_V;
     const I32 oldsave = PL_savestack_ix;
-    U32 make_mortal = SVs_TEMP;
+    U32 make_mortal = 0;
     bool multiline = 0;
-    MAGIC *mg = NULL;
 
 #ifdef DEBUGGING
     Copy(&LvTARGOFF(POPs), &pm, 1, PMOP*);
@@ -4213,40 +4187,8 @@ PP(pp_split)
 
     do_utf8 = (RX_EXTFLAGS(rx) & RXf_PMf_UTF8) != 0;
 
-#ifdef USE_ITHREADS
-    if (pm->op_pmreplrootu.op_pmtargetoff) {
-	ary = GvAVn((GV*)PAD_SVl(pm->op_pmreplrootu.op_pmtargetoff));
-    }
-#else
-    if (pm->op_pmreplrootu.op_pmtargetgv) {
-	ary = GvAVn(pm->op_pmreplrootu.op_pmtargetgv);
-    }
-#endif
-    else
-	ary = NULL;
-    if (ary) {
-	realarray = 1;
-	PUTBACK;
-	av_extend(ary,0);
-	av_clear(ary);
-	SPAGAIN;
-	if ((mg = SvTIED_mg((SV*)ary, PERL_MAGIC_tied))) {
-	    PUSHMARK(SP);
-	    XPUSHs(SvTIED_obj((SV*)ary, mg));
-	}
-	else {
-	    if (!AvREAL(ary)) {
-		I32 i;
-		AvREAL_on(ary);
-		AvREIFY_off(ary);
-		for (i = AvFILLp(ary); i >= 0; i--)
-		    AvARRAY(ary)[i] = &PL_sv_undef;	/* don't free mere refs */
-	    }
-	    /* temporarily switch stacks */
-	    SAVESWITCHSTACK(PL_curstack, ary);
-	    make_mortal = 0;
-	}
-    }
+    av = av_2mortal(newAV());
+
     base = SP - PL_stack_base;
     orig = s;
     if (RX_EXTFLAGS(rx) & RXf_SKIPWHITE) {
@@ -4286,7 +4228,7 @@ PP(pp_split)
 		break;
 
 	    dstr = newSVpvn_flags(s, m-s, make_mortal);
-	    XPUSHs(dstr);
+	    av_push(av, dstr);
 
 	    /* skip the whitespace found last */
 	    if (do_utf8)
@@ -4312,7 +4254,7 @@ PP(pp_split)
 	    if (m >= strend)
 		break;
 	    dstr = newSVpvn_flags(s, m-s, make_mortal);
-	    XPUSHs(dstr);
+	    av_push(av, dstr);
 	    s = m;
 	}
     }
@@ -4331,7 +4273,7 @@ PP(pp_split)
 		if (m >= strend)
 		    break;
 		dstr = newSVpvn_flags(s, m-s, make_mortal);
-		XPUSHs(dstr);
+		av_push(av, dstr);
 		s = m + len; /* Fake \n at the end */
 	    }
 	}
@@ -4341,7 +4283,7 @@ PP(pp_split)
 			     csv, multiline ? FBMrf_MULTILINE : 0)) )
 	    {
 		dstr = newSVpvn_flags(s, m-s, make_mortal);
-		XPUSHs(dstr);
+		av_push(av, dstr);
 		s = m + len; /* Fake \n at the end */
 	    }
 	}
@@ -4367,7 +4309,7 @@ PP(pp_split)
 	    }
 	    m = RX_OFFS(rx)[0].start + orig;
 	    dstr = newSVpvn_flags(s, m-s, make_mortal);
-	    XPUSHs(dstr);
+	    av_push(av, dstr);
 	    if (RX_NPARENS(rx)) {
 		I32 i;
 		for (i = 1; i <= (I32)RX_NPARENS(rx); i++) {
@@ -4382,14 +4324,14 @@ PP(pp_split)
 		    }
 		    else
 			dstr = &PL_sv_undef;  /* undef, not "" */
-		    XPUSHs(dstr);
+		    av_push(av, dstr);
 		}
 	    }
 	    s = RX_OFFS(rx)[0].end + orig;
 	}
     }
 
-    iters = (SP - PL_stack_base) - base;
+    iters = av_len(av) + 1;
     if (iters > maxiters)
 	DIE(aTHX_ "Split loop");
 
@@ -4397,60 +4339,22 @@ PP(pp_split)
     if (s < strend || (iters && origlimit)) {
         const STRLEN l = strend - s;
 	dstr = newSVpvn_flags(s, l, make_mortal);
-	XPUSHs(dstr);
+	av_push(av, dstr);
 	iters++;
     }
     else if (!origlimit) {
-	while (iters > 0 && (!TOPs || !SvANY(TOPs) || SvCUR(TOPs) == 0)) {
-	    if (TOPs && !make_mortal)
-		sv_2mortal(TOPs);
+	SV** last = av_fetch(av, iters-1, 0);
+	while (iters && (!last || !SvOK(*last) || SvCUR(*last) == 0)) {
+	    SvREFCNT_dec(av_pop(av));
 	    iters--;
-	    *SP-- = &PL_sv_undef;
+	    last = av_fetch(av, iters-1, 0);
 	}
     }
 
     PUTBACK;
     LEAVE_SCOPE(oldsave); /* may undo an earlier SWITCHSTACK */
     SPAGAIN;
-    if (realarray) {
-	if (!mg) {
-	    if (SvSMAGICAL(ary)) {
-		PUTBACK;
-		mg_set((SV*)ary);
-		SPAGAIN;
-	    }
-	    if (gimme == G_ARRAY) {
-		EXTEND(SP, iters);
-		Copy(AvARRAY(ary), SP + 1, iters, SV*);
-		SP += iters;
-		RETURN;
-	    }
-	}
-	else {
-	    PUTBACK;
-	    ENTER;
-	    call_method("PUSH",G_SCALAR|G_DISCARD);
-	    LEAVE;
-	    SPAGAIN;
-	    if (gimme == G_ARRAY) {
-		I32 i;
-		/* EXTEND should not be needed - we just popped them */
-		EXTEND(SP, iters);
-		for (i=0; i < iters; i++) {
-		    SV **svp = av_fetch(ary, i, FALSE);
-		    PUSHs((svp) ? *svp : &PL_sv_undef);
-		}
-		RETURN;
-	    }
-	}
-    }
-    else {
-	if (gimme == G_ARRAY)
-	    RETURN;
-    }
-
-    GETTARGET;
-    PUSHi(iters);
+    XPUSHs(AvSV(av));
     RETURN;
 }
 

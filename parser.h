@@ -35,6 +35,8 @@ typedef struct {
 typedef struct yy_str_info {
     SV *str_sv; /* SV holding the string */
     U16 flags;	/* flags for the lexer */
+    I32 char_offset; /* offset for character */
+    I32 line_number; /* line number */
 } yy_str_info;
 
 typedef struct yy_parser {
@@ -60,7 +62,6 @@ typedef struct yy_parser {
     char	*lex_brackstack;/* what kind of brackets to pop */
     char	*lex_casestack;	/* what kind of case mods in effect */
     U8		lex_defer;	/* state after determined token */
-    bool	lex_dojoin;	/* doing an array interpolation */
     U8		lex_expect;	/* expect after determined token */
     U8		expect;		/* how to interpret ambiguous tokens */
     U8 lex_flags;	/* flags for the lexer */
@@ -72,6 +73,9 @@ typedef struct yy_parser {
     yy_str_info lex_stuff; 	/* runtime pattern from m// or s/// */
     yy_str_info lex_repl; 	/* runtime pattern from m// or s/// */
 
+    I32         lex_charoffset;  /* character offset for subpaterns. */
+    SV*         lex_filename;    /* filename being currently compiled */
+    I32         lex_line_number; /* line number of the "current" token */
     I32		multi_start;	/* 1st line of multi-line string */
     I32		multi_end;	/* last line of multi-line string */
     char	multi_open;	/* delimiter of said string */

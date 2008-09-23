@@ -112,7 +112,7 @@ sub orderValues
 {
     my $index = 0;
     foreach my $ver ( sort { $a <+> $b } keys %v_list ) {
-        foreach my $name ( < @{ %v_list{$ver} } ) {
+        foreach my $name (  @{ %v_list{$ver} } ) {
 	    %ValueToName{ $index } = \@( uc $name, $ver ) ;
 	    %NameToValue{ uc $name } = $index ++ ;
         }
@@ -163,7 +163,7 @@ sub mkRange
           if @a[$i] == @a[$i - 1] + 1 && @a[$i] + 1 == @a[$i + 1] ;
     }
 
-    my $out = join(",", <@out);
+    my $out = join(",",@out);
 
     $out =~ s/,(\.\.,)+/../g ;
     return $out;
@@ -176,7 +176,7 @@ sub printTree
     my $prefix = shift ;
     my ($k, $v) ;
 
-    my $max = (sort {$a <+> $b} map { length $_ } keys %$tre)[[-1]] ;
+    my $max = ( <sort {$a <+> $b} map { length $_ } keys %$tre)[[-1]] ;
     my @keys = sort keys %$tre ;
 
     while ($k = shift @keys) {
@@ -216,11 +216,11 @@ sub mkHex
     my $mask = "\x[00]" x $max;
     my $string = "" ;
 
-    foreach (< @a) {
+    foreach ( @a) {
 	vec($mask, $_, 1) = 1 ;
     }
 
-    foreach (unpack("C*", $mask)) {
+    foreach (@(unpack("C*", $mask))) {
         $string .= sprintf("\%2.2x", $_);
     }
     return "\\x[$string]";
@@ -380,11 +380,11 @@ print $pm "our \%Bits = %(\n" ;
 foreach $k (sort keys  %list) {
 
     my $v = %list{$k} ;
-    my @list = @( sort { $a <+> $b } < @$v );
+    my @list = sort { $a <+> $b } @$v;
 
     print $pm tab(4, "    '$k'"), '=> "',
 		# mkHex($warn_size, @list),
-		mkHex($warn_size, map $_ * 2 , < @list),
+		mkHex($warn_size, < map $_ * 2, @list),
 		'", # [', mkRange(@list), "]\n" ;
 }
 
@@ -394,11 +394,11 @@ print $pm "our \%DeadBits = %(\n" ;
 foreach $k (sort keys  %list) {
 
     my $v = %list{$k} ;
-    my @list = @( sort { $a <+> $b } < @$v );
+    my @list = sort { $a <+> $b } @$v;
 
     print $pm tab(4, "    '$k'"), '=> "',
 		# mkHex($warn_size, @list),
-		mkHex($warn_size, map $_ * 2 + 1 , < @list),
+		mkHex($warn_size, < map $_ * 2 + 1, @list),
 		'", # [', mkRange(@list), "]\n" ;
 }
 

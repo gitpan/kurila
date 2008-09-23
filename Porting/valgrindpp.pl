@@ -1,10 +1,10 @@
 #!/usr/bin/perl
 use IO::File ();
-use File::Find qw(find);
-use Text::Wrap qw(wrap);
-use Getopt::Long qw(GetOptions);
-use Pod::Usage qw(pod2usage);
-use Cwd qw(cwd);
+use File::Find < qw(find);
+use Text::Wrap < qw(wrap);
+use Getopt::Long < qw(GetOptions);
+use Pod::Usage < qw(pod2usage);
+use Cwd < qw(cwd);
 use File::Spec;
 use strict;
 
@@ -16,7 +16,7 @@ my %opt = %(
   verbose => 0,
 );
 
-GetOptions(\%opt, qw(
+GetOptions(\%opt, < qw(
             dir=s
             frames=i
             hide=s@
@@ -92,7 +92,7 @@ sub summary {
 
   for my $e (keys %$error) {
     for my $f (keys %{$error->{$e}}) {
-      my($func, $file, $line) = split m/:/, $f;
+      my($func, $file, $line) = < split m/:/, $f;
       my $nf = %opt{lines} ? "$func ($file:$line)" : "$func ($file)";
       %ne{$e}->{$nf}->{count}++;
       while (my($k,$v) = each %{$error->{$e}->{$f}}) {
@@ -105,7 +105,7 @@ sub summary {
   for my $l (keys %$leak) {
     for my $s (keys %{$leak->{$l}}) {
       my $ns = join '<', map {
-                 my($func, $file, $line) = split m/:/;
+                 my($func, $file, $line) = < split m/:/;
                  m/:/ ? %opt{lines}
                        ? "$func ($file:$line)" : "$func ($file)"
                      : $_
@@ -122,8 +122,8 @@ sub summary {
 
   if (%opt{top}) {
     for my $what (qw(error leak)) {
-      my @t = @( sort { %top{$b}->{$what} <+> %top{$a}->{$what} or $a cmp $b }
-              grep %top{$_}->{$what}, keys %top );
+      my @t = sort { %top{$b}->{$what} <+> %top{$a}->{$what} or $a cmp $b }
+ grep %top{$_}->{$what}, keys %top;
       (nelems @t) +> %opt{top} and splice @t, %opt{top};
       my $n = (nelems @t);
       my $s = $n +> 1 ? 's' : '';
@@ -161,7 +161,7 @@ sub summary {
     print $fh qq("$l"\n);
     for my $frames (sort keys %{%nl{$l}}) {
       my $data = %nl{$l}->{$frames};
-      my @stack = @( split m/</, $frames );
+      my @stack = split m/</, $frames;
       $data->{count} +> 1 and @stack[-1] .= " [$data->{count} paths]";
       print $fh join('', map { ' 'x4 . "$_:@stack[$_]\n" } 0 ..( (nelems @stack)-1) ), <
                 format_tests($data->{tests}), "\n\n";
@@ -244,7 +244,7 @@ sub filter {
 
       # If there's something on the stack and we've seen perl code,
       # add this memory leak to the summary data
-      (nelems @stack) and $inperl and %leak{$type}->{join '<', < @stack}->{$test}++;
+      (nelems @stack) and $inperl and %leak{$type}->{join '<', @stack}->{$test}++;
     } else {
       debug(1, "ERROR: $line\n");
 

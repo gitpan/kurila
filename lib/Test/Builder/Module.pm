@@ -5,19 +5,9 @@ use strict;
 use Test::Builder;
 
 require Exporter;
-our @ISA = @( qw(Exporter) );
+our @ISA = qw(Exporter);
 
 our $VERSION = '0.78';
-
-# 5.004's Exporter doesn't have export_to_level.
-my $_export_to_level = sub {
-      my $pkg = shift;
-      my $level = shift;
-      (undef) = shift;                  # redundant arg
-      my $callpkg = caller($level);
-      $pkg->export($callpkg, < @_);
-};
-
 
 =head1 NAME
 
@@ -94,11 +84,11 @@ sub import {
     $test->exported_to($caller);
 
     $class->import_extra(\@_);
-    my(@imports) = @( < $class->_strip_imports(\@_) );
+    my(@imports) = $class->_strip_imports(\@_);
 
     $test->plan(< @_);
 
-    $class->?$_export_to_level(1, $class, < @imports);
+    $class->export_to_level(1, $class, < @imports);
 }
 
 
@@ -123,7 +113,7 @@ sub _strip_imports {
         $idx++;
     }
 
-    @$list = @( < @other );
+    @$list = @other;
 
     return @imports;
 }

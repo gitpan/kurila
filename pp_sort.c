@@ -1475,12 +1475,11 @@ PP(pp_sort)
     AV* av = NULL;
     GV *gv;
     CV *cv = NULL;
-    I32 gimme = GIMME;
+    I32 gimme = GIMME_V;
     OP* const nextop = PL_op->op_next;
     I32 overloading = 0;
     bool hasargs = FALSE;
     I32 is_xsub = 0;
-    I32 sorting_av = 0;
     const U8 priv = PL_op->op_private;
     const U8 flags = PL_op->op_flags;
     U32 sort_flags = 0;
@@ -1495,7 +1494,7 @@ PP(pp_sort)
     if ((priv & OPpSORT_STABLE) != 0)
 	sort_flags |= SORTf_STABLE;
 
-    if (gimme != G_ARRAY) {
+    if (gimme == G_VOID) {
 	SP = MARK;
 	EXTEND(SP,1);
 	RETPUSHUNDEF;
@@ -1543,35 +1542,12 @@ PP(pp_sort)
 	PL_sortcop = NULL;
     }
 
-    /* optimiser converts "@a = sort @a" to "sort \@a";
-     * in case of tied @a, pessimise: push (@a) onto stack, then assign
-     * result back to @a at the end of this function */
-    if (priv & OPpSORT_INPLACE) {
-	assert( MARK+1 == SP && *SP && SvTYPE(*SP) == SVt_PVAV);
-	(void)POPMARK; /* remove mark associated with ex-OP_AASSIGN */
-	av = (AV*)(*SP);
-	max = AvFILL(av) + 1;
-	if (SvMAGICAL(av)) {
-	    MEXTEND(SP, max);
-	    p2 = SP;
-	    for (i=0; i < max; i++) {
-		SV **svp = av_fetch(av, i, FALSE);
-		*SP++ = (svp) ? *svp : NULL;
-	    }
-	}
-	else {
-	    if (SvREADONLY(av))
-		Perl_croak(aTHX_ PL_no_modify);
-	    else
-		SvREADONLY_on(av);
-	    p1 = p2 = AvARRAY(av);
-	    sorting_av = 1;
-	}
+    av = SvAV(sv_mortalcopy(POPs));
+    if ( ! SvAVOK(av) ) {
+	Perl_croak(aTHX_ "%s expected ARRAY but got %s", OP_DESC(PL_op), Ddesc(av));
     }
-    else {
-	p2 = MARK+1;
-	max = SP - MARK;
-   }
+    p1 = p2 = AvARRAY(av);
+    max = AvFILL(av) + 1;
 
     /* shuffle stack down, removing optional initial cv (p1!=p2), plus
      * any nulls; also stringify or converting to integer or number as
@@ -1583,18 +1559,12 @@ PP(pp_sort)
 		if (priv & OPpSORT_NUMERIC) {
 		    if (priv & OPpSORT_INTEGER) {
 			if (!SvIOK(*p1)) {
-			    if (SvAMAGIC(*p1))
-				overloading = 1;
-			    else
-				(void)sv_2iv(*p1);
+			    (void)sv_2iv(*p1);
 			}
 		    }
 		    else {
 			if (!SvNSIOK(*p1)) {
-			    if (SvAMAGIC(*p1))
-				overloading = 1;
-			    else
-				(void)sv_2nv(*p1);
+			    (void)sv_2nv(*p1);
 			}
 			if (all_SIVs && !SvSIOK(*p1))
 			    all_SIVs = 0;
@@ -1602,11 +1572,8 @@ PP(pp_sort)
 		}
 		else {
 		    if (!SvPOK(*p1)) {
-			if (SvAMAGIC(*p1))
-			    overloading = 1;
-			else
-			    (void)sv_2pv_flags(*p1, 0,
-					       SV_GMAGIC|SV_CONST_RETURN);
+			(void)sv_2pv_flags(*p1, 0,
+			    SV_GMAGIC|SV_CONST_RETURN);
 		    }
 		}
 	    }
@@ -1615,8 +1582,7 @@ PP(pp_sort)
 	else
 	    max--;
     }
-    if (sorting_av)
-	AvFILLp(av) = max-1;
+    AvFILLp(av) = max-1;
 
     if (max > 1) {
 	SV **start;
@@ -1685,13 +1651,13 @@ PP(pp_sort)
 	}
 	else {
 	    MEXTEND(SP, 20);	/* Can't afford stack realloc on signal. */
-	    start = sorting_av ? AvARRAY(av) : ORIGMARK+1;
+	    start = AvARRAY(av);
 	    sortsvp(aTHX_ start, max,
 		    (priv & OPpSORT_NUMERIC)
 		        ? ( ( ( priv & OPpSORT_INTEGER) || all_SIVs)
-			    ? ( overloading ? S_amagic_i_ncmp : S_sv_i_ncmp)
-			    : ( overloading ? S_amagic_ncmp : S_sv_ncmp ) )
-			: ( overloading ? (SVCOMPARE_t)S_amagic_cmp : (SVCOMPARE_t)sv_cmp_static ),
+			    ? S_sv_i_ncmp
+			    : S_sv_ncmp )
+			: (SVCOMPARE_t)sv_cmp_static,
 		    sort_flags);
 	}
 	if ((priv & OPpSORT_REVERSE) != 0) {
@@ -1703,27 +1669,10 @@ PP(pp_sort)
 	    }
 	}
     }
-    if (sorting_av)
-	SvREADONLY_off(av);
-    else if (av && !sorting_av) {
-	/* simulate pp_aassign of tied AV */
-	SV** const base = ORIGMARK+1;
-	for (i=0; i < max; i++) {
-	    base[i] = newSVsv(base[i]);
-	}
-	av_clear(av);
-	av_extend(av, max);
-	for (i=0; i < max; i++) {
-	    SV * const sv = base[i];
-	    SV ** const didstore = av_store(av, i, sv);
-	    if (SvSMAGICAL(sv))
-		mg_set(sv);
-	    if (!didstore)
-		sv_2mortal(sv);
-	}
-    }
+    
     LEAVE;
-    PL_stack_sp = ORIGMARK + (sorting_av ? 0 : max);
+    PL_stack_sp = ORIGMARK;
+    *++PL_stack_sp = av;
     return nextop;
 }
 
@@ -1849,75 +1798,7 @@ S_sv_i_ncmp(pTHX_ SV *const a, SV *const b)
     return iv1 < iv2 ? -1 : iv1 > iv2 ? 1 : 0;
 }
 
-#define tryCALL_AMAGICbin(left,right,meth) \
-    (PL_amagic_generation && (SvAMAGIC(left)||SvAMAGIC(right))) \
-	? amagic_call(left, right, CAT2(meth,_amg), 0) \
-	: NULL;
-
 #define SORT_NORMAL_RETURN_VALUE(val)  (((val) > 0) ? 1 : ((val) ? -1 : 0))
-
-static I32
-S_amagic_ncmp(pTHX_ register SV *const a, register SV *const b)
-{
-    dVAR;
-    SV * const tmpsv = tryCALL_AMAGICbin(a,b,ncmp);
-
-    PERL_ARGS_ASSERT_AMAGIC_NCMP;
-
-    if (tmpsv) {
-        if (SvIOK(tmpsv)) {
-            const I32 i = SvIVX(tmpsv);
-            return SORT_NORMAL_RETURN_VALUE(i);
-        }
-	else {
-	    const NV d = SvNV(tmpsv);
-	    return SORT_NORMAL_RETURN_VALUE(d);
-	}
-     }
-     return S_sv_ncmp(aTHX_ a, b);
-}
-
-static I32
-S_amagic_i_ncmp(pTHX_ register SV *const a, register SV *const b)
-{
-    dVAR;
-    SV * const tmpsv = tryCALL_AMAGICbin(a,b,ncmp);
-
-    PERL_ARGS_ASSERT_AMAGIC_I_NCMP;
-
-    if (tmpsv) {
-        if (SvIOK(tmpsv)) {
-            const I32 i = SvIVX(tmpsv);
-            return SORT_NORMAL_RETURN_VALUE(i);
-        }
-	else {
-	    const NV d = SvNV(tmpsv);
-	    return SORT_NORMAL_RETURN_VALUE(d);
-	}
-    }
-    return S_sv_i_ncmp(aTHX_ a, b);
-}
-
-static I32
-S_amagic_cmp(pTHX_ register SV *const str1, register SV *const str2)
-{
-    dVAR;
-    SV * const tmpsv = tryCALL_AMAGICbin(str1,str2,scmp);
-
-    PERL_ARGS_ASSERT_AMAGIC_CMP;
-
-    if (tmpsv) {
-        if (SvIOK(tmpsv)) {
-            const I32 i = SvIVX(tmpsv);
-            return SORT_NORMAL_RETURN_VALUE(i);
-        }
-	else {
-	    const NV d = SvNV(tmpsv);
-	    return SORT_NORMAL_RETURN_VALUE(d);
-	}
-    }
-    return sv_cmp(str1, str2);
-}
 
 /*
  * Local variables:

@@ -1,12 +1,12 @@
 package ExtUtils::Constant::ProxySubs;
 
 use strict;
-use vars qw($VERSION @ISA %type_to_struct %type_from_struct %type_to_sv
+use vars < qw($VERSION @ISA %type_to_struct %type_from_struct %type_to_sv
 	    %type_to_C_value %type_is_a_problem %type_num_args
 	    %type_temporary);
 require ExtUtils::Constant::XS;
-use ExtUtils::Constant::Utils qw(C_stringify);
-use ExtUtils::Constant::XS qw(%XS_TypeSet);
+use ExtUtils::Constant::Utils < qw(C_stringify);
+use ExtUtils::Constant::XS < qw(%XS_TypeSet);
 
 $VERSION = '0.06';
 @ISA = @( 'ExtUtils::Constant::XS' );
@@ -61,7 +61,7 @@ $VERSION = '0.06';
 
 sub type_to_C_value {
     my ($self, $type) = < @_;
-    return %type_to_C_value{$type} || sub {return @(map {ref $_ ? < @$_ : $_} < @_) };
+    return %type_to_C_value{$type} || sub {return map {ref $_ ? < @$_ : $_} @_ };
 }
 
 # TODO - figure out if there is a clean way for the type_to_sv code to
@@ -159,7 +159,7 @@ sub WriteConstants {
     my $ARGS = \%(< @_);
 
     my ($c_fh, $xs_fh, $c_subname, $xs_subname, $default_type, $package)
-	= %{$ARGS}{[qw(C_FH XS_FH C_SUBNAME XS_SUBNAME DEFAULT_TYPE NAME)]};
+	= < %{$ARGS}{[qw(C_FH XS_FH C_SUBNAME XS_SUBNAME DEFAULT_TYPE NAME)]};
 
     my $options = $ARGS->{PROXYSUBS};
     $options = \%() unless ref $options;
@@ -176,9 +176,9 @@ sub WriteConstants {
     # A hash to lookup items with.
     my $items = \%();
 
-    my @items = @( < $self->normalise_items (\%(disable_utf8_duplication => 1),
+    my @items = $self->normalise_items (\%(disable_utf8_duplication => 1),
 					$default_type, $what, $items,
-					< @{$ARGS->{NAMES}}) );
+					< @{$ARGS->{NAMES}});
 
     # Partition the values by type. Also include any defaults in here
     # Everything that doesn't have a default needs alternative code for
@@ -288,7 +288,7 @@ EOBOOT
     my %iterator;
 
     $found->{''}
-        = \@(map {\%(< %$_, type=>'', invert_macro => 1)} < @$notfound);
+        = \ map {\%(< %$_, type=>'', invert_macro => 1)} @$notfound;
 
     foreach my $type (sort keys %$found) {
 	my $struct = %type_to_struct{$type};
@@ -308,7 +308,7 @@ EOBOOT
 EOBOOT
 
 
-	foreach my $item (< @{$found->{$type}}) {
+	foreach my $item ( @{$found->{$type}}) {
             my ($name, $namelen, $value, $macro)
                  = < $self->name_len_value_macro($item);
 
@@ -323,8 +323,8 @@ EOBOOT
 		    "        /* This is the default value: */\n" if $type;
 		print $xs_fh "#else\n";
 	    }
-	    print $xs_fh "        \{ ", join (', ', "\"$name\"", $namelen, 
-                                              < &$type_to_value($value)), " \},\n",
+	    print $xs_fh "        \{ ", join (', ', @( "\"$name\"", $namelen, 
+                                              < &$type_to_value($value))), " \},\n",
 						 $self->macro_to_endif($macro);
 	}
 
@@ -375,38 +375,19 @@ EOBOOT
 	    $add_symbol_subname($athx symbol_table, value_for_notfound->name,
 				value_for_notfound->namelen, tripwire);
 EXPLODE
-
-	    /* Need to add prototypes, else parsing will vary by platform.  */
-	    SV **sv = hv_fetch(symbol_table, value_for_notfound->name,
-			       value_for_notfound->namelen, TRUE);
-	    if (!sv) \{
-		Perl_croak($athx
-			   "Couldn't add key '\%s' to \%\%$package_sprintf_safe\::",
+            SV* namesv = sv_2mortal(newSVpvn("{$symbol_table}::", $(length($symbol_table) + 2)));
+            sv_catpvn(namesv, value_for_notfound->name, value_for_notfound->namelen);
+	    GV *gv = gv_fetchsv(namesv, GV_ADD, SVt_PVCV);
+	    if (!gv) \{
+		Perl_croak(aTHX_
+			   "Couldn't add key '{$package_sprintf_safe}::\%s'",
 			   value_for_notfound->name);
 	    \}
-	    if (!SvOK(*sv) && SvTYPE(*sv) != SVt_PVGV) \{
-		/* Nothing was here before, so mark a prototype of ""  */
-		sv_setpvn(*sv, "", 0);
-	    \} else if (SvPOK(*sv) && SvCUR(*sv) == 0) \{
-		/* There is already a prototype of "" - do nothing  */
-	    \} else \{
-		/* Someone has been here before us - have to make a real
-		   typeglob.  */
-		/* It turns out to be incredibly hard to deal with all the
-		   corner cases of sub foo (); and reporting errors correctly,
-		   so lets cheat a bit.  Start with a constant subroutine  */
-                ENTER;
-                SAVESPTR(PL_curstash);
-                HVcpREPLACE(PL_curstash, symbol_table);
-		CV *cv = newCONSTSUB(value_for_notfound->name,
-				     &PL_sv_yes);
-                LEAVE;
-		/* and then turn it into a non constant declaration only.  */
-		SvREFCNT_dec(CvXSUBANY(cv).any_ptr);
-		CvCONST_off(cv);
-		CvXSUB(cv) = NULL;
-		CvXSUBANY(cv).any_ptr = NULL;
-	    \}
+            GV* notfoundgv = gv_fetchmethod(aTHX_  symbol_table, "constant_not_found");
+            if (!notfoundgv || ! GvCV(notfoundgv)) \{
+		Perl_croak(aTHX_ "'constant_not_found' could not be found");
+            \}
+            sv_setsv((SV*)gv, sv_2mortal(newRV_inc((SV*)GvCV(notfoundgv))));
 #ifndef SYMBIAN
 	    if (!hv_store({$c_subname}_missing, value_for_notfound->name,
 			  value_for_notfound->namelen, &PL_sv_yes, 0))
@@ -421,7 +402,7 @@ DONT
 	\}
 EOBOOT
 
-    foreach my $item (< @$trouble) {
+    foreach my $item ( @$trouble) {
         my ($name, $namelen, $value, $macro)
 	    = < $self->name_len_value_macro($item);
         my $ifdef = $self->macro_to_ifdef($macro);
@@ -444,7 +425,7 @@ EOBOOT
 	# these don't fit nicely in the macro-ised generator functions
 	my $counter = 0;
 	printf $xs_fh "            \%s temp\%d;\n", $_, $counter++
-	    foreach < @{%type_temporary{$type}};
+	    foreach  @{%type_temporary{$type}};
 
 	print $xs_fh "            $item->{pre}\n" if $item->{pre};
 
@@ -452,9 +433,9 @@ EOBOOT
 	# statements, we can't declare and assign to the temporaries in one.
 	$counter = 0;
 	printf $xs_fh "            temp\%d = \%s;\n", $counter++, $_
-	    foreach < &$type_to_value($value);
+	    foreach  &$type_to_value($value);
 
-	my @tempvarnames = @( map {sprintf 'temp%d', $_} 0 .. $counter - 1 );
+	my @tempvarnames = map {sprintf 'temp%d', $_} 0 .. $counter - 1;
 	printf $xs_fh <<"EOBOOT", $name, &$generator(<@tempvarnames);
 	    {$c_subname}_add_symbol($athx symbol_table, "\%s",
 				    $namelen, \%s);
@@ -470,6 +451,12 @@ EOBOOT
        methods  */
     ++PL_sub_generation;
   \}
+
+void
+constant_not_found()
+    PPCODE:
+	Perl_croak(aTHX_ "Your vendor has not defined the requested $package_sprintf_safe macro");
+
 EOBOOT
 
     print $xs_fh $explosives ? <<"EXPLODE" : <<"DONT";

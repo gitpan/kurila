@@ -29,7 +29,7 @@ while( ~< *DATA) {
 }
 plan tests => scalar nelems @prgs;
 
-foreach my $prog (< @prgs) {
+foreach my $prog ( @prgs) {
     my($raw_prog, $name) = < @$prog;
 
     my $switch;
@@ -37,7 +37,7 @@ foreach my $prog (< @prgs) {
 	$switch = $1;
     }
 
-    my($prog,$expected) = split(m/\nEXPECT\n/, $raw_prog);
+    my($prog,$expected) = < split(m/\nEXPECT\n/, $raw_prog);
     $prog .= "\n";
     $expected = '' unless defined $expected;
 
@@ -64,7 +64,7 @@ EXPECT
 ########
 our $foo=undef; $foo->go;
 EXPECT
-Can't call method "go" on UNDEF at - line 1.
+Can't call method "go" on UNDEF at - line 1 character 21.
 ########
 BEGIN
         {
@@ -76,7 +76,7 @@ our @array;
 ########
 our $x=0x0eabcd; print $x->ref;
 EXPECT
-Can't locate object method "ref" via package "961485" (perhaps you forgot to load "961485"?) at - line 1.
+Can't locate object method "ref" via package "961485" (perhaps you forgot to load "961485"?) at - line 1 character 26.
 ########
 our $str;
 chop ($str .= ~< *DATA);
@@ -132,27 +132,27 @@ our @ordered_array=sort by_number keys(%as_ary);
 ########
 BEGIN { die "phooey" }
 EXPECT
-phooey at - line 1.
+phooey at - line 1 character 9.
 BEGIN failed--compilation aborted
 ########
 BEGIN { 1/0 }
 EXPECT
-Illegal division by zero at - line 1.
+Illegal division by zero at - line 1 character 10.
 BEGIN failed--compilation aborted
 ########
 BEGIN { undef = 0 }
 EXPECT
-Modification of a read-only value attempted at - line 1.
+Modification of a read-only value attempted at - line 1 character 14.
 BEGIN failed--compilation aborted
 ########
-my @a; @a[2] = 1; for (<@a) { $_ = 2 } print "{join ' ', <@a}\n"
+my @a; @a[2] = 1; for (@a) { $_ = 2 } print "{join ' ', @a}\n"
 EXPECT
 2 2 2
 ########
 # used to attach defelem magic to all immortal values,
 # which made restore of local $_ fail.
 foo(2+>1);
-sub foo { bar() for <@_;  }
+sub foo { bar() for @_;  }
 sub bar { local $_; }
 print "ok\n";
 EXPECT
@@ -174,6 +174,7 @@ try { my $x = 'peace'; eval q[ print "$x\n" ] }
 EXPECT
 inner peace
 ########
+# TODO fix location
 -w
 $| = 1;
 sub foo {
@@ -193,12 +194,12 @@ In foo2
 ########
 our $s = 0;
 map {#this newline here tickles the bug
-$s += $_} (1,2,4);
+$s += $_} @(1,2,4);
 print "eat flaming death\n" unless ($s == 7);
 ########
-BEGIN { @ARGV = @( qw(a b c d e) ) }
-BEGIN { print "argv <{join ' ', <@ARGV}>\nbegin <",shift,">\n" }
-END { print "end <",shift,">\nargv <{join ' ', <@ARGV}>\n" }
+BEGIN { @ARGV = qw(a b c d e) }
+BEGIN { print "argv <{join ' ', @ARGV}>\nbegin <",shift,">\n" }
+END { print "end <",shift,">\nargv <{join ' ', @ARGV}>\n" }
 INIT { print "init <",shift,">\n" }
 CHECK { print "check <",shift,">\n" }
 EXPECT
@@ -219,6 +220,7 @@ EXPECT
 1
 2
 ########
+# TODO fix location
 -w
 sub testme { my $a = "test"; { local $a = "new test"; print $a }}
 EXPECT
@@ -277,6 +279,7 @@ start
 destroyed
 destroyed
 ########
+# TODO fix trace back of "call_sv"
 BEGIN {
   $| = 1;
   $^WARN_HOOK = sub {
@@ -287,13 +290,13 @@ BEGIN {
 }
 EXPECT
 foo
-bar at - line 5.
+bar at - line 5 character 5.
     main::__ANON__ called at - line 7.
 BEGIN failed--compilation aborted
 ########
 re();
 sub re {
-    my $re = join '', eval 'qr/(??{ $obj->method })/';
+    my $re = join '', @( eval 'qr/(??{ $obj->method })/' );
     $re;
 }
 EXPECT
@@ -319,7 +322,7 @@ else {
   if ($x == 0) { print "" } else { print $x }
 }
 EXPECT
-Use of uninitialized value $main::x in numeric eq (==) at - line 4.
+Use of uninitialized value $main::x in numeric eq (==) at - line 4 character 10.
 ########
 our $x = sub {};
 foo();
@@ -339,10 +342,10 @@ sub M { @_[0] = 2; }
 eval "C";
 M(C);
 EXPECT
-Modification of a read-only value attempted at - line 2.
-    main::M called at - line 4.
+Modification of a read-only value attempted at - line 2 character 14.
+    main::M called at - line 4 character 1.
 ########
-print qw(ab a\b a\\b);
+print < qw(ab a\b a\\b);
 EXPECT
 aba\ba\\b
 ########
@@ -375,7 +378,7 @@ ok
 # reversed again as a result of [perl #17763]
 die qr(x)
 EXPECT
-recursive die at - line 3.
+(?-uxism:x) at - line 3 character 1.
 ########
 # David Dyck
 # coredump in 5.7.1
@@ -387,12 +390,12 @@ EXPECT
 "x" =~ m/(\G?x)?/;
 ########
 # Bug 20010515.004
-my @h = @(1 .. 10);
+my @h = 1 .. 10;
 bad(<@h);
 sub bad {
    undef @h;
    print "O";
-   print for <@_;
+   print for @_;
    print "K";
 }
 EXPECT

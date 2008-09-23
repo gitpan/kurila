@@ -7,7 +7,7 @@ BEGIN {
     }
     if (%ENV{PERL_CORE}) {
 	chdir('t') if -d 't';
-	@INC = @( $^O eq 'MacOS' ? qw(::lib) : qw(../lib) );
+	@INC = @( $^O eq 'MacOS' ? < qw(::lib) : < qw(../lib) );
     }
 }
 
@@ -44,12 +44,12 @@ ok($Collator->eq("", ""));
 is($Collator->cmp("", "perl"), -1);
 
 is(
-  join(':', < $Collator->sort( qw/ acha aca ada acia acka / ) ),
+  join(':', $Collator->sort( < qw/ acha aca ada acia acka / ) ),
   join(':',                  qw/ aca acha acia acka ada / ),
 );
 
 is(
-  join(':', < $Collator->sort( qw/ ACHA ACA ADA ACIA ACKA / ) ),
+  join(':', $Collator->sort( < qw/ ACHA ACA ADA ACIA ACKA / ) ),
   join(':',                  qw/ ACA ACHA ACIA ACKA ADA / ),
 );
 
@@ -153,7 +153,7 @@ ENTRIES
 );
 
 ok(
-  join(':', < $onlyABC->sort( qw/ ABA BAC cc A Ab cAc aB / ) ),
+  join(':', $onlyABC->sort( < qw/ ABA BAC cc A Ab cAc aB / ) ),
   join(':',                 qw/ A aB Ab ABA BAC cAc cc / ),
 );
 
@@ -220,8 +220,8 @@ ENTRIES
 
 # defined before undefined
 
-my $sortABC = join '', <
-    $few_entries->sort(split m//, "ABCDEFGHIJKLMNOPQRSTUVWXYZ ");
+my $sortABC = join '',
+    $few_entries->sort( <split m//, "ABCDEFGHIJKLMNOPQRSTUVWXYZ ");
 
 ok($sortABC eq "PERL ABCDFGHIJKMNOQSTUVWXYZ");
 
@@ -374,15 +374,15 @@ $temp = $c->viewSortKey("abc");
 ok($_, 'Foo');
 
 $_ = 'Foo';
-@temp = @( < $c->sort("abc", "xyz", "def") );
+@temp = $c->sort("abc", "xyz", "def");
 ok($_, 'Foo');
 
 $_ = 'Foo';
-@temp = @( < $c->index("perl5", "RL") );
+@temp = $c->index("perl5", "RL");
 ok($_, 'Foo');
 
 $_ = 'Foo';
-@temp = @( < $c->index("perl5", "LR") );
+@temp = $c->index("perl5", "LR");
 ok($_, 'Foo');
 
 #####

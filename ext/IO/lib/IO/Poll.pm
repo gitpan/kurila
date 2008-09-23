@@ -12,24 +12,23 @@ use IO::Handle;
 use Exporter ();
 our(@ISA, @EXPORT_OK, @EXPORT, $VERSION);
 
-@ISA = @( qw(Exporter) );
+@ISA = qw(Exporter);
 $VERSION = "0.07";
 
-@EXPORT = @( qw( POLLIN
+@EXPORT = qw( POLLIN
 	      POLLOUT
 	      POLLERR
 	      POLLHUP
 	      POLLNVAL
-	    ) );
+	    );
 
-@EXPORT_OK = @( qw(
+@EXPORT_OK = qw(
  POLLPRI   
  POLLRDNORM
  POLLWRNORM
  POLLRDBAND
  POLLWRBAND
- POLLNORM  
-	       ) );
+	       );
 
 # [0] maps fd's to requested masks
 # [1] maps fd's to returned  masks
@@ -115,7 +114,7 @@ sub remove {
 
 sub handles {
     my $self = shift;
-    return @( values %{$self->[2]} ) unless (nelems @_);
+    return values %{$self->[2]} unless (nelems @_);
 
     my $events = shift || 0;
     my($fd,$ev,$io,$mask);

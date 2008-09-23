@@ -29,7 +29,7 @@ BEGIN { eval q{
     use Carp::Heavy;
 } }
 
-use Opcode 1.01, qw(
+use Opcode v1.01 < qw(
     opset opset_to_ops opmask_add
     empty_opset full_opset invert_opset verify_opset
     opdesc opcodes opmask define_optag opset_to_hex
@@ -42,19 +42,16 @@ my $default_root  = 0;
 # share *_ and functions defined in universal.c
 # Don't share stuff like *UNIVERSAL:: otherwise code from the
 # compartment can 0wn functions in UNIVERSAL
-my $default_share = \@(qw[
+my $default_share = \qw[
     $_
     @_
     &PerlIO::get_layers
     &UNIVERSAL::isa
     &UNIVERSAL::can
     &UNIVERSAL::VERSION
-    &utf8::is_utf8
     &utf8::valid
     &utf8::encode
     &utf8::decode
-    &utf8::upgrade
-    &utf8::downgrade
     &utf8::native_to_unicode
     &utf8::unicode_to_native
     $version::VERSION
@@ -75,20 +72,12 @@ my $default_share = \@(qw[
     &Tie::Hash::NamedCapture::SCALAR
     &Tie::Hash::NamedCapture::flags
     &UNIVERSAL::DOES
-    &version::()
     &version::new
-    &version::(""
     &version::stringify
-    &version::(0+
     &version::numify
     &version::normal
-    &version::(cmp
-    &version::(<+>
     &version::vcmp
-    &version::(bool
     &version::boolean
-    &version::(nomethod
-    &version::noop
     &version::is_alpha
     &version::qv
     &re::regexp_pattern
@@ -96,7 +85,7 @@ my $default_share = \@(qw[
     &error::message
     &error::write_to_stderr
     &Symbol::fetch_glob
-]);
+];
 
 sub new {
     my($class, $root, $mask) = < @_;
@@ -246,7 +235,7 @@ sub share_from {
 #     croak("Package \"$pkg\" does not exist")
 # 	unless %{Symbol::stash("$pkg")};
     my $arg;
-    foreach $arg (< @$vars) {
+    foreach $arg ( @$vars) {
 	# catch some $safe->share($var) errors:
 	my ($var, $type);
 	$type = $1 if ($var = $arg) =~ s/^(\W)//;
@@ -267,8 +256,8 @@ sub share_record {
     my $pkg = shift;
     my $vars = shift;
     my $shares = \%{$obj->{Shares} ||= \%()};
-    # Record shares using keys of $obj->{Shares}. See reinit.
-    %{$shares}{[< @$vars]} = ($pkg) x nelems @$vars if (nelems @$vars);
+ <    # Record shares using keys of $obj->{Shares}. See reinit.
+    %{$shares}{[ @$vars]} = ($pkg) x nelems @$vars if (nelems @$vars);
 }
 sub share_redo {
     my $obj = shift;

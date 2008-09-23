@@ -2,18 +2,11 @@
 
 no strict;
 
-BEGIN {
-    if (%ENV{PERL_CORE}) {
-	@INC = @( '../lib' );
-	chdir 't';
-    }
-}
-
 use Getopt::Long;
 
-print "1..33\n";
+print "1..32\n";
 
-@ARGV = @( qw(-Foo -baR --foo bar) );
+@ARGV = qw(-Foo -baR --foo bar);
 Getopt::Long::Configure ("no_ignore_case");
 our %lnk = %( () );
 print "ok 1\n" if GetOptions (\%lnk, "foo", "Foo=s");
@@ -25,7 +18,7 @@ print (((nelems @ARGV) == 1)          ? "" : "not ", "ok 6\n");
 print ((@ARGV[0] eq "bar")   ? "" : "not ", "ok 7\n");
 print (!(exists %lnk{baR})   ? "" : "not ", "ok 8\n");
 
-@ARGV = @( qw(-Foo -baR --foo bar) );
+@ARGV = qw(-Foo -baR --foo bar);
 Getopt::Long::Configure ("default","no_ignore_case");
 %lnk = %( () );
 my $foo;
@@ -40,7 +33,7 @@ print (!(exists %lnk{foo})   ? "" : "not ", "ok 16\n");
 print (!(exists %lnk{baR})   ? "" : "not ", "ok 17\n");
 print (!(exists %lnk{bar})   ? "" : "not ", "ok 18\n");
 
-@ARGV = @( qw(/Foo=-baR --bar bar) );
+@ARGV = qw(/Foo=-baR --bar bar);
 Getopt::Long::Configure ("default","prefix_pattern=--|/|-|\\+","long_prefix_pattern=--|/");
 %lnk = %( () );
 my $bar;
@@ -59,7 +52,7 @@ print (!(exists %lnk{bar})   ? "" : "not ", "ok 28\n");
     %lnk = %( () );
     local $^WARN_HOOK= sub { $errors.= @_[0]->{description} };
 
-    @ARGV = @( qw(/Foo=-baR) );
+    @ARGV = qw(/Foo=-baR);
     Getopt::Long::Configure ("default","bundling","ignore_case_always",
                              "prefix_pattern=--|/|-|\\+","long_prefix_pattern=--");
     %lnk = %( () );
@@ -69,7 +62,7 @@ print (!(exists %lnk{bar})   ? "" : "not ", "ok 28\n");
     $errors="";
     %lnk = %( () );
     undef $bar;
-     @ARGV = @( qw(/Foo=-baR) );
+     @ARGV = qw(/Foo=-baR);
     Getopt::Long::Configure ("default","bundling","ignore_case_always",
                              "prefix_pattern=--|/|-|\\+","long_prefix_pattern=--|/");
     GetOptions (\%lnk, "bar" => \$bar, "Foo=s");
@@ -78,16 +71,3 @@ print (!(exists %lnk{bar})   ? "" : "not ", "ok 28\n");
     print ((%lnk{Foo} eq "-baR") ? "" : "not ", "ok 32\n");
 }
 
-{
-    # Allow hashes to overload "".
-    # This used to fail up to 2.34.
-    # Thanks to Yves Orton.
-    my $blessed = bless(\%lnk, "OverLoad::Test");
-
-    @ARGV = @( qw(--foo bar) );
-    Getopt::Long::Configure("default");
-    print "not" unless GetOptions (\%lnk, "foo=s" => \$foo);
-    print "ok 33\n";
-    package Overload::Test;
-    use overload '""' => sub{ die "Bad mojo!" };
-}

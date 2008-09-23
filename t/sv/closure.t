@@ -108,7 +108,7 @@ sub barf {
   @foo;
 }
 
-@foo = @( < barf() );
+@foo = barf();
 test {
   &{@foo[0]}() == 0 and
   &{@foo[1]}() == 1 and
@@ -186,7 +186,7 @@ test {
 {
     use strict;
 
-    use vars qw!$test!;
+    use vars < qw!$test!;
     my($debugging, %expected, $inner_type, $where_declared, $within);
     my($nc_attempt, $call_outer, $call_inner, $undef_outer);
     my($code, $inner_sub_test, $expected, $line, $errors, $output);
@@ -271,11 +271,11 @@ END_MARK_TWO
 # some of the variables which the closure will access
 our \$global_scalar = 1000;
 our \@global_array = \@(2000, 2100, 2200, 2300);
-our \%global_hash = \%(3000..3009);
+our \%global_hash = \%( < 3000..3009);
 
 my \$fs_scalar = 4000;
 my \@fs_array = \@(5000, 5100, 5200, 5300);
-my \%fs_hash = \%(6000..6009);
+my \%fs_hash = \%( < 6000..6009);
 
 END_MARK_THREE
 
@@ -286,7 +286,7 @@ END_MARK_THREE
 sub outer {
   my $sub_scalar = 7000;
   my @sub_array = @(8000, 8100, 8200, 8300);
-  my %sub_hash = %(9000..9009);
+  my %sub_hash = %(<9000..9009);
 END
     # }
 	  } elsif ($where_declared eq 'in_anon') {
@@ -294,7 +294,7 @@ END
 our $outer = sub {
   my $sub_scalar = 7000;
   my @sub_array = @(8000, 8100, 8200, 8300);
-  my %sub_hash = %(9000..9009);
+  my %sub_hash = %(<9000..9009);
 END
     # }
 	  } else {
@@ -305,7 +305,7 @@ END
 	    $code .= '
       my $foreach = 12000;
       my @list = @(10000, 10010);
-      foreach $foreach (<@list) {
+      foreach $foreach (@list) {
     ' # }
 	  } elsif ($within eq 'naked') {
 	    $code .= "  \{ # naked block\n"	# }
@@ -316,13 +316,13 @@ END
 	  }
 
 	  $sub_test = $test;
-	  @inners = @( qw!global_scalar global_array global_hash! ,
+	  @inners = @( < qw!global_scalar global_array global_hash! , <
 	    qw!fs_scalar fs_array fs_hash! );
 	  push @inners, 'foreach' if $within eq 'foreach';
 	  if ($where_declared ne 'filescope') {
-	    push @inners, qw!sub_scalar sub_array sub_hash!;
+	    push @inners, < qw!sub_scalar sub_array sub_hash!;
 	  }
-	  for $inner_sub_test (< @inners) {
+	  for $inner_sub_test ( @inners) {
 
 	    if ($inner_type eq 'named') {
 	      $code .= "    sub named_$sub_test "
@@ -388,7 +388,7 @@ END
 	  }
 
 	  # Now, we can actually prep to run the tests.
-	  for $inner_sub_test (< @inners) {
+	  for $inner_sub_test ( @inners) {
 	    $expected = %expected{$inner_sub_test} or
 	      die "expected $inner_sub_test missing";
 
@@ -451,8 +451,8 @@ END
 	      print PERL $code;
 	      close PERL;
 	      { local $/;
-	        $output = join '', ~< *READ;
-	        $errors = join '', ~< *READ2; }
+	        $output = join '', @( ~< *READ);
+	        $errors = join '', @( ~< *READ2); }
 	      close READ;
 	      close READ2;
 	    }
@@ -469,7 +469,7 @@ END
 	      # this process, and then foul our pipe back to parent by
 	      # redirecting output in the child.
 	      open PERL, "-", "$cmd" or die "Can't open pipe: $!\n";
-	      { local $/; $output = join '', ~< *PERL }
+	      { local $/; $output = join '', @( ~< *PERL) }
 	      close PERL;
 	    } else {
 	      my $outfile = "tout$$";  $outfile++ while -e $outfile;
@@ -632,7 +632,7 @@ f16302();
 
 {
     my %a;
-    for my $x (7,11) {
+    for my $x (@(7,11)) {
 	%a{$x} = sub { $x=$x; sub { eval '$x' } };
     }
     test { %a{7}->()->() + %a{11}->()->() == 18 };
@@ -681,8 +681,8 @@ __EOF__
     sub  X::DESTROY { $flag = 1 }
     {
 	my $x;
-	BEGIN {$x = \&newsub }
 	sub newsub {};
+	BEGIN {$x = \&newsub }
 	$x = bless \%(), 'X';
     }
     # test { $flag == 1 };

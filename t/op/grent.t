@@ -29,7 +29,7 @@ if (not defined $where) {	# Try NIS.
 
             # Check to make sure we're really using NIS.
             if( open(NSSW, "<", "/etc/nsswitch.conf" ) ) {
-                my($group) = grep m/^\s*group:/, ~< *NSSW;
+                my($group) = < grep m/^\s*group:/, @( ~< *NSSW);
 
                 # If there's no group line, assume it default to compat.
                 if( !$group || $group !~ m/(nis|compat)/ ) {
@@ -91,7 +91,7 @@ ok( setgrent(), 'setgrent' ) || print "# $!\n";
 while ( ~< *GR) {
     chomp;
     # LIMIT -1 so that groups with no users don't fall off
-    my @s = @( split m/:/, $_, -1 );
+    my @s = split m/:/, $_, -1;
     my ($name_s,$passwd_s,$gid_s,$members_s) = < @s;
     if ((nelems @s)) {
 	push @{ %seen{$name_s} }, iohandle::input_line_number(\*GR);
@@ -182,6 +182,6 @@ for (1..$max) {
 }
 endgrent();
 
-is("{join ' ', <@gr1}", "{join ' ', <@gr2}");
+is("{join ' ',@gr1}", "{join ' ',@gr2}");
 
 close(GR);

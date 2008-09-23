@@ -8,14 +8,14 @@ use Data::Dumper;
 
 BEGIN {
     use Exporter    ();
-    use vars        qw[ @ISA $VERSION @EXPORT_OK $VERBOSE $ALLOW_UNKNOWN
+    use vars <        qw[ @ISA $VERSION @EXPORT_OK $VERBOSE $ALLOW_UNKNOWN
                         $STRICT_TYPE $STRIP_LEADING_DASHES $NO_DUPLICATES
                         $PRESERVE_CASE $ONLY_ALLOW_DEFINED $WARNINGS_FATAL
                         $SANITY_CHECK_TEMPLATE $CALLER_DEPTH $_ERROR_STRING
                     ];
 
-    @ISA        = @(   qw[ Exporter ] );
-    @EXPORT_OK  = @(   qw[check allow last_error] );
+    @ISA        =   qw[ Exporter ];
+    @EXPORT_OK  =   qw[check allow last_error];
 
     $VERSION                = '0.26';
     $VERBOSE                = $^W ? 1 : 0;
@@ -30,7 +30,7 @@ BEGIN {
     $CALLER_DEPTH           = 0;
 }
 
-my %known_keys = %( map { $_ => 1 }
+my %known_keys = %( < map { $_ => 1 }
                     qw| required allow default strict_type no_override
                         store defined | );
 
@@ -435,7 +435,7 @@ sub allow {
         ### loop over the elements, see if one of them says the
         ### value is OK
         ### also, short-cicruit when possible
-        for ( < @{@_[1]} ) {
+        for (  @{@_[1]} ) {
             return 1 if allow( @_[0], $_ );
         }
         
@@ -536,7 +536,7 @@ sub _safe_eq {
 sub _who_was_it {
     my $level = @_[0] || 0;
 
-    return (caller(2 + $CALLER_DEPTH + $level))[[3]] || 'ANON'
+    return @(caller(2 + $CALLER_DEPTH + $level))[3] || 'ANON'
 }
 
 =head2 last_error()
@@ -554,7 +554,7 @@ It is exported upon request.
 {   $_ERROR_STRING = '';
 
     sub _store_error {
-        my($err, $verbose, $offset) = @_[[0..2]];
+        my($err, $verbose, $offset) = < @_[[0..2]];
         $verbose ||= 0;
         $offset  ||= 0;
         my $level   = 1 + $offset;
