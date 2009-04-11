@@ -96,9 +96,6 @@ See C<PUSHMARK> and L<perlcall> for other uses.
 =for apidoc Amn|SV*|POPs
 Pops an SV off the stack.
 
-=for apidoc Amn|char*|POPp
-Pops a string off the stack. Deprecated. New code should use POPpx.
-
 =for apidoc Amn|char*|POPpx
 Pops a string off the stack.
 
@@ -123,7 +120,6 @@ Pops a long off the stack.
 #define RETURNX(x)	return (x, PUTBACK, NORMAL)
 
 #define POPs		(*sp--)
-#define POPp		(SvPVx(POPs, &PL_na))		/* deprecated */
 #define POPpx		(SvPVx_nolen(POPs))
 #define POPpconstx	(SvPVx_nolen_const(POPs))
 #define POPn		(SvNV(POPs))
@@ -139,7 +135,6 @@ Pops a long off the stack.
 #define TOPs		(*sp)
 #define TOPm1s		(*(sp-1))
 #define TOPp1s		(*(sp+1))
-#define TOPp		(SvPV(TOPs, PL_na))		/* deprecated */
 #define TOPpx		(SvPV_nolen(TOPs))
 #define TOPn		(SvNV(TOPs))
 #define TOPi		((IV)SvIV(TOPs))
@@ -343,7 +338,7 @@ Does not use C<TARG>.  See also C<XPUSHu>, C<mPUSHu> and C<PUSHu>.
 #define dPOPXiirl(X)	IV right = POPi; IV left = CAT2(X,i)
 
 #define USE_LEFT(sv) \
-	(SvOK(sv) || SvGMAGICAL(sv) || !(PL_op->op_flags & OPf_STACKED))
+	(SvOK(sv) || !(PL_op->op_flags & OPf_STACKED))
 #define dPOPXnnrl_ul(X)	\
     NV right = POPn;				\
     SV *leftsv = CAT2(X,s);				\
@@ -375,7 +370,7 @@ Does not use C<TARG>.  See also C<XPUSHu>, C<mPUSHu> and C<PUSHu>.
 
 #define ARGTARG		PL_op->op_targ
 
-    /* See OPpTARGET_MY: */
+    /* See OPf_TARGET_MY: */
 #define MAXARG		(PL_op->op_private & 15)
 
 #define SWITCHSTACK(f,t) \

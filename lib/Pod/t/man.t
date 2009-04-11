@@ -11,15 +11,15 @@
 use TestInit;
 
 BEGIN {
-    $| = 1;
-    print "1..43\n";
+    $^OUTPUT_AUTOFLUSH = 1;
+    print $^STDOUT, "1..43\n";
 }
 
 use Pod::Man;
 use charnames ':full';
 use utf8;
 
-print "ok 1\n";
+print $^STDOUT, "ok 1\n";
 
 my $parser = Pod::Man->new or die "Cannot create parser\n";
 my $n = 2;
@@ -38,23 +38,23 @@ while ( ~< *DATA) {
         $expected .= $_;
     }
 
-    open (TMP, ">", 'tmp.pod') or die "Cannot create tmp.pod: $!\n";
+    open (my $tmp, ">", 'tmp.pod') or die "Cannot create tmp.pod: $^OS_ERROR\n";
 
     # We have a test in ISO 8859-1 encoding.  Make sure that nothing strange
     # happens if Perl thinks the world is Unicode.  Wrap this in eval so that
     # older versions of Perl don't croak.
     no warnings 'utf8';
-    print TMP $input;
-    close TMP;
+    print $tmp, $input;
+    close $tmp;
 
     test_outtmp($expected, "latin1\nINPUT:\n$input");
 
     unlink('tmp.pod');
 
-    open (TMP2, ">", 'tmp.pod') or die "Cannot create tmp.pod: $!\n";
-    print TMP2 "\N{BOM}";
-    print TMP2 $input;
-    close TMP2;
+    open (my $tmp2, ">", 'tmp.pod') or die "Cannot create tmp.pod: $^OS_ERROR\n";
+    print $tmp2, "\N{BOM}";
+    print $tmp2, $input;
+    close $tmp2;
     test_outtmp($expected, "UTF-8 BOM\nINPUT:\n$input");
 
     unlink('tmp.pod');
@@ -63,22 +63,22 @@ while ( ~< *DATA) {
 sub test_outtmp {
     my $expected = shift;
     my $msg = shift;
-    open (OUT, ">", 'out.tmp') or die "Cannot create out.tmp: $!\n";
-    $parser->parse_from_file ('tmp.pod', \*OUT);
-    close OUT;
-    open (OUT, "<", 'out.tmp') or die "Cannot open out.tmp: $!\n";
-    while ( ~< *OUT) { last if m/^\.nh/ }
+    open (my $out, ">", 'out.tmp') or die "Cannot create out.tmp: $^OS_ERROR\n";
+    $parser->parse_from_file ('tmp.pod', $out);
+    close $out;
+    open ($out, "<", 'out.tmp') or die "Cannot open out.tmp: $^OS_ERROR\n";
+    while ( ~< $out) { last if m/^\.nh/ }
     my $output;
-    {
-        local $/;
-        $output = ~< *OUT;
-    }
-    close OUT;
+    do {
+        local $^INPUT_RECORD_SEPARATOR = undef;
+        $output = ~< $out;
+    };
+    close $out;
     if ($output eq $expected) {
-        print "ok $n\n";
+        print $^STDOUT, "ok $n\n";
     } else {
-        print "not ok $n\n";
-        print "$msg\nEXPECTED:\n$expected\nOUTPUT:\n$output\n";
+        print $^STDOUT, "not ok $n\n";
+        print $^STDOUT, "$msg\nEXPECTED:\n$expected\nOUTPUT:\n$output\n";
     }
     $n++;
 }

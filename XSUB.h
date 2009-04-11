@@ -277,7 +277,8 @@ Rethrows a previously caught exception.  See L<perlguts/"Exception Handling">.
 #define XSRETURN(off)					\
     STMT_START {					\
 	const IV tmpXSoff = (off);			\
-	PL_stack_sp = PL_stack_base + ax + (tmpXSoff - 1);	\
+	PL_stack_sp = PL_stack_base + ax + (tmpXSoff - 1)       \
+           - (PL_op->op_flags & OPf_ASSIGN ? 1 : 0);		\
 	return;						\
     } STMT_END
 
@@ -382,25 +383,14 @@ Rethrows a previously caught exception.  See L<perlguts/"Exception Handling">.
 	} } STMT_END                                                     
 
 #if 1		/* for compatibility */
-#  define VTBL_sv		&PL_vtbl_sv
-#  define VTBL_env		&PL_vtbl_env
-#  define VTBL_envelem		&PL_vtbl_envelem
-#  define VTBL_sig		&PL_vtbl_sig
-#  define VTBL_sigelem		&PL_vtbl_sigelem
-#  define VTBL_pack		&PL_vtbl_pack
-#  define VTBL_packelem		&PL_vtbl_packelem
 #  define VTBL_dbline		&PL_vtbl_dbline
 #  define VTBL_isa		&PL_vtbl_isa
 #  define VTBL_isaelem		&PL_vtbl_isaelem
 #  define VTBL_glob		&PL_vtbl_glob
 #  define VTBL_mglob		&PL_vtbl_mglob
 #  define VTBL_nkeys		&PL_vtbl_nkeys
-#  define VTBL_taint		&PL_vtbl_taint
-#  define VTBL_vec		&PL_vtbl_vec
-#  define VTBL_pos		&PL_vtbl_pos
 #  define VTBL_bm		&PL_vtbl_bm
 #  define VTBL_uvar		&PL_vtbl_uvar
-#  define VTBL_defelem		&PL_vtbl_defelem
 #  define VTBL_regexp		&PL_vtbl_regexp
 #  define VTBL_regdata		&PL_vtbl_regdata
 #  define VTBL_regdatum		&PL_vtbl_regdatum

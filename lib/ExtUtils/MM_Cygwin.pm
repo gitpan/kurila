@@ -1,6 +1,5 @@
 package ExtUtils::MM_Cygwin;
 
-use strict;
 
 use ExtUtils::MakeMaker::Config;
 use File::Spec;
@@ -42,22 +41,21 @@ if configured for dynamic loading, triggers #define EXT in EXTERN.h
 
 =cut
 
-sub cflags {
-    my($self,$libperl)=< @_;
-    return $self->{CFLAGS} if $self->{CFLAGS};
+sub cflags($self,$libperl) {
+    return $self->{?CFLAGS} if $self->{?CFLAGS};
     return '' unless $self->needs_linking();
 
     my $base = $self->SUPER::cflags($libperl);
     foreach (split m/\n/, $base) {
-        m/^(\S*)\s*=\s*(\S*)$/ and $self->{$1} = $2;
+        m/^(\S*)\s*=\s*(\S*)$/ and $self->{+$1} = $2;
     };
-    $self->{CCFLAGS} .= " -DUSEIMPORTLIB" if (%Config{useshrplib} eq 'true');
+    $self->{+CCFLAGS} .= " -DUSEIMPORTLIB" if (%Config{?useshrplib} eq 'true');
 
-    return $self->{CFLAGS} = qq{
-CCFLAGS = $self->{CCFLAGS}
-OPTIMIZE = $self->{OPTIMIZE}
-PERLTYPE = $self->{PERLTYPE}
-};
+    return ($self->{+CFLAGS} = qq{
+CCFLAGS = $self->{?CCFLAGS}
+OPTIMIZE = $self->{?OPTIMIZE}
+PERLTYPE = $self->{?PERLTYPE}
+});
 
 }
 
@@ -68,8 +66,7 @@ replaces strings '::' with '.' in MAN*POD man page names
 
 =cut
 
-sub replace_manpage_separator {
-    my($self, $man) = < @_;
+sub replace_manpage_separator($self, $man) {
     $man =~ s{/+}{.}g;
     return $man;
 }
@@ -83,17 +80,17 @@ points to libperl.a
 sub init_linker {
     my $self = shift;
 
-    if (%Config{useshrplib} eq 'true') {
-        my $libperl = '$(PERL_INC)' .'/'. "%Config{libperl}";
+    if (%Config{?useshrplib} eq 'true') {
+        my $libperl = '$(PERL_INC)' .'/'. "%Config{?libperl}";
         $libperl =~ s/a$/dll.a/;
-        $self->{PERL_ARCHIVE} = $libperl;
+        $self->{+PERL_ARCHIVE} = $libperl;
     } else {
-        $self->{PERL_ARCHIVE} = 
-          '$(PERL_INC)' .'/'. ("%Config{libperl}" or "libperl.a");
+        $self->{+PERL_ARCHIVE} = 
+          '$(PERL_INC)' .'/'. ("%Config{?libperl}" or "libperl.a");
     }
 
-    $self->{PERL_ARCHIVE_AFTER} ||= '';
-    $self->{EXPORT_LIST}  ||= '';
+    $self->{+PERL_ARCHIVE_AFTER} ||= '';
+    $self->{+EXPORT_LIST}  ||= '';
 }
 
 =back

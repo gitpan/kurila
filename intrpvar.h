@@ -47,6 +47,8 @@ PERLVAR(Iscopestack,	I32 *)		/* scopes we've ENTERed */
 PERLVAR(Iscopestack_ix,	I32)
 PERLVAR(Iscopestack_max,I32)
 
+PERLVAR(Idynamicscope,	SV *)		/* the current dynamic scope */
+
 PERLVAR(Isavestack,	ANY *)		/* items that need to be restored when
 					   LEAVEing scopes we've ENTERed */
 PERLVAR(Isavestack_ix,	I32)
@@ -56,8 +58,6 @@ PERLVAR(Itmps_stack,	SV **)		/* mortals we've made */
 PERLVARI(Itmps_ix,	I32,	-1)
 PERLVARI(Itmps_floor,	I32,	-1)
 PERLVAR(Itmps_max,	I32)
-PERLVAR(Imodcount,	I32)		/* how much mod()ification in
-					   assignment? */
 
 PERLVAR(Imarkstack,	I32 *)		/* stack_sp locations we're
 					   remembering */
@@ -84,7 +84,7 @@ PERLVAR(Ina,		STRLEN)		/* for use in SvPV when length is
 /* stat stuff */
 PERLVAR(Istatbuf,	Stat_t)
 PERLVAR(Istatcache,	Stat_t)		/* _ */
-PERLVAR(Istatgv,	GV *)
+PERLVAR(Istatio,	IO*)
 PERLVARI(Istatname,	SV *,	NULL)
 
 #ifdef HAS_TIMES
@@ -108,8 +108,6 @@ The output field separator - C<$,> in Perl space.
 
 PERLVAR(Irs,		SV *)		/* input record separator $/ */
 PERLVAR(Iofs_sv,	SV *)		/* output field separator $, */
-PERLVAR(Idefoutgv,	GV *)		/* default FH for output */
-PERLVARI(Ichopset,	const char *, " \n-")	/* $: */
 
 /* Stashes */
 PERLVAR(Idefstash,	HV *)		/* main symbol table */
@@ -179,7 +177,6 @@ PERLVAR(Icolorset,	bool)		/* from regcomp.c */
 PERLVARI(Idirty,	bool, FALSE)	/* in the middle of tearing things
 					   down? */
 PERLVAR(Iin_eval,	U8)		/* trap "fatal" errors? */
-PERLVAR(Itainted,	bool)		/* using variables controlled by $< */
 
 /* This value may be set when embedding for full cleanup  */
 /* 0=none, 1=full, 2=full with checks */
@@ -191,11 +188,15 @@ PERLVAR(Iperldb,	U32)
 /* pseudo environmental stuff */
 PERLVAR(Iorigargc,	int)
 PERLVAR(Iorigargv,	char **)
-PERLVAR(Ienvgv,		GV *)
-PERLVAR(Iincgv,		GV *)
-PERLVAR(Ihintgv,	GV *)
+PERLVAR(Ienvhv,		HV *)
+PERLVAR(Iincludepathav,		AV *)
+PERLVAR(Iincludedhv,		HV *)
+PERLVAR(Imagicsvhv,		HV *)
+PERLVAR(Ihinthv,	HV *)
 PERLVAR(Iorigfilename,	char *)
 PERLVAR(Ierrorcreatehook,	SV *)
+PERLVARI(Idestroyav,	AV *, NULL)
+PERLVARI(Irootop_ll,	ROOTOP *, NULL)
 PERLVAR(Idiehook,	SV *)
 PERLVAR(Iwarnhook,	SV *)
 
@@ -208,7 +209,6 @@ PERLVAR(Iminus_n,	bool)
 PERLVAR(Iminus_p,	bool)
 PERLVAR(Iminus_l,	bool)
 PERLVAR(Iminus_a,	bool)
-PERLVAR(Iminus_E,	bool)
 
 /*
 
@@ -225,9 +225,7 @@ PERLVAR(Iunsafe,	bool)
 PERLVAR(Iexit_flags,	U8)		/* was exit() unexpected, etc. */
 PERLVAR(Isrand_called,	bool)
 /* Part of internal state, but makes the 16th 1 byte variable in a row.  */
-PERLVAR(Itainting,	bool)		/* doing taint checks */
 /* Space for a U8 */
-PERLVAR(Iinplace,	char *)
 PERLVAR(Ie_script,	SV *)
 
 /* magical thingies */
@@ -244,18 +242,16 @@ PERLVAR(Istatusvalue_posix,I32)
 #endif
 
 /* shortcuts to various I/O objects */
-PERLVAR(Istdingv,	GV *)
-PERLVAR(Istderrgv,	GV *)
+PERLVAR(Istdinio,	IO *)
+PERLVAR(Istdoutio,	IO *)
+PERLVAR(Istderrio,	IO *)
 PERLVAR(Idefgv,		GV *)
 PERLVAR(Iargvgv,	GV *)
 PERLVAR(Iargvoutgv,	GV *)
 PERLVAR(Iargvout_stack,	AV *)
 
-/* shortcuts to regexp stuff */
-PERLVAR(Ireplgv,	GV *)
-
 /* shortcuts to misc objects */
-PERLVAR(Ierrgv,		GV *)
+PERLVAR(Ierrsv,		SV *)
 
 /* shortcuts to debugging objects */
 PERLVAR(IDBgv,		GV *)
@@ -293,7 +289,6 @@ PERLVAR(Idbargs,	AV *)		/* args to call listed by caller function */
 PERLVAR(Idebstash,	HV *)		/* symbol table for perldb package */
 PERLVAR(Iglobalstash,	HV *)		/* global keyword overrides imported here */
 PERLVAR(Icurstname,	SV *)		/* name of current package */
-PERLVAR(Ibeginav,	AV *)		/* names of BEGIN subroutines */
 PERLVAR(Iendav,		AV *)		/* names of END subroutines */
 PERLVAR(Iunitcheckav,	AV *)		/* names of UNITCHECK subroutines */
 PERLVAR(Icheckav,	AV *)		/* names of CHECK subroutines */
@@ -318,9 +313,9 @@ PERLVARI(Iop_mask,	char *,	NULL)	/* masked operations for safe evals */
 
 /* current interpreter roots */
 PERLVAR(Imain_cv,	CV *)
-PERLVAR(Imain_root,	OP *)
+PERLVAR(Imain_root,	ROOTOP *)
 PERLVAR(Imain_start,	OP *)
-PERLVAR(Ieval_root,	OP *)
+PERLVAR(Ieval_root,	ROOTOP *)
 PERLVAR(Ieval_start,	OP *)
 
 /* runtime control stuff */
@@ -328,7 +323,7 @@ PERLVARI(Icurcopdb,	COP *,	NULL)
 
 PERLVAR(Ifilemode,	int)		/* so nextargv() can preserve mode */
 PERLVAR(Ilastfd,	int)		/* what to preserve mode on */
-PERLVAR(Ioldname,	char *)		/* what to preserve mode on */
+PERLVAR(Ioldname,	const char *)		/* what to preserve mode on */
 PERLVAR(IArgv,		const char **)	/* stuff to free from do_aexec, vfork safe */
 PERLVAR(ICmd,		char *)		/* stuff to free from do_aexec, vfork safe */
 /* Elements in this array have ';' appended and are injected as a single line
@@ -513,7 +508,6 @@ PERLVAR(IProc,		struct IPerlProc*)
 #endif
 
 PERLVAR(Iptr_table,	PTR_TBL_t*)
-PERLVARI(Ibeginav_save, AV*, NULL)	/* save BEGIN{}s when compiling */
 
 PERLVAR(Ibody_arenas, void*) /* pointer to list of body-arenas */
 
@@ -521,7 +515,6 @@ PERLVAR(Ipsig_pend, int *)		/* per-signal "count" of pending */
 PERLVARI(Isig_pending, int,0)           /* Number if highest signal pending */
 
 
-PERLVAR(Itaint_warn,	bool)      /* taint warns instead of dying */
 PERLVAR(Iutf8locale,	bool)		/* utf8 locale detected */
 PERLVARI(Irehash_seed_set, bool, FALSE)	/* 582 hash initialized? */
 
@@ -529,16 +522,6 @@ PERLVARI(Irehash_seed_set, bool, FALSE)	/* 582 hash initialized? */
 
 PERLVAR(Inumeric_radix_sv,	SV *)	/* The radix separator if not '.' */
 
-#endif
-
-#if defined(USE_ITHREADS)
-PERLVAR(Iregex_pad,     SV**)		/* Shortcut into the array of
-					   regex_padav */
-PERLVAR(Iregex_padav,   AV*)		/* All regex objects, indexed via the
-					   values in op_pmoffset of pmop.
-					   Entry 0 is an SV whose PV is a
-					   "packed" list of IVs listing
-					   the now-free slots in the array */
 #endif
 
 #ifdef USE_REENTRANT_API
@@ -573,9 +556,6 @@ PERLVAR(Iutf8_idstart,	SV *)
 PERLVAR(Iutf8_idcont,	SV *)
 
 PERLVAR(Isort_RealCmp,  SVCOMPARE_t)
-
-PERLVARI(Icheckav_save, AV*, NULL)	/* save CHECK{}s when compiling */
-PERLVARI(Iunitcheckav_save, AV*, NULL)	/* save UNITCHECK{}s when compiling */
 
 PERLVARI(Iclocktick, long, 0)	/* this many times() ticks in a second */
 

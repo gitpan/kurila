@@ -6,21 +6,20 @@
 use File::Spec;
 use lib File::Spec->catdir('t', 'lib');
 
-use Test::More (-x $^X
-		? (tests => 5)
-		: (skip_all => "Can't find an executable file")
+use Test::More (-x $^EXECUTABLE_NAME
+		?? (tests => 5)
+		!! (skip_all => "Can't find an executable file")
 	       );
 
 BEGIN {                                # Set up a tiny script file
-    local *F;
-    open(F, ">", "rel2abs2rel$$.pl")
-      or die "Can't open rel2abs2rel$$.pl file for script -- $!\n";
-    print F qq(print "ok\\n"\n);
-    close(F);
+    open(my $f, ">", "rel2abs2rel$^PID.pl")
+      or die "Can't open rel2abs2rel$^PID.pl file for script -- $^OS_ERROR\n";
+    print $f, qq(print \$^STDOUT, "ok\\n"\n);
+    close($f);
 }
 END {
-    1 while unlink("rel2abs2rel$$.pl");
-    1 while unlink("rel2abs2rel$$.tmp");
+    1 while unlink("rel2abs2rel$^PID.pl");
+    1 while unlink("rel2abs2rel$^PID.tmp");
 }
 
 use Config;
@@ -28,7 +27,7 @@ use Config;
 
 # Change 'perl' to './perl' so the shell doesn't go looking through PATH.
 sub safe_rel {
-    my($perl) = shift;
+    my@($perl) =@( shift);
     $perl = File::Spec->catfile(File::Spec->curdir, $perl) unless
       File::Spec->file_name_is_absolute($perl);
 
@@ -40,34 +39,33 @@ sub safe_rel {
 # `$perl -le "print 'ok'"`. And, for portability, we can't use fork().
 sub sayok{
     my $perl = shift;
-    open(STDOUTDUP, ">&", \*STDOUT);
-    open(STDOUT, ">", "rel2abs2rel$$.tmp")
-        or die "Can't open scratch file rel2abs2rel$$.tmp -- $!\n";
-    system($perl, "rel2abs2rel$$.pl");
-    open(STDOUT, ">&", \*STDOUTDUP);
-    close(STDOUTDUP);
+    open(my $stdoutdup, ">&", $^STDOUT);
+    open($^STDOUT, ">", "rel2abs2rel$^PID.tmp")
+        or die "Can't open scratch file rel2abs2rel$^PID.tmp -- $^OS_ERROR\n";
+    system($perl, "rel2abs2rel$^PID.pl");
+    open($^STDOUT, ">&", \*$stdoutdup);
+    close($stdoutdup);
 
-    local *F;
-    open(F, "<", "rel2abs2rel$$.tmp");
-    local $/ = undef;
-    my $output = ~< *F;
-    close(F);
+    open(my $f, "<", "rel2abs2rel$^PID.tmp");
+    local $^INPUT_RECORD_SEPARATOR = undef;
+    my $output = ~< *$f;
+    close($f);
     return $output;
 }
 
-print "# Checking manipulations of \$^X=$^X\n";
+print $^STDOUT, "# Checking manipulations of \$^X=$^EXECUTABLE_NAME\n";
 
-my $perl = safe_rel($^X);
-is( sayok($perl), "ok\n",   "`$perl rel2abs2rel$$.pl` works" );
+my $perl = safe_rel($^EXECUTABLE_NAME);
+is( sayok($perl), "ok\n",   "`$perl rel2abs2rel$^PID.pl` works" );
 
-$perl = File::Spec->rel2abs($^X);
-is( sayok($perl), "ok\n",   "`$perl rel2abs2rel$$.pl` works" );
+$perl = File::Spec->rel2abs($^EXECUTABLE_NAME);
+is( sayok($perl), "ok\n",   "`$perl rel2abs2rel$^PID.pl` works" );
 
 $perl = File::Spec->canonpath($perl);
-is( sayok($perl), "ok\n",   "canonpath(rel2abs($^X)) = $perl" );
+is( sayok($perl), "ok\n",   "canonpath(rel2abs($^EXECUTABLE_NAME)) = $perl" );
 
 $perl = safe_rel(File::Spec->abs2rel($perl));
-is( sayok($perl), "ok\n",   "safe_rel(abs2rel(canonpath(rel2abs($^X)))) = $perl" );
+is( sayok($perl), "ok\n",   "safe_rel(abs2rel(canonpath(rel2abs($^EXECUTABLE_NAME)))) = $perl" );
 
-$perl = safe_rel(File::Spec->canonpath($^X));
-is( sayok($perl), "ok\n",   "safe_rel(canonpath($^X)) = $perl" );
+$perl = safe_rel(File::Spec->canonpath($^EXECUTABLE_NAME));
+is( sayok($perl), "ok\n",   "safe_rel(canonpath($^EXECUTABLE_NAME)) = $perl" );

@@ -130,24 +130,18 @@ our @TESTS =
 
 );
 
-print "1..", int(nelems @TESTS), "\n";
+use Test::More;
+plan tests => nelems(@TESTS);
 
-my $testid = 1;
 foreach my $test ( @TESTS)
 {
-    eval "print (($test->[0]) ? \"ok $testid\\n\" : \"not ok $testid\\n\" )";
-    if ($@)
-    {
-	if (!$test->[1])
-	{
-	    print "not ok $testid\n";
-	}
-	else
-	{
-	    print "ok $testid\n";
-	}
+    if ($test->[1]) {
+        eval "$test->[0]";
+        ok $^EVAL_ERROR && $^EVAL_ERROR->message;
     }
-    ++$testid;
+    else {
+        ok($test->[0]);
+    }
 }
 
 exit 0;

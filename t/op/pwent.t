@@ -4,13 +4,13 @@ our (%Config, $where);
 
 BEGIN {
     try {my @n = @( getpwuid 0 ); setpwent()};
-    if ($@ && $@->{description} =~ m/(The \w+ function is unimplemented)/) {
-	print "1..0 # Skip: $1\n";
+    if ($^EVAL_ERROR && $^EVAL_ERROR->{?description} =~ m/(The \w+ function is unimplemented)/) {
+	print $^STDOUT, "1..0 # Skip: $1\n";
 	exit 0;
     }
     try { require Config; Config->import; };
     my $reason;
-    if (%Config{'i_pwd'} ne 'define') {
+    if (%Config{?'i_pwd'} ne 'define') {
 	$reason = '%Config{i_pwd} undefined';
     }
     elsif (not -f "/etc/passwd" ) { # Play safe.
@@ -19,9 +19,10 @@ BEGIN {
 
     if (not defined $where) {	# Try NIS.
 	foreach my $ypcat (qw(/usr/bin/ypcat /bin/ypcat /etc/ypcat)) {
+            my $pw;
 	    if (-x $ypcat &&
-		open(PW, "$ypcat passwd 2>/dev/null |") &&
-		defined( ~< *PW)) {
+		open($pw, "$ypcat passwd 2>/dev/null |") &&
+		defined( ~< $pw)) {
 		$where = "NIS passwd";
 		undef $reason;
 		last;
@@ -31,9 +32,10 @@ BEGIN {
 
     if (not defined $where) {	# Try NetInfo.
 	foreach my $nidump (qw(/usr/bin/nidump)) {
+            my $pw;
 	    if (-x $nidump &&
-		open(PW, "$nidump passwd . 2>/dev/null |") &&
-		defined( ~< *PW)) {
+		open($pw, "$nidump passwd . 2>/dev/null |") &&
+		defined( ~< $pw)) {
 		$where = "NetInfo passwd";
 		undef $reason;
 		last;
@@ -43,7 +45,8 @@ BEGIN {
 
     if (not defined $where) {	# Try local.
 	my $PW = "/etc/passwd";
-	if (-f $PW && open(PW, "<", $PW) && defined( ~< *PW)) {
+        my $pw_fh;
+	if (-f $PW && open($pw_fh, "<", $PW) && defined( ~< $pw_fh)) {
 	    $where = $PW;
 	    undef $reason;
 	}
@@ -51,9 +54,10 @@ BEGIN {
 
     if (not defined $where) {      # Try NIS+
      foreach my $niscat (qw(/bin/niscat)) {
+         my $pw;
          if (-x $niscat &&
-           open(PW, "$niscat passwd.org_dir 2>/dev/null |") &&
-           defined( ~< *PW)) {
+           open($pw, "$niscat passwd.org_dir 2>/dev/null |") &&
+           defined( ~< $pw)) {
            $where = "NIS+ $niscat passwd.org_dir";
            undef $reason;
            last;
@@ -62,14 +66,14 @@ BEGIN {
     }
 
     if ($reason) {	# Give up.
-	print "1..0 # Skip: $reason\n";
+	print $^STDOUT, "1..0 # Skip: $reason\n";
 	exit 0;
     }
 }
 
 # By now the PW filehandle should be open and full of juicy password entries.
 
-print "1..2\n";
+print $^STDOUT, "1..2\n";
 
 # Go through at most this many users.
 # (note that the first entry has been read away by now)
@@ -80,7 +84,7 @@ my $tst = 1;
 my %perfect;
 my %seen;
 
-print "# where $where\n";
+print $^STDOUT, "# where $where\n";
 
 setpwent();
 
@@ -89,38 +93,38 @@ while ( ~< *PW) {
     # LIMIT -1 so that users with empty shells don't fall off
     my @s = split m/:/, $_, -1;
     my ($name_s, $passwd_s, $uid_s, $gid_s, $gcos_s, $home_s, $shell_s);
-    (my $v) = %Config{osvers} =~ m/^(\d+)/;
-    if ($^O eq 'darwin' && $v +< 9) {
-       ($name_s, $passwd_s, $uid_s, $gid_s, $gcos_s, $home_s, $shell_s) = < @s[[@(0,1,2,3,7,8,9)]];
+    (my $v) = %Config{?osvers} =~ m/^(\d+)/;
+    if ($^OS_NAME eq 'darwin' && $v +< 9) {
+       @($name_s, $passwd_s, $uid_s, $gid_s, $gcos_s, $home_s, $shell_s) =  @s[[@(0,1,2,3,7,8,9)]];
     } else {
-       ($name_s, $passwd_s, $uid_s, $gid_s, $gcos_s, $home_s, $shell_s) = < @s;
+       @($name_s, $passwd_s, $uid_s, $gid_s, $gcos_s, $home_s, $shell_s) =  @s;
     }
     next if m/^\+/; # ignore NIS includes
     if ((nelems @s)) {
-	push @{ %seen{$name_s} }, iohandle::input_line_number(\*PW);
+	push @{ %seen{+$name_s} }, iohandle::input_line_number(\*PW);
     } else {
-	warn "# Your $where line {iohandle::input_line_number(\*PW)} is empty.\n";
+	warn "# Your $where line $(iohandle::input_line_number(\*PW)) is empty.\n";
 	next;
     }
     if ($n == $max) {
-	local $/;
+	local $^INPUT_RECORD_SEPARATOR = undef;
 	my $junk = ~< *PW;
 	last;
     }
     # In principle we could whine if @s != 7 but do we know enough
     # of passwd file formats everywhere?
-    if ((nelems @s) == 7 || ($^O eq 'darwin' && (nelems @s) == 10)) {
+    if ((nelems @s) == 7 || ($^OS_NAME eq 'darwin' && (nelems @s) == 10)) {
 	my @n = @( getpwuid($uid_s) );
 	# 'nobody' et al.
 	next unless (nelems @n);
-	my ($name,$passwd,$uid,$gid,$quota,$comment,$gcos,$home,$shell) = < @n;
+	my @($name,$passwd,$uid,$gid,$quota,$comment,$gcos,$home,$shell) =  @n;
 	# Protect against one-to-many and many-to-one mappings.
 	if ($name_s ne $name) {
 	    @n = @( getpwnam($name_s) );
-	    ($name,$passwd,$uid,$gid,$quota,$comment,$gcos,$home,$shell) = < @n;
+	    @($name,$passwd,$uid,$gid,$quota,$comment,$gcos,$home,$shell) =  @n;
 	    next if $name_s ne $name;
 	}
-	%perfect{$name_s}++
+	%perfect{+$name_s}++
 	    if $name    eq $name_s    and
                $uid     eq $uid_s     and
 # Do not compare passwords: think shadow passwords.
@@ -134,12 +138,12 @@ while ( ~< *PW) {
 
 endpwent();
 
-print "# max = $max, n = $n, perfect = ", nelems(keys %perfect), "\n";
+print $^STDOUT, "# max = $max, n = $n, perfect = ", nelems(keys %perfect), "\n";
 
 my $not;
 if ( ! %perfect && $n) {
     $max++;
-    print <<EOEX;
+    print $^STDOUT, <<EOEX;
 #
 # The failure of op/pwent test is not necessarily serious.
 # It may fail due to local password administration conventions.
@@ -153,14 +157,14 @@ if ( ! %perfect && $n) {
 # matches at all, it suspects something is wrong.
 # 
 EOEX
-    print "not ";
+    print $^STDOUT, "not ";
     $not = 1;
 } else {
     $not = 0;
 }
-print "ok ", $tst++;
-print "\t# (not necessarily serious: run t/op/pwent.t by itself)" if $not;
-print "\n";
+print $^STDOUT, "ok ", $tst++;
+print $^STDOUT, "\t# (not necessarily serious: run t/op/pwent.t by itself)" if $not;
+print $^STDOUT, "\n";
 
 # Test both the scalar and list contexts.
 
@@ -178,13 +182,11 @@ my @pw2;
 
 setpwent();
 for (1..$max) {
-    my ($pw) = (getpwent());
+    my @($pw, ...) = @(getpwent());
     last unless defined $pw;
     push @pw2, $pw;
 }
 endpwent();
 
-print "not " unless "{join ' ',@pw1}" eq "{join ' ',@pw2}";
-print "ok ", $tst++, "\n";
-
-close(PW);
+print $^STDOUT, "not " unless "$(join ' ',@pw1)" eq "$(join ' ',@pw2)";
+print $^STDOUT, "ok ", $tst++, "\n";

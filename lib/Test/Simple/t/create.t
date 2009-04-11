@@ -3,12 +3,12 @@
 #!perl -w
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't';
-        @INC = @('../lib', 'lib');
+        $^INCLUDE_PATH = @('../lib', 'lib');
     }
     else {
-        unshift @INC, 't/lib';
+        unshift $^INCLUDE_PATH, 't/lib';
     }
 }
 
@@ -21,7 +21,7 @@ isa_ok $more_tb, 'Test::Builder';
 cmp_ok $more_tb, '\==', Test::More->builder, 'create does not interfere with ->builder';
 cmp_ok $more_tb, '\==', Test::Builder->new,  '       does not interfere with ->new';
 
-{
+do {
     my $new_tb  = Test::Builder->create;
 
     isa_ok $new_tb,  'Test::Builder';
@@ -32,14 +32,14 @@ cmp_ok $more_tb, '\==', Test::Builder->new,  '       does not interfere with ->n
 
     $new_tb->plan(tests => 1);
     $new_tb->ok(1);
-}
+};
 
 pass("Changing output() of new TB doesn't interfere with singleton");
 
-ok open FILE, "<", "some_file";
-is join("", @( ~< *FILE)), <<OUT;
+ok open my $file, "<", "some_file";
+is join("", @( ~< *$file)), <<OUT;
 1..1
 ok 1
 OUT
 
-close FILE;
+close $file;

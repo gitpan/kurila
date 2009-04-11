@@ -270,7 +270,7 @@ C<$DB::sub> set to the called subroutine. It also inserts a C<BEGIN
 
 After each C<require>d file is compiled, but before it is executed, a
 call to C<&DB::postponed($main::{'_<'.$filename})> is done. C<$filename>
-is the expanded name of the C<require>d file (as found via C<%INC>).
+is the expanded name of the C<require>d file (as found via C<$^INCLUDED>).
 
 =head3 IMPORTANT INTERNAL VARIABLES
 
@@ -1066,13 +1066,13 @@ warn(               # Do not ;-)
   )
   if 0;
 
-foreach my $k (keys (%INC)) {
+foreach my $k (keys ($^INCLUDED)) {
 	&share(\%main::{'_<'.$filename});
 };
 
 # Command-line + PERLLIB:
 # Save the contents of @INC before they are modified elsewhere.
-@ini_INC = @( < @INC );
+@ini_INC = @( < $^INCLUDE_PATH );
 
 # This was an attempt to clear out the previous values of various
 # trapped errors. Apparently it didn't help. XXX More info needed!
@@ -1521,7 +1521,7 @@ the R command stuffed into the environment variables.
   PERLDB_VISITED   - files that had breakpoints
   PERLDB_FILE_...  - breakpoints for a file
   PERLDB_OPT       - active options
-  PERLDB_INC       - the original @INC
+  PERLDB_INC       - the original $^INCLUDE_PATH
   PERLDB_PRETYPE   - preprompt debugger actions
   PERLDB_PRE       - preprompt Perl code
   PERLDB_POST      - post-prompt Perl code
@@ -1562,9 +1562,9 @@ if ( exists %ENV{PERLDB_RESTART} ) {
         parse_options("$opt'$val'");
     }
 
-    # restore original @INC
-    @INC     = @( < get_list("PERLDB_INC") );
-    @ini_INC = @( < @INC );
+    # restore original $^INCLUDE_PATH
+    $^INCLUDE_PATH     = @( < get_list("PERLDB_INC") );
+    @ini_INC = @( < $^INCLUDE_PATH );
 
     # return pre/postprompt actions and typeahead buffer
     $pretype   = \@( < get_list("PERLDB_PRETYPE") );
@@ -1762,23 +1762,23 @@ and if we can.
             # read/write on in, or just read, or read on STDIN.
             open( IN,      "+<", "$i" )
               || open( IN, "<", "$i" )
-              || open( IN, "<&", \*STDIN );
+              || open( IN, "<&", $^STDIN );
 
             # read/write/create/clobber out, or write/create/clobber out,
             # or merge with STDERR, or merge with STDOUT.
                  open( OUT, "+>", "$o" )
               || open( OUT, ">", "$o" )
-              || open( OUT, ">&", \*STDERR )
+              || open( OUT, ">&", $^STDERR )
               || open( OUT, ">&", \*STDOUT );    # so we don't dongle stdout
 
         } ## end if ($console)
         elsif ( not defined $console ) {
 
             # No console. Open STDIN.
-            open( IN, "<&", \*STDIN );
+            open( IN, "<&", $^STDIN );
 
             # merge with STDERR, or with STDOUT.
-            open( OUT, ">&",      \*STDERR )
+            open( OUT, ">&",      $^STDERR )
               || open( OUT, ">&", \*STDOUT );    # so we don't dongle stdout
             $console = 'STDIN/OUT';
         } ## end elsif (not defined $console)
@@ -4101,7 +4101,7 @@ sub report_break_on_load { @(
 
 =head3 C<cmd_b_load> (command)
 
-We take the file passed in and try to find it in C<%INC> (which maps modules
+We take the file passed in and try to find it in C<$^INCLUDED> (which maps modules
 to files they came from). We mark those files for break-on-load via 
 C<break_on_load> and then report that it was done.
 
@@ -4636,7 +4636,7 @@ or that thread id (e tid cmd).
 sub cmd_e {
     my $cmd  = shift;
     my $line = shift;
-	unless (exists(%INC{'threads.pm'})) {
+	unless (exists($^INCLUDED{'threads.pm'})) {
 		print "threads not loaded(%ENV{PERL5DB_THREADED})
 		please run the debugger with PERL5DB_THREADED=1 set in the environment\n";
 	} else {
@@ -4658,7 +4658,7 @@ This could be used (when implemented) to send commands to all threads (E cmd).
 sub cmd_E {
     my $cmd  = shift;
     my $line = shift;
-	unless (exists(%INC{'threads.pm'})) { 
+	unless (exists($^INCLUDED{'threads.pm'})) { 
 		print "threads not loaded(%ENV{PERL5DB_THREADED})
 		please run the debugger with PERL5DB_THREADED=1 set in the environment\n";
 	} else {
@@ -4769,7 +4769,6 @@ sub cmd_i {
         foreach my $isa ( split( m/\s+/, $line ) ) {
             $evalarg = $isa;
             ($isa) = &eval;
-            no strict 'refs';
             print join(
                 ', ',
                 map {    # snaffled unceremoniously from Class::ISA
@@ -5482,7 +5481,7 @@ prevent return values from being shown.
 
 C<dumpit()> then checks to see if it needs to load C<dumpvar.pl> and 
 tries to load it (note: if you have a C<dumpvar.pl>  ahead of the 
-installed version in C<@INC>, yours will be used instead. Possible security 
+installed version in C<$^INCLUDE_PATH>, yours will be used instead. Possible security 
 problem?).
 
 It then checks to see if the subroutine C<main::dumpValue> is now defined
@@ -5888,7 +5887,7 @@ sub system {
 
     # We save, change, then restore STDIN and STDOUT to avoid fork() since
     # some non-Unix systems can do system() but have problems with fork().
-    open( SAVEIN, "<&",  \*STDIN )  || &warn("Can't save STDIN");
+    open( SAVEIN, "<&",  $^STDIN )  || &warn("Can't save STDIN");
     open( SAVEOUT, ">&", \*STDOUT ) || &warn("Can't save STDOUT");
     open( STDIN, "<&",   \*IN )     || &warn("Can't redirect STDIN");
     open( STDOUT, ">&",  \*OUT )    || &warn("Can't redirect STDOUT");
@@ -6609,7 +6608,7 @@ sub parse_options {
           && defined $val;
 
         # Not initialization - echo the value we set it to.
-        dump_option($option) unless $OUT \== \*STDERR;
+        dump_option($option) unless $OUT \== $^STDERR;
     } ## end while (length)
 } ## end sub parse_options
 
@@ -7025,7 +7024,7 @@ These subroutines provide functionality for various commands.
 =head2 C<list_modules>
 
 For the C<M> command: list modules loaded and their versions.
-Essentially just runs through the keys in %INC, picks each package's
+Essentially just runs through the keys in $^INCLUDED, picks each package's
 C<$VERSION> variable, gets the file name, and formats the information
 for output.
 
@@ -7037,7 +7036,7 @@ sub list_modules {    # versions
 
     # keys are the "as-loaded" name, values are the fully-qualified path
     # to the file itself.
-    for ( keys %INC ) {
+    for ( keys $^INCLUDED ) {
         $file = $_;                                # get the module name
         s,\.p[lm]$,,i;                             # remove '.pl' or '.pm'
         s,/,::,g;                                  # change '/' to '::'
@@ -7052,8 +7051,8 @@ sub list_modules {    # versions
         }
 
         # Finish up the message with the file the package came from.
-        %version{$file} .= %INC{$file};
-    } ## end for (keys %INC)
+        %version{$file} .= $^INCLUDED{$file};
+    } ## end for (keys $^INCLUDED)
 
     # Hey, dumpit() formats a hash nicely, so why not use it?
     dumpit( $OUT, \%version );
@@ -8008,8 +8007,8 @@ That we want no return values and no subroutine entry/exit trace.
 # The following BEGIN is very handy if debugger goes havoc, debugging debugger?
 
 BEGIN {    # This does not compile, alas. (XXX eh?)
-    $IN  = \*STDIN;     # For bugs before DB::OUT has been opened
-    $OUT = \*STDERR;    # For errors before DB::OUT has been opened
+    $IN  = $^STDIN;     # For bugs before DB::OUT has been opened
+    $OUT = $^STDERR;    # For errors before DB::OUT has been opened
 
     # Define characters used by command parsing.
     $sh       = '!';      # Shell escape (does not work)
@@ -8139,12 +8138,12 @@ Return this as the list of possible completions
 
 =head3 C<b load>
 
-Get all the possible files from C<@INC> as it currently stands and
+Get all the possible files from C<$^INCLUDE_PATH> as it currently stands and
 select the ones that match the text so far.
 
 =cut
 
-    return @( sort grep m/^\Q$text/, values %INC)    # files
+    return @( sort grep m/^\Q$text/, values $^INCLUDED)    # files
       if ( substr $line, 0, $start ) =~ m/^\|*b\s+load\s+$/;
 
 =head3  C<V> (list variable) and C<m> (list modules)
@@ -8188,7 +8187,7 @@ Possibilities are:
 
 =item 1. The original source file itself
 
-=item 2. A file from C<@INC>
+=item 2. A file from C<$^INCLUDE_PATH>
 
 =item 3. An C<eval> (the debugger gets a C<(eval N)> fake file for each C<eval>).
 
@@ -8580,9 +8579,6 @@ sub restart {
     for (< @ini_INC) {
         push @flags, '-I', $_;
     }
-
-    # Turn on taint if it was on before.
-    push @flags, '-T' if $^TAINT;
 
     # Arrange for setting the old INC:
     # Save the current @init_INC in the environment.

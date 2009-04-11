@@ -1,7 +1,6 @@
 package File::Spec::Epoc;
 
-use strict;
-use vars < qw($VERSION @ISA);
+our ($VERSION, @ISA);
 
 $VERSION = '3.2701';
 
@@ -43,8 +42,7 @@ path. On UNIX eliminated successive slashes and successive "/.".
 
 =cut
 
-sub canonpath {
-    my ($self,$path) = < @_;
+sub canonpath($self,?$path) {
     return unless defined $path;
 
     $path =~ s|/+|/|g;                             # xx////xx  -> xx/xx

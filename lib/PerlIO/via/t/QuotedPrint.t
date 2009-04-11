@@ -1,19 +1,12 @@
 BEGIN {				# Magic Perl CORE pragma
-    if (%ENV{PERL_CORE}) {
-        chdir 't' if -d 't';
-        @INC = @( '../lib' );
-    }
     unless (PerlIO::Layer->find( 'perlio')) {
-        print "1..0 # Skip: PerlIO not used\n";
+        print $^STDOUT, "1..0 # Skip: PerlIO not used\n";
         exit 0;
     }
     require Config;
-    if ((%Config::Config{'extensions'} !~ m!\bPerlIO/via\b!) ){
-        print "1..0 # Skip -- Perl configured without PerlIO::via module\n";
+    if ((Config::config_value('extensions') !~ m!\bPerlIO/via\b!) ){
+        print $^STDOUT, "1..0 # Skip -- Perl configured without PerlIO::via module\n";
         exit 0;
-    }
-    if (ord("A") == 193) {
-        print "1..0 # Skip: EBCDIC\n";
     }
 }
 

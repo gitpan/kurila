@@ -1,12 +1,5 @@
 package Unicode::Normalize;
 
-BEGIN {
-    unless ("A" eq pack('U', 0x41)) {
-	die "Unicode::Normalize cannot stringify a Unicode code point\n";
-    }
-}
-
-use strict;
 use warnings;
 use Carp;
 
@@ -59,9 +52,8 @@ sub unpack_U {
 ## normalization forms
 ##
 
-sub FCD ($) {
-    my $str = shift;
-    return checkFCD($str) ? $str : NFD($str);
+sub FCD ($str) {
+    return checkFCD($str) ?? $str !! NFD($str);
 }
 
 our %formNorm = %(
@@ -72,12 +64,10 @@ our %formNorm = %(
     FCD  => \&FCD,	FCC => \&FCC,
 );
 
-sub normalize($$)
+sub normalize($form, $str)
 {
-    my $form = shift;
-    my $str = shift;
     if (exists %formNorm{$form}) {
-	return %formNorm{$form}->($str);
+	return %formNorm{?$form}->($str);
     }
     croak($PACKAGE."::normalize: invalid form name: $form");
 }
@@ -95,12 +85,10 @@ our %formCheck = %(
     FCD  => \&checkFCD, 	FCC => \&checkFCC,
 );
 
-sub check($$)
+sub check($form, $str)
 {
-    my $form = shift;
-    my $str = shift;
     if (exists %formCheck{$form}) {
-	return %formCheck{$form}->($str);
+	return %formCheck{?$form}->($str);
     }
     croak($PACKAGE."::check: invalid form name: $form");
 }

@@ -4,7 +4,7 @@
 	$_ = "abc" ;
 	while ($i ++ == 0)
 	{
-    	    s/ab/{last}/ ;
+    	    s/ab/$(last)/ ;
 	}
 
     Exiting subroutine via %s		
@@ -22,7 +22,7 @@
 	last fred:
 	while ($i ++ == 0)
 	{
-    	    s/ab/{last fred}/ ;
+    	    s/ab/$(last fred)/ ;
 	}
 
 
@@ -57,36 +57,36 @@ $_ = "abc" ;
 our $i;
 while ($i ++ == 0)
 {
-    s/ab/{last}/ ;
+    s/ab/$(last)/ ;
 }
 no warnings 'exiting' ;
 while ($i ++ == 0)
 {
-    s/ab/{last}/ ;
+    s/ab/$(last)/ ;
 }
 EXPECT
-Exiting substitution via last at - line 7 character 8.
+Exiting substitution via last at - line 7 character 9.
 ########
 # pp_ctl.c
 use warnings 'exiting' ;
 sub fred { last }
-{ fred() }
+do { fred() };
 no warnings 'exiting' ;
 sub joe { last }
-{ joe() }
+do { joe() };
 EXPECT
 Exiting subroutine via last at - line 3 character 12.
-    main::fred called at - line 4 character 3.
+    main::fred called at - line 4 character 6.
 ########
 # pp_ctl.c
-{
+do {
   eval "use warnings 'exiting' ; last;" 
-}
-print STDERR $@ ;
-{
+};
+print $^STDERR, $^EVAL_ERROR ;
+do {
   eval "no warnings 'exiting' ;last;" 
-} 
-print STDERR $@ ;
+};
+print $^STDERR, $^EVAL_ERROR ;
 EXPECT
 Exiting eval via last at (eval 1) line 1 character 26.
     (eval) called at - line 3 character 3.
@@ -97,37 +97,37 @@ $_ = "abc" ; our $i;
 fred: 
 while ($i ++ == 0)
 {
-    s/ab/{last fred}/ ;
+    s/ab/$(last fred)/ ;
 }
 no warnings 'exiting' ;
 while ($i ++ == 0)
 {
-    s/ab/{last fred}/ ;
+    s/ab/$(last fred)/ ;
 }
 EXPECT
-Exiting substitution via last at - line 7 character 8.
+Exiting substitution via last at - line 7 character 9.
 ########
 # pp_ctl.c
 use warnings 'exiting' ;
 sub fred { last joe }
-joe: { fred() }
+joe: do { fred() };
 no warnings 'exiting' ;
 sub Fred { last Joe }
-Joe: { Fred() }
+Joe: do { Fred() };
 EXPECT
 Exiting subroutine via last at - line 3 character 12.
-    main::fred called at - line 4 character 8.
+    main::fred called at - line 4 character 11.
 ########
 # pp_ctl.c
 joe:
-{ eval "use warnings 'exiting' ; last joe;" }
-print STDERR $@ ;
+do { eval "use warnings 'exiting' ; last joe;" };
+print $^STDERR, $^EVAL_ERROR ;
 Joe:
-{ eval "no warnings 'exiting' ; last Joe;" }
-print STDERR $@ ;
+do { eval "no warnings 'exiting' ; last Joe;" };
+print $^STDERR, $^EVAL_ERROR ;
 EXPECT
 Exiting eval via last at (eval 1) line 1 character 26.
-    (eval) called at - line 3 character 3.
+    (eval) called at - line 3 character 6.
 ########
 # pp_ctl.c
 use warnings 'recursion' ;
@@ -140,6 +140,7 @@ sub fred
 fred()
 EXPECT
  at - line 3 character 9.
+    BEGIN called at - line 3 character 1.
 Deep recursion on subroutine "main::fred" at - line 6 character 5.
     main::fred called at - line 6 character 5.
     main::fred called at - line 6 character 5.
@@ -252,21 +253,3 @@ sub fred
  
 fred()
 EXPECT
-########
-# pp_ctl.c
-use warnings;
-our $foo;
-eval 'print $foo';
-EXPECT
-Use of uninitialized value $main::foo in print at (eval 1) line 1 character 1.
-    (eval) called at - line 4 character 1.
-########
-# pp_ctl.c
-use warnings;
-{
-    no warnings;
-    eval 'print $foo';
-}
-EXPECT
-
-########

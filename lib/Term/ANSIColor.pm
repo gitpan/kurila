@@ -16,9 +16,8 @@
 
 package Term::ANSIColor;
 
-use strict;
-use vars < qw($AUTORESET $EACHLINE @ISA @EXPORT @EXPORT_OK
-            %EXPORT_TAGS $VERSION %attributes %attributes_r);
+our ($AUTORESET, $EACHLINE, @ISA, @EXPORT, @EXPORT_OK
+,            %EXPORT_TAGS, $VERSION, %attributes, %attributes_r);
 
 use Exporter ();
 @ISA         = qw(Exporter);
@@ -58,7 +57,7 @@ $VERSION = '1.12';
 
 # Reverse lookup.  Alphabetically first name for a sequence is preferred.
 for (reverse sort keys %attributes) {
-    %attributes_r{%attributes{$_}} = $_;
+    %attributes_r{+%attributes{?$_}} = $_;
 }
 
 ##############################################################################
@@ -88,10 +87,10 @@ for (reverse sort keys %attributes) {
 # sequences.  This is to make it easier to write scripts that also work on
 # systems without any ANSI support, like Windows consoles.
 for my $attr (keys %attributes) {
-    my $enable_colors = !defined %ENV{ANSI_COLORS_DISABLED};
+    my $enable_colors = !defined env::var('ANSI_COLORS_DISABLED');
     Symbol::fetch_glob(uc $attr)->* =
         sub {
-            my $xattr = $enable_colors ? "\e[" . $attr . 'm' : '';
+            my $xattr = $enable_colors ?? "\e[" . $attr . 'm' !! '';
             if (\$AUTORESET && \@_) {
                 '$xattr' . "\@_" . "\e[0m";
             } else {
@@ -106,19 +105,19 @@ for my $attr (keys %attributes) {
 
 # Return the escape code for a given set of color attributes.
 sub color {
-    return '' if defined %ENV{ANSI_COLORS_DISABLED};
-    my @codes = map { < split } @_;
+    return '' if defined env::var('ANSI_COLORS_DISABLED');
+    my @codes = @+: map { split }, @_;
     my $attribute = '';
     foreach ( @codes) {
         $_ = lc $_;
-        unless (defined %attributes{$_}) {
+        unless (defined %attributes{?$_}) {
             require Carp;
             Carp::croak ("Invalid attribute name $_");
         }
-        $attribute .= %attributes{$_} . ';';
+        $attribute .= %attributes{?$_} . ';';
     }
     chop $attribute;
-    ($attribute ne '') ? "\e[{$attribute}m" : undef;
+    ($attribute ne '') ?? "\e[$($attribute)m" !! undef;
 }
 
 # Return a list of named color attributes for a given set of escape codes.
@@ -138,7 +137,7 @@ sub uncolor {
     }
     for ( @nums) {
 	$_ += 0; # Strip leading zeroes
-	my $name = %attributes_r{$_};
+	my $name = %attributes_r{?$_};
 	if (!defined $name) {
 	    require Carp;
 	    Carp::croak ("No name for escape sequence $_" );
@@ -159,17 +158,17 @@ sub uncolor {
 sub colored {
     my ($string, @codes);
     if (ref @_[0]) {
-        @codes = @{+shift};
+        @codes = @{$:shift};
         $string = join ('', @_);
     } else {
         $string = shift;
         @codes = @_;
     }
-    return $string if defined %ENV{ANSI_COLORS_DISABLED};
+    return $string if defined env::var('ANSI_COLORS_DISABLED');
     if (defined $EACHLINE) {
         my $attr = color (< @codes);
-        join '', map { $_ ne $EACHLINE ? $attr . $_ . "\e[0m" : $_ }
- grep { length ($_) +> 0 }
+        join '', map { $_ ne $EACHLINE ?? $attr . $_ . "\e[0m" !! $_ },
+ grep { length ($_) +> 0 },
                     split (m/(\Q$EACHLINE\E)/, $string);
     } else {
         color (< @codes) . $string . "\e[0m";

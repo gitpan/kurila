@@ -1,6 +1,6 @@
 
 package Pod::Perldoc::ToText;
-use strict;
+
 use warnings;
 
 use base < qw(Pod::Perldoc::BaseTo);
@@ -23,17 +23,17 @@ sub new { return bless \%(), ref(@_[0]) || @_[0] }
 sub parse_from_file {
   my $self = shift;
   
-  my @options = map {; $_, $self->{$_} }
- grep !m/^_/s,
+  my @options = @+: map { @: $_, $self->{?$_} },
+ grep { !m/^_/s },
         keys %$self
   ;
   
   defined(&Pod::Perldoc::DEBUG)
    and Pod::Perldoc::DEBUG()
-   and print "About to call new Pod::Text ",
-    $Pod::Text::VERSION ? "(v$Pod::Text::VERSION) " : '',
+   and print $^STDOUT, "About to call new Pod::Text ",
+    $Pod::Text::VERSION ?? "(v$Pod::Text::VERSION) " !! '',
     "with options: ",
-    (nelems @options) ? "[{join ' ',@options}]" : "(nil)", "\n";
+    (nelems @options) ?? "[$(join ' ',@options)]" !! "(nil)", "\n";
   ;
 
   Pod::Text->new(< @options)->parse_from_file(< @_);

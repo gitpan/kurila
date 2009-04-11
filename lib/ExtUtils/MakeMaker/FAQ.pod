@@ -236,8 +236,6 @@ do that.  Use at your own risk.  Have fun blowing holes in your foot.
 
     #!/usr/bin/perl -w
     
-    use strict;
-    
     use File::Spec;
     use File::Find;
     use ExtUtils::Manifest qw(maniread);
@@ -398,7 +396,7 @@ And of course a very basic test:
 
   t/cool.t:
   --------
-  use Test;
+  use Test::More;
   BEGIN { plan tests => 1 };
   use Cool::Foo;
   use Cool::Bar;

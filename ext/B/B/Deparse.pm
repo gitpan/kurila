@@ -10,17 +10,16 @@
 package B::Deparse;
 use B < qw(class main_root main_start main_cv svref_2object opnumber perlstring
 	 OPf_WANT OPf_WANT_VOID OPf_WANT_SCALAR OPf_WANT_LIST
-	 OPf_KIDS OPf_REF OPf_STACKED OPf_SPECIAL OPf_MOD OPpPAD_STATE
+	 OPf_KIDS OPf_REF OPf_STACKED OPf_SPECIAL OPf_MOD
 	 OPpLVAL_INTRO OPpOUR_INTRO OPpENTERSUB_AMPER OPpSLICE OPpCONST_BARE
-	 OPpTARGET_MY
+	 OPf_TARGET_MY
 	 OPpEXISTS_SUB OPpSORT_NUMERIC OPpSORT_INTEGER
 	 OPpSORT_REVERSE OPpSORT_DESCEND OPpITER_REVERSED
 	 SVf_IOK SVf_NOK SVf_ROK SVf_POK SVpad_OUR SVf_FAKE SVs_RMG SVs_SMG
-         CVf_METHOD CVf_LOCKED
-	 PMf_KEEP PMf_GLOBAL PMf_CONTINUE PMf_EVAL
+	 PMf_KEEP PMf_GLOBAL PMf_CONTINUE
 	 PMf_MULTILINE PMf_SINGLELINE PMf_FOLD PMf_EXTENDED RXf_SKIPWHITE);
 our $VERSION = 0.86;
-use strict;
+
 use warnings ();
 
 # Changes between 0.50 and 0.51:
@@ -84,7 +83,7 @@ use warnings ();
 # - added support for Hugo's new OP_SETSTATE (like nextstate)
 # Changes between 0.58 and 0.59
 # - added support for Chip's OP_METHOD_NAMED
-# - added support for Ilya's OPpTARGET_MY optimization
+# - added support for Ilya's OPf_TARGET_MY optimization
 # - elided arrows before `()' subscripts when possible
 # Changes between 0.59 and 0.60
 # - support for method attribues was added
@@ -143,7 +142,7 @@ use warnings ();
 # Current test.deparse failures
 # comp/hints 6 - location of BEGIN blocks wrt. block openings
 # run/switchI 1 - missing -I switches entirely
-#    perl -Ifoo -e 'print @INC'
+#    perl -Ifoo -e 'print $^INCLUDE_PATH'
 # op/caller 2 - warning mask propagates backwards before warnings::register
 #    'use warnings; BEGIN {$^WARNING_BITS eq "U"x12;} use warnings::register'
 # op/getpid 2 - can't assign to shared my() declaration (threads only)
@@ -294,9 +293,7 @@ sub null {
     return class($op) eq "NULL";
 }
 
-sub todo {
-    my $self = shift;
-    my($cv, $is_form) = < @_;
+sub todo($self, $cv, $is_form) {
     return; # unless ($cv->location[0] eq $0 || exists $self->{files}->{$cv->location[0]});
     my $seq;
     if ($cv->OUTSIDE_SEQ) {
@@ -308,7 +305,7 @@ sub todo {
     }
     push @{$self->{'subs_todo'}}, \@($seq, $cv, $is_form);
     unless ($is_form || class( <$cv->STASH) eq 'SPECIAL') {
-	$self->{'subs_deparsed'}->{$cv->STASH->NAME."::".$cv->GV->NAME} = 1;
+	$self->{'subs_deparsed'}->{+$cv->STASH->NAME."::".$cv->GV->NAME} = 1;
     }
 }
 
@@ -318,17 +315,17 @@ sub next_todo {
     my $cv = $ent->[1];
     my $gv = $cv->GV;
     my $name = $self->gv_name($gv);
-    {
-	$self->{'subs_declared'}->{$name} = 1;
+    do {
+	$self->{'subs_declared'}->{+$name} = 1;
 	if ($name eq "BEGIN") {
 	    my $use_dec = $self->begin_is_use($cv);
-	    if (defined ($use_dec) and $self->{'expand'} +< 5) {
+	    if (defined ($use_dec) and $self->{?'expand'} +< 5) {
 		return () if 0 == length($use_dec);
 		return $use_dec;
 	    }
 	}
 	my $l = '';
-	if ($self->{'linenums'}) {
+	if ($self->{?'linenums'}) {
 	    my $line = $gv->LINE;
 	    my $file = $gv->FILE;
 	    $l = "\n\f#line $line \"$file\"\n";
@@ -336,23 +333,22 @@ sub next_todo {
 	my $p = '';
 	if (class( <$cv->STASH) ne "SPECIAL") {
 	    my $stash = $cv->STASH->NAME;
-	    if ($stash ne $self->{'curstash'}) {
+	    if ($stash ne $self->{?'curstash'}) {
 		$p = "package $stash;\n";
-		$name = "$self->{'curstash'}::$name" unless $name =~ m/::/;
-		$self->{'curstash'} = $stash;
+		$name = "$self->{?'curstash'}::$name" unless $name =~ m/::/;
+		$self->{+'curstash'} = $stash;
 	    }
 	    $name =~ s/^\Q$stash\E::(?!\z|.*::)//;
 	}
-        return "{$p}{$l}sub $name " . $self->deparse_sub($cv);
-    }
+        return "$($p)$($l)sub $name " . $self->deparse_sub($cv);
+    };
 }
 
 # Return a "use" declaration for this BEGIN block, if appropriate
-sub begin_is_use {
-    my ($self, $cv) = < @_;
+sub begin_is_use($self, $cv) {
     my $root = $cv->ROOT;
     local %$self{[qw'curcv curcvlex']};
-    < %$self{[qw'curcv curcvlex']} = ($cv);
+     %$self{[qw'curcv curcvlex']} = @($cv);
 #require B::Debug;
 #B::walkoptree($cv->ROOT, "debug");
     my $lineseq = $root->first;
@@ -391,7 +387,7 @@ sub begin_is_use {
 	    $version = $version->PV;
 	} else {
 	    # version specified as a v-string
-	    $version = 'v'.join '.', map ord, split m//, $version->PV;
+	    $version = 'v'.join '.', map { ord }, split m//, $version->PV;
 	}
 	$constop = $constop->sibling;
 	return if $constop->name ne "method_named";
@@ -414,10 +410,12 @@ sub begin_is_use {
     return unless $self->const_sv($svop)->PV eq $module;
 
     # Pull out the arguments
-    for ($svop=$svop->sibling; $svop->name ne "method_named";
-		$svop = $svop->sibling) {
+    $svop=$svop->sibling;
+    while ($svop->name ne "method_named") {
 	$args .= ", " if length($args);
 	$args .= $self->deparse($svop, 6);
+
+        $svop = $svop->sibling;
     }
 
     my $use = 'use';
@@ -448,8 +446,7 @@ sub begin_is_use {
     }
 }
 
-sub stash_subs {
-    my ($self, $pack) = < @_;
+sub stash_subs($self, ?$pack) {
     my (@ret, $stash);
     if (!defined $pack) {
 	$pack = '';
@@ -460,11 +457,11 @@ sub stash_subs {
 	$stash = \%{Symbol::stash($pack)};
     }
     for my $key (keys %$stash) {
-        my $val = svref_2object( \( $stash->{$key} ) );
+        my $val = svref_2object( \( $stash->{+$key} ) );
 	my $class = class($val);
         if ($class eq "GV") {
 	    if (class(my $cv = $val->CV) ne "SPECIAL") {
-		next if $self->{'subs_done'}->{$$val}++;
+		next if $self->{'subs_done'}->{+$$val}++;
 		next if $$val != ${$cv->GV};   # Ignore imposters
 		$self->todo($cv, 0);
 	    }
@@ -479,10 +476,9 @@ sub stash_subs {
 
 sub print_protos {
     my $self = shift;
-    my $ar;
     my @ret;
-    foreach $ar ( @{$self->{'protos_todo'}}) {
-	my $proto = (defined $ar->[1] ? " (". $ar->[1] . ")" : "");
+    foreach my $ar ( @{$self->{+'protos_todo'}}) {
+	my $proto = (defined $ar->[1] ?? " (". $ar->[1] . ")" !! "");
 	push @ret, "sub " . $ar->[0] .  "$proto;\n";
     }
     delete $self->{'protos_todo'};
@@ -495,17 +491,17 @@ sub style_opts {
     my $opt;
     while (length($opt = substr($opts, 0, 1))) {
 	if ($opt eq "C") {
-	    $self->{'cuddle'} = " ";
+	    $self->{+'cuddle'} = " ";
 	    $opts = substr($opts, 1);
 	} elsif ($opt eq "i") {
 	    $opts =~ s/^i(\d+)//;
-	    $self->{'indent_size'} = $1;
+	    $self->{+'indent_size'} = $1;
 	} elsif ($opt eq "T") {
-	    $self->{'use_tabs'} = 1;
+	    $self->{+'use_tabs'} = 1;
 	    $opts = substr($opts, 1);
 	} elsif ($opt eq "v") {
 	    $opts =~ s/^v([^.]*)(.|$)//;
-	    $self->{'ex_const'} = $1;
+	    $self->{+'ex_const'} = $1;
 	}
     }
 }
@@ -513,59 +509,59 @@ sub style_opts {
 sub new {
     my $class = shift;
     my $self = bless \%(), $class;
-    $self->{'cuddle'} = "\n";
-    $self->{'curcop'} = undef;
-    $self->{'curstash'} = "main";
-    $self->{'ex_const'} = "'???'";
-    $self->{'expand'} = 0;
-    $self->{'files'} = \%();
-    $self->{'indent_size'} = 4;
-    $self->{'linenums'} = 0;
-    $self->{'parens'} = 0;
-    $self->{'subs_todo'} = \@();
-    $self->{'unquote'} = 0;
-    $self->{'use_dumper'} = 0;
-    $self->{'use_tabs'} = 0;
-    $self->{'global_variables'} = \%();
+    $self->{+'cuddle'} = "\n";
+    $self->{+'curcop'} = undef;
+    $self->{+'curstash'} = "main";
+    $self->{+'ex_const'} = "'???'";
+    $self->{+'expand'} = 0;
+    $self->{+'files'} = \%();
+    $self->{+'indent_size'} = 4;
+    $self->{+'linenums'} = 0;
+    $self->{+'parens'} = 0;
+    $self->{+'subs_todo'} = \@();
+    $self->{+'unquote'} = 0;
+    $self->{+'use_dumper'} = 0;
+    $self->{+'use_tabs'} = 0;
+    $self->{+'global_variables'} = \%();
 
-    $self->{'ambient_warnings'} = undef; # Assume no lexical warnings
-    $self->{'ambient_hints'} = 0;
-    $self->{'ambient_hinthash'} = undef;
+    $self->{+'ambient_warnings'} = undef; # Assume no lexical warnings
+    $self->{+'ambient_hints'} = 0;
+    $self->{+'ambient_hinthash'} = undef;
     $self->init();
 
     while (my $arg = shift @_) {
 	if ($arg eq "-d") {
-	    $self->{'use_dumper'} = 1;
+	    $self->{+'use_dumper'} = 1;
 	    require Data::Dumper;
 	} elsif ($arg =~ m/^-f(.*)/) {
-	    $self->{'files'}->{$1} = 1;
+	    $self->{'files'}->{+$1} = 1;
 	} elsif ($arg eq "-l") {
-	    $self->{'linenums'} = 1;
+	    $self->{+'linenums'} = 1;
 	} elsif ($arg eq "-p") {
-	    $self->{'parens'} = 1;
+	    $self->{+'parens'} = 1;
 	} elsif ($arg eq "-P") {
-	    $self->{'noproto'} = 1;
+	    $self->{+'noproto'} = 1;
 	} elsif ($arg eq "-q") {
-	    $self->{'unquote'} = 1;
+	    $self->{+'unquote'} = 1;
 	} elsif (substr($arg, 0, 2) eq "-s") {
 	    $self->style_opts(substr $arg, 2);
 	} elsif ($arg =~ m/^-x(\d)$/) {
-	    $self->{'expand'} = $1;
+	    $self->{+'expand'} = $1;
 	}
     }
     return $self;
 }
 
-{
+do {
     # Mask out the bits that L<warnings::register> uses
     my $WARN_MASK;
     BEGIN {
-	$WARN_MASK = %warnings::Bits{all} ^|^ %warnings::DeadBits{all};
+	$WARN_MASK = %warnings::Bits{?all} ^|^ %warnings::DeadBits{?all};
     }
     sub WARN_MASK () {
 	return $WARN_MASK;
     }
-}
+};
 
 # Initialise the contextual information, either from
 # defaults provided with the ambient_pragmas method,
@@ -573,64 +569,61 @@ sub new {
 sub init {
     my $self = shift;
 
-    $self->{'warnings'} = defined ($self->{'ambient_warnings'})
-				? $self->{'ambient_warnings'} ^&^ WARN_MASK
-				: undef;
-    $self->{'hints'}    = $self->{'ambient_hints'};
-    $self->{'hinthash'} = $self->{'ambient_hinthash'};
+    $self->{+'warnings'} = defined ($self->{?'ambient_warnings'})
+				?? $self->{?'ambient_warnings'} ^&^ WARN_MASK
+				!! undef;
+    $self->{+'hints'}    = $self->{?'ambient_hints'};
+    $self->{+'hinthash'} = $self->{?'ambient_hinthash'};
 
     # also a convenient place to clear out subs_declared
     delete $self->{'subs_declared'};
 }
 
 sub compile {
-    my(@args) = @_;
+    my @args = @_;
     return sub {
 	my $self = B::Deparse->new(< @args);
 	# First deparse command-line args
-	if (defined $^I) { # deparse -i
-	    print q(BEGIN { $^I = ).perlstring($^I).qq(; \}\n);
+	if ($^WARNING) { # deparse -w
+	    print $^STDOUT, qq(BEGIN \{ \$^WARNING = $^WARNING; \}\n);
 	}
-	if ($^W) { # deparse -w
-	    print qq(BEGIN \{ \$^W = $^W; \}\n);
-	}
-	if ($/ ne "\n" or defined $O::savebackslash) { # deparse -l and -0
-	    my $fs = perlstring($/) || 'undef';
+	if ($^INPUT_RECORD_SEPARATOR ne "\n" or defined $O::savebackslash) { # deparse -l and -0
+	    my $fs = perlstring($^INPUT_RECORD_SEPARATOR) || 'undef';
 	    my $bs = perlstring($O::savebackslash) || 'undef';
-	    print qq(BEGIN \{ \$/ = $fs; \$\\ = $bs; \}\n);
+	    print $^STDOUT, qq(BEGIN \{ \$^INPUT_RECORD_SEPARATOR = $fs; \$^OUTPUT_RECORD_SEPARATOR = $bs; \}\n);
 	}
-	my @BEGINs  = @( B::begin_av->isa("B::AV") ? < B::begin_av->ARRAY : () );
+	my @BEGINs  = @( B::begin_av->isa("B::AV") ?? < B::begin_av->ARRAY !! () );
 	my @UNITCHECKs = @( B::unitcheck_av->isa("B::AV")
-	    ? < B::unitcheck_av->ARRAY
-	    : () );
-	my @CHECKs  = @( B::check_av->isa("B::AV") ? < B::check_av->ARRAY : () );
-	my @INITs   = @( B::init_av->isa("B::AV") ? < B::init_av->ARRAY : () );
-	my @ENDs    = @( B::end_av->isa("B::AV") ? < B::end_av->ARRAY : () );
+	    ?? < B::unitcheck_av->ARRAY
+	    !! () );
+	my @CHECKs  = @( B::check_av->isa("B::AV") ?? < B::check_av->ARRAY !! () );
+	my @INITs   = @( B::init_av->isa("B::AV") ?? < B::init_av->ARRAY !! () );
+	my @ENDs    = @( B::end_av->isa("B::AV") ?? < B::end_av->ARRAY !! () );
 	for my $block ( @(< @BEGINs, < @UNITCHECKs, < @CHECKs, < @INITs, < @ENDs)) {
 	    $self->todo($block, 0);
 	}
 	$self->stash_subs();
-	$self->{'curcv'} = main_cv;
-	$self->{'curcvlex'} = undef;
-	print < $self->print_protos;
+	$self->{+'curcv'} = main_cv;
+	$self->{+'curcvlex'} = undef;
+	print $^STDOUT, < $self->print_protos;
 	@{$self->{'subs_todo'}} =
-	  sort {$a->[0] <+> $b->[0]} @{$self->{'subs_todo'}};
-	print $self->indent($self->deparse_root(main_root)), "\n"
+	  sort {$a->[0] <+> $b->[0]}, @{$self->{?'subs_todo'}};
+	print $^STDOUT, $self->indent($self->deparse_root(main_root)), "\n"
 	  unless null main_root;
 	my @text;
-	while (scalar(nelems @{$self->{'subs_todo'}})) {
+	while (scalar(nelems @{$self->{?'subs_todo'}})) {
 	    push @text, < $self->next_todo;
 	}
-	print < $self->indent(join("", @text)), "\n" if (nelems @text);
+	print $^STDOUT, < $self->indent(join("", @text)), "\n" if (nelems @text);
 
 	# Print __DATA__ section, if necessary
-	my $laststash = defined $self->{'curcop'}
-	    ? $self->{'curcop'}->stash->NAME : $self->{'curstash'};
+	my $laststash = defined $self->{?'curcop'}
+	    ?? $self->{'curcop'}->stash->NAME !! $self->{?'curstash'};
 	if (defined *{Symbol::fetch_glob($laststash."::DATA")}{IO}) {
-	    print "package $laststash;\n"
-		unless $laststash eq $self->{'curstash'};
-	    print "__DATA__\n";
-	    print readline(*{Symbol::fetch_glob($laststash."::DATA")});
+	    print $^STDOUT, "package $laststash;\n"
+		unless $laststash eq $self->{?'curstash'};
+	    print $^STDOUT, "__DATA__\n";
+	    print $^STDOUT, readline(*{Symbol::fetch_glob($laststash."::DATA")});
 	}
     }
 }
@@ -646,7 +639,7 @@ sub coderef2text {
 
 sub ambient_pragmas {
     my $self = shift;
-    my ($hint_bits, $warning_bits, $hinthash) = (0, 0);
+    my @($hint_bits, $warning_bits, $hinthash) = @(0, 0, undef);
 
     while ((nelems @_) +> 1) {
 	my $name = shift();
@@ -678,10 +671,10 @@ sub ambient_pragmas {
 	    || $name eq 'utf8') {
 	    require "$name.pm";
 	    if ($val) {
-		$hint_bits ^|^= ${%::{"{$name}::"}->{"hint_bits"}};
+		$hint_bits ^|^= ${Symbol::stash($name)->{?"hint_bits"}};
 	    }
 	    else {
-		$hint_bits ^&^= ^~^${%::{"{$name}::"}->{"hint_bits"}};
+		$hint_bits ^&^= ^~^ ${Symbol::stash($name)->{?"hint_bits"}};
 	    }
 	}
 
@@ -743,16 +736,13 @@ sub ambient_pragmas {
 	die "The ambient_pragmas method expects an even number of args";
     }
 
-    $self->{'ambient_warnings'} = $warning_bits;
-    $self->{'ambient_hints'} = $hint_bits;
-    $self->{'ambient_hinthash'} = $hinthash;
+    $self->{+'ambient_warnings'} = $warning_bits;
+    $self->{+'ambient_hints'} = $hint_bits;
+    $self->{+'ambient_hinthash'} = $hinthash;
 }
 
 # This method is the inner loop, so try to keep it simple
-sub deparse {
-    my $self = shift;
-    my($op, $cx) = < @_;
-
+sub deparse($self, $op, $cx) {
     die("Null op in deparse") if !defined($op)
 					|| class($op) eq "NULL";
     my $meth = "pp_" . $op->name;
@@ -765,12 +755,11 @@ sub indent {
     my @lines = split(m/\n/, $txt);
     my $leader = "";
     my $level = 0;
-    my $line;
-    for $line ( @lines) {
+    for my $line ( @lines) {
 	my $cmd = substr($line, 0, 1);
 	if ($cmd eq "\t" or $cmd eq "\b") {
-	    $level += ($cmd eq "\t" ? 1 : -1) * $self->{'indent_size'};
-	    if ($self->{'use_tabs'}) {
+	    $level += ($cmd eq "\t" ?? 1 !! -1) * $self->{?'indent_size'};
+	    if ($self->{?'use_tabs'}) {
 		$leader = "\t" x ($level / 8) . " " x ($level % 8);
 	    } else {
 		$leader = " " x $level;
@@ -793,29 +782,26 @@ sub deparse_sub {
     my $proto = "";
     die("NULL in deparse_sub") if !defined($cv) || $cv->isa("B::NULL");
     die("SPECIAL in deparse_sub") if $cv->isa("B::SPECIAL");
-    local $self->{'curcop'} = $self->{'curcop'};
+    local $self->{+'curcop'} = $self->{?'curcop'};
     if ($cv->FLAGS ^&^ SVf_POK) {
 	$proto = "(". $cv->PV . ") ";
     }
-    if ($cv->CvFLAGS ^&^ (CVf_METHOD^|^CVf_LOCKED)) {
-        $proto .= ": ";
-        $proto .= "locked " if $cv->CvFLAGS ^&^ CVf_LOCKED;
-        $proto .= "method " if $cv->CvFLAGS ^&^ CVf_METHOD;
-    }
 
-    local($self->{'curcv'}) = $cv;
-    local($self->{'curcvlex'});
+    local($self->{+'curcv'}) = $cv;
+    local($self->{?'curcvlex'});
     my @oldv = %$self{[qw'curstash warnings hints hinthash']};
     local(%$self{[qw'curstash warnings hints hinthash']});
-    < %$self{[qw'curstash warnings hints hinthash']}
-      = < @oldv;
+     %$self{[qw'curstash warnings hints hinthash']}
+      =  @oldv;
     my $body;
     if (not null $cv->ROOT) {
 	my $lineseq = $cv->ROOT->first;
 	if ($lineseq->name eq "lineseq") {
 	    my @ops;
-	    for(my$o=$lineseq->first; $$o; $o=$o->sibling) {
+	    my$o=$lineseq->first;
+            while ($$o) {
 		push @ops, $o;
+                $o=$o->sibling;
 	    }
 	    $body = $self->lineseq(undef, < @ops).";";
 	    my $scope_en = $self->find_scope_en($lineseq);
@@ -825,7 +811,7 @@ sub deparse_sub {
 	    }
 	}
 	else {
-	    $body = $self->deparse($cv->ROOT->first, 0);
+	    $body = $self->deparse($cv->ROOT->first->first, 0);
 	}
     }
     else {
@@ -837,8 +823,8 @@ sub deparse_sub {
 	    return "$proto;\n";
 	}
     }
-    if (%{$self->{'global_variables'}}) {
-        $body = "our (" . (join ", ", keys %{$self->{'global_variables'}}) . ");\n" . $body;
+    if (%{$self->{?'global_variables'}}) {
+        $body = "our (" . (join ", ", keys %{$self->{?'global_variables'}}) . ");\n" . $body;
     }
     return $proto ."\{\n\t$body\n\b\}" ."\n";
 }
@@ -895,12 +881,10 @@ sub is_scalar {
 	      && $op->first->name eq "gvsv");
 }
 
-sub maybe_parens {
-    my $self = shift;
-    my($text, $cx, $prec) = < @_;
+sub maybe_parens($self, $text, $cx, $prec) {
     if ($prec +< $cx              # unary ops nest just fine
 	or $prec == $cx and $cx != 4 and $cx != 16 and $cx != 21
-	or $self->{'parens'})
+	or $self->{?'parens'})
     {
 	$text = "($text)";
 	# In a unop, let parent reuse our parens; see maybe_parens_unop
@@ -912,10 +896,8 @@ sub maybe_parens {
 }
 
 # same as above, but get around the `if it looks like a function' rule
-sub maybe_parens_unop {
-    my $self = shift;
-    my($name, $kid, $cx) = < @_;
-    if ($cx +> 16 or $self->{'parens'}) {
+sub maybe_parens_unop($self, $name, $kid, $cx) {
+    if ($cx +> 16 or $self->{?'parens'}) {
 	$kid =  $self->deparse($kid, 1);
  	if ($name eq "umask" && $kid =~ m/^\d+$/) {
 	    $kid = sprintf("\%#o", $kid);
@@ -939,23 +921,19 @@ sub maybe_parens_unop {
     }
 }
 
-sub maybe_parens_func {
-    my $self = shift;
-    my($func, $text, $cx, $prec) = < @_;
-    if ($prec +<= $cx or substr($text, 0, 1) eq "(" or $self->{'parens'}) {
+sub maybe_parens_func($self, $func, $text, $cx, $prec) {
+    if ($prec +<= $cx or substr($text, 0, 1) eq "(" or $self->{?'parens'}) {
 	return "$func($text)";
     } else {
 	return "$func $text";
     }
 }
 
-sub maybe_local {
-    my $self = shift;
-    my($op, $cx, $text) = < @_;
-    my $our_intro = ($op->name =~ m/^(gv|rv2)[ash]v$/) ? OPpOUR_INTRO : 0;
+sub maybe_local($self, $op, $cx, $text) {
+    my $our_intro = ($op->name =~ m/^(gv|rv2)[ash]v$/) ?? OPpOUR_INTRO !! 0;
     if ($op->private ^&^ (OPpLVAL_INTRO^|^$our_intro)
-	and not $self->{'avoid_local'}->{$$op}) {
-	my $our_local = ($op->private ^&^ OPpLVAL_INTRO) ? "local" : "our";
+	and not $self->{?'avoid_local'}->{?$$op}) {
+	my $our_local = ($op->private ^&^ OPpLVAL_INTRO) ?? "local" !! "our";
 	if( $our_local eq 'our' ) {
 	    # XXX This assertion fails code with non-ASCII identifiers,
 	    # like ./ext/Encode/t/jperl.t
@@ -972,10 +950,8 @@ sub maybe_local {
     }
 }
 
-sub maybe_targmy {
-    my $self = shift;
-    my($op, $cx, $func, < @args) = < @_;
-    if ($op->private ^&^ OPpTARGET_MY) {
+sub maybe_targmy($self, $op, $cx, $func, @< @args) {
+    if ($op->flags ^&^ OPf_TARGET_MY) {
 	my $var = $self->padname( <$op->targ);
 	my $val = $func->($self, $op, 7, < @args);
 	return $self->maybe_parens("$var = $val", $cx, 7);
@@ -990,11 +966,9 @@ sub padname_sv {
     return $self->{'curcv'}->PADLIST->ARRAYelt(0)->ARRAYelt($targ);
 }
 
-sub maybe_my {
-    my $self = shift;
-    my($op, $cx, $text) = < @_;
-    if ($op->private ^&^ OPpLVAL_INTRO and not $self->{'avoid_local'}->{$$op}) {
-	my $my = $op->private ^&^ OPpPAD_STATE ? "state" : "my";
+sub maybe_my($self, $op, $cx, $text) {
+    if ($op->private ^&^ OPpLVAL_INTRO and not $self->{?'avoid_local'}->{?$$op}) {
+	my $my = "my";
 	if (want_scalar($op)) {
 	    return "$my $text";
 	} else {
@@ -1014,11 +988,11 @@ sub maybe_my {
 # any subroutine declarations to the deparsed ops, otherwise we
 # append appropriate declarations.
 sub lineseq {
-    my($self, $root, < @ops) = < @_;
+    my@($self, $root, @< @ops) =  @_;
     my($expr, @exprs);
 
-    my $out_cop = $self->{'curcop'};
-    my $out_seq = defined($out_cop) ? $out_cop->cop_seq : undef;
+    my $out_cop = $self->{?'curcop'};
+    my $out_seq = defined($out_cop) ?? $out_cop->cop_seq !! undef;
     my $limit_seq;
     if (defined $root) {
 	$limit_seq = $out_seq;
@@ -1027,30 +1001,29 @@ sub lineseq {
 	$limit_seq = $nseq if !defined($limit_seq)
 			   or defined($nseq) && $nseq +< $limit_seq;
     }
-    $limit_seq = $self->{'limit_seq'}
-	if defined($self->{'limit_seq'})
-	&& (!defined($limit_seq) || $self->{'limit_seq'} +< $limit_seq);
-    local $self->{'limit_seq'} = $limit_seq;
+    $limit_seq = $self->{?'limit_seq'}
+	if defined($self->{?'limit_seq'})
+	&& (!defined($limit_seq) || $self->{?'limit_seq'} +< $limit_seq);
+    local $self->{+'limit_seq'} = $limit_seq;
 
     $self->walk_lineseq($root, \@ops,
 		       sub { push @exprs, @_[0]} );
 
-    my $body = join(";\n", grep {length} @exprs);
+    my $body = join(";\n", grep {length}, @exprs);
     my $subs = "";
-    if (defined $root && defined $limit_seq && !$self->{'in_format'}) {
+    if (defined $root && defined $limit_seq && !$self->{?'in_format'}) {
 	$subs = join "\n", $self->seq_subs($limit_seq);
     }
-    return join(";\n", grep {length} @( $body, $subs));
+    return join(";\n", grep {length}, @( $body, $subs));
 }
 
-sub scopeop {
-    my($real_block, $self, $op, $cx) = < @_;
+sub scopeop($real_block, $self, $op, $cx) {
     my $kid;
     my @kids;
 
     my @oldv = %$self{[qw'curstash warnings hints hinthash']};
     local(%$self{[qw'curstash warnings hints hinthash']}) if $real_block;
-    < %$self{[qw'curstash warnings hints hinthash']} = < @oldv;
+     %$self{[qw'curstash warnings hints hinthash']} =  @oldv;
     if ($real_block) {
 	$kid = $op->first->sibling; # skip enter
 	if (is_miniwhile($kid)) {
@@ -1070,10 +1043,16 @@ sub scopeop {
 	    return "$body $name $cond";
 	}
     } else {
-	$kid = $op->first;
+        if ($op->last->name eq "scope") {
+            $kid = $op->last->last;
+        }
+        else {
+            $kid = $op->first;
+        }
     }
-    for (; !null($kid); $kid = $kid->sibling) {
+    while(!null($kid)) {
 	push @kids, $kid;
+        $kid = $kid->sibling;
     }
     if ($cx +> 0) { # inside an expression, (a do {} while for lineseq)
         if ($cx == 26) { # inside double quote
@@ -1083,7 +1062,7 @@ sub scopeop {
         }
     } else {
 	my $lineseq = $self->lineseq($op, < @kids);
-	return length ($lineseq) ? "$lineseq;" : "";
+	return length ($lineseq) ?? "$lineseq;" !! "";
     }
 }
 
@@ -1096,25 +1075,27 @@ sub pp_leave { scopeop(1, < @_); }
 # soon as we get them, for the sake of impatient users.
 sub deparse_root {
     my $self = shift;
-    my($op) = < @_;
+    my@($op) =  @_;
     my @oldv = %$self{[qw'curstash warnings hints hinthash']};
     local(%$self{[qw'curstash warnings hints hinthash']});
-    < %$self{[qw'curstash warnings hints hinthash']} = < @oldv;
+     %$self{[qw'curstash warnings hints hinthash']} =  @oldv;
     my @kids;
     return if null $op->first; # Can happen, e.g., for Bytecode without -k
-    for (my $kid = $op->first->sibling; !null($kid); $kid = $kid->sibling) {
+    my $kid = $op->first->sibling;
+    while (!null($kid)) {
 	push @kids, $kid;
+        $kid = $kid->sibling;
     }
     $self->walk_lineseq($op, \@kids,
-			sub { print $self->indent(@_[0].';');
-			      print "\n" unless @_[1] ==( (nelems @kids)-1);
+			sub { print $^STDOUT, $self->indent(@_[0].';');
+			      print $^STDOUT, "\n" unless @_[1] ==( (nelems @kids)-1);
 			  });
 }
 
-sub walk_lineseq {
-    my ($self, $op, $kids, $callback) = < @_;
+sub walk_lineseq($self, $op, $kids, $callback) {
     my @kids = @$kids;
-    for (my $i = 0; $i +< nelems @kids; $i++) {
+    my $i = 0;
+    while ( $i +< nelems(@kids) ) {
 	my $expr = "";
 	if (is_state @kids[$i]) {
 	    $expr = $self->deparse(@kids[$i++], 0);
@@ -1130,13 +1111,15 @@ sub walk_lineseq {
 	$expr .= $self->deparse(@kids[$i], ((nelems @kids) != 1)/2);
 	$expr =~ s/;\n?\z//;
 	$callback->($expr, $i);
+    } continue {
+        $i++;
     }
 }
 
 # The BEGIN {} is used here because otherwise this code isn't executed
 # when you run B::Deparse on itself.
 my %globalnames;
-BEGIN { map(%globalnames{$_}++, @( "SIG", "STDIN", "STDOUT", "STDERR", "INC",
+BEGIN { map( {%globalnames{+$_}++ }, @( "SIG", "STDIN", "STDOUT", "STDERR", "INC",
 	    "ENV", "ARGV", "ARGVOUT", "_")); }
 
 sub gv_name {
@@ -1148,8 +1131,8 @@ sub gv_name {
     if ($stash eq 'main' && $name =~ m/^::/) {
 	$stash = '::';
     }
-    elsif (($stash eq '' && %globalnames{$name})
-	or ($stash eq $self->{'curstash'} && !%globalnames{$name}
+    elsif (($stash eq '' && %globalnames{?$name})
+	or ($stash eq $self->{?'curstash'} && !%globalnames{?$name}
 	    && ($stash eq 'main' || $name !~ m/::/))
 	or $name =~ m/^[^A-Za-z_:]/)
     {
@@ -1166,8 +1149,7 @@ sub gv_name {
 # Return the name to use for a stash variable.
 # If a lexical with the same name is in scope, it may need to be
 # fully-qualified.
-sub stash_variable {
-    my ($self, $prefix, $name) = < @_;
+sub stash_variable($self, $prefix, $name) {
 
     return "$prefix$name" if $name =~ m/::/;
 
@@ -1176,21 +1158,20 @@ sub stash_variable {
 	return "$prefix$name";
     }
 
-    my $v = ($prefix eq '$#' ? '@' : $prefix) . $name;
+    my $v = ($prefix eq '$#' ?? '@' !! $prefix) . $name;
     return "$prefix$name" if $name =~ m/^(\W|_$)/; # no stash for magic variables.
-    return $prefix .$self->{'curstash'}.'::'. $name if 1; # if $self->lex_in_scope($v);
+    return $prefix .$self->{?'curstash'}.'::'. $name if 1; # if $self->lex_in_scope($v);
     return "$prefix$name";
 }
 
-sub lex_in_scope {
-    my ($self, $name) = < @_;
-    $self->populate_curcvlex() if !defined $self->{'curcvlex'};
+sub lex_in_scope($self, $name) {
+    $self->populate_curcvlex() if !defined $self->{?'curcvlex'};
 
-    return 0 if !defined($self->{'curcop'});
+    return 0 if !defined($self->{?'curcop'});
     my $seq = $self->{'curcop'}->cop_seq;
     return 0 if !exists $self->{'curcvlex'}->{$name};
     for my $a ( @{$self->{'curcvlex'}->{$name}}) {
-	my ($st, $en) = < @$a;
+	my @($st, $en) =  @$a;
 	return 1 if $seq +> $st && $seq +<= $en;
     }
     return 0;
@@ -1198,28 +1179,34 @@ sub lex_in_scope {
 
 sub populate_curcvlex {
     my $self = shift;
-    for (my $cv = $self->{'curcv'}; class($cv) eq "CV"; $cv = $cv->OUTSIDE) {
-	my $padlist = $cv->PADLIST;
+    my $cv = $self->{?'curcv'};
+    my $padlist = $cv->PADLIST;
+    my $parentpadlist;
+    while ($padlist) {
 	# an undef CV still in lexical chain
-	next if class($padlist) eq "SPECIAL";
+        last if class($padlist) eq "SPECIAL";
 	my @padlist = $padlist->ARRAY;
 	my @ns = @padlist[0]->ARRAY;
+        my $padflags = @ns[0];
+        $parentpadlist = @ns[1];
 
-	for (my $i=0; $i+<nelems @ns; ++$i) {
+	for my $i (4 .. nelems(@ns) -1) {
 	    next if class(@ns[$i]) eq "SPECIAL";
 	    next if @ns[$i]->FLAGS ^&^ SVpad_OUR;  # Skip "our" vars
-	    if (class(@ns[$i]) eq "PV") {
+	    if (class(@ns[$i]) eq "PV" or class(@ns[$i]) eq "IV") {
 		# Probably that pesky lexical @_
 		next;
 	    }
-            my $name = @ns[$i]->PVX;
-	    my ($seq_st, $seq_en) =
+            my $name = @ns[$i]->PVX_const;
+	    my @($seq_st, $seq_en) =
 		(@ns[$i]->FLAGS ^&^ SVf_FAKE)
-		    ? (0, 999999)
-		    : (@ns[$i]->COP_SEQ_RANGE_LOW, @ns[$i]->COP_SEQ_RANGE_HIGH);
+		    ?? @(0, 999999)
+		    !! @(@ns[$i]->COP_SEQ_RANGE_LOW, @ns[$i]->COP_SEQ_RANGE_HIGH);
 
-	    push @{$self->{'curcvlex'}->{$name}}, \@($seq_st, $seq_en);
+	    push @{$self->{+'curcvlex'}->{+$name}}, \@($seq_st, $seq_en);
 	}
+    } continue {
+        $padlist = $parentpadlist;
     }
 }
 
@@ -1227,14 +1214,14 @@ sub find_scope_st { find_scope(< @_)[0]; }
 sub find_scope_en { find_scope(< @_)[1]; }
 
 # Recurses down the tree, looking for pad variable introductions and COPs
-sub find_scope {
-    my ($self, $op, $scope_st, $scope_en) = < @_;
+sub find_scope($self, $op, ?$scope_st, ?$scope_en) {
     carp("Undefined op in find_scope") if !defined $op;
     return  @($scope_st, $scope_en) unless $op->flags ^&^ OPf_KIDS;
 
     my @queue = @($op);
     while(my $op = shift @queue ) {
-	for (my $o=$op->first; $$o; $o=$o->sibling) {
+	my $o=$op->first;
+        while ($$o) {
 	    if ($o->name =~ m/^pad.v$/ && $o->private ^&^ OPpLVAL_INTRO) {
 		my $s = int($self->padname_sv($o->targ)->COP_SEQ_RANGE_LOW);
 		my $e = $self->padname_sv($o->targ)->COP_SEQ_RANGE_HIGH;
@@ -1250,7 +1237,9 @@ sub find_scope {
 	    }
 	    elsif ($o->flags ^&^ OPf_KIDS) {
 		unshift (@queue, $o);
-	    }
+	    };
+
+            $o=$o->sibling;
 	}
     }
 
@@ -1258,8 +1247,7 @@ sub find_scope {
 }
 
 # Returns a list of subs which should be inserted before the COP
-sub cop_subs {
-    my ($self, $op, $out_seq) = < @_;
+sub cop_subs($self, $op, ?$out_seq) {
     my $seq = $op->cop_seq;
     # If we have nephews, then our sequence number indicates
     # the cop_seq of the end of some sort of scope.
@@ -1271,13 +1259,12 @@ sub cop_subs {
     return $self->seq_subs($seq);
 }
 
-sub seq_subs {
-    my ($self, $seq) = < @_;
+sub seq_subs($self, $seq) {
     my @text;
 #push @text, "# ($seq)\n";
 
     return "" if !defined $seq;
-    while (scalar(nelems @{$self->{'subs_todo'}})
+    while (scalar(nelems @{$self->{?'subs_todo'}})
 	   and $seq +> $self->{'subs_todo'}->[0]->[0]) {
 	push @text, < $self->next_todo;
     }
@@ -1286,23 +1273,21 @@ sub seq_subs {
 
 # Notice how subs and formats are inserted between statements here;
 # also $[ assignments and pragmas.
-sub pp_nextstate {
-    my $self = shift;
-    my($op, $cx) = < @_;
-    $self->{'curcop'} = $op;
+sub pp_nextstate($self, $op, $cx) {
+    $self->{+'curcop'} = $op;
     my @text;
     push @text, < $self->cop_subs($op);
     push @text, $op->label . ": " if $op->label;
     my $stash = $op->stashpv;
-    if ($stash ne $self->{'curstash'}) {
+    if ($stash ne $self->{?'curstash'}) {
 	push @text, "package $stash;\n";
-	$self->{'curstash'} = $stash;
+	$self->{+'curstash'} = $stash;
     }
 
     my $warnings = $op->warnings;
     my $warning_bits;
     if ($warnings->isa("B::SPECIAL") && $$warnings == 4) {
-	$warning_bits = %warnings::Bits{"all"} ^&^ WARN_MASK;
+	$warning_bits = %warnings::Bits{?"all"} ^&^ WARN_MASK;
     }
     elsif ($warnings->isa("B::SPECIAL") && $$warnings == 5) {
         $warning_bits = $warnings::NONE;
@@ -1315,27 +1300,27 @@ sub pp_nextstate {
     }
 
     if (defined ($warning_bits) and
-       !defined($self->{warnings}) || $self->{'warnings'} ne $warning_bits) {
-	push @text, declare_warnings($self->{'warnings'}, $warning_bits);
-	$self->{'warnings'} = $warning_bits;
+       !defined($self->{?warnings}) || $self->{?'warnings'} ne $warning_bits) {
+	push @text, declare_warnings($self->{?'warnings'}, $warning_bits);
+	$self->{+'warnings'} = $warning_bits;
     }
 
-    if ($self->{'hints'} != $op->hints) {
-	push @text, declare_hints($self->{'hints'}, $op->hints);
-	$self->{'hints'} = $op->hints;
+    if ($self->{?'hints'} != $op->hints) {
+	push @text, declare_hints($self->{?'hints'}, $op->hints);
+	$self->{+'hints'} = $op->hints;
     }
 
     # hack to check that the hint hash hasn't changed
-    if (join(' ', sort @: < %{$self->{'hinthash'} || \%()}) 
+    if (join(' ', sort @: < %{$self->{?'hinthash'} || \%()}) 
           ne join(' ', sort @: < %{$op->hints_hash || \%()})) {
-	push @text, declare_hinthash($self->{'hinthash'}, $op->hints_hash, $self->{indent_size});
-	$self->{'hinthash'} = $op->hints_hash;
+	push @text, declare_hinthash($self->{?'hinthash'}, $op->hints_hash, $self->{?indent_size});
+	$self->{+'hinthash'} = $op->hints_hash;
     }
 
     # This should go after of any branches that add statements, to
     # increase the chances that it refers to the same line it did in
     # the original program.
-    if ($self->{'linenums'}) {
+    if ($self->{?'linenums'}) {
 	push @text, "\f#line " . $op->line .
 	  ' "' . $op->file, qq'"\n';
     }
@@ -1343,8 +1328,7 @@ sub pp_nextstate {
     return join("", @text);
 }
 
-sub declare_warnings {
-    my ($from, $to) = < @_;
+sub declare_warnings($from, $to) {
     if (($to ^&^ WARN_MASK) eq (warnings::bits("all") ^&^ WARN_MASK)) {
 	return "use warnings;\n";
     }
@@ -1354,8 +1338,7 @@ sub declare_warnings {
     return "BEGIN \{\$\{^WARNING_BITS\} = ".perlstring($to)."\}\n";
 }
 
-sub declare_hints {
-    my ($from, $to) = < @_;
+sub declare_hints($from, $to) {
     my $use = $to   ^&^ ^~^$from;
     my $no  = $from ^&^ ^~^$to;
     my $decls = "";
@@ -1375,27 +1358,25 @@ my %ignored_hints = %(
     'open>' => 1,
 );
 
-sub declare_hinthash {
-    my ($from, $to, $indent) = < @_;
+sub declare_hinthash($from, $to, $indent) {
     my @decls;
     for my $key (keys %$to) {
-	next if %ignored_hints{$key};
-	if (!defined $from->{$key} or $from->{$key} ne $to->{$key}) {
-	    push @decls, qq(\$^H\{'$key'\} = q($to->{$key}););
+	next if %ignored_hints{?$key};
+	if (!defined $from->{?$key} or $from->{?$key} ne $to->{?$key}) {
+	    push @decls, qq(\%^H\{'$key'\} = q($to->{?$key}););
 	}
     }
     for my $key (keys %$from) {
-	next if %ignored_hints{$key};
+	next if %ignored_hints{?$key};
 	if (!exists $to->{$key}) {
-	    push @decls, qq(delete \$^H\{'$key'\};);
+	    push @decls, qq(delete \%^H\{'$key'\};);
 	}
     }
     (nelems @decls) or return '';
     return join("\n" . (" " x $indent), @( "BEGIN \{", < @decls)) . "\n\}\n";
 }
 
-sub hint_pragmas {
-    my ($bits) = < @_;
+sub hint_pragmas($bits) {
     my @pragmas;
     push @pragmas, "integer" if $bits ^&^ 0x1;
     push @pragmas, "strict 'refs'" if $bits ^&^ 0x2;
@@ -1408,15 +1389,11 @@ sub pp_setstate { pp_nextstate(< @_) }
 
 sub pp_unstack { return "" } # see also leaveloop
 
-sub baseop {
-    my $self = shift;
-    my($op, $cx, $name) = < @_;
+sub baseop($self, $op, $cx, $name) {
     return $name;
 }
 
-sub pp_stub {
-    my $self = shift;
-    my($op, $cx, $name) = < @_;
+sub pp_stub($self, $op, $cx, ?$name) {
     if ($cx +>= 1) {
 	return "()";
     }
@@ -1453,10 +1430,10 @@ sub POSTFIX () { 1 }
 
 sub pfixop {
     my $self = shift;
-    my($op, $cx, $name, $prec, $flags) = (< @_, 0);
+    my@($op, $cx, $name, $prec, $flags) = @(< @_, 0);
     my $kid = $op->first;
     $kid = $self->deparse($kid, $prec);
-    return $self->maybe_parens(($flags ^&^ POSTFIX) ? "$kid$name" : "$name$kid",
+    return $self->maybe_parens(($flags ^&^ POSTFIX) ?? "$kid$name" !! "$name$kid",
 			       $cx, $prec);
 }
 
@@ -1471,9 +1448,7 @@ sub pp_i_postdec { maybe_targmy(< @_, \&pfixop, "--", 23, POSTFIX) }
 sub pp_complement { maybe_targmy(< @_, \&pfixop, "~", 21) }
 
 sub pp_negate { maybe_targmy(< @_, \&real_negate) }
-sub real_negate {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub real_negate($self, $op, $cx) {
     if ($op->first->name =~ m/^(i_)?negate$/) {
 	# avoid --$x
 	$self->pfixop($op, $cx, "-", 21.5);
@@ -1483,9 +1458,7 @@ sub real_negate {
 }
 sub pp_i_negate { pp_negate(< @_) }
 
-sub pp_not {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_not($self, $op, $cx) {
     if ($cx +<= 4) {
 	$self->pfixop($op, $cx, "not ", 4);
     } else {
@@ -1493,9 +1466,7 @@ sub pp_not {
     }
 }
 
-sub unop {
-    my $self = shift;
-    my($op, $cx, $name) = < @_;
+sub unop($self, $op, $cx, $name) {
     my $kid;
     if ($op->flags ^&^ OPf_KIDS) {
 	$kid = $op->first;
@@ -1507,7 +1478,7 @@ sub unop {
 
 	return $self->maybe_parens_unop($name, $kid, $cx);
     } else {
-	return $name .  ($op->flags ^&^ OPf_SPECIAL ? "()" : "");
+	return $name .  ($op->flags ^&^ OPf_SPECIAL ?? "()" !! "");
     }
 }
 
@@ -1537,9 +1508,7 @@ sub pp_length { maybe_targmy(< @_, \&unop, "length") }
 sub pp_ord { maybe_targmy(< @_, \&unop, "ord") }
 sub pp_chr { maybe_targmy(< @_, \&unop, "chr") }
 
-sub pp_expand {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_expand($self, $op, $cx) {
     return pfixop($self, $op, $cx, "< ", 21);
 }
 
@@ -1579,16 +1548,14 @@ sub pp_gmtime { unop(< @_, "gmtime") }
 sub pp_alarm { unop(< @_, "alarm") }
 sub pp_sleep { maybe_targmy(< @_, \&unop, "sleep") }
 
-sub pp_readline { 
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_readline($self, $op, $cx) { 
     my $name = "~<";
     my $kid;
     if ($op->flags ^&^ OPf_KIDS) {
 	$kid = $op->first;
 	return $self->maybe_parens_unop($name, $kid, $cx);
     } else {
-	return $name .  ($op->flags ^&^ OPf_SPECIAL ? "()" : "");
+	return $name .  ($op->flags ^&^ OPf_SPECIAL ?? "()" !! "");
     }
 }
 
@@ -1611,15 +1578,12 @@ sub pp_lock { unop(< @_, "lock") }
 
 sub pp_continue { unop(< @_, "continue"); }
 sub pp_break {
-    my ($self, $op) = < @_;
+    my @($self, $op) =  @_;
     return "" if $op->flags ^&^ OPf_SPECIAL;
     unop(< @_, "break");
 }
 
-sub givwhen {
-    my $self = shift;
-    my($op, $cx, $givwhen) = < @_;
-
+sub givwhen($self, $op, $cx, $givwhen) {
     my $enterop = $op->first;
     my ($head, $block);
     if ($enterop->flags ^&^ OPf_SPECIAL) {
@@ -1641,9 +1605,7 @@ sub givwhen {
 sub pp_leavegiven { givwhen(< @_, "given"); }
 sub pp_leavewhen  { givwhen(< @_, "when"); }
 
-sub pp_exists {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_exists($self, $op, $cx) {
     my $arg;
     if ($op->private ^&^ OPpEXISTS_SUB) {
 	# Checking for the existence of a subroutine
@@ -1659,9 +1621,7 @@ sub pp_exists {
 				    $cx, 16);
 }
 
-sub pp_delete {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_delete($self, $op, $cx) {
     my $arg;
     if ($op->private ^&^ OPpSLICE) {
 	if ($op->flags ^&^ OPf_SPECIAL) {
@@ -1686,10 +1646,8 @@ sub pp_delete {
     }
 }
 
-sub pp_require {
-    my $self = shift;
-    my($op, $cx) = < @_;
-    my $opname = $op->flags ^&^ OPf_SPECIAL ? 'CORE::require' : 'require';
+sub pp_require($self, $op, $cx) {
+    my $opname = $op->flags ^&^ OPf_SPECIAL ?? 'CORE::require' !! 'require';
     if (class($op) eq "UNOP" and $op->first->name eq "const"
 	and $op->first->private ^&^ OPpCONST_BARE)
     {
@@ -1704,7 +1662,7 @@ sub pp_require {
 
 sub pp_scalar {
     my $self = shift;
-    my($op, $cx) = < @_;
+    my@($op, $cx) =  @_;
     my $kid = $op->first;
     if (not null < $kid->sibling) {
 	# XXX Was a here-doc
@@ -1720,32 +1678,31 @@ sub padval {
     return $self->{'curcv'}->PADLIST->ARRAYelt(1)->ARRAYelt($targ);
 }
 
-sub anon_hash_or_list {
-    my $self = shift;
-    my($op, $cx) = < @_;
-
-    my($pre, $post) = < @{%("anonlist" => \@('@(',')'),
-                          "anonhash" => \@('%(',')')){$op->name}};
+sub anon_hash_or_list($self, $op, $cx) {
+    my@($pre, $post) =  @{%("anonarray" => \@('@(',')'),
+                          "anonhash" => \@('%(',')')){?$op->name}};
     my($expr, @exprs);
     $op = $op->first->sibling; # skip pushmark
-    for (; !null($op); $op = $op->sibling) {
+    while (!null($op)) {
 	$expr = $self->deparse($op, 6);
 	push @exprs, $expr;
+
+        $op = $op->sibling;
     }
     return $pre . join(", ", @exprs) . $post;
 }
 
-sub pp_anonlist {
-    my $self = shift;
-    my ($op, $cx) = < @_;
+sub pp_anonarray($self, $op, $cx) {
     return $self->anon_hash_or_list($op, $cx);
 }
 
-*pp_anonhash = \&pp_anonlist;
+sub pp_anonscalar($self, $op, $cx) {
+    return "\$( " . $self->deparse($op->first, 6) . " )";
+}
 
-sub pp_srefgen {
-    my $self = shift;	
-    my($op, $cx) = < @_;
+*pp_anonhash = \&pp_anonarray;
+
+sub pp_srefgen($self, $op, $cx) {
     my $kid = $op->first;
     if ($kid->name eq "null") {
 	$kid = $kid->first;
@@ -1763,7 +1720,7 @@ sub pp_srefgen {
             } elsif ($sib_name eq 'entersub') {
                 my $text = $self->deparse( <$kid->sibling, 1);
                 # Always show parens for \(&func()), but only with -p otherwise
-                $text = "($text)" if $self->{'parens'}
+                $text = "($text)" if $self->{?'parens'}
                                  or $kid->sibling->private ^&^ OPpENTERSUB_AMPER;
                 return "\\$text";
             }
@@ -1771,22 +1728,19 @@ sub pp_srefgen {
     $self->pfixop($op, $cx, "\\", 20);
 }
 
-sub e_anoncode {
-    my ($self, %info) = < @_;
+sub e_anoncode($self, %info) {
     my $text = $self->deparse_sub(%info{code});
     return "sub " . $text;
 }
 
-sub pp_rcatline {
-    my $self = shift;
-    my($op) = < @_;
+sub pp_rcatline($self, $op) {
     return "~<" . $self->gv_name( <$self->gv_or_padgv($op));
 }
 
 # Unary operators that can occur as pseudo-listops inside double quotes
 sub dq_unop {
     my $self = shift;
-    my($op, $cx, $name, $prec, $flags) = (< @_, 0, 0);
+    my@($op, $cx, $name, $prec, $flags) = @(< @_, 0, 0);
     my $kid;
     if ($op->flags ^&^ OPf_KIDS) {
        $kid = $op->first;
@@ -1794,7 +1748,7 @@ sub dq_unop {
        $kid = $kid->sibling if not null < $kid->sibling;
        return $self->maybe_parens_unop($name, $kid, $cx);
     } else {
-       return $name .  ($op->flags ^&^ OPf_SPECIAL ? "()" : "");
+       return $name .  ($op->flags ^&^ OPf_SPECIAL ?? "()" !! "");
     }
 }
 
@@ -1804,9 +1758,7 @@ sub pp_uc { dq_unop(< @_, "uc") }
 sub pp_lc { dq_unop(< @_, "lc") }
 sub pp_quotemeta { maybe_targmy(< @_, \&dq_unop, "quotemeta") }
 
-sub loopex {
-    my $self = shift;
-    my ($op, $cx, $name) = < @_;
+sub loopex($self, $op, $cx, $name) {
     if (class($op) eq "PVOP") {
 	return "$name " . $op->pv;
     } elsif (class($op) eq "OP") {
@@ -1824,9 +1776,7 @@ sub pp_redo { loopex(< @_, "redo") }
 sub pp_goto { loopex(< @_, "goto") }
 sub pp_dump { loopex(< @_, "dump") }
 
-sub ftst {
-    my $self = shift;
-    my($op, $cx, $name) = < @_;
+sub ftst($self, $op, $cx, $name) {
     if (class($op) eq "UNOP") {
 	# Genuine `-X' filetests are exempt from the LLAFR, but not
 	# l?stat(); for the sake of clarity, give'em all parens
@@ -1892,7 +1842,7 @@ sub assoc_class {
 	# their associativity).
 	return assoc_class($op->first);
     }
-    return $name . ($op->flags ^&^ OPf_STACKED ? "=" : "");
+    return $name . ($op->flags ^&^ OPf_STACKED ?? "=" !! "");
 }
 
 # Left associative operators, like `+', for which
@@ -1914,11 +1864,9 @@ BEGIN {
 	    );
 }
 
-sub deparse_binop_left {
-    my $self = shift;
-    my($op, $left, $prec) = < @_;
-    if (%left{assoc_class($op)} && %left{assoc_class($left)}
-	and %left{assoc_class($op)} == %left{assoc_class($left)})
+sub deparse_binop_left($self, $op, $left, $prec) {
+    if (%left{?assoc_class($op)} && %left{?assoc_class($left)}
+	and %left{?assoc_class($op)} == %left{?assoc_class($left)})
     {
 	return $self->deparse($left, $prec - .00001);
     } else {
@@ -1947,11 +1895,9 @@ BEGIN {
 	     );
 }
 
-sub deparse_binop_right {
-    my $self = shift;
-    my($op, $right, $prec) = < @_;
-    if (%right{assoc_class($op)} && %right{assoc_class($right)}
-	and %right{assoc_class($op)} == %right{assoc_class($right)})
+sub deparse_binop_right($self, $op, $right, $prec) {
+    if (%right{?assoc_class($op)} && %right{?assoc_class($right)}
+	and %right{?assoc_class($op)} == %right{?assoc_class($right)})
     {
 	return $self->deparse($right, $prec - .00001);
     } else {
@@ -1961,7 +1907,7 @@ sub deparse_binop_right {
 
 sub binop {
     my $self = shift;
-    my ($op, $cx, $opname, $prec, $flags) = (< @_, 0);
+    my @($op, $cx, $opname, $prec, $flags, ...) = @(< @_, 0);
     my $left = $op->first;
     my $right = $op->last;
     my $eq = "";
@@ -1970,7 +1916,7 @@ sub binop {
 	$prec = 7;
     }
     if ($flags ^&^ SWAP_CHILDREN) {
-	($left, $right) = ($right, $left);
+	@($left, $right) = @($right, $left);
     }
     $left = $self->deparse_binop_left($op, $left, $prec);
     $left = "($left)" if $flags ^&^ LIST_CONTEXT
@@ -2024,7 +1970,7 @@ sub pp_sassign { binop(< @_, "=", 7, SWAP_CHILDREN) }
 sub pp_aassign { binop(< @_, "=", 7, SWAP_CHILDREN ^|^ LIST_CONTEXT) }
 
 sub pp_smartmatch {
-    my ($self, $op, $cx) = < @_;
+    my @($self, $op, $cx) =  @_;
     if ($op->flags ^&^ OPf_SPECIAL) {
 	return $self->deparse( <$op->last, $cx);
     }
@@ -2037,9 +1983,7 @@ sub pp_smartmatch {
 # by making all but the first concat stacked. The effect is as if the
 # programmer had written `($a . $b) .= $c', except legal.
 sub pp_concat { maybe_targmy(< @_, \&real_concat) }
-sub real_concat {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub real_concat($self, $op, $cx) {
     my $left = $op->first;
     my $right = $op->last;
     my $eq = "";
@@ -2054,9 +1998,7 @@ sub real_concat {
 }
 
 # `x' is weird when the left arg is a list
-sub pp_repeat {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_repeat($self, $op, $cx) {
     my $left = $op->first;
     my $right = $op->last;
     my $eq = "";
@@ -2068,8 +2010,9 @@ sub pp_repeat {
     if (null($right)) { # list repeat; count is inside left-side ex-list
 	my $kid = $left->first->sibling; # skip pushmark
 	my @exprs;
-	for (; !null( <$kid->sibling); $kid = $kid->sibling) {
+	while (!null($kid->sibling)) {
 	    push @exprs, < $self->deparse($kid, 6);
+            $kid = $kid->sibling;
 	}
 	$right = $kid;
 	$left = "(" . join(", ", @exprs). ")";
@@ -2080,9 +2023,7 @@ sub pp_repeat {
     return $self->maybe_parens("$left x$eq $right", $cx, $prec);
 }
 
-sub range {
-    my $self = shift;
-    my ($op, $cx, $type) = < @_;
+sub range($self, $op, $cx, $type) {
     my $left = $op->first;
     my $right = $left->sibling;
     $left = $self->deparse($left, 9);
@@ -2090,29 +2031,23 @@ sub range {
     return $self->maybe_parens("$left $type $right", $cx, 9);
 }
 
-sub pp_flop {
-    my $self = shift;
-    my($op, $cx) = < @_;
-    my $flip = $op->first;
-    my $type = ($flip->flags ^&^ OPf_SPECIAL) ? "..." : "..";
-    return $self->range( <$flip->first, $cx, $type);
+sub pp_range($self, $op, $cx) {
+    return $self->range($op, $cx, "..");
 }
 
 # one-line while/until is handled in pp_leave
 
-sub logop {
-    my $self = shift;
-    my ($op, $cx, $lowop, $lowprec, $highop, $highprec, $blockname) = < @_;
+sub logop($self, $op, $cx, $lowop, $lowprec, $highop, $highprec, $blockname) {
     my $left = $op->first;
     my $right = $op->first->sibling;
     if ($cx +< 1 and is_scope($right) and $blockname
-	and $self->{'expand'} +< 7)
+	and $self->{?'expand'} +< 7)
     { # if ($a) {$b}
 	$left = $self->deparse($left, 1);
 	$right = $self->deparse($right, 0);
 	return "$blockname ($left) \{\n\t$right\n\b\}\cK";
-    } elsif ($cx +< 1 and $blockname and not $self->{'parens'}
-	     and $self->{'expand'} +< 7) { # $b if $a
+    } elsif ($cx +< 1 and $blockname and not $self->{?'parens'}
+	     and $self->{?'expand'} +< 7) { # $b if $a
 	$right = $self->deparse($right, 1);
 	$left = $self->deparse($left, 1);
 	return "$right $blockname $left";
@@ -2135,9 +2070,7 @@ sub pp_dor { logop(< @_, "err", 2, "//", 10, "") }
 # old versions of opcode.pl). Syntax is what matters here.
 sub pp_xor { logop(< @_, "xor", 2, "",   0,  "") }
 
-sub logassignop {
-    my $self = shift;
-    my ($op, $cx, $opname) = < @_;
+sub logassignop($self, $op, $cx, $opname) {
     my $left = $op->first;
     my $right = $op->first->sibling->first; # skip sassign
     $left = $self->deparse($left, 7);
@@ -2149,11 +2082,9 @@ sub pp_andassign { logassignop(< @_, "&&=") }
 sub pp_orassign  { logassignop(< @_, "||=") }
 sub pp_dorassign { logassignop(< @_, "//=") }
 
-sub listop {
-    my $self = shift;
-    my($op, $cx, $name) = < @_;
+sub listop($self, $op, $cx, $name) {
     my(@exprs);
-    my $parens = ($cx +>= 5) || $self->{'parens'};
+    my $parens = ($cx +>= 5) || $self->{?'parens'};
     my $kid = $op->first->sibling;
     return $name if null $kid;
     my $first;
@@ -2177,8 +2108,9 @@ sub listop {
 	push @exprs, < $self->deparse( <$kid->first, 6);
 	$kid = $kid->sibling;
     }
-    for (; !null($kid); $kid = $kid->sibling) {
+    while (!null($kid)) {
 	push @exprs, $self->deparse($kid, 6);
+        $kid = $kid->sibling;
     }
     if ($parens) {
 	return "$name(" . join(", ", @exprs) . ")";
@@ -2268,9 +2200,7 @@ sub pp_gsbyname { listop(< @_, "getservbyname") }
 sub pp_gsbyport { listop(< @_, "getservbyport") }
 sub pp_syscall { listop(< @_, "syscall") }
 
-sub pp_glob {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_glob($self, $op, $cx) {
     my $text = $self->dq( <$op->first->sibling);  # skip pushmark
     if ($text =~ m/^\$?(\w|::|\`)+$/ # could look like a readline
 	or $text =~ m/[<>]/) {
@@ -2284,11 +2214,9 @@ sub pp_glob {
 # be a filehandle. This could probably be better fixed in the core
 # by moving the GV lookup into ck_truc.
 
-sub pp_truncate {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_truncate($self, $op, $cx) {
     my(@exprs);
-    my $parens = ($cx +>= 5) || $self->{'parens'};
+    my $parens = ($cx +>= 5) || $self->{?'parens'};
     my $kid = $op->first->sibling;
     my $fh;
     if ($op->flags ^&^ OPf_SPECIAL) {
@@ -2306,9 +2234,7 @@ sub pp_truncate {
     }
 }
 
-sub indirop {
-    my $self = shift;
-    my($op, $cx, $name) = < @_;
+sub indirop($self, $op, $cx, $name) {
     my($expr, @exprs);
     my $kid = $op->first->sibling;
     my $indir = "";
@@ -2327,15 +2253,16 @@ sub indirop {
 	$kid = $kid->sibling;
     }
     if ($name eq "sort" && $op->private ^&^ (OPpSORT_NUMERIC ^|^ OPpSORT_INTEGER)) {
-	$indir = ($op->private ^&^ OPpSORT_DESCEND) ? '{$b <+> $a} '
-						  : '{$a <+> $b} ';
+	$indir = ($op->private ^&^ OPpSORT_DESCEND) ?? '{$b <+> $a} '
+						  !! '{$a <+> $b} ';
     }
     elsif ($name eq "sort" && $op->private ^&^ OPpSORT_DESCEND) {
 	$indir = '{$b cmp $a} ';
     }
-    for (; !null($kid); $kid = $kid->sibling) {
+    while (!null($kid)) {
 	$expr = $self->deparse($kid, 6);
 	push @exprs, $expr;
+        $kid = $kid->sibling;
     }
     my $name2 = $name;
     if ($name eq "sort" && $op->private ^&^ OPpSORT_REVERSE) {
@@ -2365,9 +2292,7 @@ sub pp_prtf { indirop(< @_, "printf") }
 sub pp_print { indirop(< @_, "print") }
 sub pp_sort { indirop(< @_, "sort") }
 
-sub mapop {
-    my $self = shift;
-    my($op, $cx, $name) = < @_;
+sub mapop($self, $op, $cx, $name) {
     my($expr, @exprs);
     my $kid = $op->first; # this is the (map|grep)start
     $kid = $kid->first->sibling; # skip a pushmark
@@ -2378,9 +2303,10 @@ sub mapop {
 	$code = $self->deparse($code, 24) . ", ";
     }
     $kid = $kid->sibling;
-    for (; !null($kid); $kid = $kid->sibling) {
+    while (!null($kid)) {
 	$expr = $self->deparse($kid, 6);
 	push @exprs, $expr if defined $expr;
+        $kid = $kid->sibling;
     }
     return $self->maybe_parens_func($name, $code . join(", ", @exprs), $cx, 5);
 }
@@ -2390,14 +2316,12 @@ sub pp_grepwhile { mapop(< @_, "grep") }
 sub pp_mapstart { baseop(< @_, "map") }
 sub pp_grepstart { baseop(< @_, "grep") }
 
-sub pp_list {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_list($self, $op, $cx) {
     my($expr, @exprs);
     my $kid = $op->first->sibling; # skip pushmark
-    my $lop;
     my $local = "either"; # could be local(...), my(...), state(...) or our(...)
-    for ($lop = $kid; !null($lop); $lop = $lop->sibling) {
+    my $lop = $kid;
+    while (!null($lop)) {
 	# This assumes that no other private flags equal 128, and that
 	# OPs that store things other than flags in their op_private,
 	# like OP_AELEMFAST, won't be immediate children of a list.
@@ -2415,18 +2339,14 @@ sub pp_list {
 	    last;
 	}
 	if ($lop->name =~ m/^pad[ash]v$/) {
-	    if ($lop->private ^&^ OPpPAD_STATE) { # state()
-		($local = "", last) if $local =~ m/^(?:local|our|my)$/;
-		$local = "state";
-	    } else { # my()
-		($local = "", last) if $local =~ m/^(?:local|our|state)$/;
-		$local = "my";
-	    }
+            # my()
+            ($local = ""), last if $local =~ m/^(?:local|our|state)$/;
+            $local = "my";
 	} elsif ($lop->name =~ m/^(gv|rv2)[ash]v$/
 			&& $lop->private ^&^ OPpOUR_INTRO
 		or $lop->name eq "null" && $lop->first->name eq "gvsv"
 			&& $lop->first->private ^&^ OPpOUR_INTRO) { # our()
-	    ($local = "", last) if $local =~ m/^(?:my|local|state)$/;
+	    ($local = ""), last if $local =~ m/^(?:my|local|state)$/;
 	    $local = "our";
 	} elsif ($lop->name ne "undef"
 		# specifically avoid the "reverse sort" optimisation,
@@ -2434,26 +2354,30 @@ sub pp_list {
 		&& !($lop->name eq 'sort' && ($lop->flags ^&^ OPpSORT_REVERSE)))
 	{
 	    # local()
-	    ($local = "", last) if $local =~ m/^(?:my|our|state)$/;
+	    ($local = ""), last if $local =~ m/^(?:my|our|state)$/;
 	    $local = "local";
 	}
+    } continue {
+        $lop = $lop->sibling;
     }
     $local = "" if $local eq "either"; # no point if it's all undefs
     return $self->deparse($kid, $cx) if null $kid->sibling and not $local;
-    for (; !null($kid); $kid = $kid->sibling) {
+    while (!null($kid)) {
 	if ($local) {
 	    if (class($kid) eq "UNOP" and $kid->first->name eq "gvsv") {
 		$lop = $kid->first;
 	    } else {
 		$lop = $kid;
 	    }
-	    $self->{'avoid_local'}->{$$lop}++;
+	    $self->{+'avoid_local'}->{+$$lop}++;
 	    $expr = $self->deparse($kid, 6);
 	    delete $self->{'avoid_local'}->{$$lop};
 	} else {
 	    $expr = $self->deparse($kid, 6);
 	}
 	push @exprs, $expr;
+
+        $kid = $kid->sibling;
     }
     if ($local) {
 	return "$local(" . join(", ", @exprs) . ")";
@@ -2469,16 +2393,14 @@ sub is_ifelse_cont {
              and is_scope($op->first->first->sibling) );
 }
 
-sub pp_cond_expr {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_cond_expr($self, $op, $cx) {
     my $cond = $op->first;
     my $true = $cond->sibling;
     my $false = $true->sibling;
-    my $cuddle = $self->{'cuddle'};
+    my $cuddle = $self->{?'cuddle'};
     unless ($cx +< 1 and (is_scope($true) and $true->name ne "null") and
 	    (is_scope($false) || is_ifelse_cont($false))
-	    and $self->{'expand'} +< 7) {
+	    and $self->{?'expand'} +< 7) {
 	$cond = $self->deparse($cond, 8);
 	$true = $self->deparse($true, 6);
 	$false = $self->deparse($false, 8);
@@ -2507,14 +2429,12 @@ sub pp_cond_expr {
     return $head . join($cuddle, @( "", < @elsifs)) . $false;
 }
 
-sub loop_common {
-    my $self = shift;
-    my($op, $cx, $init) = < @_;
+sub loop_common($self, $op, $cx, $init) {
     my $enter = $op->first;
     my $kid = $enter->sibling;
     my @oldv = %$self{[qw'curstash warnings hints hinthash']};
     local(%$self{[qw'curstash warnings hints hinthash']});
-    < %$self{[qw'curstash warnings hints hinthash']} = < @oldv;
+     %$self{[qw'curstash warnings hints hinthash']} =  @oldv;
     my $head = "";
     my $bare = 0;
     my $body;
@@ -2533,11 +2453,10 @@ sub loop_common {
 	if ($ary->name eq 'null' and $enter->private ^&^ OPpITER_REVERSED) {
 	    # "reverse" was optimised away
 	    $ary = listop($self, $ary->first->sibling, 1, 'reverse');
-	} elsif ($enter->flags ^&^ OPf_SPECIAL
-	    and not null $ary->first->sibling->sibling)
+	} elsif ($enter->flags ^&^ OPf_SPECIAL)
 	{
-	    $ary = $self->deparse($ary->first->sibling, 9) . " .. " .
-	      $self->deparse($ary->first->sibling->sibling, 9);
+	    $ary = $self->deparse($ary->first, 9) . " .. " .
+	      $self->deparse($ary->first->sibling, 9);
 	} else {
 	    $ary = $self->deparse($ary, 1);
 	}
@@ -2566,7 +2485,7 @@ sub loop_common {
 	$head = "foreach $var ($ary) ";
     } elsif ($kid->name eq "null") { # while/until
 	$kid = $kid->first;
-	my $name = %("and" => "while", "or" => "until"){$kid->name};
+	my $name = %("and" => "while", "or" => "until"){?$kid->name};
 	$cond = $self->deparse($kid->first, 1);
 	$head = "$name ($cond) ";
 	$body = $kid->first->sibling;
@@ -2590,13 +2509,14 @@ sub loop_common {
 	    }
 	}
 	my $state = $body->first;
-	my $cuddle = $self->{'cuddle'};
+	my $cuddle = $self->{?'cuddle'};
 	my @states;
-	for (; $$state != $$cont; $state = $state->sibling) {
+	while ($$state != $$cont) {
 	    push @states, $state;
+            $state = $state->sibling;
 	}
 	$body = $self->lineseq(undef, < @states);
-	if (defined $cond and not is_scope $cont and $self->{'expand'} +< 3) {
+	if (defined $cond and not is_scope $cont and $self->{?'expand'} +< 3) {
 	    $head = "for ($init; $cond; " . $self->deparse($cont, 1) .") ";
 	    $cont = "\cK";
 	} else {
@@ -2611,6 +2531,10 @@ sub loop_common {
 	$cont = "\cK";
 	$body = $self->deparse($body, 0);
     }
+    if ( ! $head ) {
+        $head = "do ";
+        $cont = ";";
+    }
     $body =~ s/;?$/;\n/;
 
     return $head . "\{\n\t" . $body . "\b\}" . $cont;
@@ -2618,9 +2542,7 @@ sub loop_common {
 
 sub pp_leaveloop { shift->loop_common(< @_, "") }
 
-sub for_loop {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub for_loop($self, $op, $cx) {
     my $init = $self->deparse($op, 1);
     return $self->loop_common($op->sibling->first->sibling, $cx, $init);
 }
@@ -2635,12 +2557,10 @@ BEGIN { eval "sub OP_STRINGIFY () \{" . opnumber("stringify") . "\}" }
 BEGIN { eval "sub OP_RV2SV () \{" . opnumber("rv2sv") . "\}" }
 BEGIN { eval "sub OP_LIST () \{" . opnumber("list") . "\}" }
 
-sub pp_null {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_null($self, $op, $cx) {
     if (class($op) eq "OP") {
 	# old value is lost
-	return $self->{'ex_const'} if $op->targ == OP_CONST;
+	return $self->{?'ex_const'} if $op->targ == OP_CONST;
     } elsif ($op->first->name eq "pushmark") {
 	return $self->pp_list($op, $cx);
     } elsif ($op->first->name eq "enter") {
@@ -2675,7 +2595,7 @@ sub pp_null {
 sub padname {
     my $self = shift;
     my $targ = shift;
-    return $self->padname_sv($targ)->PVX;
+    return $self->padname_sv($targ)->PVX_const;
 }
 
 sub padany {
@@ -2684,9 +2604,7 @@ sub padany {
     return substr($self->padname( <$op->targ), 1); # skip $/@/%
 }
 
-sub pp_padsv {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_padsv($self, $op, $cx) {
     return $self->maybe_my($op, $cx, $self->padname($op->targ));
 }
 
@@ -2702,9 +2620,7 @@ BEGIN {
 		       "!", "@");
 }
 
-sub pp_threadsv {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_threadsv($self, $op, $cx) {
     return $self->maybe_local($op, $cx, "\$" .  @threadsv_names[$op->targ]);
 }
 
@@ -2718,24 +2634,18 @@ sub gv_or_padgv {
     }
 }
 
-sub pp_gvsv {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_gvsv($self, $op, $cx) {
     my $gv = $self->gv_or_padgv($op);
     return $self->maybe_local($op, $cx, $self->stash_variable("\$",
 				 $self->gv_name($gv)));
 }
 
-sub pp_gv {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_gv($self, $op, $cx) {
     my $gv = $self->gv_or_padgv($op);
     return $self->gv_name($gv);
 }
 
-sub pp_aelemfast {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_aelemfast($self, $op, $cx) {
     my $name;
     if ($op->flags ^&^ OPf_SPECIAL) { # optimised PADAV
 	$name = $self->padname( <$op->targ);
@@ -2743,7 +2653,7 @@ sub pp_aelemfast {
     else {
 	my $gv = $self->gv_or_padgv($op);
 	$name = $self->gv_name($gv);
-	$name = $self->{'curstash'}."::$name"
+	$name = $self->{?'curstash'}."::$name"
 	    if $name !~ m/::/ && $self->lex_in_scope('@'.$name);
 	$name = '@' . $name;
     }
@@ -2751,10 +2661,7 @@ sub pp_aelemfast {
     return $name . "[" .  ($op->private) . "]";
 }
 
-sub rv2x {
-    my $self = shift;
-    my($op, $cx, $type) = < @_;
-
+sub rv2x($self, $op, $cx, $type) {
     if (class($op) eq 'NULL' || !$op->can("first")) {
 	carp("Unexpected op in pp_rv2x");
 	return 'XXX';
@@ -2787,39 +2694,32 @@ sub pp_rv2hv { maybe_local(< @_, rv2x(< @_, "\%")) }
 sub pp_rv2gv { maybe_local(< @_, rv2x(< @_, "*")) }
 
 # skip down to the old, ex-rv2cv
-sub pp_rv2cv {
-    my ($self, $op, $cx) = < @_;
-    if (!null( <$op->first) && $op->first->name eq 'null' &&
-	$op->first->targ eq OP_LIST)
-    {
-	return $self->rv2x( <$op->first->first->sibling, $cx, "&")
+sub pp_rv2cv($self, $op, $cx) {
+    if ($op->flags ^&^ OPf_SPECIAL) {
+	return $self->rv2x($op, $cx, "&")
     }
     else {
 	return $self->rv2x($op, $cx, "")
     }
 }
 
-sub list_const {
-    my $self = shift;
-    my($cx, < @list) = < @_;
-    my @a = map $self->const($_, 6), @list;
+sub list_const($self, $cx, @< @list) {
+    my @a = map { $self->const($_, 6) }, @list;
     if ((nelems @a) == 0) {
 	return "()";
     } elsif ((nelems @a) == 1) {
 	return @a[0];
-    } elsif ( (nelems @a) +> 2 and !grep(!m/^-?\d+$/, @a)) {
+    } elsif ( (nelems @a) +> 2 and !grep( {!m/^-?\d+$/ }, @a)) {
 	# collapse (-1,0,1,2) into (-1..2)
-	my ($s, $e) = < @a[[@(0,-1)]];
+	my @($s, $e) =  @a[[@(0,-1)]];
 	my $i = $s;
 	return $self->maybe_parens("$s..$e", $cx, 9)
-	  unless grep $i++ != $_, @a;
+	  unless grep { $i++ != $_ }, @a;
     }
     return $self->maybe_parens(join(", ", @a), $cx, 6);
 }
 
-sub pp_rv2av {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_rv2av($self, $op, $cx) {
     my $kid = $op->first;
     if ($kid->name eq "const") { # constant list
 	my $av = $self->const_sv($kid);
@@ -2848,11 +2748,8 @@ sub is_subscriptable {
     }
 }
 
-sub elem_or_slice_array_name
+sub elem_or_slice_array_name($self, $array, $left, $padname, $allow_arrow)
 {
-    my $self = shift;
-    my ($array, $left, $padname, $allow_arrow) = < @_;
-
     if ($array->name eq $padname) {
 	return $self->padany($array);
     } elsif (is_scope($array)) { # ${expr}[0]
@@ -2860,8 +2757,8 @@ sub elem_or_slice_array_name
     } elsif ($array->name eq "gv") {
 	$array = $self->gv_name( <$self->gv_or_padgv($array));
 	if ($array !~ m/::/) {
-	    my $prefix = ($left eq '[' ? '@' : '%');
-	    $array = $self->{curstash}.'::'.$array
+	    my $prefix = ($left eq '[' ?? '@' !! '%');
+	    $array = $self->{?curstash}.'::'.$array
 		if $self->lex_in_scope($prefix . $array);
 	}
 	return $array;
@@ -2872,11 +2769,8 @@ sub elem_or_slice_array_name
     }
 }
 
-sub elem_or_slice_single_index
+sub elem_or_slice_single_index($self, $idx)
 {
-    my $self = shift;
-    my ($idx) = < @_;
-
     $idx = $self->deparse($idx, 1);
 
     # Outer parens in an array index will confuse perl
@@ -2895,7 +2789,7 @@ sub elem_or_slice_single_index
     # two pairs of parens, and *that* means that the whole
     # expression would be parenthesized as well.]
     #
-    $idx =~ s/^\((.*)\)$/$1/ if $self->{'parens'};
+    $idx =~ s/^\((.*)\)$/$1/ if $self->{?'parens'};
 
     # Hash-element braces will autoquote a bareword inside themselves.
     # We need to make sure that C<$hash{warn()}> doesn't come out as
@@ -2910,10 +2804,8 @@ sub elem_or_slice_single_index
     return $idx;
 }
 
-sub elem {
-    my $self = shift;
-    my ($op, $cx, $left, $right, $padname) = < @_;
-    my($array, $idx) = ($op->first, $op->first->sibling);
+sub elem($self, $op, $cx, $left, $right, $padname) {
+    my@($array, $idx) = @($op->first, $op->first->sibling);
 
     $idx = $self->elem_or_slice_single_index($idx);
 
@@ -2922,7 +2814,7 @@ sub elem {
 	return $array_name . $left . $idx . $right;
     } else {
 	# $x[20][3]{hi} or expr->[20]
-	my $arrow = is_subscriptable($array) ? "" : "->";
+	my $arrow = is_subscriptable($array) ?? "" !! "->";
 	return $self->deparse($array, 24) . $arrow . $left . $idx . $right;
     }
 
@@ -2931,38 +2823,38 @@ sub elem {
 sub pp_aelem { maybe_local(< @_, elem(< @_, "[", "]", "padav")) }
 sub pp_helem { maybe_local(< @_, elem(< @_, "\{", "\}", "padhv")) }
 
-sub pp_gelem {
-    my $self = shift;
-    my($op, $cx) = < @_;
-    my($glob, $part) = ($op->first, $op->last);
+sub pp_gelem($self, $op, $cx) {
+    my@($glob, $part) = @($op->first, $op->last);
     $glob = $glob->first; # skip rv2gv
     $glob = $glob->first if $glob->name eq "rv2gv"; # this one's a bug
     my $scope = is_scope($glob);
     $glob = $self->deparse($glob, 0);
     $part = $self->deparse($part, 1);
-    return "*" . ($scope ? "\{$glob\}" : $glob) . "\{$part\}";
+    return "*" . ($scope ?? "\{$glob\}" !! $glob) . "\{$part\}";
 }
 
-sub slice {
-    my $self = shift;
-    my ($op, $cx, $left, $right, $regname, $padname) = < @_;
+sub slice($self, $op, $cx, $left, $right, $regname, $padname) {
     my $last;
-    my(@elems, $kid, $array, $list);
+    my(@elems, $array, $list);
     if (class($op) eq "LISTOP") {
 	$last = $op->last;
     } else { # ex-hslice inside delete()
-	for ($kid = $op->first; !null $kid->sibling; $kid = $kid->sibling) {}
+	my $kid = $op->first;
+        while (!null $kid->sibling) {
+            $kid = $kid->sibling;
+        }
 	$last = $kid;
     }
     $array = $last;
     $array = $array->first
 	if $array->name eq $regname or $array->name eq "null";
     $array = $self->elem_or_slice_array_name($array,$left,$padname,0);
-    $kid = $op->first->sibling; # skip pushmark
+    my $kid = $op->first;
     if ($kid->name eq "list") {
 	$kid = $kid->first->sibling; # skip list, pushmark
-	for (; !null $kid; $kid = $kid->sibling) {
+	while (!null $kid) {
 	    push @elems, $self->deparse($kid, 6);
+            $kid = $kid->sibling;
 	}
 	$list = join(", ", @elems);
     } else {
@@ -2974,9 +2866,7 @@ sub slice {
 sub pp_aslice { maybe_local(< @_, slice(< @_, "[[", "]]", "rv2av", "padav")) }
 sub pp_hslice { maybe_local(< @_, slice(< @_, "\{[", "]\}", "rv2hv", "padhv")) }
 
-sub pp_lslice {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_lslice($self, $op, $cx) {
     my $idx = $op->first;
     my $list = $op->last;
     my(@elems, $kid);
@@ -2995,9 +2885,7 @@ sub want_list {
     return ($op->flags ^&^ OPf_WANT) == OPf_WANT_LIST;
 }
 
-sub _method {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub _method($self, $op, $cx) {
     my $kid = $op->first->sibling; # skip pushmark
     my($meth, $obj, @exprs);
     if ($kid->name eq "list" and want_list $kid) {
@@ -3016,15 +2904,16 @@ sub _method {
 	$kid = $kid->first->sibling; # skip pushmark
 	$obj = $kid;
 	$kid = $kid->sibling;
-	for (; not null $kid; $kid = $kid->sibling) {
+	while (not null $kid) {
 	    push @exprs, $kid;
+            $kid = $kid->sibling;
 	}
     } else {
 	$obj = $kid;
 	$kid = $kid->sibling;
-	for (; !null ($kid->sibling) && $kid->name ne "method_named";
-	      $kid = $kid->sibling) {
-	    push @exprs, $kid
+	while (!null ($kid->sibling) && $kid->name ne "method_named") {
+	    push @exprs, $kid;
+            $kid = $kid->sibling;
 	}
 	$meth = $kid;
     }
@@ -3051,13 +2940,12 @@ sub method {
     return $self->e_method( < $self->_method(< @_) );
 }
 
-sub e_method {
-    my ($self, $info) = < @_;
-    my $obj = $self->deparse($info->{object}, 24);
+sub e_method($self, $info) {
+    my $obj = $self->deparse($info->{?object}, 24);
 
-    my $meth = $info->{method};
-    $meth = '?' . $self->deparse($meth, 1) if $info->{variable_method};
-    my $args = join(", ", map { $self->deparse($_, 6) } @{$info->{args}} );
+    my $meth = $info->{?method};
+    $meth = '?' . $self->deparse($meth, 1) if $info->{?variable_method};
+    my $args = join(", ", map { $self->deparse($_, 6) }, @{$info->{args}} );
     my $kid = $obj . "->" . $meth;
     if (length $args) {
 	return $kid . "(" . $args . ")"; # parens mandatory
@@ -3068,10 +2956,9 @@ sub e_method {
 
 # returns "&" if the prototype doesn't match the args,
 # or ("", $args_after_prototype_demunging) if it does.
-sub check_proto {
-    my $self = shift;
-    return "&" if $self->{'noproto'};
-    my($proto, < @args) = < @_;
+sub check_proto($self, $proto, @< @args) {
+    return "&" if $self->{?'noproto'};
+
     my($arg, $real);
     my $doneok = 0;
     my @reals;
@@ -3085,7 +2972,7 @@ sub check_proto {
 	} elsif ($chr eq ";") {
 	    $doneok = 1;
 	} elsif ($chr eq "@" or $chr eq "\%") {
-	    push @reals, < map($self->deparse($_, 6), @args);
+	    push @reals, < map( {$self->deparse($_, 6) }, @args);
 	    @args = @( () );
 	} else {
 	    $arg = shift @args;
@@ -3145,9 +3032,7 @@ sub check_proto {
     return  @("", join ", ", @reals);
 }
 
-sub pp_entersub {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_entersub($self, $op, $cx) {
     return $self->e_method($self->_method($op, $cx))
         unless null $op->first->sibling;
     my $prefix = "";
@@ -3160,8 +3045,9 @@ sub pp_entersub {
     }
     $kid = $op->first;
     $kid = $kid->first->sibling; # skip ex-list, pushmark
-    for (; not null $kid->sibling; $kid = $kid->sibling) {
+    while (not null $kid->sibling) {
 	push @exprs, $kid;
+        $kid = $kid->sibling;
     }
     my $simple = 0;
     my $proto = undef;
@@ -3187,37 +3073,37 @@ sub pp_entersub {
 	$kid = $self->deparse($kid, 24);
     } else {
 	$prefix = "";
-	my $arrow = is_subscriptable($kid->first) ? "" : "->";
+	my $arrow = is_subscriptable($kid->first) ?? "" !! "->";
 	$kid = $self->deparse($kid, 24) . $arrow;
     }
 
     # Doesn't matter how many prototypes there are, if
     # they haven't happened yet!
     my $declared;
-    {
-	no strict 'refs';
+    do {
 	no warnings 'uninitialized';
-	$declared = exists $self->{'subs_declared'}->{$kid}
+	$declared = exists(($self->{?'subs_declared'} || \%())->{$kid})
 	    || (
-		 defined %{Symbol::stash($self->{'curstash'})}{$kid}
-		 && !exists
-		     $self->{'subs_deparsed'}->{$self->{'curstash'}."::".$kid}
-		 && defined prototype $self->{'curstash'}."::".$kid
+		 defined %{Symbol::stash($self->{?'curstash'})}{?$kid}
+		 && !exists(
+		     ($self->{?'subs_deparsed'}||\%())->{$self->{?'curstash'}."::".$kid})
+		 && defined prototype(
+                     \&{*{Symbol::fetch_glob($self->{?'curstash'}."::".$kid)}})
 	       );
 	if (!$declared && defined($proto)) {
 	    # Avoid "too early to check prototype" warning
-	    ($amper, $proto) = ('&');
+	    @($amper, $proto) = @('&');
 	}
-    }
+    };
 
     my $args;
     if ($declared and defined $proto and not $amper) {
-	($amper, $args) = < $self->check_proto($proto, < @exprs);
+	@($amper, $args) =  $self->check_proto($proto, < @exprs);
 	if ($amper eq "&") {
-	    $args = join(", ", map($self->deparse($_, 6), @exprs));
+	    $args = join(", ", map( {$self->deparse($_, 6) }, @exprs));
 	}
     } else {
-	$args = join(", ", map($self->deparse($_, 6), @exprs));
+	$args = join(", ", map( {$self->deparse($_, 6) }, @exprs));
     }
     if ($prefix or $amper) {
 	if ($op->flags ^&^ OPf_STACKED) {
@@ -3231,7 +3117,7 @@ sub pp_entersub {
 	# it back.
 	$kid =~ s/^CORE::GLOBAL:://;
 
-	my $dproto = defined($proto) ? $proto : "undefined";
+	my $dproto = defined($proto) ?? $proto !! "undefined";
         if (!$declared) {
 	    return "$kid(" . $args . ")";
 	} elsif ($dproto eq "") {
@@ -3250,17 +3136,14 @@ sub pp_entersub {
     }
 }
 
-sub pp_enterwrite { unop(< @_, "write") }
-
 # escape things that cause interpolation in double quotes,
 # but not character escapes
-sub uninterp {
-    my($str) = < @_;
+sub uninterp($str) {
     $str =~ s/(^|\G|[^\\])((?:\\\\)*)([\$\@]|\\[uUlLQE])/$1$2\\$3/g;
     return $str;
 }
 
-{
+do {
 my $bal;
 BEGIN {
     use re "eval";
@@ -3276,8 +3159,7 @@ BEGIN {
 }
 
 # the same, but treat $|, $), $( and $ at the end of the string differently
-sub re_uninterp {
-    my($str) = < @_;
+sub re_uninterp($str) {
 
     $str =~ s/
 	  ( ^|\G                  # $1
@@ -3295,15 +3177,14 @@ sub re_uninterp {
           | \\[uUlLQE]
           )
 
-	/{defined($4) && length($4) ? "$1$2$4" : "$1$2\\$3"}/xg;
+	/$(defined($4) && length($4) ?? "$1$2$4" !! "$1$2\\$3")/xg;
 
     return $str;
 }
 
 # This is for regular expressions with the /x modifier
 # We have to leave comments unmangled.
-sub re_uninterp_extended {
-    my($str) = < @_;
+sub re_uninterp_extended($str) {
 
     $str =~ s/
 	  ( ^|\G                  # $1
@@ -3323,11 +3204,11 @@ sub re_uninterp_extended {
           | \\[uUlLQE]
           )
 
-	/{defined($4) && length($4) ? "$1$2$4" : "$1$2\\$3"}/xg;
+	/$(defined($4) && length($4) ?? "$1$2$4" !! "$1$2\\$3")/xg;
 
     return $str;
 }
-}
+};
 
 my %unctrl = # portable to to EBCDIC
     %(
@@ -3365,9 +3246,8 @@ my %unctrl = # portable to to EBCDIC
     );
 
 # character escapes, but not delimiters that might need to be escaped
-sub escape_str { # ASCII, UTF8
-    my($str) = < @_;
-    $str =~ s/(.)/{ord($1) +> 255 ? sprintf("\\x\{\%x\}", ord($1)) : $1}/g;
+sub escape_str($str) {
+    $str =~ s/(.)/$(ord($1) +> 255 ?? sprintf("\\x\{\%x\}", ord($1)) !! $1)/g;
     $str =~ s/\a/\\a/g;
 #    $str =~ s/\cH/\\b/g; # \b means something different in a regex
     $str =~ s/\t/\\t/g;
@@ -3375,47 +3255,43 @@ sub escape_str { # ASCII, UTF8
     $str =~ s/\e/\\e/g;
     $str =~ s/\f/\\f/g;
     $str =~ s/\r/\\r/g;
-    $str =~ s/([\cA-\cZ])/{%unctrl{$1}}/g;
-    $str =~ s/([[:^print:]])/{sprintf("\\\%03o", ord($1))}/g;
+    $str =~ s/([\cA-\cZ])/$(%unctrl{?$1})/g;
+    $str =~ s/([[:^print:]])/$(sprintf("\\\%03o", ord($1)))/g;
     return $str;
 }
 
 # For regexes with the /x modifier.
 # Leave whitespace unmangled.
-sub escape_extended_re {
-    my($str) = < @_;
-    $str =~ s/(.)/{ord($1) +> 255 ? sprintf("\\x\{\%x\}", ord($1)) : $1}/g;
-    $str =~ s/([[:^print:]])/{
-	($1 =~ m![ \t\n]!) ? $1 : sprintf("\\\%03o", ord($1))}/g;
+sub escape_extended_re($str) {
+    $str =~ s/(.)/$(ord($1) +> 255 ?? sprintf("\\x\{\%x\}", ord($1)) !! $1)/g;
+    $str =~ s/([[:^print:]])/$(
+	($1 =~ m![ \t\n]!) ?? $1 !! sprintf("\\\%03o", ord($1)))/g;
     $str =~ s/\n/\n\f/g;
     return $str;
 }
 
 # Don't do this for regexen
-sub unback {
-    my($str) = < @_;
+sub unback($str) {
     $str =~ s/\\/\\\\/g;
     return $str;
 }
 
 # Remove backslashes which precede literal control characters,
 # to avoid creating ambiguity when we escape the latter.
-sub re_unback {
-    my($str) = < @_;
+sub re_unback($str) {
 
     # the insane complexity here is due to the behaviour of "\c\"
     $str =~ s/(^|[^\\]|\\c\\)(?<!\\c)\\(\\\\)*(?=[[:^print:]])/$1$2/g;
     return $str;
 }
 
-sub balanced_delim {
-    my($str) = < @_;
+sub balanced_delim($str) {
     my @str = split m//, $str;
-    my($ar, $open, $close, $fail, $c, $cnt, $last_bs);
-    for $ar (@(\@('[',']'), \@('(',')'), \@('<','>'), \@('{','}'))) {
-	($open, $close) = < @$ar;
+    my($open, $close, $fail, $cnt, $last_bs);
+    for my $ar (@(\@('[',']'), \@('(',')'), \@('<','>'), \@('{','}'))) {
+	@($open, $close) =  @$ar;
 	$fail = 0; $cnt = 0; $last_bs = 0;
-	for $c ( @str) {
+	for my $c ( @str) {
 	    if ($c eq $open) {
 		$fail = 1 if $last_bs;
 		$cnt++;
@@ -3436,11 +3312,10 @@ sub balanced_delim {
     return  @("", $str);
 }
 
-sub single_delim {
-    my($q, $default, $str) = < @_;
+sub single_delim($q, $default, $str) {
     return "$default$str$default" if $default and index($str, $default) == -1;
     if ($q !~ m/^(?:qr|m)$/) {
-	(my $succeed, $str) = < balanced_delim($str);
+	@(my $succeed, $str) =  balanced_delim($str);
 	return "$q$str" if $succeed;
     }
     for my $delim (@('/', '"', '#')) {
@@ -3461,8 +3336,7 @@ BEGIN { $max_prec = int(0.999 + 8*length(pack("F", 42))*log(2)/log(10)); }
 # Split a floating point number into an integer mantissa and a binary
 # exponent. Assumes you've already made sure the number isn't zero or
 # some weird infinity or NaN.
-sub split_float {
-    my($f) = < @_;
+sub split_float($f) {
     my $exponent = 0;
     if ($f == int($f)) {
 	while ($f % 2 == 0) {
@@ -3479,10 +3353,8 @@ sub split_float {
     return  @($mantissa, $exponent);
 }
 
-sub const {
-    my $self = shift;
-    my($sv, $cx) = < @_;
-    if ($self->{'use_dumper'}) {
+sub const($self, $sv, $cx) {
+    if ($self->{?'use_dumper'}) {
 	return $self->const_dumper($sv, $cx);
     }
     if (class($sv) eq "SPECIAL") {
@@ -3493,8 +3365,10 @@ sub const {
     }
     # convert a version object into the "v1.2.3" string in its V magic
     if ($sv->FLAGS ^&^ SVs_RMG) {
-	for (my $mg = $sv->MAGIC; $mg; $mg = $mg->MOREMAGIC) {
+	my $mg = $sv->MAGIC;
+        while ($mg) {
 	    return $mg->PTR if $mg->TYPE eq 'V';
+            $mg = $mg->MOREMAGIC;
 	}
     }
 
@@ -3538,12 +3412,12 @@ sub const {
 	my $str = "$nv";
 	if ($str != $nv) {
 	    # failing that, try using more precision
-	    $str = sprintf("\%.{$max_prec}g", $nv);
+	    $str = sprintf("\%.$($max_prec)g", $nv);
 #	    if (pack("F", $str) ne pack("F", $nv)) {
 	    if ($str != $nv) {
 		# not representable in decimal with whatever sprintf()
 		# and atof() Perl is using here.
-		my($mant, $exp) = < split_float($nv);
+		my@($mant, $exp) =  split_float($nv);
 		return $self->maybe_parens("$mant * 2**$exp", $cx, 19);
 	    }
 	}
@@ -3557,18 +3431,20 @@ sub const {
 	    my %hash = %( < $ref->ARRAY );
 	    my @elts;
 	    for my $k (sort keys %hash) {
-		push @elts, "$k => " . $self->const(%hash{$k}, 6);
+		push @elts, "$k => " . $self->const(%hash{?$k}, 6);
 	    }
 	    return '\%(' . join(", ", @elts) . ")";
 	} elsif (class($ref) eq "CV") {
 	    return "sub " . $self->deparse_sub($ref);
 	}
 	if ($ref->FLAGS ^&^ SVs_SMG) {
-	    for (my $mg = $ref->MAGIC; $mg; $mg = $mg->MOREMAGIC) {
+	    my $mg = $ref->MAGIC;
+            while ($mg) {
 		if ($mg->TYPE eq 'r') {
 		    my $re = re_uninterp( <escape_str( <re_unback( <$mg->precomp)));
 		    return single_delim("qr", "", $re);
 		}
+                $mg = $mg->MOREMAGIC;
 	    }
 	}
 	
@@ -3585,9 +3461,7 @@ sub const {
     }
 }
 
-sub const_dumper {
-    my $self = shift;
-    my($sv, $cx) = < @_;
+sub const_dumper($self, $sv, $cx) {
     my $ref = $sv->object_2svref();
     my $dumper = Data::Dumper->new(\@($$ref), \@('$v'));
     $dumper->Purity(1)->Terse(1)->Deparse(1)->Indent(0)->Useqq(1)->Sortkeys(1);
@@ -3608,9 +3482,7 @@ sub const_sv {
     return $sv;
 }
 
-sub pp_const {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_const($self, $op, $cx) {
 #    if ($op->private & OPpCONST_BARE) { # trouble with `=>' autoquoting
 #	return $self->const_sv($op)->PV;
 #    }
@@ -3652,20 +3524,18 @@ sub dq {
     }
 }
 
-sub pp_backtick {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_backtick($self, $op, $cx) {
     # skip pushmark if it exists (readpipe() vs ``)
     my $child = $op->first->sibling->isa('B::NULL')
-	? $op->first->first : $op->first->sibling;
+	?? $op->first->first !! $op->first->sibling;
     return single_delim("qx", '`', < $self->dq($child));
 }
 
 sub dquote {
     my $self = shift;
-    my($op, $cx) = < @_;
+    my@($op, $cx) =  @_;
     my $kid = $op->first->sibling; # skip ex-stringify, pushmark
-    return $self->deparse($kid, $cx) if $self->{'unquote'};
+    return $self->deparse($kid, $cx) if $self->{?'unquote'};
     $self->maybe_targmy($kid, $cx,
 			sub {single_delim("qq", '"', < $self->dq(@_[1]))});
 }
@@ -3675,23 +3545,22 @@ sub pp_stringify { maybe_targmy(< @_, \&dquote) }
 
 # tr/// and s/// (and tr[][], tr[]//, tr###, etc)
 # note that tr(from)/to/ is OK, but not tr/from/(to)
-sub double_delim {
-    my($from, $to) = < @_;
-    my($succeed, $delim);
+sub double_delim($from, $to) {
+    my($succeed);
     if ($from !~ m[/] and $to !~ m[/]) {
 	return "/$from/$to/";
-    } elsif (($succeed, $from) = < balanced_delim($from) and $succeed) {
-	if (($succeed, $to) = < balanced_delim($to) and $succeed) {
+    } elsif (@($succeed, $from) =  balanced_delim($from) and $succeed) {
+	if (@($succeed, $to) =  balanced_delim($to) and $succeed) {
 	    return "$from$to";
 	} else {
-	    for $delim (@('/', '"', '#')) { # note no `'' -- s''' is special
+	    for my $delim (@('/', '"', '#')) { # note no `'' -- s''' is special
 		return "$from$delim$to$delim" if index($to, $delim) == -1;
 	    }
 	    $to =~ s[/][\\/]g;
 	    return "$from/$to/";
 	}
     } else {
-	for $delim (@('/', '"', '#')) { # note no '
+	for my $delim (@('/', '"', '#')) { # note no '
 	    return "$delim$from$delim$to$delim"
 		if index($to . $from, $delim) == -1;
 	}
@@ -3702,8 +3571,7 @@ sub double_delim {
 }
 
 # Only used by tr///, so backslashes hyphens
-sub pchr { # ASCII
-    my($n) = < @_;
+sub pchr($n) {
     if ($n == ord '\') {
 	return '\\';
     } elsif ($n == ord "-") {
@@ -3732,29 +3600,28 @@ sub pchr { # ASCII
     }
 }
 
-sub collapse {
-    my(@chars) = @_;
-    my($str, $c, $tr) = ("");
-    for ($c = 0; $c +< nelems @chars; $c++) {
+sub collapse(@chars) {
+    my@($str, $tr) = @("");
+    my $c = 0;
+    while ($c +< nelems @chars) {
 	$tr = @chars[$c];
 	$str .= pchr($tr);
 	if ($c +<=( (nelems @chars)-1) - 2 and @chars[$c + 1] == $tr + 1 and
 	    @chars[$c + 2] == $tr + 2)
 	{
-	    for (; $c +<=( (nelems @chars)-1)-1 and @chars[$c + 1] == @chars[$c] + 1; $c++)
-	      {}
+	    while( $c +<=( (nelems @chars)-1)-1 and @chars[$c + 1] == @chars[$c] + 1 ) {
+                $c++;
+            }
 	    $str .= "-";
 	    $str .= pchr(@chars[$c]);
 	}
+        $c++;
     }
     return $str;
 }
 
 # Like dq(), but different
-sub re_dq {
-    my $self = shift;
-    my ($op, $extended) = < @_;
-
+sub re_dq($self, $op, $extended) {
     my $type = $op->name;
     if ($type eq "const") {
 	my $unbacked = re_unback( <$self->const_sv($op)->as_string);
@@ -3789,8 +3656,7 @@ sub re_dq {
     }
 }
 
-sub pure_string {
-    my ($self, $op) = < @_;
+sub pure_string($self, $op) {
     return 0 if null $op;
     my $type = $op->name;
 
@@ -3831,9 +3697,7 @@ sub pure_string {
     return 1;
 }
 
-sub regcomp {
-    my $self = shift;
-    my($op, $cx, $extended) = < @_;
+sub regcomp($self, $op, $cx, $extended) {
     my $kid = $op->first;
     $kid = $kid->first if $kid->name eq "regcmaybe";
     $kid = $kid->first if $kid->name eq "regcreset";
@@ -3853,23 +3717,20 @@ sub regcomp {
     return  @($self->deparse($kid, $cx), 0);
 }
 
-sub pp_regcomp {
-    my ($self, $op, $cx) = < @_;
+sub pp_regcomp($self, $op, $cx) {
     return  @(( <$self->regcomp($op, $cx, 0))[[0]]);
 }
 
 # osmic acid -- see osmium tetroxide
 
 my %matchwords;
-map(%matchwords{join "", sort split m//, $_} = $_, @( 'cig', 'cog', 'cos', 'cogs',
+map( {%matchwords{+join "", sort split m//, $_} = $_ }, @( 'cig', 'cog', 'cos', 'cogs',
     'cox', 'go', 'is', 'ism', 'iso', 'mig', 'mix', 'osmic', 'ox', 'sic',
     'sig', 'six', 'smog', 'so', 'soc', 'sog', 'xi'));
 
-sub matchop {
-    my $self = shift;
-    my($op, $cx, $name, $delim) = < @_;
+sub matchop($self, $op, $cx, $name, $delim) {
     my $kid = $op->first;
-    my ($binop, $var, $re) = ("", "", "");
+    my @($binop, $var, $re) = @("", "", "");
     if ($op->flags ^&^ OPf_STACKED) {
 	$binop = 1;
 	$var = $self->deparse($kid, 20);
@@ -3887,7 +3748,7 @@ sub matchop {
     } elsif ($kid->name ne 'regcomp') {
 	carp("found ".$kid->name." where regcomp expected");
     } else {
-	($re, $quote) = < $self->regcomp($kid, 21, $extended);
+	@($re, $quote) =  $self->regcomp($kid, 21, $extended);
     }
     my $flags = "";
     $flags .= "c" if $op->pmflags ^&^ PMf_CONTINUE;
@@ -3897,7 +3758,7 @@ sub matchop {
     $flags .= "o" if $op->pmflags ^&^ PMf_KEEP;
     $flags .= "s" if $op->pmflags ^&^ PMf_SINGLELINE;
     $flags .= "x" if $op->pmflags ^&^ PMf_EXTENDED;
-    $flags = %matchwords{$flags} if %matchwords{$flags};
+    $flags = %matchwords{?$flags} if %matchwords{?$flags};
     if ($quote) {
 	$re = single_delim($name, $delim, $re);
     }
@@ -3913,9 +3774,7 @@ sub pp_match { matchop(< @_, "m", "") }
 sub pp_pushre { matchop(< @_, "m", "/") }
 sub pp_qr { matchop(< @_, "qr", "") }
 
-sub pp_split {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_split($self, $op, $cx) {
     my($kid, @exprs, $ary, $expr);
     $kid = $op->first;
 
@@ -3934,8 +3793,9 @@ sub pp_split {
     }
     $ary = $self->stash_variable('@', < $self->gv_name($gv)) if $gv;
 
-    for (; !null($kid); $kid = $kid->sibling) {
+    while (!null($kid)) {
 	push @exprs, $self->deparse($kid, 6);
+        $kid = $kid->sibling;
     }
 
     # handle special case of split(), and split(' ') that compiles to /\s+/
@@ -3958,16 +3818,14 @@ sub pp_split {
 # bivalent grouping C=NOH [Webster's Tenth]
 
 my %substwords;
-map(%substwords{join "", sort split m//, $_} = $_, @( 'ego', 'egoism', 'em',
+map( {%substwords{+join "", sort split m//, $_} = $_ }, @( 'ego', 'egoism', 'em',
     'es', 'ex', 'exes', 'gee', 'go', 'goes', 'ie', 'ism', 'iso', 'me',
     'meese', 'meso', 'mig', 'mix', 'os', 'ox', 'oxime', 'see', 'seem',
     'seg', 'sex', 'sig', 'six', 'smog', 'sog', 'some', 'xi'));
 
-sub pp_subst {
-    my $self = shift;
-    my($op, $cx) = < @_;
+sub pp_subst($self, $op, $cx) {
     my $kid = $op->first;
-    my($binop, $var, $re, $repl) = ("", "", "", "");
+    my@($binop, $var, $re, $repl) = @("", "", "", "");
     if ($op->flags ^&^ OPf_STACKED) {
 	$binop = 1;
 	$var = $self->deparse($kid, 20);
@@ -3983,11 +3841,7 @@ sub pp_subst {
 	    $repl = $repl->first;
 	    $flags .= "e";
 	}
-	if ($op->pmflags ^&^ PMf_EVAL) {
-	    $repl = $self->deparse($repl->first, 0);
-	} else {
-	    $repl = $self->dq($repl);	
-	}
+        $repl = $self->dq($repl);	
     }
     my $extended = ($op->pmflags ^&^ PMf_EXTENDED);
     if (null $kid) {
@@ -4001,14 +3855,13 @@ sub pp_subst {
     } else {
 	($re) = $self->regcomp($kid, 1, $extended);
     }
-    $flags .= "e" if $op->pmflags ^&^ PMf_EVAL;
     $flags .= "g" if $op->pmflags ^&^ PMf_GLOBAL;
     $flags .= "i" if $op->pmflags ^&^ PMf_FOLD;
     $flags .= "m" if $op->pmflags ^&^ PMf_MULTILINE;
     $flags .= "o" if $op->pmflags ^&^ PMf_KEEP;
     $flags .= "s" if $op->pmflags ^&^ PMf_SINGLELINE;
     $flags .= "x" if $extended;
-    $flags = %substwords{$flags} if %substwords{$flags};
+    $flags = %substwords{?$flags} if %substwords{?$flags};
     if ($binop) {
 	return $self->maybe_parens("$var =~ s"
 				   . double_delim($re, $repl) . $flags,
@@ -4300,10 +4153,6 @@ directives, B<pragmas>. These are:
 
 =item *
 
-use strict;
-
-=item *
-
 use warnings;
 
 =item *
@@ -4444,7 +4293,7 @@ the main:: package, the code will include a package declaration.
 =item *
 
 The only pragmas to be completely supported are: C<use warnings>,
-C<use strict 'refs'>, C<use bytes>, and C<use integer>. (C<$[>, which
+C<use bytes>, and C<use integer>. (C<$[>, which
 behaves like a pragma, is also supported.)
 
 Excepting those listed above, we're currently unable to guarantee that

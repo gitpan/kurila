@@ -4,12 +4,11 @@ our @ISA = qw(Exporter);
 require Exporter;
 our @EXPORT = qw(setup_recurs teardown_recurs);
 
-use strict;
 use File::Path;
 use File::Basename;
 use MakeMaker::Test::Utils;
 
-my $Is_VMS = $^O eq 'VMS';
+my $Is_VMS = $^OS_NAME eq 'VMS';
 
 my %Files = %(
              'Big-Dummy/lib/Big/Dummy.pm'     => <<'END',
@@ -30,7 +29,7 @@ END
 use ExtUtils::MakeMaker;
 
 # This will interfere with the PREREQ_PRINT tests.
-printf "Current package is: \%s\n", __PACKAGE__ unless (join " ", @ARGV) =~ m/PREREQ/;
+printf $^STDOUT, "Current package is: \%s\n", __PACKAGE__ unless (join " ", @ARGV) =~ m/PREREQ/;
 
 WriteMakefile(
     NAME          => 'Big::Dummy',
@@ -55,18 +54,18 @@ program - this is a program
 END
 
              'Big-Dummy/t/compile.t'          => <<'END',
-print "1..2\n";
+print $^STDOUT, "1..2\n";
 
-print eval "use Big::Dummy; 1;" ? "ok 1\n" : "not ok 1\n";
-print "ok 2 - TEST_VERBOSE\n";
+print $^STDOUT, eval "use Big::Dummy; 1;" ?? "ok 1\n" !! "not ok 1\n";
+print $^STDOUT, "ok 2 - TEST_VERBOSE\n";
 END
 
              'Big-Dummy/Liar/t/sanity.t'      => <<'END',
-print "1..3\n";
+print $^STDOUT, "1..3\n";
 
-print eval "use Big::Dummy; 1;" ? "ok 1\n" : "not ok 1\n";
-print eval "use Big::Liar; 1;" ? "ok 2\n" : "not ok 2\n";
-print "ok 3 - TEST_VERBOSE\n";
+print $^STDOUT, eval "use Big::Dummy; 1;" ?? "ok 1\n" !! "not ok 1\n";
+print $^STDOUT, eval "use Big::Liar; 1;" ?? "ok 2\n" !! "not ok 2\n";
+print $^STDOUT, "ok 3 - TEST_VERBOSE\n";
 END
 
              'Big-Dummy/Liar/lib/Big/Liar.pm' => <<'END',
@@ -86,9 +85,9 @@ my $mm = WriteMakefile(
               _KEEP_AFTER_FLUSH => 1
              );
 
-print "Big::Liar's vars\n";
+print $^STDOUT, "Big::Liar's vars\n";
 foreach my $key (qw(INST_LIB INST_ARCHLIB)) {
-    print "$key = $mm->{$key}\n";
+    print $^STDOUT, "$key = $mm->{$key}\n";
 }
 END
 
@@ -99,15 +98,15 @@ sub setup_recurs {
     setup_mm_test_root();
     chdir 'MM_TEST_ROOT:[t]' if $Is_VMS;
 
-    while(my($file, $text) = each %Files) {
+    while(my@(?$file, ?$text) =@( each %Files)) {
         # Convert to a relative, native file path.
         $file = 'File::Spec'->catfile('File::Spec'->curdir, < split m{\/}, $file);
 
         my $dir = dirname($file);
         mkpath $dir;
-        open(FILE, ">", "$file") || die "Can't create $file: $!";
-        print FILE $text;
-        close FILE;
+        open(my $fh, ">", "$file") || die "Can't create $file: $^OS_ERROR";
+        print $fh, $text;
+        close $fh;
     }
 
     return 1;

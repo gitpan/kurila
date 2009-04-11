@@ -124,7 +124,7 @@ bitflip_key(pTHX_ IV action, SV *field) {
 
 	if (len) {
 	    SV *newkey = newSV(len);
-	    char *new_p = SvPVX(newkey);
+	    char *new_p = SvPVX_mutable(newkey);
 
             while (len--)
                 *new_p++ = *p++ ^ 32;
@@ -149,7 +149,7 @@ rot13_key(pTHX_ IV action, SV *field) {
 
 	if (len) {
 	    SV *newkey = newSV(len);
-	    char *new_p = SvPVX(newkey);
+	    char *new_p = SvPVX_mutable(newkey);
 
 	    /* There's a deliberate fencepost error here to loop len + 1 times
 	       to copy the trailing \0  */
@@ -316,7 +316,7 @@ delete_ent(hash, key_sv, flags = 0)
         OUTPUT:
         RETVAL
 
-SV *
+void
 store_ent(hash, key, value)
 	PREINIT:
 	SV *copy;
@@ -327,19 +327,12 @@ store_ent(hash, key, value)
 	SV *value
 	CODE:
 	copy = newSV(0);
-	result = hv_store_ent(hash, key, copy, 0);
+	hv_store_ent(hash, key, copy, 0);
 	SvSetMagicSV(copy, value);
-	if (!result) {
-	    SvREFCNT_dec(copy);
-	    XSRETURN_EMPTY;
-	}
 	/* It's about to become mortal, so need to increase reference count.
 	 */
-	RETVAL = SvREFCNT_inc(HeVAL(result));
-        OUTPUT:
-        RETVAL
 
-SV *
+void
 store(hash, key_sv, value)
 	PREINIT:
 	STRLEN len;
@@ -353,17 +346,10 @@ store(hash, key_sv, value)
 	CODE:
 	key = SvPV(key_sv, len);
 	copy = newSV(0);
-	result = hv_store(hash, key, UTF8KLEN(key_sv, len), copy, 0);
+	hv_store(hash, key, UTF8KLEN(key_sv, len), copy, 0);
 	SvSetMagicSV(copy, value);
-	if (!result) {
-	    SvREFCNT_dec(copy);
-	    XSRETURN_EMPTY;
-	}
 	/* It's about to become mortal, so need to increase reference count.
 	 */
-	RETVAL = SvREFCNT_inc(*result);
-        OUTPUT:
-        RETVAL
 
 SV *
 fetch_ent(hash, key_sv)
@@ -637,16 +623,17 @@ call_sv(sv, flags, ...)
     I32 flags
     PREINIT:
 	I32 i;
+        SV* res;
     PPCODE:
 	for (i=0; i<items-2; i++)
 	    ST(i) = ST(i+2); /* pop first two args */
 	PUSHMARK(SP);
 	SP += items - 2;
 	PUTBACK;
-	i = call_sv(sv, flags);
+	res = call_sv(sv, flags);
 	SPAGAIN;
 	EXTEND(SP, 1);
-	PUSHs(sv_2mortal(newSViv(i)));
+	PUSHs(sv_2mortal(newSVsv(res)));
 
 void
 call_pv(subname, flags, ...)
@@ -654,16 +641,17 @@ call_pv(subname, flags, ...)
     I32 flags
     PREINIT:
 	I32 i;
+        SV* res;
     PPCODE:
 	for (i=0; i<items-2; i++)
 	    ST(i) = ST(i+2); /* pop first two args */
 	PUSHMARK(SP);
 	SP += items - 2;
 	PUTBACK;
-	i = call_pv(subname, flags);
+	res = call_pv(subname, flags);
 	SPAGAIN;
 	EXTEND(SP, 1);
-	PUSHs(sv_2mortal(newSViv(i)));
+	PUSHs(sv_2mortal(newSVsv(res)));
 
 void
 call_method(methname, flags, ...)
@@ -671,16 +659,17 @@ call_method(methname, flags, ...)
     I32 flags
     PREINIT:
 	I32 i;
+        SV* res;
     PPCODE:
 	for (i=0; i<items-2; i++)
 	    ST(i) = ST(i+2); /* pop first two args */
 	PUSHMARK(SP);
 	SP += items - 2;
 	PUTBACK;
-	i = call_method(methname, flags);
+	res = call_method(methname, flags);
 	SPAGAIN;
 	EXTEND(SP, 1);
-	PUSHs(sv_2mortal(newSViv(i)));
+	PUSHs(sv_2mortal(newSVsv(res)));
 
 void
 eval_sv(sv, flags)
@@ -802,7 +791,7 @@ rmagical_flags(sv)
         res = newAV();
         mXPUSHs((SV*)res);
 	sv = SvRV(sv);
-	av_push(res, newSVuv(SvFLAGS(sv) & SVs_GMG));
+	av_push(res, newSVuv(0));
 	av_push(res, newSVuv(SvFLAGS(sv) & SVs_SMG));
 	av_push(res, newSVuv(SvFLAGS(sv) & SVs_RMG));
         XSRETURN(1);

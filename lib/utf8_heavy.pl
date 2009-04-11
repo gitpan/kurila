@@ -1,6 +1,5 @@
 package utf8;
 
-use strict;
 use warnings;
 
 sub DEBUG () { 0 }
@@ -19,10 +18,10 @@ our (%PropertyAlias, %PA_reverse, %PropValueAlias, %PVA_reverse, %PVA_abbr_map);
 use bytes;
 
 sub SWASHNEW_real {
-    my ($class, $type, $list, $minbits, $none) = < @_;
-    local $^D = 0 if $^D;
+    my @($class, $type, $list, $minbits, $none) =  @_;
+    local $^DEBUGGING = 0 if $^DEBUGGING;
 
-    print STDERR "SWASHNEW {join ' ',@_}\n" if DEBUG;
+    print $^STDERR, "SWASHNEW $(join ' ',@_)\n" if DEBUG;
 
     ##
     ## Get the list of codepoints for the type.
@@ -61,20 +60,20 @@ sub SWASHNEW_real {
         $type =~ s/^\s+//;
         $type =~ s/\s+$//;
 
-        print STDERR "type = $type\n" if DEBUG;
+        print $^STDERR, "type = $type\n" if DEBUG;
 
       GETFILE:
-        {
+        do {
 	    ##
 	    ## It could be a user-defined property.
 	    ##
 
-	    my $caller1 = $type =~ s/(.+)::// ? $1 : caller(1);
+	    my $caller1 = $type =~ s/(.+)::// ?? $1 !! caller(2);
 
 	    if (defined $caller1 && $type =~ m/^(?:\w+)$/) {
-		my $prop = Symbol::fetch_glob("{$caller1}::$type");
+		my $prop = Symbol::fetch_glob("$($caller1)::$type");
 		if (exists &{*{$prop}}) {
-		    $list = &{*{$prop}};
+		    $list = &{*{$prop}}( < @_ );
 		    last GETFILE;
 		}
 	    }
@@ -95,16 +94,16 @@ sub SWASHNEW_real {
 	    ##
 	    require "unicore/PVA.pl";
 	    if ($type =~ m/^([\w\s]+)[:=]\s*(.*)/) {
-		my ($enum, $val) = (lc $1, lc $2);
+		my @($enum, $val) = @(lc $1, lc $2);
 		$enum =~ s/[ _-]//g;
 		$val =~ s/[ _-]//g;
 
-		my $pa = %PropertyAlias{$enum} ? $enum : %PA_reverse{$enum};
-		my $f = %PropValueAlias{$pa}->{$val} ? $val : %PVA_reverse{$pa}->{lc $val};
+		my $pa = %PropertyAlias{?$enum} ?? $enum !! %PA_reverse{?$enum};
+		my $f = %PropValueAlias{$pa}->{?$val} ?? $val !! %PVA_reverse{$pa}->{?lc $val};
 
 		if ($pa and $f) {
 		    $pa = "gc_sc" if $pa eq "gc" or $pa eq "sc";
-		    $file = "unicore/lib/$pa/%PVA_abbr_map{$pa}->{lc $f}.pl";
+		    $file = "unicore/lib/$pa/%PVA_abbr_map{$pa}->{?lc $f}.pl";
 		    last GETFILE;
 		}
 	    }
@@ -112,8 +111,8 @@ sub SWASHNEW_real {
 		my $t = lc $type;
 		$t =~ s/[ _-]//g;
 
-		if (%PropValueAlias{gc}->{$t} or %PropValueAlias{sc}->{$t}) {
-		    $file = "unicore/lib/gc_sc/%PVA_abbr_map{gc_sc}->{$t}.pl";
+		if (%PropValueAlias{gc}->{?$t} or %PropValueAlias{sc}->{?$t}) {
+		    $file = "unicore/lib/gc_sc/%PVA_abbr_map{gc_sc}->{?$t}.pl";
 		    last GETFILE;
 		}
 	    }
@@ -122,7 +121,7 @@ sub SWASHNEW_real {
             ## See if it's in the direct mapping table.
             ##
             require "unicore/Exact.pl";
-            if (my $base = %utf8::Exact{$type}) {
+            if (my $base = %utf8::Exact{?$type}) {
                 $file = "unicore/lib/gc_sc/$base.pl";
                 last GETFILE;
             }
@@ -133,29 +132,27 @@ sub SWASHNEW_real {
             ##
             my $canonical = lc $type;
             $canonical =~ s/(?<=[a-z\d])(?:\s+|[-_])(?=[a-z\d])//g;
-            print STDERR "canonical = $canonical\n" if DEBUG;
+            print $^STDERR, "canonical = $canonical\n" if DEBUG;
 
             require "unicore/Canonical.pl";
-	    { no warnings "uninitialized";
-            if (my $base = (%utf8::Canonical{$canonical} || %utf8::Canonical{ lc %utf8::PropertyAlias{$canonical} })) {
+	    do { no warnings "uninitialized";
+            if (my $base = (%utf8::Canonical{?$canonical} || %utf8::Canonical{?lc %utf8::PropertyAlias{?$canonical} })) {
                 $file = "unicore/lib/gc_sc/$base.pl";
                 last GETFILE;
             }
-            }
+            };
 
 	    ##
 	    ## See if it's a user-level "To".
 	    ##
 
-	    my $caller0 = caller(0);
+	    my $caller0 = caller(1);
 
 	    if (defined $caller0 && $type =~ m/^To(?:\w+)$/) {
 		my $map = $caller0 . "::" . $type;
 
 		if (exists &{*{Symbol::fetch_glob($map)}}) {
-		    no strict 'refs';
-		    
-		    $list = &{*{Symbol::fetch_glob($map)}};
+		    $list = &{*{Symbol::fetch_glob($map)}}( < @_ );
 		    last GETFILE;
 		}
 	    }
@@ -178,10 +175,10 @@ sub SWASHNEW_real {
             ##
 
             return $type;
-        }
+        };
 
 	if (defined $file) {
-	    print STDERR "found it (file='$file')\n" if DEBUG;
+	    print $^STDERR, "found it (file='$file')\n" if DEBUG;
 
 	    ##
 	    ## If we reach here, it was due to a 'last GETFILE' above
@@ -190,13 +187,13 @@ sub SWASHNEW_real {
 	    ## If we have, return the cached results. The cache key is the
 	    ## class and file to load.
 	    ##
-	    my $found = %Cache{$class . "," . $file};
+	    my $found = %Cache{?$class . "," . $file};
 	    if ($found and ref($found) eq $class) {
-		print STDERR "Returning cached '$file' for \\p\{$type\}\n" if DEBUG;
+		print $^STDERR, "Returning cached '$file' for \\p\{$type\}\n" if DEBUG;
 		return $found;
 	    }
 
-	    $list = do $file; die $@ if $@;
+	    $list = do $file; die $^EVAL_ERROR if $^EVAL_ERROR;
 	}
 
         $ListSorted = 1; ## we know that these lists are sorted
@@ -210,11 +207,11 @@ sub SWASHNEW_real {
 	my @tmp = split(m/^/m, $list);
 	my %seen;
 	no warnings;
-	$extras = join '', grep m/^[^0-9a-fA-F]/, @tmp;
-	$list = join '', map  { $_->[1] }
-	    sort { $a->[0] <+> $b->[0] }
- map  { m/^([0-9a-fA-F]+)/; \@( CORE::hex($1), $_ ) }
- grep { m/^([0-9a-fA-F]+)/ and not %seen{$1}++ } @tmp; # XXX doesn't do ranges right
+	$extras = join '', grep { m/^[^0-9a-fA-F]/ }, @tmp;
+	$list = join '', map  { $_->[1] },
+	    sort { $a->[0] <+> $b->[0] },
+ map  { m/^([0-9a-fA-F]+)/; \@( CORE::hex($1), $_ ) },
+ grep { m/^([0-9a-fA-F]+)/ and not %seen{+$1}++ }, @tmp; # XXX doesn't do ranges right
     }
 
     if ($none) {
@@ -226,31 +223,31 @@ sub SWASHNEW_real {
 	my $top = 0;
 	while ($list =~ m/^([0-9a-fA-F]+)(?:[\t]([0-9a-fA-F]+)?)(?:[ \t]([0-9a-fA-F]+))?/mg) {
 	    my $min = CORE::hex $1;
-	    my $max = defined $2 ? CORE::hex $2 : $min;
-	    my $val = defined $3 ? CORE::hex $3 : 0;
+	    my $max = defined $2 ?? CORE::hex $2 !! $min;
+	    my $val = defined $3 ?? CORE::hex $3 !! 0;
 	    $val += $max - $min if defined $3;
 	    $top = $val if $val +> $top;
 	}
 	my $topbits =
-	    $top +> 0xffff ? 32 :
-	    $top +> 0xff ? 16 : 8;
+	    $top +> 0xffff ?? 32 !!
+	    $top +> 0xff ?? 16 !! 8;
 	$bits = $topbits if $bits +< $topbits;
     }
 
     my @extras;
-    for my $x (@($extras)) {
-	pos $x = 0;
+    do {
+        my $x = $extras;
 	while ($x =~ m/^([^0-9a-fA-F\n])(.*)/mg) {
 	    my $char = $1;
 	    my $name = $2;
-	    print STDERR "$1 => $2\n" if DEBUG;
+	    print $^STDERR, "$1 => $2\n" if DEBUG;
 	    if ($char =~ m/[-+!&]/) {
-		my ($c,$t) = < split(m/::/, $name, 2);	# bogus use of ::, really
+		my @($c,?$t) =  split(m/::/, $name, 2);	# bogus use of ::, really
 		my $subobj;
 		if ($c eq 'utf8') {
 		    $subobj = SWASHNEW_real('utf8', $t, "", $minbits, 0);
 		}
-		elsif (exists &$name) {
+		elsif (exists &{*{Symbol::fetch_glob($name)}}) {
 		    $subobj = SWASHNEW_real('utf8', $name, "", $minbits, 0);
 		}
 		elsif ($c =~ m/^([0-9a-fA-F]+)/) {
@@ -258,12 +255,12 @@ sub SWASHNEW_real {
 		}
 		return $subobj unless ref $subobj;
 		push @extras, $name => $subobj;
-		$bits = $subobj->{BITS} if $bits +< $subobj->{BITS};
+		$bits = $subobj->{?BITS} if $bits +< $subobj->{?BITS};
 	    }
 	}
-    }
+    };
 
-    print STDERR "CLASS = $class, TYPE => $type, BITS => $bits, NONE => $none\nEXTRAS =>\n$extras\nLIST =>\n$list\n" if DEBUG;
+    print $^STDERR, "CLASS = $class, TYPE => $type, BITS => $bits, NONE => $none\nEXTRAS =>\n$extras\nLIST =>\n$list\n" if DEBUG;
 
     my $SWASH = bless \%(
 	TYPE => $type,
@@ -275,7 +272,7 @@ sub SWASHNEW_real {
     ) => $class;
 
     if ($file) {
-        %Cache{$class . "," . $file} = $SWASH;
+        %Cache{+$class . "," . $file} = $SWASH;
     }
 
     return $SWASH;

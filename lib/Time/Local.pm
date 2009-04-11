@@ -2,10 +2,10 @@ package Time::Local;
 
 require Exporter;
 use Config;
-use strict;
+
 use integer;
 
-use vars < qw( $VERSION @ISA @EXPORT @EXPORT_OK );
+our ($VERSION, @ISA, @EXPORT, @EXPORT_OK);
 $VERSION   = '1.18_01';
 
 @ISA       = qw( Exporter );
@@ -28,23 +28,23 @@ use constant SECS_PER_MINUTE => 60;
 use constant SECS_PER_HOUR   => 3600;
 use constant SECS_PER_DAY    => 86400;
 
-my $MaxInt = ( ( 1 << ( 8 * %Config{ivsize} - 2 ) ) - 1 ) * 2 + 1;
+my $MaxInt = ( ( 1 << ( 8 * config_value('ivsize') - 2 ) ) - 1 ) * 2 + 1;
 my $MaxDay = int( ( $MaxInt - ( SECS_PER_DAY / 2 ) ) / SECS_PER_DAY ) - 1;
 
-if ( $^O eq 'MacOS' ) {
+if ( $^OS_NAME eq 'MacOS' ) {
     # time_t is unsigned...
-    $MaxInt = ( 1 << ( 8 * %Config{ivsize} ) ) - 1;
+    $MaxInt = ( 1 << ( 8 * config_value('ivsize') ) ) - 1;
 }
 
 # Determine the EPOC day for this machine
 my $Epoc = 0;
-if ( $^O eq 'vos' ) {
+if ( $^OS_NAME eq 'vos' ) {
     # work around posix-977 -- VOS doesn't handle dates in the range
     # 1970-1980.
     $Epoc = _daygm( 0, 0, 0, 1, 0, 70, 4, 0 );
 }
-elsif ( $^O eq 'MacOS' ) {
-    $MaxDay *=2 if $^O eq 'MacOS';  # time_t unsigned ... quick hack?
+elsif ( $^OS_NAME eq 'MacOS' ) {
+    $MaxDay *=2 if $^OS_NAME eq 'MacOS';  # time_t unsigned ... quick hack?
     # MacOS time() is seconds since 1 Jan 1904, localtime
     # so we need to calculate an offset to apply later
     $Epoc = 693901;
@@ -62,7 +62,7 @@ sub _daygm {
     # This is written in such a byzantine way in order to avoid
     # lexical variables and sub calls, for speed
     return @_[3] + (
-        %Cheat{ pack( 'ss', < @_[[@( 4, 5) ]] ) } ||= do {
+        %Cheat{+pack( 'ss', < @_[[@( 4, 5) ]] ) } ||= do {
             my $month = ( @_[4] + 10 ) % 12;
             my $year  = @_[5] + 1900 - $month / 10;
 
@@ -81,20 +81,19 @@ sub _timegm {
     my $sec =
         $SecOff + @_[0] + ( SECS_PER_MINUTE * @_[1] ) + ( SECS_PER_HOUR * @_[2] );
 
-    return $sec + ( SECS_PER_DAY * &_daygm );
+    return $sec + ( SECS_PER_DAY * &_daygm( < @_ ) );
 }
 
-sub timegm {
-    my ( $sec, $min, $hour, $mday, $month, $year ) = < @_;
+sub timegm( $sec, $min, $hour, $mday, $month, $year, ...) {
 
     if ( $year +>= 1000 ) {
         $year -= 1900;
     }
     elsif ( $year +< 100 and $year +>= 0 ) {
-        $year += ( $year +> $Breakpoint ) ? $Century : $NextCentury;
+        $year += ( $year +> $Breakpoint ) ?? $Century !! $NextCentury;
     }
 
-    unless ( %Options{no_range_check} ) {
+    unless ( %Options{?no_range_check} ) {
         if ( abs($year) +>= 0x7fff ) {
             $year += 1900;
             die
@@ -117,7 +116,7 @@ sub timegm {
 
     my $days = _daygm( undef, undef, undef, $mday, $month, $year );
 
-    unless (%Options{no_range_check} or abs($days) +< $MaxDay) {
+    unless (%Options{?no_range_check} or abs($days) +< $MaxDay) {
         my $msg = '';
         $msg .= "Day too big - $days > $MaxDay\n" if $days +> $MaxDay;
 
@@ -143,12 +142,12 @@ sub _is_leap_year {
 }
 
 sub timegm_nocheck {
-    local %Options{no_range_check} = 1;
-    return &timegm;
+    local %Options{+no_range_check} = 1;
+    return &timegm( < @_ );
 }
 
 sub timelocal {
-    my $ref_t = &timegm;
+    my $ref_t = &timegm( < @_ );
     my $loc_for_ref_t = _timegm( localtime($ref_t) );
 
     my $zone_off = $loc_for_ref_t - $ref_t
@@ -176,15 +175,15 @@ sub timelocal {
 
     # If the original date was a non-extent gap in a forward DST jump,
     # we should now have the wrong answer - undo the DST adjustment
-    my ( $s, $m, $h ) = localtime($loc_t);
+    my @( $s, $m, $h, ... ) = @: localtime($loc_t);
     $loc_t -= $dst_off if $s != @_[0] || $m != @_[1] || $h != @_[2];
 
     return $loc_t;
 }
 
 sub timelocal_nocheck {
-    local %Options{no_range_check} = 1;
-    return &timelocal;
+    local %Options{+no_range_check} = 1;
+    return &timelocal( < @_ );
 }
 
 1;

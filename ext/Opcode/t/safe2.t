@@ -1,20 +1,14 @@
 #!./perl -w
-$|=1;
+$^OUTPUT_AUTOFLUSH=1;
 use Config;
-BEGIN {
-    if (%Config{'extensions'} !~ m/\bOpcode\b/ && %Config{'osname'} ne 'VMS') {
-        print "1..0\n";
-        exit 0;
-    }
-}
 
-print "1..0\n# TODO for changes pckage system";
+print $^STDOUT, "1..0\n# TODO for changes pckage system";
 exit;
 
 # Tests Todo:
 #	'main' as root
 
-use vars < qw($bar);
+our ($bar);
 
 use Opcode v1.00 < qw(opdesc opset opset_to_ops opset_to_hex
 	opmask_add full_opset empty_opset opcodes opmask define_optag);
@@ -22,7 +16,7 @@ use Opcode v1.00 < qw(opdesc opset opset_to_ops opset_to_hex
 use Safe v1.00;
 
 my $last_test; # initalised at end
-print "1..$last_test\n";
+print $^STDOUT, "1..$last_test\n";
 
 # Set up a package namespace of things to be visible to the unsafe code
 $My::Root::main::foo = "visible";
@@ -41,11 +35,11 @@ $cpt = Safe->new( "My::Root");
 $cpt->permit( <qw(:base_io));
 
 $cpt->reval(q{ system("echo not ok 1"); });
-if ($@ && $@->{description} =~ m/^'?system'? trapped by operation mask/) {
-    print "ok 1\n";
+if ($^EVAL_ERROR && $^EVAL_ERROR->{?description} =~ m/^'?system'? trapped by operation mask/) {
+    print $^STDOUT, "ok 1\n";
 } else {
-    print "#$@" if $@;
-    print "not ok 1\n";
+    print $^STDOUT, "#$^EVAL_ERROR" if $^EVAL_ERROR;
+    print $^STDOUT, "not ok 1\n";
 }
 
 $cpt->reval(q{
@@ -56,17 +50,16 @@ $cpt->reval(q{
     print defined($main::bar)		? "not ok 5\n" : "ok 5\n";
     print defined($main::bar)		? "not ok 6\n" : "ok 6\n";
 });
-print $@ ? "not ok 7\n#{$@->message}" : "ok 7\n";
+print $^STDOUT, $^EVAL_ERROR ?? "not ok 7\n#$($^EVAL_ERROR->message)" !! "ok 7\n";
 
 our $foo = "ok 8\n";
 our %bar = %(key => "ok 9\n");
-our @baz = @( () ); push(@baz, "o", "10"); $" = 'k ';
+our @baz = @( () ); push(@baz, "o", "10");
 our @glob = qw(not ok 16);
 
-sub sayok { print "ok {join ' ',@_}\n" }
+sub sayok { print $^STDOUT, "ok $(join ' ',@_)\n" }
 
 $cpt->share( <qw($foo %bar @baz sayok));
-$cpt->share('$"') unless %Config{use5005threads};
 
 $cpt->reval(q{
     package other;
@@ -82,9 +75,8 @@ $cpt->reval(q{
     %bar{new} = "ok 15\n";
     @glob = @(qw(ok 16));
 });
-print $@ ? "not ok 13\n#{$@->message}" : "ok 13\n";
-$" = ' ';
-print $foo, %bar{new}, "{join ' ',@glob}\n";
+print $^STDOUT, $^EVAL_ERROR ?? "not ok 13\n#$($^EVAL_ERROR->message)" !! "ok 13\n";
+print $^STDOUT, $foo, %bar{?new}, "$(join ' ',@glob)\n";
 
 $Root::foo = "not ok 17";
 @{$cpt->varglob('bar')} = qw(not ok 18);
@@ -92,53 +84,52 @@ ${$cpt->varglob('foo')} = "ok 17";
 @Root::bar = @( "ok" );
 push(@Root::bar, "18"); # Two steps to prevent "Identifier used only once..."
 
-print "$Root::foo\n";
-print "{join ' ',@{$cpt->varglob('bar')}}\n";
+print $^STDOUT, "$Root::foo\n";
+print $^STDOUT, join(' ',@{$cpt->varglob('bar')}) . "\n";
 
-use strict;
 
-print 1 ? "ok 19\n" : "not ok 19\n";
-print 1 ? "ok 20\n" : "not ok 20\n";
+print $^STDOUT, 1 ?? "ok 19\n" !! "not ok 19\n";
+print $^STDOUT, 1 ?? "ok 20\n" !! "not ok 20\n";
 
 my $m1 = $cpt->mask;
 $cpt->trap("negate");
 my $m2 = $cpt->mask;
 my @masked = opset_to_ops($m1);
-print $m2 eq opset("negate", < @masked) ? "ok 21\n" : "not ok 21\n";
+print $^STDOUT, $m2 eq opset("negate", < @masked) ?? "ok 21\n" !! "not ok 21\n";
 
-print try { $cpt->mask("a bad mask") } ? "not ok 22\n" : "ok 22\n";
+print $^STDOUT, try { $cpt->mask("a bad mask") } ?? "not ok 22\n" !! "ok 22\n";
 
-print $cpt->reval("2 + 2") == 4 ? "ok 23\n" : "not ok 23\n";
+print $^STDOUT, $cpt->reval("2 + 2") == 4 ?? "ok 23\n" !! "not ok 23\n";
 
 $cpt->mask( <empty_opset);
 my $t_scalar = $cpt->reval('print wantarray ? "not ok 24\n" : "ok 24\n"');
-print $cpt->reval('our @ary=(6,7,8);@ary') == 3 ? "ok 25\n" : "not ok 25\n";
+print $^STDOUT, $cpt->reval('our @ary=(6,7,8);@ary') == 3 ?? "ok 25\n" !! "not ok 25\n";
 my @t_array  = $cpt->reval('print wantarray ? "ok 26\n" : "not ok 26\n"; (2,3,4)');
-print @t_array[2] == 4 ? "ok 27\n" : "not ok 27\n";
+print $^STDOUT, @t_array[2] == 4 ?? "ok 27\n" !! "not ok 27\n";
 
 my $t_scalar2 = $cpt->reval('die "foo bar"; 1');
-print defined $t_scalar2 ? "not ok 28\n" : "ok 28\n";
-print $@ && $@->{description} =~ m/foo bar/ ? "ok 29\n" : "not ok 29\n";
+print $^STDOUT, defined $t_scalar2 ?? "not ok 28\n" !! "ok 28\n";
+print $^STDOUT, $^EVAL_ERROR && $^EVAL_ERROR->{?description} =~ m/foo bar/ ?? "ok 29\n" !! "not ok 29\n";
 
 # --- rdo
   
 my $t = 30;
-$! = 0;
+$^OS_ERROR = 0;
 my $nosuch = '/non/existant/file.name';
-open(NOSUCH, "<", $nosuch);
-if ($@) {
-    my $errno  = $!;
-    die "Eek! Attempting to open $nosuch failed, but \$! is still 0" unless $!;
-    $! = 0;
+open(my $nosuch_fh, "<", $nosuch);
+if ($^EVAL_ERROR) {
+    my $errno  = $^OS_ERROR;
+    die "Eek! Attempting to open $nosuch failed, but \$! is still 0" unless $^OS_ERROR;
+    $^OS_ERROR = 0;
     $cpt->rdo($nosuch);
-    print $! == $errno ? "ok $t\n" : sprintf "not ok $t # \"$!\" is \%d (expected \%d)\n", $!, $errno; $t++;
+    print $^STDOUT, $^OS_ERROR == $errno ?? "ok $t\n" !! sprintf "not ok $t # \"$^OS_ERROR\" is \%d (expected \%d)\n", $^OS_ERROR, $errno; $t++;
 } else {
     die "Eek! Didn't expect $nosuch to be there.";
 }
-close(NOSUCH);
+close($nosuch_fh);
 
 # test #31 is gone.
-print "ok $t\n"; $t++;
+print $^STDOUT, "ok $t\n"; $t++;
   
 #my $rdo_file = "tmp_rdo.tpl";
 #if (open X,">$rdo_file") {
@@ -153,5 +144,5 @@ print "ok $t\n"; $t++;
 #}
 
 
-print "ok $last_test\n";
+print $^STDOUT, "ok $last_test\n";
 BEGIN { $last_test = 32 }

@@ -1,13 +1,11 @@
 package B::OP;
 
-use strict;
 use warnings;
 use B;
 
 require DynaLoader;
-use vars < qw( @ISA $VERSION );
-@ISA = qw(DynaLoader);
-$VERSION = '1.10';
+our @ISA = qw(DynaLoader);
+our $VERSION = '1.10';
 
 B::OP->bootstrap($VERSION);
 
@@ -22,8 +20,9 @@ B::OP->bootstrap($VERSION);
 @B::LOOP::ISA = @( 'B::LISTOP' );
 @B::PMOP::ISA = @( 'B::LISTOP' );
 @B::COP::ISA = @( 'B::OP' );
+@B::ROOTOP::ISA = @( 'B::UNOP' );
 
-@B::optype = qw(OP UNOP BINOP LOGOP LISTOP PMOP SVOP PADOP PVOP LOOP COP);
+@B::optype = qw(OP UNOP BINOP LOGOP LISTOP PMOP SVOP PADOP PVOP LOOP COP ROOTOP);
 
 use constant OP_LIST    => 141;    # MUST FIX CONSTANTS.
 
@@ -32,13 +31,15 @@ sub linklist {
     my $o = shift;
     if ( $o->can("first") and $o->first and ${ $o->first } ) {
         $o->next( < $o->first->linklist );
-        for ( my $kid = $o->first; $$kid; $kid = $kid->sibling ) {
+        my $kid = $o->first;
+        while ($$kid) {
             if ( ${ $kid->sibling } ) {
                 $kid->next( < $kid->sibling->linklist );
             }
             else {
                 $kid->next($o);
             }
+            $kid = $kid->sibling;
         }
     }
     else {
@@ -48,8 +49,7 @@ sub linklist {
     return $o->next;
 }
 
-sub append_elem {
-    my ( $class, $type, $first, $last ) = < @_;
+sub append_elem( $class, $type, $first, $last) {
     return $last  unless $first and $$first;
     return $first unless $last  and $$last;
 
@@ -71,8 +71,7 @@ sub append_elem {
     return $first;
 }
 
-sub prepend_elem {
-    my ( $class, $type, $first, $last ) = < @_;
+sub prepend_elem( $class, $type, $first, $last) {
     if ( $last->type() != $type ) {
         return B::LISTOP->new( $type, 0, $first, $last );
     }

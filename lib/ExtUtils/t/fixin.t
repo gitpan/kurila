@@ -1,12 +1,12 @@
 #!/usr/bin/perl -w
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't';
-        @INC = @('../lib', 'lib/');
+        $^INCLUDE_PATH = @('../lib', 'lib/');
     }
     else {
-        unshift @INC, 't/lib/';
+        unshift $^INCLUDE_PATH, 't/lib/';
     }
 }
 chdir 't';
@@ -31,14 +31,14 @@ END {
 }
 
 ok( chdir 'Big-Dummy', "chdir'd to Big-Dummy" ) ||
-  diag("chdir failed: $!");
+  diag("chdir failed: $^OS_ERROR");
 
 # [rt.cpan.org 26234]
-{
-    local $/ = "foo";
-    local $\ = "bar";
+do {
+    local $^INPUT_RECORD_SEPARATOR = "foo";
+    local $^OUTPUT_RECORD_SEPARATOR = "bar";
     MY->fixin("bin/program");
-    is $/, "foo", '$/ not clobbered';
-    is $\, "bar", '$\ not clobbered';
-}
+    is $^INPUT_RECORD_SEPARATOR, "foo", '$/ not clobbered';
+    is $^OUTPUT_RECORD_SEPARATOR, "bar", '$\ not clobbered';
+};
 

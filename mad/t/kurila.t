@@ -19,8 +19,8 @@ use Fatal qw|open close|;
 
 use Convert;
 
-my $from = 'kurila-1.13';
-my $to = 'kurila-1.14';
+my $from = 'kurila-1.18';
+my $to = 'kurila-1.18';
 
 sub p5convert {
     my ($input, $expected) = @_;
@@ -31,13 +31,33 @@ sub p5convert {
     my $output = Convert::convert($input,
                                   "/usr/bin/env perl ../mad/p5kurila.pl --from $from",
                                   from => $from, to => $to,
+                                  switches => "-I../lib",
                                   dumpcommand => "$ENV{madpath}/perl",
                                  );
-    is($output, $expected) or $TODO or die;
+    is($output, $expected) or $TODO or die "failed test";
 }
 
+t_local();
+die "END";
+t_stdin();
+t_prototype();
+t_must_haveargs();
+t_block_arg();
+t_print();
+t_rename_inc_vars();
+t_rename_magic_vars_2();
+t_rename_magic_vars();
+t_remove_vars();
+t_env_using_package();
+t_pattern_assignment();
+t_hashkey_regulator();
+t_rename_ternary_op();
+t_call_parens();
+t_remove_strict();
+t_lval_vec();
+t_block();
+t_ampcall();
 t_array_simplify();
-die;
 t_map_array();
 t_array_hash();
 t_eval_to_try();
@@ -1326,5 +1346,379 @@ sub t_array_simplify {
 my $x = @( < $a );
 ----
 my $x = $a;
+END
+}
+
+sub t_ampcall {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+sub foo { }
+&foo;
+&foo();
+foo;
+----
+sub foo { }
+&foo( < @_ );
+&foo();
+foo;
+END
+}
+
+sub t_block {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+{ 1; }
+----
+do { 1; };
+====
+map { $_ } 1..10;
+while (1) { 1 };
+sub { 1 };
+{ 1 }
+SKIP: { 1 }
+----
+map { $_ } 1..10;
+while (1) { 1 };
+sub { 1 };
+do { 1 };
+SKIP: do { 1 };
+====
+"{1}";
+"" . join('*', map { $_ } 1..5);
+"" . join('*', @{$_});
+s/x/{ ord($1) }/;
+"x {$a} - {$@->message} y";
+----
+"$(1)";
+"" . join('*', map { $_ } 1..5);
+"" . join('*', @{$_});
+s/x/$( ord($1) )/;
+"x $($a) - $($@->message) y";
+====
+my $x .= do { 3 };
+----
+my $x .= do { 3 };
+END
+}
+
+sub t_lval_vec {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+vec($a, 1, 1) = 1;
+----
+vec($a, 1, 1, 1);
+END
+}
+
+sub t_remove_strict {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+BEGIN { %INC{"strict.pm"} = 1 }
+#before
+use strict;
+#after
+----
+BEGIN { %INC{"strict.pm"} = 1 }
+#before
+#after
+====
+BEGIN { %INC{"strict.pm"} = 1 }
+#before
+no strict 'refs';
+#after
+----
+BEGIN { %INC{"strict.pm"} = 1 }
+#before
+#after
+END
+}
+
+sub t_call_parens {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+sub foo { }
+foo 1, 2;
+foo(1, 2);
+----
+sub foo { }
+foo( 1, 2);
+foo(1, 2);
+====
+sub BAR() { 3 }
+BAR;
+----
+sub BAR() { 3 }
+BAR();
+END
+}
+
+sub t_rename_ternary_op {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+$a ? 1 : 2;
+----
+$a ?? 1 !! 2;
+END
+}
+
+sub t_hashkey_regulator {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+$a{ee} = 3;
+$b = $a{ee};
+$a{ff}->{gg} = 2;
+----
+$a{+ee} = 3;
+$b = $a{?ee};
+$a{ff}->{+gg} = 2;
+====
+sub foo { }
+foo($a{ee});
+----
+sub foo { }
+foo($a{?ee});
+====
+$a{ee} ||= 1;
+$a{ff}++;
+$a{gg}->foo();
+----
+$a{+ee} ||= 1;
+$a{+ff}++;
+$a{gg}->foo();
+END
+}
+
+sub t_pattern_assignment {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+my ($x, $y) = (1, 2);
+($x, $y) = (1, 2);
+my ($u, $v) = < $x;
+----
+my @($x, $y) = @(1, 2);
+@($x, $y) = @(1, 2);
+my @($u, $v) =  $x;
+====
+< $a{[qw|aap noot|]} = < qw|Mies Wim|;
+----
+ $a{[qw|aap noot|]} =  qw|Mies Wim|;
+====
+my ($x, < @y) = (1, 2);
+my ($u, < %h) = (1, 2);
+----
+my @($x, @< @y) = @(1, 2);
+my @($u, %< %h) = @(1, 2);
+====
+my (@l) = $a->list();
+----
+my (@l) = $a->list();
+====
+my ($l) = "foo";
+----
+my ($l) = "foo";
+====
+my ($l) = m/(foo)/;
+----
+my @($l) = @(m/(foo)/);
+END
+}
+
+sub t_env_using_package {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+%ENV{foo};
+----
+env::var('foo');
+====
+%ENV{foo} = 3;
+----
+env::set_var('foo') = 3;
+====
+local %ENV{foo} = 3;
+----
+ env::temp_set_var('foo') = 3;
+====
+"foo%ENV{bar}baz";
+----
+"foo$(env::var('bar'))baz";
+END
+}
+
+sub t_remove_vars {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+package X;
+#bar
+use vars < qw($foo);
+$foo;
+----
+package X;
+#bar
+our ($foo);
+$foo;
+====
+use vars < qw($foo $bar);
+----
+our ($foo, $bar);
+END
+}
+
+sub t_rename_magic_vars_2 {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+%^H;
+----
+$^HINTS;
+====
+%^H{'foo'} = 3;
+----
+$^HINTS{'foo'} = 3;
+END
+}
+
+sub t_rename_magic_vars {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+$|
+----
+$^OUTPUT_AUTOFLUSH
+====
+$@->{?description};
+----
+$^EVALERROR->{?description};
+END
+}
+
+sub t_rename_inc_vars {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+push @INC, '.';
+----
+push $^INCLUDE_PATH, '.';
+====
+%INC{"foo.pm"} = 1;
+----
+$^INCLUDED{"foo.pm"} = 1;
+END
+}
+
+sub t_print {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+print "something";
+printf "something";
+print("something");
+----
+print \*STDOUT, "something";
+printf \*STDOUT, "something";
+print(\*STDOUT, "something");
+====
+print $a "something";
+print {$a} "something";
+print STDERR "something";
+----
+print $a, "something";
+print $a ,"something";
+print $^STDERR, "something";
+END
+}
+
+sub t_block_arg {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+map { $_ } $a;
+----
+map { $_ }, $a;
+====
+sub foo(&$) { }
+foo { $_ } $a;
+----
+sub foo(&$) { }
+foo { $_ }, $a;
+====
+grep { $_ } $a;
+----
+grep { $_ }, $a;
+====
+$a = sort { $_ } $a;
+----
+$a = sort { $_ }, $a;
+====
+mysort( sub { $_ }, $a);
+----
+mysort( sub { $_ }, $a);
+====
+map { my $x = $_; $x } $a;
+----
+map { my $x = $_; $x }, $a;
+====
+sub foo(&$) { }
+foo { my $x = $_; $x } $a;
+----
+sub foo(&$) { }
+foo { my $x = $_; $x }, $a;
+====
+grep m/x/, $a;
+----
+grep { m/x/ }, $a;
+====
+END
+}
+
+sub t_must_haveargs {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+&{$a};
+&{$a}();
+----
+&{$a}( < @_ );
+&{$a}();
+====
+\&{$a};
+----
+\&{$a};
+====
+sub foo { }
+&foo;
+----
+sub foo { }
+&foo;
+END
+}
+
+sub t_prototype {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+sub foo {
+    my @($x, $y) = @_;
+    return 3;
+}
+sub bar {
+    3;
+    my @($z) = @_;
+    return 3;
+}
+----
+sub foo($x, $y) {
+    return 3;
+}
+sub bar($z) {
+    3;
+
+    return 3;
+}
+END
+}
+
+sub t_stdin {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+my $x = ~< *STDIN;
+my $y = ~< \*STDIN;
+----
+my $x = ~< $^STDIN;
+my $y = ~< $^STDIN;
+END
+}
+
+sub t_local {
+    p5convert( split(m/^\-{4}.*\n/m, $_, 2)) for split(m/^={4}\n/m, <<'END');
+local $a;
+local $a = 3;
+1;
+----
+local $a = undef;
+local $a = 3;
+1;
+====
+local $^INPUT_RECORD_SEPARATOR;
+local $^INPUT_RECORD_SEPARATOR = 3;
+2;
+----
+local $^INPUT_RECORD_SEPARATOR = undef;
+local $^INPUT_RECORD_SEPARATOR = 3;
+2;
 END
 }

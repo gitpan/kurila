@@ -4,20 +4,20 @@
 # fresh_perl_is, and fresh_perl_is uses a closure -- a special
 # case of what this program tests for.
 
-use strict;
+
 BEGIN { require "./test.pl" }
 
-my $Is_VMS = $^O eq 'VMS';
-my $Is_MSWin32 = $^O eq 'MSWin32';
-my $Is_MacOS = $^O eq 'MacOS';
-my $Is_NetWare = $^O eq 'NetWare';
-%ENV{PERL5LIB} = "../lib" unless $Is_VMS;
+my $Is_VMS = $^OS_NAME eq 'VMS';
+my $Is_MSWin32 = $^OS_NAME eq 'MSWin32';
+my $Is_MacOS = $^OS_NAME eq 'MacOS';
+my $Is_NetWare = $^OS_NAME eq 'NetWare';
+env::var('PERL5LIB' ) = "../lib" unless $Is_VMS;
 
 our $i = 0;
 
-$|=1;
+$^OUTPUT_AUTOFLUSH=1;
 
-undef $/;
+undef $^INPUT_RECORD_SEPARATOR;
 my @prgs = split "\n########\n", ~< *DATA;
 plan(6 + scalar nelems @prgs);
 
@@ -30,51 +30,51 @@ for ( @prgs){
     if (s/^\s*(-\w+)//){
        $switch = $1;
     }
-    my($prog,$expected) = < split(m/\nEXPECT\n/, $_);
-    open TEST, ">", "$tmpfile";
-    print TEST "$prog\n";
-    close TEST or die "Could not close: $!";
-    my $results = $Is_VMS ?
-		`$^X "-I[-.lib]" $switch $tmpfile 2>&1` :
-		  $Is_MSWin32 ?
-		    `.\\perl -I../lib $switch $tmpfile 2>&1` :
-		      $Is_MacOS ?  
-			`$^X -I::lib $switch $tmpfile` :
-			    $Is_NetWare ?
-				`perl -I../lib $switch $tmpfile 2>&1` :
+    my@($prog,$expected) =  split(m/\nEXPECT\n/, $_);
+    open my $test, ">", "$tmpfile";
+    print $test, "$prog\n";
+    close $test or die "Could not close: $^OS_ERROR";
+    my $results = $Is_VMS ??
+		`$^EXECUTABLE_NAME "-I[-.lib]" $switch $tmpfile 2>&1` !!
+		  $Is_MSWin32 ??
+		    `.\\perl -I../lib $switch $tmpfile 2>&1` !!
+		      $Is_MacOS ??  
+			`$^EXECUTABLE_NAME -I::lib $switch $tmpfile` !!
+			    $Is_NetWare ??
+				`perl -I../lib $switch $tmpfile 2>&1` !!
 				    `./perl $switch $tmpfile 2>&1`;
-    my $status = $?;
+    my $status = $^CHILD_ERROR;
     $results =~ s/\n+$//;
     # allow expected output to be written as if $prog is on STDIN
     $results =~ s/runltmp\d+/-/g;
     $results =~ s/\n%[A-Z]+-[SIWEF]-.*$// if $Is_VMS;  # clip off DCL status msg
     $expected =~ s/\n+$//;
     if ($results ne $expected) {
-       print STDERR "PROG: $switch\n$prog\n";
+       print $^STDERR, "PROG: $switch\n$prog\n";
     }
     is($results, $expected);
 }
 
 sub test_invalid_decl {
-    my ($code,$todo) = < @_;
+    my @($code,?$todo) =  @_;
     local our $TODO = $todo;
     eval_dies_like( $code,
                     qr/^Illegal declaration of anonymous subroutine/);
 }
 
 test_invalid_decl('sub;');
-test_invalid_decl('sub ($) ;');
-test_invalid_decl('{ $x = sub }');
-test_invalid_decl('sub ($) && 1');
-test_invalid_decl('sub ($) : lvalue;',' # TODO');
+test_invalid_decl('sub ($s) ;', " # TODO ");
+test_invalid_decl('do { my $x = sub }');
+test_invalid_decl('sub ($s) && 1', " # TODO ");
+test_invalid_decl('sub ($s) : lvalue;',' # TODO');
 
-eval "sub #foo\n\{print 1\}";
-is $@, '', "No error"
+eval "sub #foo\n\{print \$^STDOUT, 1\}";
+is $^EVAL_ERROR, '', "No error"
 
 __END__
 sub X {
     my $n = "ok 1\n";
-    sub { print $n };
+    sub { print $^STDOUT, $n };
 }
 my $x = X();
 undef &X;
@@ -86,8 +86,8 @@ sub X {
     my $n = "ok 1\n";
     sub {
         my $dummy = $n;	# eval can't close on $n without internal reference
-	eval 'print $n';
-	die $@ if $@;
+	eval 'print $^STDOUT, $n';
+	die $^EVAL_ERROR if $^EVAL_ERROR;
     };
 }
 my $x = X();
@@ -98,15 +98,15 @@ ok 1
 ########
 sub X {
     my $n = "ok 1\n";
-    eval 'sub { print $n }';
+    eval 'sub { print $^STDOUT, $n }';
 }
 my $x = X();
-die $@ if $@;
+die $^EVAL_ERROR if $^EVAL_ERROR;
 undef &X;
 $x->();
 EXPECT
 ok 1
 ########
-print sub { return "ok 1\n" } -> ();
+print $^STDOUT, sub { return "ok 1\n" } -> ();
 EXPECT
 ok 1

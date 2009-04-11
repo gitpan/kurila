@@ -1,7 +1,7 @@
 #!./perl
 
 use warnings;
-use strict;
+
 use Text::ParseWords;
 use Test::More tests => 27;
 
@@ -10,14 +10,14 @@ is(@words[0], 'foo');
 is(@words[1], 'bar quiz');
 is(@words[2], 'zoo');
 
-{
+do {
   # Gonna get some undefined things back
   no warnings 'uninitialized' ;
 
   # Test quotewords() with other parameters and null last field
   @words = quotewords(':+', 1, 'foo:::"bar:foo":zoo zoo:');
   is(join(";", @words), qq(foo;"bar:foo";zoo zoo;));
-}
+};
 
 # Test $keep eq 'delimiters' and last field zero
 @words = quotewords('\s+', 'delimiters', '4 3 2 1 0');
@@ -58,7 +58,7 @@ is((nelems @words), 0);
 @words = quotewords('s+', 0, $string);
 is((nelems @words), 0);
 
-{
+do {
   # Gonna get some more undefined things back
   no warnings 'uninitialized' ;
 
@@ -77,7 +77,7 @@ is((nelems @words), 0);
   $result = join('|',parse_line(':', 0, ':"' . "\001" . '":'));
   is($result, "|\1|");
 
-}
+};
 
 # Now test perlish single quote behavior
 $Text::ParseWords::PERL_SINGLE_QUOTE = 1;
@@ -114,7 +114,7 @@ is($result, "");
 $result = join('|',shellwords(" aa \\  \\ bb ", " \\  ", "cc dd ee\\ "));
 is($result, "aa| | bb| |cc|dd|ee ");
 
-%SIG{ALRM} = sub {die "Timeout!"};
+signals::handler("ALRM") = sub {die "Timeout!"};
 alarm(3);
 @words = @( Text::ParseWords::old_shellwords("foo\\") );
 is((nelems @words), 1);

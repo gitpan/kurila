@@ -5,18 +5,17 @@ our $VERSION = '1.13';
 # (feature name) => (internal name, used in %^H)
 my %feature = %(
     switch => 'feature_switch',
-    state  => "feature_state",
 );
 
 # NB. the latest bundle must be loaded by the -E switch (see toke.c)
 
 my %feature_bundle = %(
-    "5.10" => \qw(switch state),
-    "5.11" => \qw(switch state),
+    "5.10" => \qw(switch),
+    "5.11" => \qw(switch),
 );
 
 # special case
-%feature_bundle{"5.9.5"} = %feature_bundle{"5.10"};
+%feature_bundle{+"5.9.5"} = %feature_bundle{?"5.10"};
 
 # TODO:
 # - think about versioned features (use feature switch => 2)
@@ -80,13 +79,6 @@ given/when construct.
 
 See L<perlsyn/"Switch statements"> for details.
 
-=head2 the 'state' feature
-
-C<use feature 'state'> tells the compiler to enable C<state>
-variables.
-
-See L<perlsub/"Persistent Private Variables"> for details.
-
 =head1 FEATURE BUNDLES
 
 It's possible to load a whole slew of features in one go, using
@@ -149,13 +141,13 @@ sub import {
 		    unknown_feature_bundle(substr($name, 1));
 		}
 	    }
-	    unshift @_, < @{%feature_bundle{$v}};
+	    unshift @_, < @{%feature_bundle{?$v}};
 	    next;
 	}
 	if (!exists %feature{$name}) {
 	    unknown_feature($name);
 	}
-	%^H{%feature{$name}} = 1;
+	$^HINTS{+%feature{?$name}} = 1;
     }
 }
 
@@ -164,7 +156,7 @@ sub unimport {
 
     # A bare C<no feature> should disable *all* features
     if (!nelems @_) {
-	delete %^H{[ <values(%feature) ]};
+	delete $^HINTS{[ <values(%feature) ]};
 	return;
     }
 
@@ -178,14 +170,14 @@ sub unimport {
 		    unknown_feature_bundle(substr($name, 1));
 		}
 	    }
-	    unshift @_, < @{%feature_bundle{$v}};
+	    unshift @_, < @{%feature_bundle{?$v}};
 	    next;
 	}
 	if (!exists(%feature{$name})) {
 	    unknown_feature($name);
 	}
 	else {
-	    delete %^H{%feature{$name}};
+	    delete $^HINTS{%feature{?$name}};
 	}
     }
 }
@@ -193,13 +185,13 @@ sub unimport {
 sub unknown_feature {
     my $feature = shift;
     die(sprintf('Feature "%s" is not supported by Perl %s',
-                $feature, $^V));
+                $feature, $^PERL_VERSION));
 }
 
 sub unknown_feature_bundle {
     my $feature = shift;
     die(sprintf('Feature bundle "%s" is not supported by Perl %s',
-	    $feature, $^V));
+	    $feature, $^PERL_VERSION));
 }
 
 1;

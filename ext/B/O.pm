@@ -5,14 +5,15 @@ our $VERSION = '1.00';
 use B < qw(minus_c save_BEGINs);
 use Carp;
 
-sub import {
-    my ($class, < @options) = < @_;
-    my ($quiet, $veryquiet) = (0, 0);
+my $saveout;
+
+sub import($class, @< @options) {
+    my @($quiet, $veryquiet) = @(0, 0);
     if (@options[0] eq '-q' || @options[0] eq '-qq') {
 	$quiet = 1;
-	open (SAVEOUT, ">&", \*STDOUT);
-	close STDOUT;
-	open (STDOUT, ">", \$O::BEGIN_output);
+	open ($saveout, ">&", $^STDOUT);
+	close $^STDOUT;
+	open ($^STDOUT, ">", \$O::BEGIN_output);
 	if (@options[0] eq '-qq') {
 	    $veryquiet = 1;
 	}
@@ -27,9 +28,9 @@ sub import {
 
 	CHECK {
 	    if ($quiet) {
-		close STDOUT;
-		open (STDOUT, ">&", \*SAVEOUT);
-		close SAVEOUT;
+		close $^STDOUT;
+		open ($^STDOUT, ">&", \*$saveout);
+		close $saveout;
 	    }
 
 	    # Note: if you change the code after this 'use', please
@@ -37,24 +38,24 @@ sub import {
 	    # "fragile kludge") so that its output still looks
 	    # nice. Thanks. --smcc
 	    use B::].$backend.q[ ();
-	    if ($@) {
-		croak "use of backend $backend failed: $@";
+	    if ($^EVAL_ERROR) {
+		croak "use of backend $backend failed: $($^EVAL_ERROR->message)";
 	    }
 
-	    my $compilesub = &{*{Symbol::fetch_glob("B::{$backend}::compile")}}( < @options);
+	    my $compilesub = &{*{Symbol::fetch_glob("B::$($backend)::compile")}}( < @options);
 	    if (ref($compilesub) ne "CODE") {
 		die $compilesub;
 	    }
 
             our $savebackslash;
-	    local $savebackslash = $\;
-	    local ($\,$",$,) = (undef,' ','');
+	    local $savebackslash = $^OUTPUT_RECORD_SEPARATOR;
+	    local @($^OUTPUT_RECORD_SEPARATOR,$^OUTPUT_FIELD_SEPARATOR) = @(undef,'');
 	    &$compilesub();
 
-	    close STDERR if $veryquiet;
+	    close $^STDERR if $veryquiet;
 	}
     ];
-    die $@ if $@;
+    die $^EVAL_ERROR if $^EVAL_ERROR;
 }
 
 1;

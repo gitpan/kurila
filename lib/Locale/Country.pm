@@ -5,7 +5,7 @@
 #
 
 package Locale::Country;
-use strict;
+
 
 require Exporter;
 use Carp;
@@ -15,7 +15,7 @@ use Locale::Constants;
 #-----------------------------------------------------------------------
 #	Public Global Variables
 #-----------------------------------------------------------------------
-use vars < qw($VERSION @ISA @EXPORT @EXPORT_OK);
+our ($VERSION, @ISA, @EXPORT, @EXPORT_OK);
 $VERSION   = sprintf("\%d.\%02d", q$Revision: 2.7 $ =~ m/(\d+)\.(\d+)/);
 @ISA       = qw(Exporter);
 @EXPORT    = qw(code2country country2code
@@ -38,7 +38,7 @@ my $COUNTRIES = \@();
 sub code2country
 {
     my $code = shift;
-    my $codeset = (nelems @_) +> 0 ? shift : LOCALE_CODE_DEFAULT;
+    my $codeset = (nelems @_) +> 0 ?? shift !! LOCALE_CODE_DEFAULT;
 
 
     return undef unless defined $code;
@@ -61,7 +61,7 @@ sub code2country
 
     if (exists $CODES->[$codeset]->{$code})
     {
-        return $CODES->[$codeset]->{$code};
+        return $CODES->[$codeset]->{?$code};
     }
     else
     {
@@ -81,14 +81,14 @@ sub code2country
 sub country2code
 {
     my $country = shift;
-    my $codeset = (nelems @_) +> 0 ? shift : LOCALE_CODE_DEFAULT;
+    my $codeset = (nelems @_) +> 0 ?? shift !! LOCALE_CODE_DEFAULT;
 
 
     return undef unless defined $country;
     $country = lc($country);
     if (exists $COUNTRIES->[$codeset]->{$country})
     {
-        return $COUNTRIES->[$codeset]->{$country};
+        return $COUNTRIES->[$codeset]->{?$country};
     }
     else
     {
@@ -131,7 +131,7 @@ sub country_code2code
 #=======================================================================
 sub all_country_codes
 {
-    my $codeset = (nelems @_) +> 0 ? shift : LOCALE_CODE_DEFAULT;
+    my $codeset = (nelems @_) +> 0 ?? shift !! LOCALE_CODE_DEFAULT;
 
     return keys %{ $CODES->[$codeset] };
 }
@@ -144,7 +144,7 @@ sub all_country_codes
 #=======================================================================
 sub all_country_names
 {
-    my $codeset = (nelems @_) +> 0 ? shift : LOCALE_CODE_DEFAULT;
+    my $codeset = (nelems @_) +> 0 ?? shift !! LOCALE_CODE_DEFAULT;
 
     return values %{ $CODES->[$codeset] };
 }
@@ -164,7 +164,7 @@ sub alias_code
 {
     my $alias = shift;
     my $real  = shift;
-    my $codeset = (nelems @_) +> 0 ? shift : LOCALE_CODE_DEFAULT;
+    my $codeset = (nelems @_) +> 0 ?? shift !! LOCALE_CODE_DEFAULT;
 
     my $country;
 
@@ -174,9 +174,9 @@ sub alias_code
         carp "attempt to alias \"$alias\" to unknown country code \"$real\"\n";
         return undef;
     }
-    $country = $CODES->[$codeset]->{$real};
-    $CODES->[$codeset]->{$alias} = $country;
-    $COUNTRIES->[$codeset]->{lc "$country"} = $alias;
+    $country = $CODES->[$codeset]->{?$real};
+    $CODES->[$codeset]->{+$alias} = $country;
+    $COUNTRIES->[$codeset]->{+lc "$country"} = $alias;
 
     return $alias;
 }
@@ -197,18 +197,18 @@ sub rename_country
 {
     my $code     = shift;
     my $new_name = shift;
-    my $codeset = (nelems @_) +> 0 ? shift : _code2codeset($code);
+    my $codeset = (nelems @_) +> 0 ?? shift !! _code2codeset($code);
     my $country;
     my $c;
 
 
     if (not defined $codeset)
     {
-        carp "rename_country(): unknown country code \"$code\"\n";
+        warn "rename_country(): unknown country code \"$code\"\n";
         return 0;
     }
 
-    $country = $CODES->[$codeset]->{$code};
+    $country = $CODES->[$codeset]->{?$code};
 
     foreach my $cset (@(LOCALE_CODE_ALPHA_2,
 			LOCALE_CODE_ALPHA_3,
@@ -223,8 +223,8 @@ sub rename_country
 	    $c = country_code2code($code, $codeset, $cset);
 	}
 
-	$CODES->[$cset]->{$c} = $new_name;
-	$COUNTRIES->[$cset]->{lc "$new_name"} = $c;
+	$CODES->[$cset]->{+$c} = $new_name;
+	$COUNTRIES->[$cset]->{+lc "$new_name"} = $c;
     }
 
     return 1;
@@ -259,46 +259,46 @@ sub _code2codeset
 # initialisation code - stuff the DATA into the ALPHA2 hash
 #
 #=======================================================================
-{
+do {
     my   ($alpha2, $alpha3, $numeric);
-    my   ($country, @countries);
-    local $_;
+    my   (@countries);
+    local $_ = undef;
 
 
     while ( ~< *DATA)
     {
         next unless m/\S/;
         chop;
-        ($alpha2, $alpha3, $numeric, < @countries) = < split(m/:/, $_);
+        @($alpha2, $alpha3, $numeric, @< @countries) =  split(m/:/, $_);
 
-        $CODES->[LOCALE_CODE_ALPHA_2]->{$alpha2} = @countries[0];
-	foreach $country ( @countries)
+        $CODES->[+LOCALE_CODE_ALPHA_2]->{+$alpha2} = @countries[0];
+	foreach my $country ( @countries)
 	{
-	    $COUNTRIES->[LOCALE_CODE_ALPHA_2]->{lc "$country"} = $alpha2;
+	    $COUNTRIES->[+LOCALE_CODE_ALPHA_2]->{+lc "$country"} = $alpha2;
 	}
 
 	if ($alpha3)
 	{
-            $CODES->[LOCALE_CODE_ALPHA_3]->{$alpha3} = @countries[0];
-	    foreach $country ( @countries)
+            $CODES->[+LOCALE_CODE_ALPHA_3]->{+$alpha3} = @countries[0];
+	    foreach my $country ( @countries)
 	    {
-		$COUNTRIES->[LOCALE_CODE_ALPHA_3]->{lc "$country"} = $alpha3;
+		$COUNTRIES->[+LOCALE_CODE_ALPHA_3]->{+lc "$country"} = $alpha3;
 	    }
 	}
 
 	if ($numeric)
 	{
-            $CODES->[LOCALE_CODE_NUMERIC]->{$numeric} = @countries[0];
-	    foreach $country ( @countries)
+            $CODES->[+LOCALE_CODE_NUMERIC]->{+$numeric} = @countries[0];
+	    foreach my $country ( @countries)
 	    {
-		$COUNTRIES->[LOCALE_CODE_NUMERIC]->{lc "$country"} = $numeric;
+		$COUNTRIES->[+LOCALE_CODE_NUMERIC]->{+lc "$country"} = $numeric;
 	    }
 	}
 
     }
 
-    close(DATA);
-}
+    close(\*DATA);
+};
 
 1;
 

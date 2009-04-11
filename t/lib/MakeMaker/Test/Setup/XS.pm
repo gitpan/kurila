@@ -4,12 +4,11 @@ our @ISA = qw(Exporter);
 require Exporter;
 our @EXPORT = qw(setup_xs teardown_xs);
 
-use strict;
 use File::Path;
 use File::Basename;
 use MakeMaker::Test::Utils;
 
-my $Is_VMS = $^O eq 'VMS';
+my $Is_VMS = $^OS_NAME eq 'VMS';
 
 my %Files = %(
              'XS-Test/lib/XS/Test.pm'     => <<'END',
@@ -70,15 +69,15 @@ sub setup_xs {
     setup_mm_test_root();
     chdir 'MM_TEST_ROOT:[t]' if $Is_VMS;
 
-    while(my($file, $text) = each %Files) {
+    while(my@(?$file, ?$text) =@( each %Files)) {
         # Convert to a relative, native file path.
         $file = File::Spec->catfile(File::Spec->curdir, < split m{\/}, $file);
 
         my $dir = dirname($file);
         mkpath $dir;
-        open(FILE, ">", $file) || die "Can't create $file: $!";
-        print FILE $text;
-        close FILE;
+        open(my $file, ">", $file) || die "Can't create $file: $^OS_ERROR";
+        print $file, $text;
+        close $file;
     }
 
     return 1;

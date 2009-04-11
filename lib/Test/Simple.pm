@@ -1,8 +1,7 @@
 package Test::Simple;
 
 
-use strict 'vars';
-use vars < qw($VERSION @ISA @EXPORT);
+our ($VERSION, @ISA, @EXPORT);
 $VERSION = '0.78';
 $VERSION = eval $VERSION;    # make the alpha version come out as a number
 
@@ -76,8 +75,8 @@ will do what you mean (fail if stuff is empty)
 
 =cut
 
-sub ok ($;$) {
-    $CLASS->builder->ok(< @_);
+sub ok($ok, ?$name) {
+    $CLASS->builder->ok($ok, $name);
 }
 
 

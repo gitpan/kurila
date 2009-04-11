@@ -1,19 +1,18 @@
 # qr// was introduced in 5.004-devel.  Skip this test if we're not
 # of high enough version.
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't';
-        @INC = @('../lib', 'lib');
+        $^INCLUDE_PATH = @('../lib', 'lib');
     }
     else {
-        unshift @INC, 't/lib';
+        unshift $^INCLUDE_PATH, 't/lib';
     }
 }
 
 # There was a bug with like() involving a qr// not failing properly.
 # This tests against that.
 
-use strict;
 
 
 # Can't use Test.pm, that's a 5.005 thing.
@@ -27,8 +26,9 @@ $TB->plan(tests => 2);
 
 
 require Test::Simple::Catch;
-my($out, $err) = < Test::Simple::Catch::caught();
-local %ENV{HARNESS_ACTIVE} = 0;
+use env;
+my@($out, $err) =  Test::Simple::Catch::caught();
+local env::var('HARNESS_ACTIVE' ) = 0;
 
 
 package main;

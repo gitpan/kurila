@@ -4,9 +4,9 @@
 # passed in as test arguments.
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't';
-        @INC = @( '../lib' );
+        $^INCLUDE_PATH = @( '../lib' );
     }
 }
 
@@ -23,7 +23,7 @@ sub DESTROY {
 package main;
 
 for (1..3) {
-    ok(my $foo = Foo->new, 'created Foo object');
+    ok((my $foo = Foo->new), 'created Foo object');
 }
 is $destroyed, 3, "DESTROY called 3 times";
 

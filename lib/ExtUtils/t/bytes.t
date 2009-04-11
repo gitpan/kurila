@@ -1,30 +1,29 @@
 #!/usr/bin/perl -w
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't' if -d 't';
-        @INC = @('../lib', 'lib');
+        $^INCLUDE_PATH = @('../lib', 'lib');
     }
     else {
-        unshift @INC, 't/lib';
+        unshift $^INCLUDE_PATH, 't/lib';
     }
 }
 
-use strict;
 use Test::More tests => 4;
 
 use_ok('ExtUtils::MakeMaker::bytes');
 
-{
+do {
     use utf8;
 
     my $chr = chr(400);
     is( length $chr, 1 );
 
-    {
+    do {
         use ExtUtils::MakeMaker::bytes;
         is( length $chr, 2, 'byte.pm in effect' );
-    }
+    };
 
     is( length $chr, 1, '  score is lexical' );
-}
+};

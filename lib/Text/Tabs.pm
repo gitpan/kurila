@@ -3,12 +3,11 @@ package Text::Tabs;
 
 require Exporter;
 
-use strict;
 
 our @ISA = @('Exporter');
 our @EXPORT = qw(expand unexpand $tabstop);
 
-use vars < qw($VERSION $tabstop $debug);
+our ($VERSION, $tabstop, $debug);
 $VERSION = 2007.1117;
 
 BEGIN	{
@@ -22,11 +21,11 @@ sub expand {
         my $s = '';
         for (split(m/^/m, @_[0], -1)) {
             my $offs = 0;
-            s{\t}{{
+            s{\t}{$( do {
 				$pad = $tabstop - (pos() + $offs) % $tabstop;
 				$offs += $pad - 1;
 				" " x $pad;
-			}}g;
+			} )}g;
             $s .= $_;
         }
         return $s;
@@ -34,7 +33,7 @@ sub expand {
 
 sub unexpand
 {
-	my (@l) = @_;
+	my @l = @_;
 	my @e;
 	my $lastbit;
 	my $ts_as_space = " "x$tabstop;
@@ -47,11 +46,11 @@ sub unexpand
               unless defined $lastbit;
             $lastbit = "\t"
               if $lastbit eq $ts_as_space;
-            for $_ ( @e) {
+            for my $_ ( @e) {
                 if ($debug) {
                     my $x = $_;
                     $x =~ s/\t/^I\t/gs;
-                    print "sub on '$x'\n";
+                    print $^STDOUT, "sub on '$x'\n";
                 }
                 s/  +$/\t/;
             }

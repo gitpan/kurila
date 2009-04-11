@@ -1,6 +1,5 @@
 package IO::Compress::Base::Common;
-
-use strict ;
+ 
 use warnings;
 use bytes;
 
@@ -51,18 +50,14 @@ sub hasEncode()
             Encode->import();
         };
 
-        $HAS_ENCODE = $@ ? 0 : 1 ;
+        $HAS_ENCODE = $^EVAL_ERROR ?? 0 !! 1 ;
     }
 
     return $HAS_ENCODE;
 }
 
-sub getEncoding($$$)
+sub getEncoding($obj, $class, $want_encoding)
 {
-    my $obj = shift;
-    my $class = shift ;
-    my $want_encoding = shift ;
-
     $obj->croakError("$class: Encode module needed to use -Encode")
         if ! hasEncode();
 
@@ -75,19 +70,17 @@ sub getEncoding($$$)
 }
 
 our ($needBinmode);
-$needBinmode = ($^O eq 'MSWin32' || 
+$needBinmode = ($^OS_NAME eq 'MSWin32' || 
                     (eval ' $^UNICODE || $^UTF8LOCALE '))
-                    ? 1 : 1 ;
+                    ?? 1 !! 1 ;
 
-sub setBinModeInput($)
+sub setBinModeInput($handle)
 {
-    my $handle = shift ;
-
     binmode $handle 
         if  $needBinmode;
 }
 
-sub isaFilehandle($)
+sub isaFilehandle
 {
     return  (defined @_[0] and 
                (UNIVERSAL::isa(@_[0],'GLOB')
@@ -96,7 +89,7 @@ sub isaFilehandle($)
            )
 }
 
-sub isaFilename($)
+sub isaFilename
 {
     return  (defined @_[0] and 
                ! ref @_[0]    and 
@@ -123,7 +116,7 @@ use constant WANT_UNDEF => 4 ;
 #use constant WANT_HASH  => 8 ;
 use constant WANT_HASH  => 0 ;
 
-sub whatIsInput($;$)
+sub whatIsInput
 {
     my $got = whatIs(< @_);
     
@@ -131,35 +124,35 @@ sub whatIsInput($;$)
     {
         #use IO::File;
         $got = 'handle';
-        @_[0] = \*STDIN;
+        @_[0] = $^STDIN;
         #$_[0] = new IO::File("<-");
     }
 
     return $got;
 }
 
-sub whatIsOutput($;$)
+sub whatIsOutput
 {
     my $got = whatIs(< @_);
     
     if (defined $got && $got eq 'filename' && defined @_[0] && @_[0] eq '-')
     {
         $got = 'handle';
-        @_[0] = \*STDOUT;
+        @_[0] = $^STDOUT;
         #$_[0] = new IO::File(">-");
     }
     
     return $got;
 }
 
-sub whatIs ($;$)
+sub whatIs
 {
     return 'handle' if isaFilehandle(@_[0]);
 
-    my $wantCode = defined @_[1] && @_[1] ^&^ WANT_CODE ;
-    my $extended = defined @_[1] && @_[1] ^&^ WANT_EXT ;
-    my $undef    = defined @_[1] && @_[1] ^&^ WANT_UNDEF ;
-    my $hash     = defined @_[1] && @_[1] ^&^ WANT_HASH ;
+    my $wantCode = defined @_[?1] && @_[1] ^&^ WANT_CODE ;
+    my $extended = defined @_[?1] && @_[1] ^&^ WANT_EXT ;
+    my $undef    = defined @_[?1] && @_[1] ^&^ WANT_UNDEF ;
+    my $hash     = defined @_[?1] && @_[1] ^&^ WANT_HASH ;
 
     return 'undef'  if ! defined @_[0] && $undef ;
 
@@ -199,11 +192,11 @@ sub Validator::new
 
     local $Carp::CarpLevel = 1;
 
-    my $inType    = %data{inType}    = whatIsInput(@_[0], WANT_EXT^|^WANT_HASH);
-    my $outType   = %data{outType}   = whatIsOutput(@_[1], WANT_EXT^|^WANT_HASH);
+    my $inType    = %data{+inType}    = whatIsInput(@_[0], WANT_EXT^|^WANT_HASH);
+    my $outType   = %data{+outType}   = whatIsOutput(@_[1], WANT_EXT^|^WANT_HASH);
 
-    my $oneInput  = %data{oneInput}  = oneTarget($inType);
-    my $oneOutput = %data{oneOutput} = oneTarget($outType);
+    my $oneInput  = %data{+oneInput}  = oneTarget($inType);
+    my $oneOutput = %data{+oneOutput} = oneTarget($outType);
 
     if (! $inType)
     {
@@ -237,20 +230,20 @@ sub Validator::new
 
     if ($inType eq 'fileglob' && $outType eq 'fileglob')
     {
-        %data{GlobMap} = 1 ;
-        %data{inType} = %data{outType} = 'filename';
+        %data{+GlobMap} = 1 ;
+        %data{+inType} = %data{+outType} = 'filename';
         my $mapper = File::GlobMapper->new(@_[0], @_[1]);
         if ( ! $mapper )
         {
             return $obj->saveErrorString($File::GlobMapper::Error) ;
         }
-        %data{Pairs} = $mapper->getFileMap();
+        %data{+Pairs} = $mapper->getFileMap();
 
         return $obj;
     }
     
     die("$reportClass: input and output $inType are identical")
-        if $inType eq $outType && (ref @_[0] ? @_[0] \== @_[1] : @_[0] eq @_[1] && @_[0] ne '-' );
+        if $inType eq $outType && (ref @_[0] ?? @_[0] \== @_[1] !! @_[0] eq @_[1] && @_[0] ne '-' );
 
     if ($inType eq 'fileglob') # && $outType ne 'fileglob'
     {
@@ -267,15 +260,15 @@ sub Validator::new
             $obj->validateInputFilenames(@inputs[0])
                 or return undef;
             @_[0] = @inputs[0]  ;
-            %data{inType} = 'filename' ;
-            %data{oneInput} = 1;
+            %data{+inType} = 'filename' ;
+            %data{+oneInput} = 1;
         }
         else
         {
             $obj->validateInputFilenames(< @inputs)
                 or return undef;
             @_[0] = \ @inputs ;
-            %data{inType} = 'filenames' ;
+            %data{+inType} = 'filenames' ;
         }
     }
     elsif ($inType eq 'filename')
@@ -285,7 +278,7 @@ sub Validator::new
     }
     elsif ($inType eq 'array')
     {
-        %data{inType} = 'filenames' ;
+        %data{+inType} = 'filenames' ;
         $obj->validateInputArray(@_[0])
             or return undef ;
     }
@@ -333,7 +326,7 @@ sub Validator::validateInputFilenames
 
     foreach my $filename ( @_)
     {
-        $self->croakError("$self->{reportClass}: input filename is undef or null string")
+        $self->croakError("$self->{?reportClass}: input filename is undef or null string")
             if ! defined $filename || $filename eq ''  ;
 
         next if $filename eq '-';
@@ -350,7 +343,7 @@ sub Validator::validateInputFilenames
 
         if (! -r _ )
         {
-            return $self->saveErrorString("cannot open file '$filename': $!");
+            return $self->saveErrorString("cannot open file '$filename': $^OS_ERROR");
         }
     }
 
@@ -419,11 +412,11 @@ sub createSelfTiedObject
     my $error_ref = shift ;
 
     my $obj = bless \%(), ref($class) || $class;
-    $obj->{Closed} = 1 ;
+    $obj->{+Closed} = 1 ;
     $$error_ref = '';
-    $obj->{Error} = $error_ref ;
+    $obj->{+Error} = $error_ref ;
     my $errno = 0 ;
-    $obj->{ErrorNo} = \$errno ;
+    $obj->{+ErrorNo} = \$errno ;
 
     return $obj;
 }
@@ -438,13 +431,13 @@ sub createSelfTiedObject
 #$VERSION = '2.000_08';
 #@ISA = qw(Exporter);
 
-%EXPORT_TAGS{Parse} = \qw( ParseParameters 
+%EXPORT_TAGS{+Parse} = \qw( ParseParameters 
                            Parse_any Parse_unsigned Parse_signed 
                            Parse_boolean Parse_custom Parse_string
                            Parse_multiple Parse_writable_scalar
                          );              
 
-push @EXPORT, < @{ %EXPORT_TAGS{Parse} } ;
+push @EXPORT, < @{ %EXPORT_TAGS{?Parse} } ;
 
 use constant Parse_any      => 0x01;
 use constant Parse_unsigned => 0x02;
@@ -471,18 +464,17 @@ sub ParseParameters
 {
     my $level = shift || 0 ; 
 
-    my $sub = @(caller($level + 1))[3] ;
+    my $sub = @(caller($level + 1))[?3] ;
     local $Carp::CarpLevel = 1 ;
     my $p = IO::Compress::Base::Parameters->new() ;
     $p->parse(< @_)
-        or croak "$sub: $p->{Error}" ;
+        or croak "$sub: $p->{?Error}" ;
 
     return $p;
 }
 
 #package IO::Compress::Base::Parameters;
 
-use strict;
 use warnings;
 use Carp;
 
@@ -502,9 +494,9 @@ sub IO::Compress::Base::Parameters::setError
 {
     my $self = shift ;
     my $error = shift ;
-    my $retval = (nelems @_) ? shift : undef ;
+    my $retval = (nelems @_) ?? shift !! undef ;
 
-    $self->{Error} = $error ;
+    $self->{+Error} = $error ;
     return $retval;
 }
           
@@ -520,7 +512,7 @@ sub IO::Compress::Base::Parameters::parse
 
     my $default = shift ;
 
-    my $got = $self->{Got} ;
+    my $got = $self->{?Got} ;
     my $firstTime = nkeys %{ $got } == 0 ;
 
     my (@Bad) ;
@@ -538,7 +530,7 @@ sub IO::Compress::Base::Parameters::parse
  
         foreach my $key (keys %$href) {
             push @entered, $key ;
-            push @entered, \$href->{$key} ;
+            push @entered, \$href->{+$key} ;
         }
     }
     else {
@@ -553,12 +545,12 @@ sub IO::Compress::Base::Parameters::parse
     }
 
 
-    while (my ($key, $v) = each %$default)
+    while (my @(?$key, ?$v) =@( each %$default))
     {
-        croak "need 4 params [{join ' ',@$v}]"
+        croak "need 4 params [$(join ' ',@$v)]"
             if (nelems @$v) != 4 ;
 
-        my ($first_only, $sticky, $type, $value) = < @$v ;
+        my @($first_only, $sticky, $type, $value) =  @$v ;
         my $x ;
         $self->_checkType($key, \$value, $type, 0, \$x) 
             or return undef ;
@@ -569,7 +561,7 @@ sub IO::Compress::Base::Parameters::parse
             $x = \@( $x )
                 if $type ^&^ Parse_multiple;
 
-            $got->{$key} = \@(0, $type, $value, $x, $first_only, $sticky) ;
+            $got->{+$key} = \@(0, $type, $value, $x, $first_only, $sticky) ;
         }
 
         $got->{$key}->[OFF_PARSED] = 0 ;
@@ -586,12 +578,12 @@ sub IO::Compress::Base::Parameters::parse
         $key =~ s/^-// ;
         my $canonkey = lc $key;
  
-        if ($got->{$canonkey} && ($firstTime ||
+        if ($got->{?$canonkey} && ($firstTime ||
                                   ! $got->{$canonkey}->[OFF_FIRST_ONLY]  ))
         {
             my $type = $got->{$canonkey}->[OFF_TYPE] ;
-            my $parsed = %parsed{$canonkey};
-            ++ %parsed{$canonkey};
+            my $parsed = %parsed{?$canonkey};
+            ++ %parsed{+$canonkey};
 
             return $self->setError("Muliple instances of '$key' found") 
                 if $parsed && ($type ^&^ Parse_multiple) == 0 ;
@@ -606,7 +598,7 @@ sub IO::Compress::Base::Parameters::parse
                 push @{ $got->{$canonkey}->[OFF_FIXED] }, $s ;
             }
             else {
-                $got->{$canonkey} = \@(1, $type, $value, $s) ;
+                $got->{+$canonkey} = \@(1, $type, $value, $s) ;
             }
         }
         else
@@ -614,8 +606,8 @@ sub IO::Compress::Base::Parameters::parse
     }
  
     if ((nelems @Bad)) {
-        my ($bad) = join(", ", @Bad) ;
-        return $self->setError("unknown key value(s) {join ' ',@Bad}") ;
+        my $bad = join(", ", @Bad) ;
+        return $self->setError("unknown key value(s) $(join ' ',@Bad)") ;
     }
 
     return 1;
@@ -680,7 +672,7 @@ sub IO::Compress::Base::Parameters::_checkType
         return $self->setError("Parameter '$key' must be an unsigned int, got '$value'")
             if $validate && $value !~ m/^\d+$/;
 
-        $$output = defined $value ? $value : 0 ;    
+        $$output = defined $value ?? $value !! 0 ;    
         return 1;
     }
     elsif ($type ^&^ Parse_signed)
@@ -690,19 +682,19 @@ sub IO::Compress::Base::Parameters::_checkType
         return $self->setError("Parameter '$key' must be a signed int, got '$value'")
             if $validate && $value !~ m/^-?\d+$/;
 
-        $$output = defined $value ? $value : 0 ;    
+        $$output = defined $value ?? $value !! 0 ;    
         return 1 ;
     }
     elsif ($type ^&^ Parse_boolean)
     {
         return $self->setError("Parameter '$key' must be an int, got '$value'")
             if $validate && defined $value && $value !~ m/^\d*$/;
-        $$output =  defined $value ? $value != 0 : 0 ;    
+        $$output =  defined $value ?? $value != 0 !! 0 ;    
         return 1;
     }
     elsif ($type ^&^ Parse_string)
     {
-        $$output = defined $value ? $value : "" ;    
+        $$output = defined $value ?? $value !! "" ;    
         return 1;
     }
 
@@ -717,7 +709,7 @@ sub IO::Compress::Base::Parameters::parsed
     my $self = shift ;
     my $name = shift ;
 
-    return $self->{Got}->{lc $name}->[OFF_PARSED] ;
+    return $self->{Got}->{+ lc $name}->[?OFF_PARSED] ;
 }
 
 sub IO::Compress::Base::Parameters::value
@@ -727,12 +719,12 @@ sub IO::Compress::Base::Parameters::value
 
     if ((nelems @_))
     {
-        $self->{Got}->{lc $name}->[OFF_PARSED]  = 1;
-        $self->{Got}->{lc $name}->[OFF_DEFAULT] = @_[0] ;
-        $self->{Got}->{lc $name}->[OFF_FIXED]   = @_[0] ;
+        $self->{Got}->{+ lc $name}->[+OFF_PARSED]  = 1;
+        $self->{Got}->{+ lc $name}->[+OFF_DEFAULT] = @_[0] ;
+        $self->{Got}->{+ lc $name}->[+OFF_FIXED]   = @_[0] ;
     }
 
-    return $self->{Got}->{lc $name}->[OFF_FIXED] ;
+    return $self->{Got}->{+ lc $name}->[?OFF_FIXED] ;
 }
 
 sub IO::Compress::Base::Parameters::valueOrDefault
@@ -762,12 +754,12 @@ sub IO::Compress::Base::Parameters::clone
     my $obj = \%( );
     my %got ;
 
-    while (my ($k, $v) = each %{ $self->{Got} }) {
-        %got{$k} = \ @$v;
+    while (my @($k, $v) =@( each %{ $self->{Got} })) {
+        %got{+$k} = \ @$v;
     }
 
-    $obj->{Error} = $self->{Error};
-    $obj->{Got} = \%got ;
+    $obj->{+Error} = $self->{?Error};
+    $obj->{+Got} = \%got ;
 
     return bless $obj, 'IO::Compress::Base::Parameters' ;
 }
@@ -800,7 +792,7 @@ sub newUnpack_V64
 {
     my $string = shift;
 
-    my ($low, $hi) = unpack "V V", $string ;
+    my @($low, $hi) =@( unpack "V V", $string) ;
     bless \@( $low, $hi ), "U64";
 }
 

@@ -1,7 +1,6 @@
 use Config;
 
-sub to_string {
-    my ($value) = < @_;
+sub to_string($value) {
     $value =~ s/\\/\\\\/g;
     $value =~ s/'/\\'/g;
     return "'$value'";
@@ -30,12 +29,12 @@ sub to_string {
 # The $^O tests test both for $^O and for $Config{osname}.
 # The latter is better for some for cross-compilation setups.
 #
-sub _expansion {
-    my ($op, $os, $expr) = < @_;
+sub _expansion($op, $os, $expr) {
     if ($op ne 'eq' and $op ne 'ne') {die "wrong eq-ne arg"};
     if ($expr =~ m[^(.*?)<<\|\$\^O-$op-$os>>(.*?)$]s) {
-        my ($if,$el) = ($1,$2);
-        if (($op eq 'eq' and ($^O eq $os || %Config{osname} eq $os)) || ($op eq 'ne' and ($^O ne $os || %Config{osname} ne $os))) {
+        my @($if,$el) = @($1,$2);
+        if (($op eq 'eq' and ($^OS_NAME eq $os || config_value("osname") eq $os))
+              || ($op eq 'ne' and ($^OS_NAME ne $os || config_value("osname") ne $os))) {
             return $if
         }
         else {
@@ -44,7 +43,8 @@ sub _expansion {
     }
     else {
         # #if;#endif
-        if (($op eq 'eq' and ($^O eq $os || %Config{osname} eq $os)) || ($op eq 'ne' and ($^O ne $os || %Config{osname} ne $os))) {
+        if (($op eq 'eq' and ($^OS_NAME eq $os || config_value("osname") eq $os))
+              || ($op eq 'ne' and ($^OS_NAME ne $os || config_value("osname") ne $os))) {
             return $expr
         }
         else {
@@ -55,10 +55,10 @@ sub _expansion {
 
 sub expand_os_specific {
     my $s = shift;
-    $s =~ s/<<=(.*?)>>/{eval $1}/g;
-    $s =~ s/<<\$\^O-(eq|ne)-(\w+)>>(.*?)<<\/\$\^O-\1-\2>>/{
-           _expansion($1,$2,$3);
-        }/gs;
+    $s =~ s/<<=(.*?)>>/$(eval $1)/g;
+    $s =~ s/<<\$\^O-(eq|ne)-(\w+)>>(.*?)<<\/\$\^O-\1-\2>>/$(
+            _expansion($1,$2,$3)
+        )/gs;
     if ($s =~ m/<<(=|\$\^O-)/) {
         die "bad <<\$^O-eq/ne-osname>> expression.".
           " Unclosed brackets?";
@@ -67,8 +67,8 @@ sub expand_os_specific {
 }
 
 unlink "DynaLoader.pm" if -f "DynaLoader.pm";
-open OUT, ">", "DynaLoader.pm" or die $!;
-print OUT <<'EOT';
+open my $out, ">", "DynaLoader.pm" or die $^OS_ERROR;
+print $out, <<'EOT';
 
 # Generated from DynaLoader_pm.PL
 
@@ -94,7 +94,7 @@ use Config;
 
 # enable debug/trace messages from DynaLoader perl code
 our $dl_debug;
-$dl_debug = %ENV{PERL_DL_DEBUG} || 0 unless defined $dl_debug;
+$dl_debug = env::var("PERL_DL_DEBUG") || 0 unless defined $dl_debug;
 
 #
 # Flags to alter dl_load_file behaviour.  Assigned bits:
@@ -111,19 +111,19 @@ sub dl_load_flags { 0x00 }
 
 EOT
 
-if (%ENV{PERL_BUILD_EXPAND_CONFIG_VARS}) {
-    print OUT "our (\$dl_dlext, \$dl_so, \$dlsrc) = (", <
-              to_string(%Config{'dlext'}), ",", <
-              to_string(%Config{'so'}), ",", <
-              to_string(%Config{'dlsrc'}), ")\n;" ;
+if (env::var('PERL_BUILD_EXPAND_CONFIG_VARS')) {
+    print $out, "our @(\$dl_dlext, \$dl_so, \$dlsrc) = @(",
+              < to_string(config_value('dlext')), ",",
+              < to_string(config_value('so')), ",",
+              < to_string(config_value('dlsrc')), ")\n;" ;
 }
 else {
-    print OUT <<'EOT';
-our ($dl_dlext, $dl_so, $dlsrc) = < %Config::Config{[qw(dlext so dlsrc)]};
+    print $out, <<'EOT';
+our @($dl_dlext, $dl_so, $dlsrc) = map { config_value($_) }, qw(dlext so dlsrc);
 EOT
 }
 
-print OUT expand_os_specific(<<'EOT');
+print $out, expand_os_specific(<<'EOT');
 
 <<$^O-eq-VMS>>
 # Some systems need special handling to expand file specifications
@@ -154,20 +154,20 @@ our @dl_modules;              # Modules we have loaded
 EOT
 
 my $cfg_dl_library_path = <<'EOT';
-push(@dl_library_path, < split(' ', %Config::Config{libpth}));
+push(@dl_library_path, < split(' ', config_value('libpth')));
 EOT
 
 sub dquoted_comma_list {
-    join(", ", map {'"'.quotemeta($_).'"'} @_);
+    join(", ", map {'"'.quotemeta($_).'"'}, @_);
 }
 
 our @dl_library_path;
 
-if (%ENV{PERL_BUILD_EXPAND_CONFIG_VARS}) {
+if (env::var('PERL_BUILD_EXPAND_CONFIG_VARS')) {
     eval $cfg_dl_library_path;
-    if (!%ENV{PERL_BUILD_EXPAND_ENV_VARS}) {
+    if (!env::var('PERL_BUILD_EXPAND_ENV_VARS')) {
         my $dl_library_path = dquoted_comma_list(< @dl_library_path);
-        print OUT <<EOT;
+        print $out, <<EOT;
 # The below \@dl_library_path has been expanded (\%Config) in Perl build time.
 
 \@dl_library_path = ($dl_library_path);
@@ -176,7 +176,7 @@ EOT
     }
 }
 else {
-    print OUT <<EOT;
+    print $out, <<EOT;
 # Initialise \@dl_library_path with the 'standard' library path
 # for this platform as determined by Configure.
 
@@ -189,17 +189,17 @@ my $ldlibpthname;
 my $ldlibpthname_defined;
 my $pthsep;
 
-if (%ENV{PERL_BUILD_EXPAND_CONFIG_VARS}) {
-    $ldlibpthname         = to_string(%Config::Config{ldlibpthname});
-    $ldlibpthname_defined = to_string(defined %Config::Config{ldlibpthname} ? 1 : 0);
-    $pthsep               = to_string(%Config::Config{path_sep});
+if (env::var('PERL_BUILD_EXPAND_CONFIG_VARS')) {
+    $ldlibpthname         = to_string(config_value("ldlibpthname"));
+    $ldlibpthname_defined = to_string(defined config_value("ldlibpthname") ?? 1 !! 0);
+    $pthsep               = to_string(config_value("path_sep"));
 }
 else {
-    $ldlibpthname         = q(%Config::Config{ldlibpthname});
-    $ldlibpthname_defined = q(defined %Config::Config{ldlibpthname});
-    $pthsep               = q(%Config::Config{path_sep});
+    $ldlibpthname         = q(config_value("ldlibpthname"));
+    $ldlibpthname_defined = q(defined config_value("ldlibpthname"));
+    $pthsep               = q(config_value("path_sep"));
 }
-print OUT <<EOT;
+print $out, <<EOT;
 my \$ldlibpthname         = $ldlibpthname;
 my \$ldlibpthname_defined = $ldlibpthname_defined;
 my \$pthsep               = $pthsep;
@@ -208,24 +208,24 @@ EOT
 
 my $env_dl_library_path = <<'EOT';
 if ($ldlibpthname_defined &&
-    exists %ENV{$ldlibpthname}) {
-    push(@dl_library_path, < split(m/$pthsep/, %ENV{$ldlibpthname}));
+    defined env::var($ldlibpthname)) {
+    push(@dl_library_path, < split(m/$pthsep/, env::var($ldlibpthname)));
 }
 
 # E.g. HP-UX supports both its native SHLIB_PATH *and* LD_LIBRARY_PATH.
 
 if ($ldlibpthname_defined &&
     $ldlibpthname ne 'LD_LIBRARY_PATH' &&
-    exists %ENV{LD_LIBRARY_PATH}) {
-    push(@dl_library_path, < split(m/$pthsep/, %ENV{LD_LIBRARY_PATH}));
+    defined env::var('LD_LIBRARY_PATH')) {
+    push(@dl_library_path, < split(m/$pthsep/, env::var('LD_LIBRARY_PATH')));
 }
 EOT
 
-if (%ENV{PERL_BUILD_EXPAND_CONFIG_VARS} && %ENV{PERL_BUILD_EXPAND_ENV_VARS}) {
+if (env::var('PERL_BUILD_EXPAND_CONFIG_VARS') && env::var('PERL_BUILD_EXPAND_ENV_VARS')) {
     eval $env_dl_library_path;
 }
 else {
-    print OUT <<EOT;
+    print $out, <<EOT;
 # Add to \@dl_library_path any extra directories we can gather from environment
 # during runtime.
 
@@ -234,9 +234,9 @@ $env_dl_library_path
 EOT
 }
 
-if (%ENV{PERL_BUILD_EXPAND_CONFIG_VARS} && %ENV{PERL_BUILD_EXPAND_ENV_VARS}) {
+if (env::var('PERL_BUILD_EXPAND_CONFIG_VARS') && env::var('PERL_BUILD_EXPAND_ENV_VARS')) {
     my $dl_library_path = dquoted_comma_list(< @dl_library_path);
-    print OUT <<EOT;
+    print $out, <<EOT;
 # The below \@dl_library_path has been expanded (\%Config, \%ENV)
 # in Perl build time.
 
@@ -247,20 +247,20 @@ EOT
 
 
 # following long string contains $^O-specific stuff, which is factored out
-print OUT expand_os_specific(<<'EOT');
+print $out, expand_os_specific(<<'EOT');
 # No prizes for guessing why we don't say 'bootstrap DynaLoader;' here.
 # NOTE: All dl_*.xs (including dl_none.xs) define a dl_error() XSUB
 boot_DynaLoader('DynaLoader') if defined(&boot_DynaLoader) &&
                                 !defined(&dl_error);
 
 if ($dl_debug) {
-    print STDERR "DynaLoader.pm loaded (@INC, @dl_library_path)\n";
-    print STDERR "DynaLoader not linked into this perl\n"
+    print $^STDERR, "DynaLoader.pm loaded ($^INCLUDE_PATH, @dl_library_path)\n";
+    print $^STDERR, "DynaLoader not linked into this perl\n"
 	    unless defined(&boot_DynaLoader);
 }
 
-use vars < qw(@isa @args $module @dirs $file $dl_debug $dlsrc @dl_library_path
-            @do_expand);
+our (@isa, @args, $module, @dirs, $file, $dl_debug, $dlsrc, @dl_library_path,
+     @do_expand);
 
 sub bootstrap_inherit {
     my $module = @_[0];
@@ -276,7 +276,7 @@ sub bootstrap_inherit {
 sub bootstrap {
     # use local vars to enable $module.bs script to edit values
     local(@args) = @_;
-    local($module) = @args[0];
+    local($module) = @args[?0];
     local(@dirs, $file);
 
     unless ($module) {
@@ -313,12 +313,12 @@ sub bootstrap {
 
     my $modpname = join(<<$^O-eq-MacOS>>':'<<|$^O-eq-MacOS>>'/'<</$^O-eq-MacOS>>,@modparts);
 
-    print STDERR "DynaLoader::bootstrap for $module ",
+    print $^STDERR, "DynaLoader::bootstrap for $module ",
 		       <<$^O-eq-MacOS>> "(:auto:$modpname:$modfname.$dl_dlext)\n" 
 		       <<|$^O-eq-MacOS>>"(auto/$modpname/$modfname.$dl_dlext)\n"<</$^O-eq-MacOS>>
 	if $dl_debug;
 
-    foreach (@INC) {
+    foreach ($^INCLUDE_PATH) {
 	<<$^O-eq-VMS>>chop($_ = VMS::Filespec::unixpath($_));<</$^O-eq-VMS>>
 	<<$^O-eq-MacOS>>
 	    my $path = $_;
@@ -335,7 +335,7 @@ sub bootstrap {
 	
 	# check for common cases to avoid autoload of dl_findfile
 	my $try = <<$^O-eq-MacOS>> "$dir:$modfname.$dl_dlext" <<|$^O-eq-MacOS>> "$dir/$modfname.$dl_dlext"<</$^O-eq-MacOS>>;
-	last if $file = <<$^O-eq-VMS>>($do_expand) ? dl_expandspec($try) : ((-f $try) && $try);
+	last if $file = <<$^O-eq-VMS>>($do_expand) ?? dl_expandspec($try) !! ((-f $try) && $try);
 	<<|$^O-eq-VMS>>(-f $try) && $try;
 	<</$^O-eq-VMS>>
 	
@@ -343,12 +343,12 @@ sub bootstrap {
 	push @dirs, $dir;
     }
     # last resort, let dl_findfile have a go in all known locations
-    ($file) = < dl_findfile(< map("-L$_",@(<@dirs,<@INC)), $modfname) unless $file;
+    @(?$file) = dl_findfile(< map({ "-L$_" } ,@(<@dirs,<$^INCLUDE_PATH)), $modfname) unless $file;
 
-    die("Can't locate loadable object for module $module in \@INC (\@INC contains: $(join ' ', @INC))")
+    die("Can't locate loadable object for module $module in \$^INCLUDE_PATH (\$^INCLUDE_PATH contains: $(join ' ', $^INCLUDE_PATH))")
 	unless $file;	# wording similar to error from 'require'
 
-    <<$^O-eq-VMS>>$file = uc($file) if %Config::Config{d_vms_case_sensitive_symbols};<</$^O-eq-VMS>>
+    <<$^O-eq-VMS>>$file = uc($file) if config_value("d_vms_case_sensitive_symbols");<</$^O-eq-VMS>>
     my $bootname = "boot_$module";
     $bootname =~ s/\W/_/g;
     @dl_require_symbols = @($bootname);
@@ -359,16 +359,20 @@ sub bootstrap {
     my $bs = $file;
     $bs =~ s/(\.\w+)?(;\d*)?$/\.bs/; # look for .bs 'beside' the library
     if (-s $bs) { # only read file if it's not empty
-        print STDERR "BS: $bs ($^O, $dlsrc)\n" if $dl_debug;
+        print $^STDERR, "BS: $bs ($^OS_NAME, $dlsrc)\n" if $dl_debug;
         try { do $bs; };
-        warn "$bs: $@\n" if $@;
+        warn "$bs: $^EVAL_ERROR\n" if $^EVAL_ERROR;
     }
 
     my $boot_symbol_ref;
 
     <<$^O-eq-darwin>>
     if ($boot_symbol_ref = dl_find_symbol(0, $bootname)) {
-        goto boot; #extension library has already been loaded, e.g. darwin
+        #extension library has already been loaded, e.g. darwin
+        my $xs = dl_install_xsub("$($module)::bootstrap", $boot_symbol_ref, $file);
+        # See comment block above
+        push(@dl_shared_objects, $file); # record files loaded
+        return &$xs(<@args);
     }
     <</$^O-eq-darwin>>
 
@@ -394,12 +398,11 @@ sub bootstrap {
 
     push(@dl_modules, $module); # record loaded module
 
-  boot:
-    my $xs = dl_install_xsub("{$module}::bootstrap", $boot_symbol_ref, $file);
+    my $xs = do { no warnings 'redefine';
+                  dl_install_xsub("$($module)::bootstrap", $boot_symbol_ref, $file); };
 
     # See comment block above
-
-	push(@dl_shared_objects, $file); # record files loaded
+    push(@dl_shared_objects, $file); # record files loaded
 
     &$xs(<@args);
 }
@@ -419,12 +422,12 @@ sub dl_findfile {
     # This function does not automatically consider the architecture
     # or the perl library auto directories.
     my (@args) = @_;
-    my (@dirs,  $dir);   # which directories to search
+    my (@dirs);   # which directories to search
     my (@found);         # full paths to real files we have found
-    #my $dl_ext= <<=to_string(%Config::Config{'dlext'})>>; # %Config::Config{'dlext'} suffix for perl extensions
-    #my $dl_so = <<=to_string(%Config::Config{'so'})>>; # %Config::Config{'so'} suffix for shared libraries
+    #my $dl_ext= <<=to_string(config_value('dlext'))>>; # config_value('dlext') suffix for perl extensions
+    #my $dl_so = <<=to_string(config_value('so'))>>; # config_value('so') suffix for shared libraries
 
-    print STDERR "dl_findfile(@args)\n" if $dl_debug;
+    print $^STDERR, "dl_findfile(@args)\n" if $dl_debug;
 
     # accumulate directories but process files as they appear
     arg: foreach(@args) {
@@ -459,13 +462,13 @@ sub dl_findfile {
             my(@names, $name);    # what filenames to look for
 	    s/^-l//;
 	    push(@names, $_);
-            foreach $dir (@(<@dirs, <@dl_library_path)) {
+            foreach my $dir (@(<@dirs, <@dl_library_path)) {
             	next unless -d $dir;
 		$dir =~ s/^([^:]+)$/:$1/;
 		$dir =~ s/:$//;
             	foreach $name (@names) {
 	    	    my($file) = "$dir:$name";
-                    print STDERR " checking in $dir for $name\n" if $dl_debug;
+                    print $^STDERR, " checking in $dir for $name\n" if $dl_debug;
 		    if (-f $file) {
                     	push(@found, $file);
                     	next arg; # no need to look any further
@@ -486,7 +489,7 @@ sub dl_findfile {
 	<</$^O-eq-VMS>>
 
         #  Only files should get this far...
-        my(@names, $name);    # what filenames to look for
+        my(@names);    # what filenames to look for
         if (m:-l: ) {          # convert -lname to appropriate library name
             s/-l//;
             push(@names,"lib$_.$dl_so");
@@ -504,19 +507,19 @@ sub dl_findfile {
 	$dirsep = '\\';
 	if ($0 =~ /^([a-z]):/i) {
 	    my $drive = $1;
-	    @dirs = map { "$drive:$_" } @dirs;
-	    @dl_library_path = map { "$drive:$_" } @dl_library_path;
+	    @dirs = map { "$drive:$_" }, @dirs;
+	    @dl_library_path = map { "$drive:$_" }, @dl_library_path;
 	}
 	<</$^O-eq-symbian>>
-        foreach $dir (@(<@dirs, <@dl_library_path)) {
+        foreach my $dir (@(<@dirs, <@dl_library_path)) {
             next unless -d $dir;
 	    <<$^O-eq-VMS>>
             chop($dir = VMS::Filespec::unixpath($dir));
 	    <</$^O-eq-VMS>>
-            foreach $name (@names) {
+            foreach my $name (@names) {
 		my($file) = "$dir$dirsep$name";
-                print STDERR " checking in $dir for $name\n" if $dl_debug;
-		$file = ($do_expand) ? dl_expandspec($file) : (-f $file && $file);
+                print $^STDERR, " checking in $dir for $name\n" if $dl_debug;
+		$file = ($do_expand) ?? dl_expandspec($file) !! (-f $file && $file);
 		#$file = _check_file($file);
 		if ($file) {
                     push(@found, $file);
@@ -527,9 +530,9 @@ sub dl_findfile {
     }
     if ($dl_debug) {
         foreach(@dirs) {
-            print STDERR " dl_findfile ignored non-existent directory: $_\n" unless -d $_;
+            print $^STDERR, " dl_findfile ignored non-existent directory: $_\n" unless -d $_;
         }
-        print STDERR "dl_findfile found: @found\n";
+        print $^STDERR, "dl_findfile found: @found\n";
     }
     @found;
 }
@@ -557,20 +560,21 @@ sub dl_expandspec {
     <<|$^O-eq-VMS>>
 	return undef unless -f $file;
     <</$^O-eq-VMS>>
-    print STDERR "dl_expandspec($spec) => $file\n" if $dl_debug;
+    print $^STDERR, "dl_expandspec($spec) => $file\n" if $dl_debug;
     $file;
 }
 
 sub dl_find_symbol_anywhere
 {
     my $sym = shift;
-    my $libref;
-    foreach $libref (@dl_librefs) {
+    foreach my $libref (@dl_librefs) {
 	my $symref = dl_find_symbol($libref,$sym);
 	return $symref if $symref;
     }
     return undef;
 }
+
+1;
 
 =head1 NAME
 
@@ -931,7 +935,7 @@ It performs the following actions:
 
 =item *
 
-locates an auto/$module directory by searching @INC
+locates an auto/$module directory by searching $^INCLUDE_PATH
 
 =item *
 
@@ -994,5 +998,5 @@ assistance from Tim Bunce, January 1996.
 =cut
 EOT
 
-close OUT or die $!;
+close $out or die $^OS_ERROR;
 

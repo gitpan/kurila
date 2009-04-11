@@ -25,6 +25,7 @@ Configure		Portability tool
 configure.com		Configure-equivalent for VMS
 configure.gnu		Crude emulation of GNU configure
 cop.h			Control operator header
+cop_i.h			Control operator header
 Copying			The GNU General Public License
 Cross/build-arm-n770-sh	Cross-compilation
 Cross/cflags-cross-arm	Cross-compilation
@@ -41,6 +42,7 @@ Cross/README.new	Cross-compilation
 Cross/TODO		Cross-compilation
 Cross/warp		Cross-compilation
 cv.h			Code value header
+cv_i.h			Code value inline functions
 cygwin/cygwin.c		Additional code for Cygwin port
 cygwin/Makefile.SHs	Shared library generation for Cygwin port
 deb.c			Debugging routines
@@ -101,7 +103,6 @@ ext/B/t/OptreeCheck.pm		optree comparison tool
 ext/B/t/optree_check.t		test OptreeCheck apparatus
 ext/B/t/optree_concise.t	more B::Concise tests
 ext/B/t/optree_specials.t	BEGIN, END, etc code
-ext/B/t/optree_varinit.t	my,our,local var init optimization
 ext/B/t/o.t		See if O works
 ext/B/t/pragma.t	See if user pragmas work.
 ext/B/t/showlex.t	See if B::ShowLex works
@@ -160,7 +161,6 @@ ext/Cwd/Changes			Cwd extension Changelog
 ext/Cwd/Cwd.xs			Cwd extension external subroutines
 ext/Cwd/Makefile.PL		Cwd extension makefile maker
 ext/Cwd/t/cwd.t			See if Cwd works
-ext/Cwd/t/taint.t		See if Cwd works with taint
 ext/Cwd/t/win32.t		See if Cwd works on Win32
 ext/Data-Dumper/Changes		Data pretty printer, changelog
 ext/Data-Dumper/Dumper.pm	Data pretty printer, module
@@ -231,7 +231,6 @@ ext/File-Glob/Makefile.PL	File::Glob extension makefile writer
 ext/File-Glob/t/basic.t		See if File::Glob works
 ext/File-Glob/t/case.t		See if File::Glob works
 ext/File-Glob/TODO		File::Glob extension todo list
-ext/File-Glob/t/taint.t		See if File::Glob works
 ext/Hash-Util/Changes		Change history of Hash::Util
 ext/Hash-Util/lib/Hash/Util.pm	Hash::Util
 ext/Hash-Util/Makefile.PL	Makefile for Hash::Util
@@ -307,7 +306,6 @@ ext/IO/t/io_poll.t	See if poll()-related methods from IO work
 ext/IO/t/io_sel.t	See if select()-related methods from IO work
 ext/IO/t/io_sock.t	See if INET socket-related methods from IO work
 ext/IO/t/IO.t	See if IO works
-ext/IO/t/io_taint.t	See if the untaint method from IO works
 ext/IO/t/io_tell.t	See if seek()/tell()-related methods from IO work
 ext/IO/t/io_udp.t	See if UDP socket-related methods from IO work
 ext/IO/t/io_unix.t	See if UNIX socket-related methods from IO work
@@ -330,7 +328,6 @@ ext/List-Util/Changes		Util extension
 ext/List-Util/lib/List/Util.pm	List::Util
 ext/List-Util/lib/Scalar/Util.pm	Scalar::Util
 ext/List-Util/Makefile.PL	Util extension
-ext/List-Util/multicall.h	Util extension
 ext/List-Util/README		Util extension
 ext/List-Util/t/00version.t	Scalar::Util
 ext/List-Util/t/blessed.t	Scalar::Util
@@ -342,14 +339,12 @@ ext/List-Util/t/max.t		List::Util
 ext/List-Util/t/minstr.t	List::Util
 ext/List-Util/t/min.t		List::Util
 ext/List-Util/t/openhan.t	Scalar::Util
-ext/List-Util/t/proto.t		Scalar::Util
 ext/List-Util/t/readonly.t	Scalar::Util
 ext/List-Util/t/reduce.t	List::Util
 ext/List-Util/t/refaddr.t	Scalar::Util
 ext/List-Util/t/reftype.t	Scalar::Util
 ext/List-Util/t/shuffle.t	List::Util
 ext/List-Util/t/sum.t		List::Util
-ext/List-Util/t/tainted.t	Scalar::Util
 ext/List-Util/t/weak.t		Scalar::Util
 ext/List-Util/Util.xs		Util extension
 ext/MIME-Base64/Base64.pm	MIME::Base64 extension
@@ -489,7 +484,6 @@ ext/POSIX/t/math.t		Basic math tests for POSIX
 ext/POSIX/t/posix.t		See if POSIX works
 ext/POSIX/t/sigaction.t		See if POSIX::sigaction works
 ext/POSIX/t/sysconf.t		See if POSIX works
-ext/POSIX/t/taint.t		See if POSIX works with taint
 ext/POSIX/t/termios.t		See if POSIX works
 ext/POSIX/t/time.t		See if POSIX time-related functions work
 ext/POSIX/t/waitpid.t		See if waitpid works
@@ -534,7 +528,6 @@ ext/Storable/t/canonical.t	See if Storable works
 ext/Storable/t/circular_hook.t	Test thaw hook called depth-first for circular refs
 ext/Storable/t/code.t		See if Storable works
 ext/Storable/t/compat01.t	See if Storable works
-ext/Storable/t/compat06.t	See if Storable works
 ext/Storable/t/croak.t		See if Storable works
 ext/Storable/t/dclone.t		See if Storable works
 ext/Storable/t/downgrade.t	See if Storable works
@@ -558,8 +551,6 @@ ext/Storable/t/sig_die.t	See if Storable works
 ext/Storable/t/st-dump.pl	See if Storable works
 ext/Storable/t/store.t		See if Storable works
 ext/Storable/t/testlib.pl	more helper routines for tests
-ext/Storable/t/threads.t	Does Storable work with threads?
-ext/Storable/t/tied_items.t	See if Storable works
 ext/Storable/t/utf8.t		See if Storable works
 ext/Storable/t/weak.t		Can Storable store weakrefs
 ext/Sys-Hostname/Hostname.pm	Sys::Hostname extension Perl module
@@ -583,51 +574,6 @@ ext/Sys-Syslog/win32/PerlLog_dll.uu	Sys::Syslog extension Win32 related file
 ext/Sys-Syslog/win32/PerlLog.mc	Sys::Syslog extension Win32 related file
 ext/Sys-Syslog/win32/PerlLog_RES.uu	Sys::Syslog extension Win32 related file
 ext/Sys-Syslog/win32/Win32.pm	Sys::Syslog extension Win32 related file
-ext/threads/hints/hpux.pl	Hint file for HPUX
-ext/threads/hints/linux.pl	Hint file for Linux
-ext/threads/Makefile.PL		ithreads
-ext/threads-shared/hints/linux.pl	thread shared variables
-ext/threads-shared/Makefile.PL	thread shared variables
-ext/threads-shared/shared.pm	thread shared variables
-ext/threads-shared/shared.xs	thread shared variables
-ext/threads-shared/t/0nothread.t	Tests for basic shared array functionality.
-ext/threads-shared/t/av_refs.t	Tests for arrays containing references
-ext/threads-shared/t/av_simple.t	Tests for basic shared array functionality.
-ext/threads-shared/t/blessed.t	Test blessed shared variables
-ext/threads-shared/t/cond.t	Test condition variables
-ext/threads-shared/t/disabled.t	Test threads::shared when threads are disabled.
-ext/threads-shared/t/hv_refs.t	Test shared hashes containing references
-ext/threads-shared/t/hv_simple.t	Tests for basic shared hash functionality.
-ext/threads-shared/t/no_share.t	Tests for disabled share on variables.
-ext/threads-shared/t/object.t	Shared objects tests
-ext/threads-shared/t/shared_attr.t	Test :shared attribute
-ext/threads-shared/t/stress.t	Stress test
-ext/threads-shared/t/sv_refs.t	thread shared variables
-ext/threads-shared/t/sv_simple.t	thread shared variables
-ext/threads-shared/t/waithires.t	Test sub-second cond_timedwait
-ext/threads-shared/t/wait.t	Test cond_wait and cond_timedwait
-ext/threads/t/basic.t		ithreads
-ext/threads/t/blocks.t		Test threads in special blocks
-ext/threads/t/context.t		Explicit thread context
-ext/threads/t/end.t		Test end functions
-ext/threads/t/err.t		Test $thr->error()
-ext/threads/t/exit.t		Test exit and die in threads
-ext/threads/t/free2.t		More ithread destruction tests
-ext/threads/t/free.t		Test ithread destruction
-ext/threads/threads.pm		ithreads
-ext/threads/threads.xs		ithreads
-ext/threads/t/join.t		Testing the join function
-ext/threads/t/kill.t		Tests thread signalling
-ext/threads/t/libc.t		testing libc functions for threadsafety
-ext/threads/t/list.t		Test threads->list()
-ext/threads/t/problems.t	Test various memory problems
-ext/threads/t/stack_env.t	Tests for stack limits
-ext/threads/t/stack.t		Tests for stack limits
-ext/threads/t/state.t		Tests state methods
-ext/threads/t/stress_cv.t	Test with multiple threads, coderef cv argument.
-ext/threads/t/stress_re.t	Test with multiple threads, string cv argument and regexes.
-ext/threads/t/stress_string.t	Test with multiple threads, string cv argument.
-ext/threads/t/thread.t		General ithread tests from thr5005
 ext/Time-HiRes/Changes		Time::HiRes extension
 ext/Time-HiRes/fallback/const-c.inc	Time::HiRes extension
 ext/Time-HiRes/fallback/const-xs.inc	Time::HiRes extension
@@ -656,7 +602,6 @@ ext/Unicode-Normalize/t/func.t	Unicode::Normalize
 ext/Unicode-Normalize/t/illegal.t	Unicode::Normalize
 ext/Unicode-Normalize/t/norm.t	Unicode::Normalize
 ext/Unicode-Normalize/t/null.t	Unicode::Normalize
-ext/Unicode-Normalize/t/proto.t	Unicode::Normalize
 ext/Unicode-Normalize/t/split.t	Unicode::Normalize
 ext/Unicode-Normalize/t/test.t	Unicode::Normalize
 ext/util/make_ext		Used by Makefile to execute extension Makefiles
@@ -719,6 +664,7 @@ global.sym			Symbols that need hiding when embedded
 globvar.sym			Global variables that need hiding when embedded
 gv.c				Glob value code
 gv.h				Glob value header
+gv_i.h				Glob value inline functions
 handy.h				Handy definitions
 hints/3b1cc			Hints for named architecture
 hints/3b1.sh			Hints for named architecture
@@ -819,6 +765,7 @@ hints/vmesa.sh			Hints for named architecture
 hints/vos.sh			Hints for named architecture
 hv.c				Hash value code
 hv.h				Hash value header
+hv_i.h				Hash value inline functions
 INSTALL				Detailed installation instructions
 installhtml			Perl script to install html files for pods
 installman			Perl script to install man pages for pods
@@ -829,8 +776,6 @@ iperlsys.h			Perl's interface to the system
 keywords.h			The keyword numbers
 keywords.pl			Program to write keywords.h
 lib/attributes.pm		For "sub foo : attrlist"
-lib/autouse.pm			Load and call a function only when it's used
-lib/autouse.t			See if autouse works
 lib/base/Changes		base.pm changelog
 lib/base.pm			Establish IS-A relationship at compile time
 lib/base/t/base.t		See if base works
@@ -878,6 +823,8 @@ lib/dumpvar.pl			A variable dumper
 lib/dumpvar.t			A variable dumper tester
 lib/English.pm			Readable aliases for short variables
 lib/English.t			See if English works
+lib/env.pm                      Environemnt package
+lib/env.t                       Environemnt package tests
 lib/error.pm                    Error Objects
 lib/error.pod                   Error Objects documentation
 lib/error.t                     See if error works
@@ -958,7 +905,7 @@ lib/ExtUtils/t/config.t		Test ExtUtils::MakeMaker::Config
 lib/ExtUtils/t/Constant.t	See if ExtUtils::Constant works
 lib/ExtUtils/t/dir_target.t	Verify if dir_target() is supported
 lib/ExtUtils/t/Embed.t		See if ExtUtils::Embed and embedding works
-lib/ExtUtils/testlib.pm		Fixes up @INC to use just-built extension
+lib/ExtUtils/testlib.pm		Fixes up $^INCLUDE_PATH to use just-built extension
 lib/ExtUtils/t/eu_command.t	See if ExtUtils::Command works
 lib/ExtUtils/t/FIRST_MAKEFILE.t		See if FIRST_MAKEFILE works
 lib/ExtUtils/t/fixin.t		See if ExtUtils::MakeMaker works
@@ -1024,9 +971,7 @@ lib/File/Fetch.pm	File::Fetch
 lib/File/Fetch/t/01_File-Fetch.t	File::Fetch tests
 lib/File/Find.pm		Routines to do a find
 lib/File/Find/t/find.t		See if File::Find works
-lib/File/Find/t/taint.t		See if File::Find works with taint
-lib/FileHandle.pm		Backward-compatible front end to IO extension
-lib/FileHandle.t		See if FileHandle works
+lib/File/GlobPP.pm		Pure perl glob
 lib/File/Path.pm		Do things like `mkdir -p' and `rm -r'
 lib/File/Path.t			See if File::Path works
 lib/File/Spec/Cygwin.pm		portable operations on Cygwin file names
@@ -1068,7 +1013,6 @@ lib/Getopt/Long/t/gol-xargv.t	See if Getopt::Long works
 lib/Getopt/Long/t/gol-xstring.t	See if Getopt::Long works
 lib/Getopt/Std.pm		Fetch command options (getopt, getopts)
 lib/Getopt/Std.t		See if Getopt::Std and Getopt::Long work
-lib/h2ph.t			See if h2ph works like it should
 lib/h2xs.t			See if h2xs produces expected lists of files
 lib/I18N/LangTags/ChangeLog	I18N::LangTags
 lib/I18N/LangTags/Detect.pm	Detect language preferences
@@ -1082,8 +1026,6 @@ lib/I18N/LangTags/t/20_locales.t	See whether I18N::LangTags works
 lib/I18N/LangTags/t/50_super.t	See whether I18N::LangTags works
 lib/I18N/LangTags/t/55_supers_strict.t	See whether I18N::LangTags works
 lib/I18N/LangTags/t/80_all_env.t	See whether I18N::LangTags works
-lib/if.pm			For "use if"
-lib/if.t			Tests for "use if"
 lib/integer.pm			For "use integer"
 lib/integer.t			For "use integer" testing
 lib/Internals.t			For Internals::* testing
@@ -1417,14 +1359,12 @@ lib/Pod/t/utils.t		Test for Pod::ParseUtils
 lib/Pod/Usage.pm		Pod-Parser - print usage messages
 lib/Search/Dict.pm		Perform binary search on dictionaries
 lib/Search/Dict.t		See if Search::Dict works
-lib/SelectSaver.pm		Enforce proper select scoping
-lib/SelectSaver.t		See if SelectSaver works
+lib/signals.pm			For handling signals
+lib/signals.t			See if signals works
 lib/sigtrap.pm			For trapping an abort and giving traceback
 lib/sigtrap.t			See if sigtrap works
 lib/sort.pm			For "use sort"
 lib/sort.t			See if "use sort" works
-lib/strict.pm			For "use strict"
-lib/strict.t			See if strictures work
 lib/Symbol.pm			Symbol table manipulation routines
 lib/Symbol.t			See if Symbol works
 lib/Term/ANSIColor/ChangeLog	Term::ANSIColor
@@ -1440,7 +1380,6 @@ lib/Test/Builder.pm		For writing new test libraries
 lib/Test/Builder/Tester/Color.pm	Turn on color in Test::Builder::Tester
 lib/Test/Builder/Tester.pm	For testing Test::Builder based classes
 lib/Test/More.pm		More utilities for writing tests
-lib/Test.pm			A simple framework for writing test scripts
 lib/Test/Simple/Changes		Test::Simple changes
 lib/Test/Simple.pm		Basic utility for writing tests
 lib/Test/Simple/README		Test::Simple README
@@ -1470,9 +1409,7 @@ lib/Test/Simple/t/fork.t	Test::More fork tests
 lib/Test/Simple/t/has_plan2.t	Test::More->plan tests
 lib/Test/Simple/t/has_plan.t	Test::Builder->plan tests
 lib/Test/Simple/t/import.t	Test::More test, importing functions
-lib/Test/Simple/t/is_deeply_dne_bug.t	Test::More test
 lib/Test/Simple/t/is_deeply_fail.t	Test::More test, is_deeply()
-lib/Test/Simple/t/is_deeply_with_threads.t	Test::More test
 lib/Test/Simple/t/is_fh.t	Test::Builder test, _is_fh()
 lib/Test/Simple/t/lib/Dummy.pm	Test::More test module
 lib/Test/Simple/t/lib/MyOverload.pm	Test::More test module 
@@ -1485,8 +1422,6 @@ lib/Test/Simple/t/no_plan.t	Test::Simple test, forgot the plan
 lib/Test/Simple/TODO		Test::Simple TODO
 lib/Test/Simple/t/ok_obj.t	Test::Builder object tests
 lib/Test/Simple/t/output.t	Test::Builder test, output methods
-lib/Test/Simple/t/overload.t		Test::Simple test
-lib/Test/Simple/t/overload_threads.t	Test::Simple test
 lib/Test/Simple/t/plan_bad.t		Test::Simple test
 lib/Test/Simple/t/plan_is_noplan.t	Test::Simple test, no_plan
 lib/Test/Simple/t/plan_no_plan.t	Test::More test, plan() w/no_plan
@@ -1505,28 +1440,17 @@ lib/Test/Simple/t/tbt_04line_num.t	Test::Builder::Tester test
 lib/Test/Simple/t/tbt_05faildiag.t	Test::Builder::Tester test
 lib/Test/Simple/t/tbt_06errormess.t	Test::Builder::Tester test
 lib/Test/Simple/t/tbt_07args.t	Test::Builder::Tester test
-lib/Test/Simple/t/threads.t	Test::Builder thread-safe checks
 lib/Test/Simple/t/thread_taint.t	Test::Simple test
 lib/Test/Simple/t/todo.t	Test::More test, TODO tests
 lib/Test/Simple/t/try.t		Test::More test
 lib/Test/Simple/t/undef.t	Test::More test, undefs don't cause warnings
 lib/Test/Simple/t/useing.t	Test::More test, compile test
 lib/Test/Simple/t/use_ok.t	Test::More test, use_ok()
-lib/Test/Simple/t/utf8.t	Test::More test
-lib/Test/t/fail.t		See if Test works
-lib/Test/t/mix.t		See if Test works
-lib/Test/t/multiline.t		See if Test works
-lib/Test/t/onfail.t		See if Test works
-lib/Test/t/qr.t			See if Test works
-lib/Test/t/skip.t		See if Test works
-lib/Test/t/success.t		See if Test works
-lib/Test/t/todo.t		See if Test works
 lib/Test/Tutorial.pod		A tutorial on writing tests
 lib/Text/Abbrev.pm		An abbreviation table builder
 lib/Text/Abbrev.t		Test Text::Abbrev
 lib/Text/ParseWords.pm		Perl module to split words on arbitrary delimiter
 lib/Text/ParseWords.t		See if Text::ParseWords works
-lib/Text/ParseWords/taint.t	See if Text::ParseWords works with tainting
 lib/Text/Tabs.pm		Do expand and unexpand
 lib/Text/TabsWrap/CHANGELOG	ChangeLog for Tabs+Wrap
 lib/Text/TabsWrap/t/37000.t	See if Text::Tabs is working
@@ -1541,25 +1465,7 @@ lib/Text/TabsWrap/t/sep.t	See if Text::Tabs is working
 lib/Text/TabsWrap/t/tabs.t	See if Text::Tabs works
 lib/Text/TabsWrap/t/wrap.t	See if Text::Wrap::wrap works
 lib/Text/Wrap.pm		Paragraph formatter
-lib/Thread.pm			Thread extensions frontend
-lib/Thread/Queue.pm		Thread-safe queues
-lib/Thread/Queue/t/01_basic.t	Thread::Queue tests
-lib/Thread/Queue/t/02_refs.t	Thread::Queue tests
-lib/Thread/Queue/t/03_peek.t	Thread::Queue tests
-lib/Thread/Queue/t/04_errs.t	Thread::Queue tests
-lib/Thread/Queue/t/05_extract.t	Thread::Queue tests
-lib/Thread/Queue/t/06_insert.t	Thread::Queue tests
-lib/Thread/Queue/t/07_lock.t	Thread::Queue tests
-lib/Thread/Queue/t/08_nothreads.t	Thread::Queue tests
-lib/Thread/Semaphore.pm		Thread-safe semaphores
-lib/Thread/Semaphore/t/01_basic.t	Thread::Semaphore tests
-lib/Thread/Semaphore/t/02_errs.t	Thread::Semaphore tests
-lib/Thread/Semaphore/t/03_nothreads.t	Thread::Semaphore tests
-lib/Thread.t			Thread extensions frontend tests
-lib/Tie/Hash/NamedCapture.pm	Implements %- and %+ behaviour
 lib/Tie/Hash.pm			Base class for tied hashes
-lib/Tie/SubstrHash.pm		Compact hash for known key, value and table size
-lib/Tie/SubstrHash.t		Test for Tie::SubstrHash
 lib/Time/gmtime.pm		By-name interface to Perl's builtin gmtime
 lib/Time/gmtime.t		Test for Time::gmtime
 lib/Time/Local.pm		Reverse translation of localtime, gmtime
@@ -1627,9 +1533,6 @@ lib/User/pwent.t		See if User::pwent works
 lib/utf8_heavy.pl		Support routines for utf8 pragma
 lib/utf8.pm			Pragma to control Unicode support
 lib/utf8.t			See if utf8 operations work
-lib/vars_carp.t			See if "use vars" doesn't load Carp.pm per default
-lib/vars.pm			Declare pseudo-imported global variables
-lib/vars.t			See if "use vars" works
 lib/version.pm			Support for version objects
 lib/version.pod			Documentation of the version module
 lib/version.t			Tests for version objects
@@ -1738,9 +1641,11 @@ NetWare/win32ish.h		NetWare port
 nostdio.h			Cause compile error on stdio calls
 numeric.c			Miscellaneous numeric conversion routines
 op.c				Opcode syntax tree code
+op_context.c			Opcode context propagation code
 opcode.h			Automatically generated opcode header
 opcode.pl			Opcode header generator
 op.h				Opcode syntax tree header
+op_i.h				Opcode syntax tree inline functions
 opnames.h			Automatically generated opcode header
 os2/Changes			Changelog for OS/2 port
 os2/diff.configure		Patches to Configure
@@ -1843,13 +1748,18 @@ plan9/plan9ish.h		Plan9 port: Plan9-specific C header file
 plan9/setup.rc			Plan9 port: script for easy build+install
 plan9/versnum			Plan9 port: script to print version number
 pod/buildtoc			Update files based on pod.lst
-pod/checkpods.PL		Tool to check for common errors in pods
+pod/checkpods.pl		Tool to check for common errors in pods
 pod/kurila01delta.pod	What is new for Perl Kurila 0.1
 pod/kurila02delta.pod	What is new for Perl Kurila 0.2
 pod/kurila111delta.pod	What is new for Perl Kurila 1.11
 pod/kurila112delta.pod	What is new for Perl Kurila 1.12
 pod/kurila113delta.pod	What is new for Perl Kurila 1.13
 pod/kurila114delta.pod	What is new for Perl Kurila 1.14
+pod/kurila115delta.pod	What is new for Perl Kurila 1.15
+pod/kurila116delta.pod	What is new for Perl Kurila 1.16
+pod/kurila117delta.pod	What is new for Perl Kurila 1.17
+pod/kurila118delta.pod	What is new for Perl Kurila 1.18
+pod/kurila119delta.pod	What is new for Perl Kurila 1.19
 pod/kurila110delta.pod	What is new for Perl Kurila 1.10
 pod/kurila13delta.pod	What is new for Perl Kurila 1.3
 pod/kurila14delta.pod	What is new for Perl Kurila 1.4
@@ -1899,7 +1809,6 @@ pod/perlclib.pod		Internal replacements for standard C library functions
 pod/perlcommunity.pod		Perl community information
 pod/perlcompile.pod		Perl compiler suite intro
 pod/perldata.pod		Perl data structures
-pod/perldbmfilter.pod		Perl DBM filters
 pod/perldebguts.pod		Perl debugging guts and tips
 pod/perldebtut.pod		Perl debugging tutorial
 pod/perldebug.pod		Perl debugging
@@ -1966,7 +1875,6 @@ pod/perlstyle.pod		Perl style guide
 pod/perlsub.pod			Perl subroutines
 pod/perlsyn.pod			Perl syntax
 pod/perlthrtut.pod		Perl threads tutorial
-pod/perltie.pod			Perl objects hidden behind simple variables
 pod/perltodo.pod		Perl things to do
 pod/perltooc.pod		Perl OO tutorial, part 2
 pod/perltoot.pod		Perl OO tutorial, part 1
@@ -1979,13 +1887,13 @@ pod/perlutil.pod		utilities packaged with the Perl distribution
 pod/perlvar.pod			Perl predefined variables
 pod/perlxs.pod			Perl XS application programming interface
 pod/perlxstut.pod		Perl XS tutorial
-pod/pod2html.PL			Precursor for translator to turn pod into HTML
-pod/pod2latex.PL		Precursor for translator to turn pod into LaTeX
-pod/pod2man.PL			Precursor for translator to turn pod into manpage
-pod/pod2text.PL			Precursor for translator to turn pod into text
-pod/pod2usage.PL		Pod-Parser - print usage messages from POD docs
-pod/podchecker.PL		Pod-Parser - Pod::Checker::podchecker() CLI
-pod/podselect.PL		Pod-Parser - Pod::Select::podselect() CLI
+pod/pod2html.pl			Precursor for translator to turn pod into HTML
+pod/pod2latex.pl		Precursor for translator to turn pod into LaTeX
+pod/pod2man.pl			Precursor for translator to turn pod into manpage
+pod/pod2text.pl			Precursor for translator to turn pod into text
+pod/pod2usage.pl		Pod-Parser - print usage messages from POD docs
+pod/podchecker.pl		Pod-Parser - Pod::Checker::podchecker() CLI
+pod/podselect.pl		Pod-Parser - Pod::Select::podselect() CLI
 pod/roffitall			troff the whole man page set
 pod/rofftoc			Generate a table of contents in troff format
 pod/splitman			Splits perlfunc into multiple man pages
@@ -2036,6 +1944,7 @@ pp.c				Push/Pop code
 pp_ctl.c			Push/Pop code for control flow
 pp.h				Push/Pop code defs
 pp_hot.c			Push/Pop code for heavily used opcodes
+pp_re.c			Push/Pop code for regex related opcodes
 pp_pack.c			Push/Pop code for pack/unpack
 pp_proto.h			C++ definitions for Push/Pop code
 pp_sort.c			Push/Pop code for sort
@@ -2104,9 +2013,10 @@ regnodes.h			Description of nodes of RE engine
 run.c				The interpreter loop
 scope.c				Scope entry and exit code
 scope.h				Scope entry and exit header
+scope_i.h			Scope entry and exit inline functions
 sv.c				Scalar value code
 sv.h				Scalar value header
-svx.h				Scalar value header
+sv_i.h				Scalar value inline functions
 symbian/bld.inf			Symbian sample app build config
 symbian/config.pl		Configuration script for Symbian
 symbian/config.sh		Configuration data for Symbian
@@ -2157,7 +2067,6 @@ symbian/TODO			Symbian things to do
 symbian/uid.pl			Helper code for config.pl
 symbian/version.pl		Helper code for config.pl
 symbian/xsbuild.pl		Building extensions
-taint.c				Tainting code
 t/arch/64bitint.t			See if 64 bit integers work
 t/base/cond.t			See if conditionals work
 t/base/if.t			See if if works
@@ -2172,10 +2081,15 @@ t/cmd/mod.t			See if statement modifiers work
 t/cmd/subval.t			See if subroutine values work
 t/cmd/switch.t			See if switch optimizations work
 t/cmd/while.t			See if while loops work
+t/comp/assignment.t			See if assignments work
+t/comp/return.t			See if return opcode works
+t/comp/arguments.t			See if passing arguments to subs work
 t/comp/blocks.t			See if BEGIN and friends work
+t/comp/scope.t			See if scoping works
 t/comp/bproto.t			See if builtins conform to their prototypes
 t/comp/cmdopt.t			See if command optimization works
 t/comp/colon.t			See if colons are parsed correctly
+t/comp/dynascope.t		See if dynascope work
 t/comp/decl.t			See if declarations work
 t/comp/fold.t			See if constant folding works
 t/comp/hints.t			See if %^H works
@@ -2184,12 +2098,10 @@ t/comp/opsubs.t			See if q() etc. are not parsed as functions
 t/comp/our.t			Tests for our declaration
 t/comp/package.t		See if packages work
 t/comp/parser.t			See if the parser works in edge cases
-t/comp/proto.t			See if function prototypes work
 t/comp/redef.t			See if we get correct warnings on redefined subs
 t/comp/require.t		See if require works
 t/comp/script.t			See if script invocation works
 t/comp/term.t			See if more terms work
-t/comp/uproto.t			See if the _ prototype works
 t/comp/use.t			See if pragmata work
 t/comp/utf.t			See if UTFs work
 thread.h			Threading header
@@ -2200,21 +2112,16 @@ t/io/crlf_through.t		See if pipe passes data intact with :crlf
 t/io/dup.t			See if >& works right
 t/io/fflush.t			See if auto-flush on fork/exec/system/qx works
 t/io/fs.t			See if directory manipulations work
-t/io/inplace.t			See if inplace editing works
-t/io/iprefix.t			See if inplace editing works with prefixes
 t/io/layers.t			See if PerlIO layers work
-t/io/nargv.t			See if nested ARGV stuff works
 t/io/openpid.t			See if open works for subprocesses
 t/io/open.t			See if open works
 t/io/pipe.t			See if secure pipes work
 t/io/print.t			See if print commands work
 t/io/read.t			See if read works
-t/io/select.t			See if select works
 t/io/tell.t			See if file seeking works
 t/io/through.t			See if pipe passes data intact
 t/io/utf8.t			See if file seeking works
 t/japh/abigail.t		Obscure tests
-t/lex/attrs.t			See if attributes on declarations work
 t/lex/chars.t			See if character escapes work
 t/lex/qq.t			See if qq works
 t/lex/qr.t			See if qr work
@@ -2222,7 +2129,10 @@ t/lex/use.t			See if use works
 t/lex/ver.t			See if v-strings and the %v format flag work
 t/lex/location.t		See if locations are correctly saved
 t/op/anon_array.t		See if @( ... ) work
+t/op/hashconcat.t		See if +%+ works
 t/op/anon_hash.t		See if %( ... ) work
+t/op/aslice.t		See if [[...]] work
+t/op/hashjoin.t		See if %+: work
 t/lib/Cname.pm			Test charnames in regexes (op/pat.t)
 t/lib/common.pl			Helper for lib/{warnings,feature}.t
 t/lib/commonsense.t		See if configuration meets basic needs
@@ -2244,15 +2154,12 @@ t/lib/Devel/switchd.pm		Module for t/run/switchd.t
 t/lib/Dev/Null.pm		Module for testing Test::Harness	
 t/lib/Dummy.pm			Module for testing base.pm
 t/lib/feature/bundle		Tests for feature bundles
-t/lib/feature/implicit		Tests for implicit loading of feature.pm
 t/lib/feature/nonesuch		Tests for enabling/disabling nonexistent feature
 t/lib/Filter/Simple/ExportTest.pm	Helper file for Filter::Simple tests
 t/lib/Filter/Simple/FilterOnlyTest.pm	Helper file for Filter::Simple tests
 t/lib/Filter/Simple/FilterTest.pm	Helper file for Filter::Simple tests
 t/lib/Filter/Simple/ImportTest.pm	Helper file for Filter::Simple tests
 t/lib/filter-util.pl		See if Filter::Util::Call works
-t/lib/h2ph.h			Test header file for h2ph
-t/lib/h2ph.pht			Generated output from h2ph.h by h2ph, for comparison
 t/lib/HasSigDie.pm		Module for testing base.pm
 t/lib/locale/latin1		Part of locale.t in Latin 1
 t/lib/locale/utf8		Part of locale.t in UTF8
@@ -2269,12 +2176,9 @@ t/lib/no_load.t			Test that some modules don't load others
 t/lib/Sans_mypragma.pm			Test module for t/lib/mypragma.t
 t/lib/Test/Simple/Catch.pm	Utility module for testing Test::Simple
 t/lib/Test/Simple/sample_tests/death_in_eval.plx	for exit.t
-t/lib/Test/Simple/sample_tests/death.plx		for exit.t
-t/lib/Test/Simple/sample_tests/death_with_handler.plx	for exit.t
 t/lib/Test/Simple/sample_tests/exit.plx			for exit.t
 t/lib/Test/Simple/sample_tests/extras.plx		for exit.t
 t/lib/Test/Simple/sample_tests/five_fail.plx		for exit.t
-t/lib/Test/Simple/sample_tests/last_minute_death.plx	for exit.t
 t/lib/Test/Simple/sample_tests/one_fail.plx		for exit.t
 t/lib/Test/Simple/sample_tests/pre_plan_death.plx		for exit.t
 t/lib/Test/Simple/sample_tests/require.plx		for exit.t
@@ -2289,7 +2193,6 @@ t/lib/warnings/4lint		Tests for -W switch
 t/lib/warnings/5nolint		Tests for -X switch
 t/lib/warnings/6default		Tests default warnings
 t/lib/warnings/7fatal		Tests fatal warnings
-t/lib/warnings/8signal		Tests warnings + __WARN__ and __DIE__
 t/lib/warnings/9enabled		Tests warnings
 t/lib/warnings/9uninit		Tests "Use of uninitialized" warnings
 t/lib/warnings/av		Tests for av.c for warnings.t
@@ -2303,7 +2206,6 @@ t/lib/warnings/op		Tests for op.c for warnings.t
 t/lib/warnings/pad		Tests for pad.c for warnings.t
 t/lib/warnings/perl		Tests for perl.c for warnings.t
 t/lib/warnings/perlio		Tests for perlio.c for warnings.t
-t/lib/warnings/perly		Tests for perly.y for warnings.t
 t/lib/warnings/pp		Tests for pp.c for warnings.t
 t/lib/warnings/pp_ctl		Tests for pp_ctl.c for warnings.t
 t/lib/warnings/pp_hot		Tests for pp_hot.c for warnings.t
@@ -2311,9 +2213,7 @@ t/lib/warnings/pp_pack		Tests for pp_pack.c for warnings.t
 t/lib/warnings/pp_sys		Tests for pp_sys.c for warnings.t
 t/lib/warnings/regcomp		Tests for regcomp.c for warnings.t
 t/lib/warnings/regexec		Tests for regexec.c for warnings.t
-t/lib/warnings/run		Tests for run.c for warnings.t
 t/lib/warnings/sv		Tests for sv.c for warnings.t
-t/lib/warnings/taint		Tests for taint.c for warnings.t
 t/lib/warnings/toke		Tests for toke.c for warnings.t
 t/lib/warnings/universal	Tests for universal.c for warnings.t
 t/lib/warnings/utf8		Tests for utf8.c for warnings.t
@@ -2328,18 +2228,14 @@ t/mro/complex_c3.t		mro tests
 t/mro/dbic_c3.t			mro tests
 t/mro/inconsistent_c3.t		mro tests
 t/mro/method_caching.t		mro tests
-t/mro/next_edgecases.t		mro tests
-t/mro/next_goto.t		mro tests
-t/mro/next_inanon.t		mro tests
-t/mro/next_ineval.t		mro tests
-t/mro/next_method.t		mro tests
-t/mro/next_skip.t		mro tests
 t/mro/pkg_gen.t		mro tests
 t/mro/recursion_c3.t		mro tests
 t/mro/vulcan_c3.t		mro tests
 Todo.micro			The Wishlist for microperl
 toke.c				The tokener
 t/op/arith.t			See if arithmetic works
+t/op/arrayexpand.t			See if the array expand operator works
+t/op/hashexpand.t			See if the hash expand operator works
 t/op/assignwarn.t		See if OP= operators warn correctly for undef targets
 t/op/auto.t			See if autoincrement et all work
 t/op/bless.t			See if bless works
@@ -2367,21 +2263,17 @@ t/op/exec.t			See if exec, system and qx work
 t/op/exp.t			See if math functions work
 t/op/filetest.t			See if file tests work
 t/op/fork.t			See if fork works
-t/op/fun.t			See if op.c:Perl_ck_fun works
-t/op/getpid.t			See if $$ and getppid work with threads
 t/op/getppid.t			See if getppid works
 t/op/glob.t			See if <*> works
-t/op/goto.t			See if goto works
-t/op/goto_xs.t			See if "goto &sub" works on XSUBs
 t/op/grent.t			See if getgr*() functions work
 t/op/grep.t			See if grep() and map() work
 t/op/groups.t			See if $( works
+t/op/helem.t		See if hash element operator work
 t/op/hashassign.t		See if hash assignments work
 t/op/hashwarn.t			See if warnings for bad hash assignments work
-t/op/inccode.t			See if coderefs work in @INC
+t/op/inccode.t			See if coderefs work in $^INCLUDE_PATH
 t/op/inc.t			See if inc/dec of integers near 32 bit limit work
 t/op/index.t			See if index works
-t/op/index_thr.t		See if index works in another thread
 t/op/int.t			See if int works
 t/op/join.t			See if join works
 t/op/kill0.t			See if kill(0, $pid) works
@@ -2405,13 +2297,15 @@ t/op/negate.t			See if unary minus works
 t/op/nelems.t			See if nelems works
 t/op/not.t			See if not works
 t/op/numconvert.t		See if accessing fields does not change numeric values
+t/op/sassign.t			See if assignment operator works
+t/op/try.t			See if try operator works
 t/op/oct.t			See if oct and hex work
 t/op/ord.t			See if ord works
 t/op/or.t			See if || works in weird situations
 t/op/override.t			See if operator overriding works
 t/op/pack.t			See if pack and unpack work
+t/op/padsv.t			See if my variables operators works
 t/op/pat.t			See if esoteric patterns work
-t/op/pat_thr.t			See if esoteric patterns work in another thread
 t/op/pos.t			See if pos works
 t/op/pow.t			See if ** works
 t/op/push.t			See if push and pop work
@@ -2430,11 +2324,9 @@ t/op/ref_eq.t			See if \== and \!= work
 t/op/ref.t			See if refs and objects work
 t/op/reftype.t			See if ref::reftype works
 t/op/reg_email.t		See if regex recursion works by parsing email addresses
-t/op/reg_email_thr.t		See if regex recursion works by parsing email addresses in another thread
 t/op/regexp_noamp.t		See if regular expressions work with optimizations
 t/op/regexp_notrie.t		See if regular expressions work without trie optimisation
 t/op/regexp_qr_embed.t		See if regular expressions work with embedded qr//
-t/op/regexp_qr_embed_thr.t	See if regular expressions work with embedded qr// in another thread
 t/op/regexp_qr.t		See if regular expressions work as qr//
 t/op/regexp.t			See if regular expressions work
 t/op/regexp_trielist.t		See if regular expressions work with trie optimisation
@@ -2457,27 +2349,19 @@ t/op/sprintf2.t			See if sprintf works
 t/op/sprintf.t			See if sprintf works
 t/op/srand.t			See if srand works
 t/op/sselect.t			See if 4 argument select works
-t/op/state.t			See if state variables work
 t/op/stat.t			See if stat works
 t/op/study.t			See if study works
 t/op/substr.t			See if substr works
-t/op/substr_thr.t		See if substr works in another thread
 t/op/subst.t			See if substitution works
-t/op/substT.t			See if substitution works with -T
 t/op/sub.t			See if subroutines work
 t/op/symbolcache.t		See if undef/delete works on stashes with functions
 t/op/sysio.t			See if sysread and syswrite work
-t/op/taint.t			See if tainting works
-t/op/threads_create.pl		Ancillary file for t/op/threads.t
-t/op/threads.t			Misc. tests for perl features with threads
-t/op/tie.t			See if tie/untie functions work
 t/op/time.t			See if time functions work
 t/op/undef.t			See if undef works
 t/op/universal.t		See if UNIVERSAL class works
 t/op/unshift.t			See if unshift works
 t/op/upgrade.t			See if upgrading and assigning scalars works
 t/op/utf8decode.t		See if UTF-8 decoding works
-t/op/utftaint.t			See if utf8 and taint work together
 t/op/vec.t			See if vectors work
 t/op/view.t			See if view function works
 t/perl.supp			Perl valgrind suppressions
@@ -2533,14 +2417,17 @@ t/run/switches.t		Tests for the other switches (-0, -l, -c, -s, -M, -m, -V, -v, 
 t/run/switchI.t			Test the -I switch
 t/run/switchn.t			Test the -n switch
 t/run/switchp.t			Test the -p switch
-t/run/switcht.t			Test the -t switch
+t/run/switchp.aux			Test the -p switch
 t/run/switchx2.aux		Data for switchx.t
 t/run/switchx.aux		Data for switchx.t
 t/run/switchx.t			Test the -x switch
 t/sv/alarm.t			See if alarm works
 t/sv/anonsub.t			See if anonymous subroutines work
+t/sv/blocksub.t			See if anonymous block subroutines work
+t/sv/code.t			See if code copying works
 t/sv/args.t			See if operations on @_ work
 t/sv/array.t			See if array operations work
+t/sv/object.t			See if objects work
 t/sv/closure.t			See if closures work
 t/sv/fh.t			See if filehandles work
 t/sv/hash.t			See if the complexity attackers are repelled
@@ -2562,13 +2449,18 @@ t/win32/system_tests		Test runner for system.t
 uconfig.h			Configuration header for microperl
 uconfig.sh			Configuration script for microperl
 universal.c			The default UNIVERSAL package methods
+libenv.c			The env package methods
+liberror.c			The error package methods
+libinternals.c			The Internals package methods
+libutf8.c			The utf8 package methods
+libversion.c			The version package methods
+libsignals.c			The signals package methods
 unixish.h			Defines that are assumed on Unix
 utf8.c				Unicode routines
 utf8.h				Unicode header
 utfebcdic.h			Unicode on EBCDIC (UTF-EBCDIC, tr16) header
 util.c				Utility routines
 util.h				Dummy header
-utils/h2ph.pl			A thing to turn C .h files into perl .ph files
 utils/h2xs.pl			Program to make .xs files from C header files
 utils/instmodsh.PL		Give information about installed extensions
 utils.lst			Lists utilities bundled with Perl

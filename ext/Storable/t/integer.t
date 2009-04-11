@@ -16,7 +16,7 @@ use Config;
 
 use Test::More;
 use Storable < qw (dclone store retrieve freeze thaw nstore nfreeze);
-use strict;
+
 
 my $max_uv = ^~^0;
 my $max_uv_m1 = ^~^0 ^^^ 1;
@@ -27,7 +27,7 @@ my $max_iv_p1 = $max_uv ^^^ ($max_uv >> 1);
 my $lots_of_9C = do {
   my $temp = sprintf "\%#x", ^~^0;
   $temp =~ s/ff/9c/g;
-  local $^W;
+  local $^WARNING = undef;
   eval $temp;
 };
 
@@ -58,15 +58,15 @@ my @numbers =
 
 plan tests => (nelems @processes) * (nelems @numbers) * 5;
 
-my $file = "integer.$$";
+my $file = "integer.$^PID";
 die "Temporary file '$file' already exists" if -e $file;
 
-END { while (-f $file) {unlink $file or die "Can't unlink '$file': $!" }}
+END { while (-f $file) {unlink $file or die "Can't unlink '$file': $^OS_ERROR" }}
 
 sub do_clone {
   my $data = shift;
   my $copy = try {dclone $data};
-  is ($@, '', 'Should be no error dcloning');
+  is ($^EVAL_ERROR, '', 'Should be no error dcloning');
   ok (1, "dlcone is only 1 process, not 2");
   return $copy;
 }
@@ -74,41 +74,41 @@ sub do_clone {
 sub freeze_and_thaw {
   my $data = shift;
   my $frozen = try {freeze $data};
-  is ($@, '', 'Should be no error freezing');
+  is ($^EVAL_ERROR, '', 'Should be no error freezing');
   my $copy = try {thaw $frozen};
-  is ($@, '', 'Should be no error thawing');
+  is ($^EVAL_ERROR, '', 'Should be no error thawing');
   return $copy;
 }
 
 sub nfreeze_and_thaw {
   my $data = shift;
   my $frozen = try {nfreeze $data};
-  is ($@, '', 'Should be no error nfreezing');
+  is ($^EVAL_ERROR, '', 'Should be no error nfreezing');
   my $copy = try {thaw $frozen};
-  is ($@, '', 'Should be no error thawing');
+  is ($^EVAL_ERROR, '', 'Should be no error thawing');
   return $copy;
 }
 
 sub store_and_retrieve {
   my $data = shift;
   my $frozen = try {store $data, $file};
-  is ($@, '', 'Should be no error storing');
+  is ($^EVAL_ERROR, '', 'Should be no error storing');
   my $copy = try {retrieve $file};
-  is ($@, '', 'Should be no error retrieving');
+  is ($^EVAL_ERROR, '', 'Should be no error retrieving');
   return $copy;
 }
 
 sub nstore_and_retrieve {
   my $data = shift;
   my $frozen = try {nstore $data, $file};
-  is ($@, '', 'Should be no error storing');
+  is ($^EVAL_ERROR, '', 'Should be no error storing');
   my $copy = try {retrieve $file};
-  is ($@, '', 'Should be no error retrieving');
+  is ($^EVAL_ERROR, '', 'Should be no error retrieving');
   return $copy;
 }
 
 foreach ( @processes) {
-  my ($process, $sub) = < @$_;
+  my @($process, $sub) =  @$_;
   foreach my $number ( @numbers) {
     # as $number is an alias into @numbers, we don't want any side effects of
     # conversion macros affecting later runs, so pass a copy to Storable:
@@ -145,7 +145,7 @@ foreach ( @processes) {
 
       # Oh well; at least the parser gets it right. :-)
       my $copy_s3 = eval $copy_s1;
-      die "Was supposed to have number $copy_s3, got error $@"
+      die "Was supposed to have number $copy_s3, got error $^EVAL_ERROR"
 	unless defined $copy_s3;
       my $bit = ok (($copy_s3 ^^^ $copy1) == 0, "$process $copy1 (bitpattern)");
       # This is sick. 5.005_03 survives without the IV/UV flag, and somehow
@@ -157,7 +157,7 @@ foreach ( @processes) {
                      "$process $copy1 (sign)");
 
       unless ($bit and $sign) {
-        printf "# Passed in \%s  (\%#x, \%i)\n# got back '\%s' (\%#x, \%i)\n",
+        printf $^STDOUT, "# Passed in \%s  (\%#x, \%i)\n# got back '\%s' (\%#x, \%i)\n",
           $copy1, $copy1, $copy1, $copy_s1, $copy_s1, $copy_s1;
         # use Devel::Peek; Dump $number; Dump $copy1; Dump $copy_s1;
       }

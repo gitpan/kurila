@@ -5,22 +5,20 @@ BEGIN {
     try {
 	require warnings;
     };
-    if ($@) {
-	print "1..0\n";
-	print $@;
+    if ($^EVAL_ERROR) {
+	print $^STDOUT, "1..0\n";
+	print $^STDOUT, $^EVAL_ERROR;
 	exit;
     }
 }
 
-use strict;
+use Test::More tests => 1;
 use MIME::Base64 < qw(decode_base64);
-
-print "1..1\n";
 
 use warnings;
 
 my @warn;
-$^WARN_HOOK = sub { push(@warn, @_[0]->{description} . "\n") };
+$^WARN_HOOK = sub { push(@warn, @_[0]->{?description} . "\n") };
 
 warn;
 my $a;
@@ -37,20 +35,20 @@ $a = do {
 };
 warn;
 $a = do {
-    local $^W;
+    local $^WARNING = 0;
     decode_base64("aa");
 };
 $a = do {
-    local $^W;
+    local $^WARNING = 0;
     decode_base64("a===");
 };
 warn;
 
 for ( @warn) {
-    print "# $_";
+    print $^STDOUT, "# $_";
 }
 
-print "not " unless join("", @warn) eq <<"EOT"; print "ok 1\n";
+is(join("", @warn), <<"EOT");
 Warning: something's wrong
 Premature end of base64 data
 Premature padding of base64 data

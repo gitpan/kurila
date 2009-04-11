@@ -1,43 +1,35 @@
 #!/usr/bin/perl
 
-BEGIN {
-    if( %ENV{PERL_CORE} ) {
-        chdir 't' if -d 't';
-        @INC = @( '../lib' );
-    }
-}
-chdir 't';
-
 use Config;
 use ExtUtils::Embed;
 use File::Spec;
 
-open(my $fh, ">","embed_test.c") || die "Cannot open embed_test.c:$!";
-print $fh ~< *DATA;
+open(my $fh, ">","embed_test.c") || die "Cannot open embed_test.c:$^OS_ERROR";
+print $fh, ~< *DATA;
 close($fh);
 
-$| = 1;
-print "1..9\n";
-my $cc = %Config{'cc'};
-my $cl  = ($^O eq 'MSWin32' && $cc eq 'cl');
-my $borl  = ($^O eq 'MSWin32' && $cc eq 'bcc32');
-my $skip_exe = $^O eq 'os2' && %Config{ldflags} =~ m/(?<!\S)-Zexe\b/;
+$^OUTPUT_AUTOFLUSH = 1;
+print $^STDOUT, "1..9\n";
+my $cc = config_value('cc');
+my $cl  = ($^OS_NAME eq 'MSWin32' && $cc eq 'cl');
+my $borl  = ($^OS_NAME eq 'MSWin32' && $cc eq 'bcc32');
+my $skip_exe = $^OS_NAME eq 'os2' && config_value("ldflags") =~ m/(?<!\S)-Zexe\b/;
 my $exe = 'embed_test';
-$exe .= %Config{'exe_ext'} unless $skip_exe;	# Linker will auto-append it
-my $obj = 'embed_test' . %Config{'obj_ext'};
+$exe .= config_value('exe_ext') unless $skip_exe;	# Linker will auto-append it
+my $obj = 'embed_test' . config_value('obj_ext');
 my $inc = File::Spec->updir;
 my $lib = File::Spec->updir;
 my $libperl_copied;
 my $testlib;
 my @cmd;
-my (@cmd2) if $^O eq 'VMS';
+my (@cmd2) if $^OS_NAME eq 'VMS';
 # Don't use ccopts() here as we may want to overwrite an existing
 # perl with a new one with inconsistent header files, meaning
 # the usual value for perl_inc(), which is used by ccopts(),
 # will be wrong.
-if ($^O eq 'VMS') {
+if ($^OS_NAME eq 'VMS') {
     push(@cmd,$cc,"/Obj=$obj");
-    my (@incs) = @($inc);
+    my @(@incs) =@( @($inc));
     my $crazy = ccflags();
     if ($crazy =~ s#/inc[^=/]*=([\w\$\_\-\.\[\]\:]+)##i) {
         push(@incs,$1);
@@ -50,7 +42,7 @@ if ($^O eq 'VMS') {
     push(@cmd,$crazy);
     push(@cmd,"embed_test.c");
 
-    push(@cmd2,%Config{'ld'}, %Config{'ldflags'}, "/exe=$exe"); 
+    push(@cmd2,config_value('ld'), config_value('ldflags'), "/exe=$exe"); 
     push(@cmd2,"$obj,[-]perlshr.opt/opt,[-]perlshr_attr.opt/opt");
 
 } else {
@@ -63,7 +55,7 @@ if ($^O eq 'VMS') {
    else {
     push(@cmd,$cc,'-o' => $exe);
    }
-   if ($^O eq 'dec_osf' && !defined %Config{usedl}) {
+   if ($^OS_NAME eq 'dec_osf' && !defined config_value("usedl")) {
        # The -non_shared is needed in case of -Uusedl or otherwise
        # the test application will try to use libperl.so
        # instead of libperl.a.
@@ -71,55 +63,58 @@ if ($^O eq 'VMS') {
    }
 
    push(@cmd,"-I$inc", ccflags(),'embed_test.c');
-   if ($^O eq 'MSWin32') {
+   if ($^OS_NAME eq 'MSWin32') {
     $inc = File::Spec->catdir($inc,'win32');
     push(@cmd,"-I$inc");
     $inc = File::Spec->catdir($inc,'include');
     push(@cmd,"-I$inc");
     if ($cc eq 'cl') {
-	push(@cmd,'-link',"-libpath:$lib",%Config{'libperl'},%Config{'libs'});
+	push(@cmd,'-link',"-libpath:$lib",
+             config_value('libperl'),config_value('libs'));
     }
     else {
-	push(@cmd,"-L$lib", File::Spec->catfile($lib,%Config{'libperl'}),%Config{'libc'});
+	push(@cmd,"-L$lib",
+             File::Spec->catfile($lib, config_value('libperl')),
+             config_value('libc'));
     }
    }
-   elsif ($^O eq 'os390' && %Config{usedl}) {
+   elsif ($^OS_NAME eq 'os390' && config_value('usedl')) {
     # Nothing for OS/390 (z/OS) dynamic.
    } else { # Not MSWin32 or OS/390 (z/OS) dynamic.
     push(@cmd,"-L$lib",'-lperl');
     local $^WARN_HOOK = sub {
-	print STDERR @_[0]->message unless @_[0]->message =~ m/No library found for .*perl/
+	print $^STDERR, @_[0]->message unless @_[0]->message =~ m/No library found for .*perl/
     };
     push(@cmd, '-Zlinker', '/PM:VIO')	# Otherwise puts a warning to STDOUT!
-	if $^O eq 'os2' and %Config{ldflags} =~ m/(?<!\S)-Zomf\b/;
+	if $^OS_NAME eq 'os2' and config_value('ldflags') =~ m/(?<!\S)-Zomf\b/;
     push(@cmd, ldopts());
    }
    if ($borl) {
-     @cmd = @(@cmd[0],(< grep{m/^-[LI]/}@cmd[[1..((nelems @cmd)-1)]]),(< grep{!m/^-[LI]/}@cmd[[1..((nelems @cmd)-1)]]));
+     @cmd = @(@cmd[0],(< grep{m/^-[LI]/},@cmd[[1..((nelems @cmd)-1)]]),(< grep{!m/^-[LI]/},@cmd[[1..((nelems @cmd)-1)]]));
    }
 
-   if ($^O eq 'aix') { # AIX needs an explicit symbol export list.
-    my ($perl_exp) = < grep { -f } qw(perl.exp ../perl.exp);
+   if ($^OS_NAME eq 'aix') { # AIX needs an explicit symbol export list.
+    my @($perl_exp) =  grep { -f }, qw(perl.exp ../perl.exp);
     die "where is perl.exp?\n" unless defined $perl_exp;
     for ( @cmd) {
         s!-bE:(\S+)!-bE:$perl_exp!;
     }
    }
-   elsif ($^O eq 'cygwin') { # Cygwin needs the shared libperl copied
-     my $v_e_r_s = substr(%Config{version},0,-2);
+   elsif ($^OS_NAME eq 'cygwin') { # Cygwin needs the shared libperl copied
+     my $v_e_r_s = substr(config_version('version'),0,-2);
      $v_e_r_s =~ s/[.]/_/g;
      system("cp ../cygperl$v_e_r_s.dll ./");    # for test 1
    }
-   elsif (%Config{'libperl'} !~ m/\Alibperl\./) {
+   elsif (config_value('libperl') !~ m/\Alibperl\./) {
      # Everyone needs libperl copied if it's not found by '-lperl'.
-     $testlib = %Config{'libperl'};
+     $testlib = config_value('libperl');
      my $srclib = $testlib;
      $testlib =~ s/.+(?=\.[^.]*)/libperl/;
      $testlib = File::Spec->catfile($lib, $testlib);
      $srclib = File::Spec->catfile($lib, $srclib);
      if (-f $srclib) {
        unlink $testlib if -f $testlib;
-       my $ln_or_cp = %Config{'ln'} || %Config{'cp'};
+       my $ln_or_cp = config_value('ln') || config_value('cp');
        my $lncmd = "$ln_or_cp $srclib $testlib";
        #print "# $lncmd\n";
        $libperl_copied = 1	unless system($lncmd);
@@ -130,27 +125,27 @@ my $status;
 # On OS/2 the linker will always emit an empty line to STDOUT; filter these
 my $cmd = join ' ', @cmd;
 chomp($cmd); # where is the newline coming from? ldopts()?
-print "# $cmd\n";
+print $^STDOUT, "# $cmd\n";
 my @out = @( `$cmd` );
-$status = $?;
-print "# $_\n" foreach  @out;
+$status = $^CHILD_ERROR;
+print $^STDOUT, "# $_\n" foreach  @out;
 
-if ($^O eq 'VMS' && !$status) {
-  print "# {join ' ',@cmd2}\n";
+if ($^OS_NAME eq 'VMS' && !$status) {
+  print $^STDOUT, "# $(join ' ',@cmd2)\n";
   $status = system(join(' ', @cmd2)); 
 }
-print (($status? 'not ': '')."ok 1\n");
+print ($^STDOUT, ($status?? 'not '!! '')."ok 1\n");
 
 my $embed_test = File::Spec->catfile(File::Spec->curdir, $exe);
-$embed_test = "run/nodebug $exe" if $^O eq 'VMS';
-print "# embed_test = $embed_test\n";
+$embed_test = "run/nodebug $exe" if $^OS_NAME eq 'VMS';
+print $^STDOUT, "# embed_test = $embed_test\n";
 $status = system($embed_test);
-print (($status? 'not ':'')."ok 9 # system returned $status\n");
+print ($^STDOUT, ($status?? 'not '!!'')."ok 9 # system returned $status\n");
 unlink($exe,"embed_test.c",$obj);
-unlink("$exe.manifest") if $cl and %Config{'ccversion'} =~ m/^(\d+)/ and $1 +>= 14;
-unlink("$exe%Config{exe_ext}") if $skip_exe;
-unlink("embed_test.map","embed_test.lis") if $^O eq 'VMS';
-unlink(glob( <"./*.dll")) if $^O eq 'cygwin';
+unlink("$exe.manifest") if $cl and config_value('ccversion') =~ m/^(\d+)/ and $1 +>= 14;
+unlink("$exe" . config_value("exe_ext")) if $skip_exe;
+unlink("embed_test.map","embed_test.lis") if $^OS_NAME eq 'VMS';
+unlink(glob( <"./*.dll")) if $^OS_NAME eq 'cygwin';
 unlink($testlib)	       if $libperl_copied;
 
 # gcc -g -I.. -L../ -o perl_test perl_test.c -lperl `../perl -I../lib -MExtUtils::Embed -I../ -e ccflags -e ldopts`
@@ -163,7 +158,7 @@ __END__
 
 #define my_puts(a) if(puts(a) < 0) exit(666)
 
-static const char * cmds [] = { "perl", "-e", "$|=1; print qq[ok 5\\n]", NULL };
+static const char * cmds [] = { "perl", "-e", "$^OUTPUT_AUTOFLUSH=1; print $^STDOUT, qq[ok 5\\n]", NULL };
 
 #ifdef PERL_GLOBAL_STRUCT_PRIVATE
 static struct perl_vars *my_plvarsp;

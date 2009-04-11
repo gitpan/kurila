@@ -1,6 +1,6 @@
 
 package Pod::Perldoc::GetOptsOO;
-use strict;
+
 
 # Rather like Getopt::Std's getopts
 #  Call Pod::Perldoc::GetOptsOO::getopts($object, \@ARGV, $truth)
@@ -20,36 +20,36 @@ use strict;
 
 BEGIN { # Make a DEBUG constant ASAP
   *DEBUG = defined( &Pod::Perldoc::DEBUG )
-   ? \&Pod::Perldoc::DEBUG
-   : sub(){10};
+   ?? \&Pod::Perldoc::DEBUG
+   !! sub(){10};
 }
 
 
 sub getopts {
-  my($target, $args, $truth) = < @_;
+  my@($target, $args, $truth) =  @_;
   
   $args ||= \@ARGV;
 
   $target->aside(
-    "Starting switch processing.  Scanning arguments [{join ' ',@$args}]\n"
+    "Starting switch processing.  Scanning arguments [$(join ' ',@$args)]\n"
   ) if $target->can('aside');
 
   return unless (nelems @$args);
 
   $truth = 1 unless (nelems @_) +> 2;
 
-  DEBUG +> 3 and print "   Truth is $truth\n";
+  DEBUG +> 3 and print $^STDOUT, "   Truth is $truth\n";
 
 
   my $error_count = 0;
 
   while( (nelems @$args)  and  ($_ = $args->[0]) =~ m/^-(.)(.*)/s ) {
-    my($first,$rest) = ($1,$2);
+    my@($first,$rest) = @($1,$2);
     if ($_ eq '--') {	# early exit if "--"
       shift @$args;
       last;
     }
-    my $method = "opt_{$first}_with";
+    my $method = "opt_$($first)_with";
     if( $target->can($method) ) {  # it's argumental
       if($rest eq '') {   # like -f bar
         shift @$args;
@@ -59,21 +59,21 @@ sub getopts {
         shift @$args;
       }
 
-      DEBUG +> 3 and print " $method => $rest\n";
+      DEBUG +> 3 and print $^STDOUT, " $method => $rest\n";
       $target->?$method( $rest );
 
     # Otherwise, it's not argumental...
     } else {
 
       if( $target->can( $method = "opt_$first" ) ) {
-        DEBUG +> 3 and print " $method is true ($truth)\n";
+        DEBUG +> 3 and print $^STDOUT, " $method is true ($truth)\n";
         $target->?$method( $truth );
 
       # Otherwise it's an unknown option...
 
       } elsif( $target->can('handle_unknown_option') ) {
         DEBUG +> 3
-         and print " calling handle_unknown_option('$first')\n";
+         and print $^STDOUT, " calling handle_unknown_option('$first')\n";
          
         $error_count += (
           $target->handle_unknown_option( $first ) || 0
@@ -87,7 +87,7 @@ sub getopts {
       if($rest eq '') {   # like -f
         shift @$args
       } else {            # like -fbar  (== -f -bar )
-        DEBUG +> 2 and print "   Setting args->[0] to \"-$rest\"\n";
+        DEBUG +> 2 and print $^STDOUT, "   Setting args->[0] to \"-$rest\"\n";
         $args->[0] = "-$rest";
       }
     }
@@ -95,7 +95,7 @@ sub getopts {
   
 
   $target->aside(
-    "Ending switch processing.  Args are [{join ' ',@$args}] with $error_count errors.\n"
+    "Ending switch processing.  Args are [$(join ' ',@$args)] with $error_count errors.\n"
   ) if $target->can('aside');
 
   $error_count == 0;

@@ -1,6 +1,6 @@
 package Config::Extensions;
-use strict;
-use vars < qw(%Extensions $VERSION @ISA @EXPORT_OK);
+
+our (%Extensions, $VERSION, @ISA, @EXPORT_OK);
 use Config;
 require Exporter;
 
@@ -9,9 +9,9 @@ $VERSION = '0.01';
 @EXPORT_OK = @( '%Extensions' );
 
 foreach my $type (qw(static dynamic nonxs)) {
-    foreach (split m/\s+/, %Config{$type . '_ext'}) {
+    foreach (split m/\s+/, config_value($type . '_ext')) {
 	s!/!::!g;
-	%Extensions{$_} = $type;
+	%Extensions{+$_} = $type;
     }
 }
 

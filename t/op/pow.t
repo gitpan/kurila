@@ -47,7 +47,7 @@ is(-3**3, -27);
 my $remainder = $bits_in_uv ^&^ 3;
 
 cmp_ok ($remainder, '==', 0, 'Sanity check bits in UV calculation')
-    or printf "# ~0 is \%d (0x\%d) which gives $bits_in_uv bits\n", ^~^0, ^~^0;
+    or printf $^STDOUT, "# ~0 is \%d (0x\%d) which gives $bits_in_uv bits\n", ^~^0, ^~^0;
 
 # These are a lot of brute force tests to see how accurate $m ** $n is.
 # Unfortunately rather a lot of perl programs expect 2 ** $n to be integer
@@ -60,7 +60,7 @@ foreach my $n (0..$bits_in_uv - 1) {
 }
 
 foreach my $pow ( @pow) {
-    my ($base, $max, $range) = < @$pow;
+    my @($base, $max, $range) =  @$pow;
     my $expect = 1;
     foreach my $n (0..$max-1) {
         my $got = $base ** $n;

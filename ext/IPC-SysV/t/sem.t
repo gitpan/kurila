@@ -6,10 +6,10 @@ use Config;
 
 my $TEST_COUNT = 11;
 
-if (%Config{'d_sem'} ne 'define') {
+if (config_value('d_sem') ne 'define') {
     skip_all('$Config{d_sem} undefined');
 }
-elsif (%Config{'d_msg'} ne 'define') {
+elsif (config_value('d_msg') ne 'define') {
     skip_all('$Config{d_msg} undefined');
 }
 else {
@@ -29,26 +29,26 @@ use IPC::SysV < qw(
 );
 use IPC::Semaphore;
 
-SKIP: {
+SKIP: do {
 
 my $sem =
     IPC::Semaphore->new(IPC_PRIVATE, 10, S_IRWXU ^|^ S_IRWXG ^|^ S_IRWXO ^|^ IPC_CREAT);
 if (!$sem) {
-    if ($! eq 'No space left on device') {
+    if ($^OS_ERROR eq 'No space left on device') {
         # "normal" error
-        skip( "cannot proceed: IPC::Semaphore->new() said: $!", $TEST_COUNT);
+        skip( "cannot proceed: IPC::Semaphore->new() said: $^OS_ERROR", $TEST_COUNT);
     }
     else {
         # unexpected error
-        die "IPC::Semaphore->new(): ",$!+0," $!\n";
+        die "IPC::Semaphore->new(): ",$^OS_ERROR+0," $^OS_ERROR\n";
     }
 }
 
 pass('acquired a semaphore');
 
-ok(my $st = $sem->stat,'stat it');
+ok((my $st = $sem->stat),'stat it');
 
-ok($sem->setall( (0) x 10),'set all');
+ok($sem->setall( < $: @(0) x 10),'set all');
 
 my @sem =$sem->getall;
 cmp_ok(join("",@sem),'eq',"0000000000",'get all');
@@ -73,4 +73,4 @@ END {
     }
 }
 
-} # SKIP
+}; # SKIP

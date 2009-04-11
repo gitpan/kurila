@@ -2,19 +2,13 @@
 # Tests that all ops can be trapped by a Safe compartment
 
 BEGIN {
-    if (not %ENV{PERL_CORE}) {
+    if (not env::var('PERL_CORE')) {
 	# this won't work outside of the core, so exit
-        print "1..0\n"; exit 0;
+        print $^STDOUT, "1..0\n"; exit 0;
     }
 }
 use Config;
-BEGIN {
-    if (%Config{'extensions'} !~ m/\bOpcode\b/ && %Config{'osname'} ne 'VMS') {
-        print "1..0\n"; exit 0;
-    }
-}
 
-use strict;
 use Test::More;
 use Safe;
 
@@ -25,30 +19,29 @@ my %code;
 while ( ~< *DATA) {
     chomp;
     die "Can't match $_" unless m/^([a-z_0-9]+)\t+(.*)/;
-    %code{$1} = $2;
+    %code{+$1} = $2;
 }
 
-open my $fh, '<', '../opcode.pl' or die "Can't open opcode.pl: $!";
+open my $fh, '<', '../opcode.pl' or die "Can't open opcode.pl: $^OS_ERROR";
 while ( ~< $fh) {
     last if m/^__END__/;
 }
 while ( ~< $fh) {
     chomp;
     next if !$_ or m/^#/;
-    my ($op, $opname) = < split m/\t+/;
-    push @op, \@($op, $opname, %code{$op});
+    my @($op, $opname, ...) =  split m/\t+/;
+    push @op, \@($op, $opname, %code{?$op});
 }
 close $fh;
 
 plan(tests => nelems(@op));
 
-sub testop {
-    my ($op, $opname, $code) = < @_;
+sub testop($op, $opname, $code) {
     pass("$op : skipped") and return if $code =~ m/^SKIP/;
     my $c = Safe->new();
     $c->deny_only($op);
     $c->reval($code);
-    like($@->message, qr/'\Q$opname\E' trapped by operation mask/, $op);
+    like($^EVAL_ERROR->message, qr/'\Q$opname\E' trapped by operation mask/, $op);
 }
 
 foreach (@op) {
@@ -98,7 +91,6 @@ qr		qr/foo/
 subst		s/foo/bar/
 substcont	SKIP (set by optimizer)
 sassign		$x = $y
-aassign		($x) = ($y)
 chop		chop @foo
 schop		chop
 chomp		chomp @foo
@@ -203,7 +195,7 @@ split		split m/foo/
 join		join $a, @b
 list		@x = (1,2)
 lslice		SKIP @x[[1,2]]
-anonlist	\@(1,2)
+anonarray	\@(1,2)
 anonhash	\%( a => 1 )
 splice		splice @x, 1, 2, 3
 push		push @x, $x
@@ -222,7 +214,7 @@ flop		1..2
 and		$x && $y
 or		$x || $y
 xor		$x xor $y
-cond_expr	$x ? 1 : 0
+cond_expr	$x ?? 1 !! 0
 andassign	$x &&= $y
 orassign	$x ||= $y
 method		Foo->?$x()
@@ -248,7 +240,6 @@ last		last
 next		next
 redo		redo THIS
 dump		dump
-goto		goto THERE
 exit		exit 0
 open		open FOO
 close		close FOO
@@ -256,8 +247,6 @@ pipe_op		pipe FOO,BAR
 fileno		fileno FOO
 umask		umask 0755, 'foo'
 binmode		binmode FOO
-tie		tie
-untie		untie
 tied		tied
 sselect		SKIP (set by optimizer)
 select		select FOO
@@ -366,7 +355,7 @@ msgrcv		msgrcv
 semget		semget
 semctl		semctl
 semop		semop
-require		use strict
+require		use error
 dofile		do 'file'
 entereval	eval "1+1"
 leaveeval	eval "1+1"

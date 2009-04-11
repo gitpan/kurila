@@ -80,7 +80,6 @@ typedef struct yy_parser {
     I32		multi_end;	/* last line of multi-line string */
     char	multi_open;	/* delimiter of said string */
     char	multi_close;	/* delimiter of said string */
-    char	pending_ident;	/* pending identifier lookup */
     bool	preambled;
     /* XXX I32 space */
     SUBLEXINFO	sublex_info;
@@ -92,7 +91,6 @@ typedef struct yy_parser {
     char	*linestart;	/* beginning of most recently read line */
     char	*last_uni;	/* position of last named-unary op */
     char	*last_lop;	/* position of last list operator */
-    line_t	copline;	/* current line number */
     U16		in_my;		/* we're compiling a "my"/"our" declaration */
     U8		lex_state;	/* next token is determined */
     U8		error_count;	/* how many compile errors so far, max 10 */

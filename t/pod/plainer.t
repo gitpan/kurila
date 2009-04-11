@@ -1,36 +1,36 @@
 #!./perl
 
 use Pod::Plainer;
-my $parser = 'Pod::Plainer'->new();
+my $parser = Pod::Plainer->new();
 my $header = "=pod\n\n";
 my $input  = 'plnr_in.pod';
 my $output = 'plnr_out.pod';
 
 my $test = 0;
-print "1..7\n";
+print $^STDOUT, "1..7\n";
 while( ~< *DATA ) {
     my $expected = $header. ~< *DATA; 
 
-    open(IN, '>', $input) or die $!;
-    print IN $header, $_;
-    close IN or die $!;
+    open(my $in, '>', $input) or die $^OS_ERROR;
+    print $in, $header, $_;
+    close $in or die $^OS_ERROR;
 
-    open IN, '<', $input or die $!;
-    open OUT, '>', $output or die $!;
-    $parser->parse_from_filehandle(\*IN,\*OUT);
+    open $in, '<', $input or die $^OS_ERROR;
+    open my $out, '>', $output or die $^OS_ERROR;
+    $parser->parse_from_filehandle($in, $out);
 
-    open OUT, '<', $output or die $!;
-    my $returned; { local $/; $returned = ~< *OUT; }
+    open $out, '<', $output or die $^OS_ERROR;
+    my $returned; do { local $^INPUT_RECORD_SEPARATOR = undef; $returned = ~< $out; };
     
     unless( $returned eq $expected ) {
-       print < map { s/^/\#/mg; $_; }
- map {+$_}               # to avoid readonly values
+       print $^STDOUT, < map { s/^/\#/mg; $_; },
+ map { $: $_ },               # to avoid readonly values
  @(                   "EXPECTED:\n", $expected, "GOT:\n", $returned);
-       print "not ";
+       print $^STDOUT, "not ";
     }
-    printf "ok \%d\n", ++$test; 
-    close OUT;
-    close IN;
+    printf $^STDOUT, "ok \%d\n", ++$test; 
+    close $out;
+    close $in;
 }
 
 END { 

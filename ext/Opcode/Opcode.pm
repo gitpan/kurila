@@ -1,7 +1,6 @@
 package Opcode;
 
 
-use strict;
 
 our($VERSION, @ISA, @EXPORT_OK);
 
@@ -28,18 +27,17 @@ _init_optags();
 
 sub ops_to_opset { opset(< @_) }	# alias for old name
 
-sub opset_to_hex ($) {
-    return "(invalid opset)" unless verify_opset(@_[0]);
-    unpack("h*",@_[0]);
+sub opset_to_hex ($v) {
+    return "(invalid opset)" unless verify_opset($v);
+    unpack("h*",$v);
 }
 
-sub opdump (;$) {
-	my $pat = shift;
+sub opdump (?$pat) {
     # handy utility: perl -MOpcode=opdump -e 'opdump File'
     foreach( opset_to_ops( <full_opset())) {
         my $op = sprintf "  \%12s  \%s\n", $_, < opdesc($_);
 		next if defined $pat and $op !~ m/$pat/i;
-		print $op;
+		print $^STDOUT, $op;
     }
 }
 
@@ -47,30 +45,30 @@ sub opdump (;$) {
 
 sub _init_optags {
     my(%all, %seen);
- <    %all{[opset_to_ops(full_opset())]} = (); # keys only
+     %all{[opset_to_ops(full_opset())]} = @(); # keys only
 
     local($_);
-    local($/) = "\n=cut"; # skip to optags definition section
+    local($^INPUT_RECORD_SEPARATOR) = "\n=cut"; # skip to optags definition section
     ~< *DATA;
-    $/ = "\n=";		# now read in 'pod section' chunks
-    while( ~< *DATA) {
-	next unless m/^item\s+(:\w+)/;
+    $^INPUT_RECORD_SEPARATOR = "\n=";		# now read in 'pod section' chunks
+    while(defined(my $line = ~< *DATA)) {
+	next unless $line =~ m/^item\s+(:\w+)/;
 	my $tag = $1;
 
 	# Split into lines, keep only indented lines
-	my @lines = grep { m/^\s/    } split(m/\n/);
+	my @lines = grep { m/^\s/    }, split(m/\n/, $line);
 	foreach ( @lines) { s/--.*//  } # delete comments
-	my @ops   = map  { < split ' ' } @lines; # get op words
+	my @ops   = @+: map  { split ' ' }, @lines; # get op words
 
 	foreach( @ops) {
-	    warn "$tag - $_ already tagged in %seen{$_}\n" if %seen{$_};
-	    %seen{$_} = $tag;
+	    warn "$tag - $_ already tagged in %seen{?$_}\n" if %seen{?$_};
+	    %seen{+$_} = $tag;
 	    delete %all{$_};
 	}
 	# opset will croak on invalid names
 	define_optag($tag, opset(< @ops));
     }
-    close(DATA);
+    close(\*DATA);
     warn "Untagged opnames: ".join(' ',keys %all)."\n" if %all;
 }
 
@@ -298,11 +296,11 @@ invert_opset function.
 
 =item :base_core
 
-    null stub scalar pushmark wantarray const defined undef
+    root null stub scalar pushmark const defined undef
 
-    rv2sv sassign
+    rv2sv sassign logassign_assign dotdotdot placeholder
 
-    rv2av aassign aelem aelemfast aslice
+    rv2av aelem aelemfast aslice
 
     rv2hv helem hslice each values keys exists delete nkeys
 
@@ -318,19 +316,21 @@ invert_opset function.
 
     substr vec stringify study pos length index rindex ord chr
 
-    ucfirst lcfirst uc lc quotemeta chop schop chomp schomp
+    ucfirst lcfirst uc lc quotemeta chop chomp
 
     match split qr
 
-    list listlast lslice splice push pop shift unshift reverse expand nelems
+    list listlast listfirst lslice splice push pop shift unshift reverse
+    arrayexpand enter_arrayexpand_assign enter_hashexpand_assign
+    hashexpand expand nelems
 
-    cond_expr flip flop andassign orassign dorassign and or dor xor
+    cond_expr andassign orassign dorassign and or dor xor
 
     warn die lineseq nextstate scope enter leave
 
     rv2cv anoncode prototype
 
-    entersub leavesub return method method_named -- XXX loops via recursion?
+    entersub entersub_save entersub_targargs leavesub return method method_named -- XXX loops via recursion?
 
     leaveeval -- needed for Safe to operate, is safe without entereval
 
@@ -340,9 +340,9 @@ These memory related ops are not included in :base_core because they
 can easily be used to implement a resource attack (e.g., consume all
 available memory).
 
-    concat repeat join range
+    concat repeat join range arrayjoin hashjoin arrayconcat hashconcat
 
-    anonlist anonhash anonscalar
+    anonarray enter_anonarray_assign anonhash enter_anonhash_assign anonscalar
 
 Note that despite the existence of this optag a memory resource attack
 may still be possible using only :base_core ops.
@@ -361,7 +361,6 @@ used to implement a resource attack (e.g., consume all available CPU time).
     enteriter iter
     enterloop leaveloop unstack
     last next redo
-    goto
 
 =item :base_io
 
@@ -385,7 +384,7 @@ These are a hotchpotch of opcodes still waiting to be considered
 
     gvsv gv gelem
 
-    padsv padany
+    padsv magicsv
 
     rv2gv srefgen ref
 
@@ -397,16 +396,12 @@ These are a hotchpotch of opcodes still waiting to be considered
 
     crypt
 
-    tie untie
-
-    sselect select
+    select
     pipe_op sockpair
 
     getppid getpgrp setpgrp getpriority setpriority localtime gmtime
 
     entertry leavetry -- can be used to 'hide' fatal errors
-
-    smartmatch
 
     custom -- where should this go
 
@@ -528,7 +523,7 @@ This tag holds opcodes related to loading modules and getting information
 about calling environment and args.
 
     require dofile 
-    caller compsub
+    caller compsub dynascope
 
 =item :still_to_be_decided
 
@@ -540,7 +535,6 @@ about calling environment and args.
 
     sleep alarm -- changes global timer state and signal handling
     sort -- assorted problems including core dumps
-    tied -- can be used to access object implementing a tie
     pack unpack -- can be used to create/use memory pointers
 
     hintseval -- constant op holding eval hints
@@ -554,7 +548,7 @@ about calling environment and args.
 This tag is simply a bucket for opcodes that are unlikely to be used via
 a tag name but need to be tagged for completeness and documentation.
 
-    syscall dump chroot
+    syscall chroot
 
 =back
 

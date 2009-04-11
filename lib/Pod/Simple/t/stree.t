@@ -1,7 +1,6 @@
 
 
-use strict;
-use Test;
+use Test::More;
 BEGIN { plan tests => 33 };
 
 #use Pod::Simple::Debug (6);
@@ -9,7 +8,7 @@ BEGIN { plan tests => 33 };
 ok 1;
 
 use Pod::Simple::SimpleTree;
-print "# Pod::Simple version $Pod::Simple::VERSION\n";
+print $^STDOUT, "# Pod::Simple version $Pod::Simple::VERSION\n";
 
 my $hashes_dont_matter = 0;
 
@@ -23,9 +22,9 @@ sub x {
 
 ok 1;
 
-print "# a bit of meta-testing...\n";
-&ok( deq( 1,     1     ));
-&ok(!deq( 2,     1     ));
+print $^STDOUT, "# a bit of meta-testing...\n";
+ok( deq( 1,     1     ));
+ok(!deq( 2,     1     ));
 
 &ok( deq( undef, undef ));
 &ok(!deq( undef, 1     ));
@@ -57,12 +56,12 @@ print "# a bit of meta-testing...\n";
 
 
 
-print '# ', Pod::Simple::pretty( x( "=pod\n\nI like pie.\n" )), "\n";
-print "# Making sure we get a tree at all...\n";
+print $^STDOUT, '# ', Pod::Simple::pretty( x( "=pod\n\nI like pie.\n" )), "\n";
+print $^STDOUT, "# Making sure we get a tree at all...\n";
 ok x( "=pod\n\nI like pie.\n" );
 
 
-print "# Some real tests...\n";
+print $^STDOUT, "# Some real tests...\n";
 &ok( deq( x( "=pod\n\nI like pie.\n"),
   \@( "Document", \%("start_line"=>1),
     \@( "Para",   \%("start_line"=>3),
@@ -113,9 +112,9 @@ $hashes_dont_matter = 1;
   )
 ));
 
-print "# Wrapping up... one for the road...\n";
+print $^STDOUT, "# Wrapping up... one for the road...\n";
 ok 1;
-print "# --- Done with ", __FILE__, " --- \n";
+print $^STDOUT, "# --- Done with ", __FILE__, " --- \n";
 
 sub deq { # deep-equals
   #print "# deq ", Pod::Simple::pretty($_[0], $_[1]), "\n";
@@ -127,8 +126,8 @@ sub deq { # deep-equals
   use UNIVERSAL;
   if(UNIVERSAL::isa(@_[0], 'ARRAY')) {
     return '' unless (nelems @{@_[0]}) == nelems @{@_[1]};
-    for(my $i = 0; $i +< nelems @{@_[0]}; $i++) {
-      print("# NEQ ", Pod::Simple::pretty(@_[0]),
+    for my $i (0 .. nelems(@{@_[0]}) -1) {
+      print($^STDOUT, "# NEQ ", Pod::Simple::pretty(@_[0]),
           "\n#  != ", Pod::Simple::pretty(@_[1]), "\n"),
        return '' unless deq(@_[0]->[$i], @_[1]->[$i]); # recurse!
     }
@@ -138,11 +137,11 @@ sub deq { # deep-equals
     return '' unless nelems(keys %{@_[0]}) == (nelems( keys %{@_[1]}));
     foreach my $k (keys %{@_[0]}) {
       return '' unless exists @_[1]->{$k};
-      return '' unless deq(@_[0]->{$k}, @_[1]->{$k});
+      return '' unless deq(@_[0]->{?$k}, @_[1]->{?$k});
     }
     return 1;
   } else {
-    print "# I don't know how to deque @_[0] & @_[1]\n";
+    print $^STDOUT, "# I don't know how to deque @_[0] & @_[1]\n";
     return 1;
   }
 }

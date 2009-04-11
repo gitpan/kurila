@@ -5,13 +5,13 @@ use Cwd <             qw[cwd];
 use File::Basename <  qw[basename];
 use Data::Dumper;
 
-use_ok('File::Fetch');
+use File::Fetch;
 
 ### optionally set debugging ###
-$File::Fetch::DEBUG = $File::Fetch::DEBUG   = 1 if @ARGV[0];
-$IPC::Cmd::DEBUG    = $IPC::Cmd::DEBUG      = 1 if @ARGV[0];
+$File::Fetch::DEBUG = $File::Fetch::DEBUG   = 1 if @ARGV[?0];
+$IPC::Cmd::DEBUG    = $IPC::Cmd::DEBUG      = 1 if @ARGV[?0];
 
-unless( %ENV{PERL_CORE} ) {
+unless( env::var('PERL_CORE') ) {
     warn qq[
 
 ####################### NOTE ##############################
@@ -83,7 +83,7 @@ push @map, (
         path    => '/tmp/',
         file    => 'foo.txt',
     ),    
-) if not &File::Fetch::ON_WIN and not &File::Fetch::ON_VMS;
+) if not &File::Fetch::ON_WIN( < @_ ) and not &File::Fetch::ON_VMS( < @_ );
 
 ### these only on win32
 push @map, (
@@ -108,19 +108,19 @@ push @map, (
         path    => '/tmp/',
         file    => 'foo.txt',
     ),    
-) if &File::Fetch::ON_WIN;
+) if &File::Fetch::ON_WIN( < @_ );
 
 
 ### parse uri tests ###
 for my $entry (@map ) {
-    my $uri = $entry->{'uri'};
+    my $uri = $entry->{?'uri'};
 
     my $href = File::Fetch->_parse_uri( $uri );
     ok( $href,  "Able to parse uri '$uri'" );
 
     for my $key ( sort keys %$entry ) {
-        is( $href->{$key}, $entry->{$key},
-                "   '$key' ok ($entry->{$key}) for $uri");
+        is( $href->{?$key}, $entry->{?$key},
+                "   '$key' ok ($entry->{?$key}) for $uri");
     }
 }
 
@@ -128,29 +128,29 @@ for my $entry (@map ) {
 for my $entry (@map) {
     my $ff = File::Fetch->new( uri => $entry->{uri} );
 
-    ok( $ff,                    "Object for uri '$entry->{uri}'" );
+    ok( $ff,                    "Object for uri '$entry->{?uri}'" );
     isa_ok( $ff, "File::Fetch", "   Object" );
 
     for my $acc ( keys %$entry ) {
-        is( $ff->?$acc(), $entry->{$acc},
-                                "   Accessor '$acc' ok ($entry->{$acc})" );
+        is( $ff->?$acc(), $entry->{?$acc},
+                                "   Accessor '$acc' ok ($entry->{?$acc})" );
     }
 }
 
 ### fetch() tests ###
 
 ### file:// tests ###
-{
-    my $prefix = &File::Fetch::ON_UNIX ? 'file://' : 'file:///';
-    my $uri = $prefix . cwd() .'/'. basename($0);
+do {
+    my $prefix = &File::Fetch::ON_UNIX( < @_ ) ?? 'file://' !! 'file:///';
+    my $uri = $prefix . cwd() .'/'. basename($^PROGRAM_NAME);
 
     for (qw[lwp file]) {
         _fetch_uri( file => $uri, $_ );
     }
-}
+};
 
 ### ftp:// tests ###
-{   my $uri = 'ftp://ftp.funet.fi/pub/CPAN/index.html';
+do {   my $uri = 'ftp://ftp.funet.fi/pub/CPAN/index.html';
     for (qw[lwp netftp wget curl ncftp]) {
 
         ### STUPID STUPID warnings ###
@@ -159,34 +159,34 @@ for my $entry (@map) {
 
         _fetch_uri( ftp => $uri, $_ );
     }
-}
+};
 
 ### http:// tests ###
-{   for my $uri (@( 'http://www.cpan.org/index.html',
+do {   for my $uri (@( 'http://www.cpan.org/index.html',
                   'http://www.cpan.org/index.html?q=1&y=2')
     ) {
         for (qw[lwp wget curl lynx]) {
             _fetch_uri( http => $uri, $_ );
         }
     }
-}
+};
 
 ### rsync:// tests ###
-{   my $uri = 'rsync://cpan.pair.com/CPAN/MIRRORING.FROM';
+do {   my $uri = 'rsync://cpan.pair.com/CPAN/MIRRORING.FROM';
 
     for (qw[rsync]) {
         _fetch_uri( rsync => $uri, $_ );
     }
-}
+};
 
 sub _fetch_uri {
     my $type    = shift;
     my $uri     = shift;
     my $method  = shift or return;
 
-    SKIP: {
+    SKIP: do {
         skip "'$method' fetching tests disabled under perl core", 4
-                if %ENV{PERL_CORE};
+                if env::var('PERL_CORE');
     
         ### stupid warnings ###
         $File::Fetch::METHODS =
@@ -198,10 +198,10 @@ sub _fetch_uri {
     
         my $file = $ff->fetch( to => 'tmp' );
     
-        SKIP: {
+        SKIP: do {
             skip "You do not have '$method' installed/available", 3
-                if $File::Fetch::METHOD_FAIL->{$method} &&
-                   $File::Fetch::METHOD_FAIL->{$method};
+                if $File::Fetch::METHOD_FAIL->{?$method} &&
+                   $File::Fetch::METHOD_FAIL->{?$method};
             ok( $file,          "   File ($file) fetched with $method ($uri)" );
             ok( $file && -s $file,   
                                 "   File has size" );
@@ -209,8 +209,8 @@ sub _fetch_uri {
                                 "   File has expected name" );
     
             unlink $file;
-        }
-    }
+        };
+    };
 }
 
 

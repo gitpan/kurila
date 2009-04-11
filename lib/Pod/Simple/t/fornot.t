@@ -1,12 +1,11 @@
 BEGIN {
-    if(%ENV{PERL_CORE}) {
+    if(env::var('PERL_CORE')) {
         chdir 't';
-        @INC = @( '../lib' );
+        $^INCLUDE_PATH = @( '../lib' );
     }
 }
 
-use strict;
-use Test;
+use Test::More;
 BEGIN { plan tests => 21 };
 
 #use Pod::Simple::Debug (5);
@@ -15,8 +14,8 @@ ok 1;
 
 use Pod::Simple::DumpAsXML;
 use Pod::Simple::XMLOutStream;
-print "# Pod::Simple version $Pod::Simple::VERSION\n";
-sub e ($$) { Pod::Simple::DumpAsXML->_duo(< @_) }
+print $^STDOUT, "# Pod::Simple version $Pod::Simple::VERSION\n";
+sub e ($x, $y) { Pod::Simple::DumpAsXML->_duo(< @_) }
 
 my $x = 'Pod::Simple::XMLOutStream';
 $Pod::Simple::XMLOutStream::ATTR_PAD   = ' ';
@@ -29,81 +28,81 @@ sub any     {shift->accept_target(        '*'       )}
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-ok( $x->_out( "=pod\n\nI like pie.\n\n=for mojojojo stuff\n\n=for !mojojojo bzarcho\n\nYup.\n"),
+is( $x->_out( "=pod\n\nI like pie.\n\n=for mojojojo stuff\n\n=for !mojojojo bzarcho\n\nYup.\n"),
   '<Document><Para>I like pie.</Para><for target="!mojojojo" target_matching="!"><Data xml:space="preserve">bzarcho</Data></for><Para>Yup.</Para></Document>'
 );
-ok( $x->_out( "=pod\n\nI like pie.\n\n=for psketti,mojojojo,crunk stuff\n\n=for !psketti,mojojojo,crunk bzarcho\n\nYup.\n"),
+is( $x->_out( "=pod\n\nI like pie.\n\n=for psketti,mojojojo,crunk stuff\n\n=for !psketti,mojojojo,crunk bzarcho\n\nYup.\n"),
   '<Document><Para>I like pie.</Para><for target="!psketti,mojojojo,crunk" target_matching="!"><Data xml:space="preserve">bzarcho</Data></for><Para>Yup.</Para></Document>'
 );
 
-ok( $x->_out( "=pod\n\nI like pie.\n\n=for :mojojojo stuff\n\n=for :!mojojojo bzarcho\n\nYup.\n"),
+is( $x->_out( "=pod\n\nI like pie.\n\n=for :mojojojo stuff\n\n=for :!mojojojo bzarcho\n\nYup.\n"),
   '<Document><Para>I like pie.</Para><for target=":!mojojojo" target_matching="!"><Para>bzarcho</Para></for><Para>Yup.</Para></Document>'
 );
-ok( $x->_out( "=pod\n\nI like pie.\n\n=for :psketti,mojojojo,crunk stuff\n\n=for :!psketti,mojojojo,crunk bzarcho\n\nYup.\n"),
+is( $x->_out( "=pod\n\nI like pie.\n\n=for :psketti,mojojojo,crunk stuff\n\n=for :!psketti,mojojojo,crunk bzarcho\n\nYup.\n"),
   '<Document><Para>I like pie.</Para><for target=":!psketti,mojojojo,crunk" target_matching="!"><Para>bzarcho</Para></for><Para>Yup.</Para></Document>'
 );
-ok( $x->_out( "=pod\n\nI like pie.\n\n=for :mojojojo stuff\n\n=for :!mojojojo I<bzarcho>\n\nYup.\n"),
+is( $x->_out( "=pod\n\nI like pie.\n\n=for :mojojojo stuff\n\n=for :!mojojojo I<bzarcho>\n\nYup.\n"),
   '<Document><Para>I like pie.</Para><for target=":!mojojojo" target_matching="!"><Para><I>bzarcho</I></Para></for><Para>Yup.</Para></Document>'
 );
-ok( $x->_out( "=pod\n\nI like pie.\n\n=for :psketti,mojojojo,crunk stuff\n\n=for :!psketti,mojojojo,crunk I<bzarcho>\n\nYup.\n"),
+is( $x->_out( "=pod\n\nI like pie.\n\n=for :psketti,mojojojo,crunk stuff\n\n=for :!psketti,mojojojo,crunk I<bzarcho>\n\nYup.\n"),
   '<Document><Para>I like pie.</Para><for target=":!psketti,mojojojo,crunk" target_matching="!"><Para><I>bzarcho</I></Para></for><Para>Yup.</Para></Document>'
 );
 
 
-print "#   ( Now just swapping '!' and ':' )\n";
-ok( $x->_out( "=pod\n\nI like pie.\n\n=for :mojojojo stuff\n\n=for !:mojojojo bzarcho\n\nYup.\n"),
+print $^STDOUT, "#   ( Now just swapping '!' and ':' )\n";
+is( $x->_out( "=pod\n\nI like pie.\n\n=for :mojojojo stuff\n\n=for !:mojojojo bzarcho\n\nYup.\n"),
   '<Document><Para>I like pie.</Para><for target="!:mojojojo" target_matching="!"><Para>bzarcho</Para></for><Para>Yup.</Para></Document>'
 );
-ok( $x->_out( "=pod\n\nI like pie.\n\n=for :psketti,mojojojo,crunk stuff\n\n=for !:psketti,mojojojo,crunk bzarcho\n\nYup.\n"),
+is( $x->_out( "=pod\n\nI like pie.\n\n=for :psketti,mojojojo,crunk stuff\n\n=for !:psketti,mojojojo,crunk bzarcho\n\nYup.\n"),
   '<Document><Para>I like pie.</Para><for target="!:psketti,mojojojo,crunk" target_matching="!"><Para>bzarcho</Para></for><Para>Yup.</Para></Document>'
 );
 
 
-print "# Testing accept_target ...\n";
+print $^STDOUT, "# Testing accept_target ...\n";
 
-ok( $x->_out( \&moj, "=pod\n\nI like pie.\n\n=for !mojojojo I<stuff>\n\nYup.\n"),
+is( $x->_out( \&moj, "=pod\n\nI like pie.\n\n=for !mojojojo I<stuff>\n\nYup.\n"),
   '<Document><Para>I like pie.</Para><Para>Yup.</Para></Document>'
 );
-ok( $x->_out( \&moj, "=pod\n\nI like pie.\n\n=for !psketti,mojojojo,crunk I<stuff>\n\nYup.\n"),
+is( $x->_out( \&moj, "=pod\n\nI like pie.\n\n=for !psketti,mojojojo,crunk I<stuff>\n\nYup.\n"),
   '<Document><Para>I like pie.</Para><Para>Yup.</Para></Document>'
 );
-ok( $x->_out( \&moj, "=pod\n\nI like pie.\n\n=for :!mojojojo I<stuff>\n\nYup.\n"),
-  '<Document><Para>I like pie.</Para><Para>Yup.</Para></Document>'
-);
-
-print "# Testing accept_target_as_text ...\n";
-
-ok( $x->_out( \&mojtext, "=pod\n\nI like pie.\n\n=for !mojojojo I<stuff>\n\nYup.\n"),
-  '<Document><Para>I like pie.</Para><Para>Yup.</Para></Document>'
-);
-ok( $x->_out( \&mojtext, "=pod\n\nI like pie.\n\n=for !psketti,mojojojo,crunk I<stuff>\n\nYup.\n"),
-  '<Document><Para>I like pie.</Para><Para>Yup.</Para></Document>'
-);
-ok( $x->_out( \&mojtext, "=pod\n\nI like pie.\n\n=for :!mojojojo I<stuff>\n\nYup.\n"),
+is( $x->_out( \&moj, "=pod\n\nI like pie.\n\n=for :!mojojojo I<stuff>\n\nYup.\n"),
   '<Document><Para>I like pie.</Para><Para>Yup.</Para></Document>'
 );
 
+print $^STDOUT, "# Testing accept_target_as_text ...\n";
 
-print "# Testing accept_target(*) ...\n";
+is( $x->_out( \&mojtext, "=pod\n\nI like pie.\n\n=for !mojojojo I<stuff>\n\nYup.\n"),
+  '<Document><Para>I like pie.</Para><Para>Yup.</Para></Document>'
+);
+is( $x->_out( \&mojtext, "=pod\n\nI like pie.\n\n=for !psketti,mojojojo,crunk I<stuff>\n\nYup.\n"),
+  '<Document><Para>I like pie.</Para><Para>Yup.</Para></Document>'
+);
+is( $x->_out( \&mojtext, "=pod\n\nI like pie.\n\n=for :!mojojojo I<stuff>\n\nYup.\n"),
+  '<Document><Para>I like pie.</Para><Para>Yup.</Para></Document>'
+);
 
-ok( $x->_out( \&any, "=pod\n\nI like pie.\n\n=for !mojojojo I<stuff>\n\nYup.\n"),
+
+print $^STDOUT, "# Testing accept_target(*) ...\n";
+
+is( $x->_out( \&any, "=pod\n\nI like pie.\n\n=for !mojojojo I<stuff>\n\nYup.\n"),
   '<Document><Para>I like pie.</Para><for target="!mojojojo" target_matching="!"><Data xml:space="preserve">I&#60;stuff&#62;</Data></for><Para>Yup.</Para></Document>'
 );
-ok( $x->_out( \&any, "=pod\n\nI like pie.\n\n=for !mojojojo I<stuff>\n\nYup.\n"),
+is( $x->_out( \&any, "=pod\n\nI like pie.\n\n=for !mojojojo I<stuff>\n\nYup.\n"),
   '<Document><Para>I like pie.</Para><for target="!mojojojo" target_matching="!"><Data xml:space="preserve">I&#60;stuff&#62;</Data></for><Para>Yup.</Para></Document>'
 );
-ok( $x->_out( \&any, "=pod\n\nI like pie.\n\n=for !psketti,mojojojo,crunk I<stuff>\n\nYup.\n"),
+is( $x->_out( \&any, "=pod\n\nI like pie.\n\n=for !psketti,mojojojo,crunk I<stuff>\n\nYup.\n"),
   '<Document><Para>I like pie.</Para><for target="!psketti,mojojojo,crunk" target_matching="!"><Data xml:space="preserve">I&#60;stuff&#62;</Data></for><Para>Yup.</Para></Document>'
 );
-ok( $x->_out( \&any, "=pod\n\nI like pie.\n\n=for !:mojojojo I<stuff>\n\nYup.\n"),
+is( $x->_out( \&any, "=pod\n\nI like pie.\n\n=for !:mojojojo I<stuff>\n\nYup.\n"),
   '<Document><Para>I like pie.</Para><for target="!:mojojojo" target_matching="!"><Para><I>stuff</I></Para></for><Para>Yup.</Para></Document>'
 );
-ok( $x->_out( \&any, "=pod\n\nI like pie.\n\n=for !:psketti,mojojojo,crunk I<stuff>\n\nYup.\n"),
+is( $x->_out( \&any, "=pod\n\nI like pie.\n\n=for !:psketti,mojojojo,crunk I<stuff>\n\nYup.\n"),
   '<Document><Para>I like pie.</Para><for target="!:psketti,mojojojo,crunk" target_matching="!"><Para><I>stuff</I></Para></for><Para>Yup.</Para></Document>'
 );
 
 
-print "# Wrapping up... one for the road...\n";
+print $^STDOUT, "# Wrapping up... one for the road...\n";
 ok 1;
-print "# --- Done with ", __FILE__, " --- \n";
+print $^STDOUT, "# --- Done with ", __FILE__, " --- \n";
 

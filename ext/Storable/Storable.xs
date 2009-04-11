@@ -297,7 +297,6 @@ typedef struct stcxt {
 	IV tagnum;			/* incremented at store time for each seen object */
 	IV classnum;		/* incremented at store time for each seen classname */
 	int netorder;		/* true if network order used */
-	int s_tainted;		/* true if input source is tainted, at retrieve time */
 	int forgive_me;		/* whether to be forgiving... */
 	int deparse;        /* whether to deparse code refs */
 	SV *eval;           /* whether to eval source code */
@@ -324,7 +323,7 @@ typedef struct stcxt {
 	SV *self = newSV(sizeof(stcxt_t) - 1);			\
 	SV *my_sv = newRV_noinc(self);					\
 	sv_bless(my_sv, gv_stashpv("Storable::Cxt", GV_ADD));	\
-	cxt = (stcxt_t *)SvPVX(self);					\
+	cxt = (stcxt_t *)SvPVX_mutable(self);					\
 	Zero(cxt, 1, stcxt_t);							\
 	cxt->my_sv = my_sv;								\
   } STMT_END
@@ -337,7 +336,7 @@ typedef struct stcxt {
 
 #define dSTCXT_PTR(T,name)							\
 	T name = ((perinterp_sv && SvIOK(perinterp_sv) && SvIVX(perinterp_sv)	\
-				? (T)SvPVX(SvRV(INT2PTR(SV*,SvIVX(perinterp_sv)))) : (T) 0))
+				? (T)SvPVX_mutable(SvRV(INT2PTR(SV*,SvIVX(perinterp_sv)))) : (T) 0))
 #define dSTCXT										\
 	dSTCXT_SV;										\
 	dSTCXT_PTR(stcxt_t *, cxt)
@@ -1348,7 +1347,7 @@ static void clean_store_context(pTHX_ stcxt_t *cxt)
  *
  * Initialize a new retrieve context for real recursion.
  */
-static void init_retrieve_context(pTHX_ stcxt_t *cxt, int optype, int is_tainted)
+static void init_retrieve_context(pTHX_ stcxt_t *cxt, int optype)
 {
 	TRACEME(("init_retrieve_context"));
 
@@ -1383,7 +1382,6 @@ static void init_retrieve_context(pTHX_ stcxt_t *cxt, int optype, int is_tainted
 	cxt->tagnum = 0;				/* Have to count objects... */
 	cxt->classnum = 0;				/* ...and class names as well */
 	cxt->optype = optype;
-	cxt->s_tainted = is_tainted;
 	cxt->entry = 1;					/* No recursion yet */
 #ifndef HAS_RESTRICTED_HASHES
         cxt->derestrict = -1;		/* Fetched from perl if needed */
@@ -1497,7 +1495,7 @@ static stcxt_t *allocate_context(pTHX_ stcxt_t *parent_cxt)
  */
 static void free_context(pTHX_ stcxt_t *cxt)
 {
-	stcxt_t *prev = (stcxt_t *)(cxt->prev ? SvPVX(SvRV(cxt->prev)) : 0);
+	stcxt_t *prev = (stcxt_t *)(cxt->prev ? SvPVX_mutable(SvRV(cxt->prev)) : 0);
 
 	TRACEME(("free_context"));
 
@@ -1571,7 +1569,7 @@ static SV *pkg_fetchmeth(
 	HV *pkg,
 	const char *method)
 {
-	GV *gv;
+	CV *cv;
 	SV *sv;
 	const char *hvname = HvNAME_get(pkg);
 
@@ -1581,9 +1579,9 @@ static SV *pkg_fetchmeth(
 	 * in the Perl core.
 	 */
 
-	gv = gv_fetchmethod(pkg, method);
-	if (gv && isGV(gv)) {
-		sv = newRV((SV*) GvCV(gv));
+	cv = gv_fetchmethod(pkg, method);
+	if (cv) {
+		sv = newRV(cvTsv(cv));
 		TRACEME(("%s->%s: 0x%"UVxf, hvname, method, PTR2UV(sv)));
 	} else {
 		sv = newSVsv(&PL_sv_undef);
@@ -1716,15 +1714,12 @@ static SV *scalar_call(
 	PUTBACK;
 
 	TRACEME(("calling..."));
-	count = perl_call_sv(hook, flags);		/* Go back to Perl code */
+	sv = perl_call_sv(hook, flags);		/* Go back to Perl code */
 	TRACEME(("count = %d", count));
 
 	SPAGAIN;
 
-	if (count) {
-		sv = POPs;
-		SvREFCNT_inc(sv);		/* We're returning it, must stay alive! */
-	}
+        SvREFCNT_inc(sv);		/* We're returning it, must stay alive! */
 
 	PUTBACK;
 	FREETMPS;
@@ -1747,7 +1742,7 @@ static AV *array_call(
 {
 	dSP;
 	int count;
-	AV *av;
+	SV *res;
 	int i;
 
 	TRACEME(("array_call (cloning=%d)", cloning));
@@ -1760,18 +1755,14 @@ static AV *array_call(
 	XPUSHs(sv_2mortal(newSViv(cloning)));		/* Cloning flag */
 	PUTBACK;
 
-	count = perl_call_sv(hook, G_SCALAR);		/* Go back to Perl code */
+	res = SvREFCNT_inc( perl_call_sv(hook, G_SCALAR) );		/* Go back to Perl code */
 
 	SPAGAIN;
-
-        assert(count == 1);
-	av = SvREFCNT_inc(POPs);
-
 	PUTBACK;
 	FREETMPS;
 	LEAVE;
 
-	return av;
+	return (AV*)res;
 }
 
 /*
@@ -1810,8 +1801,7 @@ static int known_class(
 	 */
 
 	cxt->classnum++;
-	if (!hv_store(hclass, name, len, INT2PTR(SV*, cxt->classnum), 0))
-		CROAK(("Unable to record new classname"));
+	hv_store(hclass, name, len, INT2PTR(SV*, cxt->classnum), 0);
 
 	*classnum = cxt->classnum;
 	return FALSE;
@@ -2032,7 +2022,7 @@ static int store_scalar(pTHX_ stcxt_t *cxt, SV *sv)
             wlen = (I32) len; /* WLEN via STORE_SCALAR expects I32 */
             STORE_SCALAR(pv, wlen);
             TRACEME(("ok (scalar 0x%"UVxf" '%s', length = %"IVdf")",
-                     PTR2UV(sv), SvPVX(sv), (IV)len));
+                     PTR2UV(sv), SvPVX_mutable(sv), (IV)len));
 	} else
             CROAK(("Can't determine type of %s(0x%"UVxf")",
                    sv_reftype(sv, FALSE),
@@ -2122,12 +2112,12 @@ static int store_hash(pTHX_ stcxt_t *cxt, HV *hv)
 	int ret = 0;
 	I32 riter;
 	HE *eiter;
-        int flagged_hash = ((SvREADONLY(hv)
+        int flagged_hash = ((SvREADONLY(hv) || HvRESTRICTED(hv)
 #ifdef HAS_HASH_KEY_FLAGS
                              || HvHASKFLAGS(hv)
 #endif
                                 ) ? 1 : 0);
-        unsigned char hash_flags = (SvREADONLY(hv) ? SHV_RESTRICTED : 0);
+        unsigned char hash_flags = (HvRESTRICTED(hv) ? SHV_RESTRICTED : 0);
 
         if (flagged_hash) {
             /* needs int cast for C++ compilers, doesn't it?  */
@@ -2445,11 +2435,8 @@ static int store_code(pTHX_ stcxt_t *cxt, CV *cv)
 	PUSHMARK(sp);
 	XPUSHs(sv_2mortal(newSVpvn("B::Deparse",10)));
 	PUTBACK;
-	count = call_method("new", G_SCALAR);
+	bdeparse = call_method("new", G_SCALAR);
 	SPAGAIN;
-	if (count != 1)
-		CROAK(("Unexpected return value from B::Deparse::new\n"));
-	bdeparse = POPs;
 
 	/*
 	 * call the coderef2text method
@@ -2459,12 +2446,8 @@ static int store_code(pTHX_ stcxt_t *cxt, CV *cv)
 	XPUSHs(bdeparse); /* XXX is this already mortal? */
 	XPUSHs(sv_2mortal(newRV_inc((SV*)cv)));
 	PUTBACK;
-	count = call_method("coderef2text", G_SCALAR);
+	text = call_method("coderef2text", G_SCALAR);
 	SPAGAIN;
-	if (count != 1)
-		CROAK(("Unexpected return value from B::Deparse::coderef2text\n"));
-
-	text = POPs;
 	len = SvCUR(text);
 	reallen = strlen(SvPV_nolen(text));
 
@@ -2815,8 +2798,8 @@ static int store_hook(
 	/* We can't use pkg_can here because it only caches one method per
 	 * package */
 	{ 
-	    GV* gv = gv_fetchmethod(pkg, "STORABLE_attach");
-	    if (gv && isGV(gv)) {
+	    CV* cv = gv_fetchmethod(pkg, "STORABLE_attach");
+	    if (cv) {
 	        if (count > 1)
 	            CROAK(("Freeze cannot return references if %s class is using STORABLE_attach", classname));
 	        goto check_done;
@@ -3271,7 +3254,6 @@ static int sv_type(pTHX_ SV *sv)
 		 */
 		return SvROK(sv) ? svis_REF : svis_SCALAR;
 	case SVt_PVMG:
-	case SVt_PVLV:		/* Workaround for perl5.004_04 "LVALUE" bug */
 		if (SvRMAGICAL(sv) && (mg_find(sv, 'p')))
 			return svis_TIED_ITEM;
 		/* FALL THROUGH */
@@ -3783,7 +3765,7 @@ static SV *retrieve_idx_blessed(pTHX_ stcxt_t *cxt, const char *cname)
 	if (!sva)
 		CROAK(("Class name #%"IVdf" should have been seen already", (IV) idx));
 
-	classname = SvPVX(*sva);	/* We know it's a PV, by construction */
+	classname = SvPVX_mutable(*sva);	/* We know it's a PV, by construction */
 
 	TRACEME(("class ID %d => %s", idx, classname));
 
@@ -3885,7 +3867,7 @@ static SV *retrieve_hook(pTHX_ stcxt_t *cxt, const char *cname)
 	SV *hook;
 	SV *sv;
 	SV *rv;
-	GV *attach;
+	CV *attach;
 	int obj_type;
 	int clone = cxt->optype & ST_CLONE;
 	char mtype = '\0';
@@ -3988,7 +3970,7 @@ static SV *retrieve_hook(pTHX_ stcxt_t *cxt, const char *cname)
 			CROAK(("Class name #%"IVdf" should have been seen already",
 				(IV) idx));
 
-		classname = SvPVX(*sva);	/* We know it's a PV, by construction */
+		classname = SvPVX_mutable(*sva);	/* We know it's a PV, by construction */
 		TRACEME(("class ID %d => %s", idx, classname));
 
 	} else {
@@ -4041,13 +4023,11 @@ static SV *retrieve_hook(pTHX_ stcxt_t *cxt, const char *cname)
 
 	frozen = NEWSV(10002, len2);
 	if (len2) {
-		SAFEREAD(SvPVX(frozen), len2, frozen);
+		SAFEREAD(SvPVX_mutable(frozen), len2, frozen);
 		SvCUR_set(frozen, len2);
 		*SvEND(frozen) = '\0';
 	}
 	(void) SvPOK_only(frozen);		/* Validates string pointer */
-	if (cxt->s_tainted)				/* Is input source tainted? */
-		SvTAINT(frozen);
 
 	TRACEME(("frozen string: %d bytes", len2));
 
@@ -4115,9 +4095,9 @@ static SV *retrieve_hook(pTHX_ stcxt_t *cxt, const char *cname)
 	/* Handle attach case; again can't use pkg_can because it only
 	 * caches one method */
 	attach = gv_fetchmethod(SvSTASH(sv), "STORABLE_attach");
-	if (attach && isGV(attach)) {
+	if (attach) {
 	    SV* attached;
-	    SV* attach_hook = newRV((SV*) GvCV(attach));
+	    SV* attach_hook = newRV(cvTsv(attach));
 
 	    if (av)
 	        CROAK(("STORABLE_attach called with unexpected references"));
@@ -4541,14 +4521,12 @@ static SV *retrieve_lscalar(pTHX_ stcxt_t *cxt, const char *cname)
 	 * this way, it's worth the hassle and risk.
 	 */
 
-	SAFEREAD(SvPVX(sv), len, sv);
+	SAFEREAD(SvPVX_mutable(sv), len, sv);
 	SvCUR_set(sv, len);				/* Record C string length */
 	*SvEND(sv) = '\0';				/* Ensure it's null terminated anyway */
 	(void) SvPOK_only(sv);			/* Validate string pointer */
-	if (cxt->s_tainted)				/* Is input source tainted? */
-		SvTAINT(sv);				/* External data cannot be trusted */
 
-	TRACEME(("large scalar len %"IVdf" '%s'", (IV) len, SvPVX(sv)));
+	TRACEME(("large scalar len %"IVdf" '%s'", (IV) len, SvPVX_const(sv)));
 	TRACEME(("ok (retrieve_lscalar at 0x%"UVxf")", PTR2UV(sv)));
 
 	return sv;
@@ -4602,15 +4580,13 @@ static SV *retrieve_scalar(pTHX_ stcxt_t *cxt, const char *cname)
 		 * work done by sv_setpv. Since we're going to allocate lots of scalars
 		 * this way, it's worth the hassle and risk.
 		 */
-		SAFEREAD(SvPVX(sv), len, sv);
+		SAFEREAD(SvPVX_mutable(sv), len, sv);
 		SvCUR_set(sv, len);			/* Record C string length */
 		*SvEND(sv) = '\0';			/* Ensure it's null terminated anyway */
-		TRACEME(("small scalar len %d '%s'", len, SvPVX(sv)));
+		TRACEME(("small scalar len %d '%s'", len, SvPVX_const(sv)));
 	}
 
 	(void) SvPOK_only(sv);			/* Validate string pointer */
-	if (cxt->s_tainted)				/* Is input source tainted? */
-		SvTAINT(sv);				/* External data cannot be trusted */
 
 	TRACEME(("ok (retrieve_scalar at 0x%"UVxf")", PTR2UV(sv)));
 	return sv;
@@ -4898,8 +4874,7 @@ static SV *retrieve_hash(pTHX_ stcxt_t *cxt, const char *cname)
 		 * Enter key/value pair into hash table.
 		 */
 
-		if (hv_store(hv, kbuf, (U32) size, sv, 0) == 0)
-			return (SV *) 0;
+		hv_store(hv, kbuf, (U32) size, sv, 0);
 	}
 
 	TRACEME(("ok (retrieve_hash at 0x%"UVxf")", PTR2UV(hv)));
@@ -4986,8 +4961,7 @@ static SV *retrieve_flag_hash(pTHX_ stcxt_t *cxt, const char *cname)
             if (!keysv)
                 return (SV *) 0;
 
-            if (!hv_store_ent(hv, keysv, sv, 0))
-                return (SV *) 0;
+            hv_store_ent(hv, keysv, sv, 0);
         } else {
             /*
              * Get key.
@@ -5022,8 +4996,7 @@ static SV *retrieve_flag_hash(pTHX_ stcxt_t *cxt, const char *cname)
              */
 
 #ifdef HAS_RESTRICTED_HASHES
-            if (hv_store_flags(hv, kbuf, size, sv, 0, store_flags) == 0)
-                return (SV *) 0;
+            hv_store_flags(hv, kbuf, size, sv, 0, store_flags);
 #else
             if (!(store_flags & HVhek_PLACEHOLD))
                 if (hv_store(hv, kbuf, size, sv, 0) == 0)
@@ -5033,7 +5006,7 @@ static SV *retrieve_flag_hash(pTHX_ stcxt_t *cxt, const char *cname)
     }
 #ifdef HAS_RESTRICTED_HASHES
     if (hash_flags & SHV_RESTRICTED)
-        SvREADONLY_on(hv);
+        HvRESTRICTED_on(hv);
 #endif
 
     TRACEME(("ok (retrieve_hash at 0x%"UVxf")", PTR2UV(hv)));
@@ -5126,11 +5099,8 @@ static SV *retrieve_code(pTHX_ stcxt_t *cxt, const char *cname)
 		PUSHMARK(sp);
 		XPUSHs(sv_2mortal(newSVsv(sub)));
 		PUTBACK;
-		count = call_sv(cxt->eval, G_SCALAR);
+		cv = call_sv(cxt->eval, G_SCALAR);
 		SPAGAIN;
-		if (count != 1)
-			CROAK(("Unexpected return value from $Storable::Eval callback\n"));
-		cv = POPs;
 		if (SvTRUE(errsv)) {
 			CROAK(("code %s caused an error: %s",
 				SvPV_nolen(sub), SvPV_nolen(errsv)));
@@ -5300,8 +5270,7 @@ static SV *old_retrieve_hash(pTHX_ stcxt_t *cxt, const char *cname)
 		 * Enter key/value pair into hash table.
 		 */
 
-		if (hv_store(hv, kbuf, (U32) size, sv, 0) == 0)
-			return (SV *) 0;
+		hv_store(hv, kbuf, (U32) size, sv, 0);
 	}
 
 	TRACEME(("ok (retrieve_hash at 0x%"UVxf")", PTR2UV(hv)));
@@ -5569,9 +5538,8 @@ static SV *retrieve(pTHX_ stcxt_t *cxt, const char *cname)
 		 * tag number. See test for SX_OBJECT above to see how this is perused.
 		 */
 
-		if (!hv_store(cxt->hseen, (char *) &tag, sizeof(tag),
-				newSViv(cxt->tagnum), 0))
-			return (SV *) 0;
+		 hv_store(cxt->hseen, (char *) &tag, sizeof(tag),
+			              	newSViv(cxt->tagnum), 0);
 
 		goto first_time;
 	}
@@ -5682,7 +5650,6 @@ static SV *do_retrieve(
 {
 	dSTCXT;
 	SV *sv;
-	int is_tainted;				/* Is input source tainted? */
 	int pre_06_fmt = 0;			/* True with pre Storable 0.6 formats */
 
 	TRACEME(("do_retrieve (optype = 0x%x)", optype));
@@ -5752,19 +5719,7 @@ static SV *do_retrieve(
 	TRACEME(("data stored in %s format",
 		cxt->netorder ? "net order" : "native"));
 
-	/*
-	 * Check whether input source is tainted, so that we don't wrongly
-	 * taint perfectly good values...
-	 *
-	 * We assume file input is always tainted.  If both `f' and `in' are
-	 * NULL, then we come from dclone, and tainted is already filled in
-	 * the context.  That's a kludge, but the whole dclone() thing is
-	 * already quite a kludge anyway! -- RAM, 15/09/2000.
-	 */
-
-	is_tainted = f ? 1 : (in ? SvTAINTED(in) : cxt->s_tainted);
-	TRACEME(("input source is %s", is_tainted ? "tainted" : "trusted"));
-	init_retrieve_context(aTHX_ cxt, optype, is_tainted);
+	init_retrieve_context(aTHX_ cxt, optype);
 
 	ASSERT(is_retrieving(aTHX), ("within retrieve operation"));
 
@@ -5882,18 +5837,6 @@ static SV *dclone(pTHX_ SV *sv)
 		clean_context(aTHX_ cxt);
 
 	/*
-	 * Tied elements seem to need special handling.
-	 */
-
-	if ((SvTYPE(sv) == SVt_PVLV
-#if PERL_VERSION < 8
-	     || SvTYPE(sv) == SVt_PVMG
-#endif
-	     ) && SvRMAGICAL(sv) && mg_find(sv, 'p')) {
-		mg_get(sv);
-	}
-
-	/*
 	 * do_store() optimizes for dclone by not freeing its context, should
 	 * we need to allocate one because we're deep cloning from a hook.
 	 */
@@ -5928,7 +5871,6 @@ static SV *dclone(pTHX_ SV *sv)
 	 * do_retrieve() will free non-root context.
 	 */
 
-	cxt->s_tainted = SvTAINTED(sv);
 	out = do_retrieve(aTHX_ (PerlIO*) 0, Nullsv, ST_CLONE);
 
 	TRACEME(("dclone returns 0x%"UVxf, PTR2UV(out)));
@@ -5961,7 +5903,7 @@ void
 DESTROY(self)
     SV *self
 PREINIT:
-	stcxt_t *cxt = (stcxt_t *)SvPVX(SvRV(self));
+	stcxt_t *cxt = (stcxt_t *)SvPVX_mutable(SvRV(self));
 PPCODE:
 	if (kbuf)
 		Safefree(kbuf);

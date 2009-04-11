@@ -2,21 +2,14 @@
 
 use Config;
 
-BEGIN {
-    if ($^O ne 'VMS' and %Config{'extensions'} !~ m/\bPOSIX\b/) {
-	print "1..0\n";
-	exit 0;
-    }
-}
-
 use POSIX;
-use strict ;
+ 
 
 # E.g. \t might or might not be isprint() depending on the locale,
 # so let's reset to the default.
-setlocale(LC_ALL, 'C') if %Config{d_setlocale};
+setlocale(LC_ALL, 'C') if config_value("d_setlocale");
 
-$| = 1;
+$^OUTPUT_AUTOFLUSH = 1;
 
 # List of characters (and strings) to feed to the is<xxx> functions.
 #
@@ -63,10 +56,10 @@ my %classes =
 # listed above.
 my %functions;
 foreach my $s (keys %classes) {
-    %classes{$s} = \%( < map {
-	%functions{"is$_"}++;	# Keep track of all the 'is<xxx>' functions
-	"is$_" => 1;		# Our return value: is<xxx>($s) should pass.
-    } @{%classes{$s}} );
+    %classes{+$s} = \%( < @+: map {
+	%functions{+"is$_"}++;	# Keep track of all the 'is<xxx>' functions
+	@: "is$_" => 1;		# Our return value: is<xxx>($s) should pass.
+    }, @{%classes{$s}} );
 }
 
 # Expected number of tests is one each for every combination of a

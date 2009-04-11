@@ -149,9 +149,6 @@ typedef struct regexp_engine {
     SV*     (*named_buff_iter) (pTHX_ REGEXP * const rx, const SV * const lastkey,
                                 const U32 flags);
     SV*     (*qr_package)(pTHX_ REGEXP * const rx);
-#ifdef USE_ITHREADS
-    void*   (*dupe) (pTHX_ REGEXP * const rx, CLONE_PARAMS *param);
-#endif
 } regexp_engine;
 
 /*
@@ -197,8 +194,6 @@ typedef struct regexp_engine {
 Convenience macro to get the REGEXP from a SV. This is approximately
 equivalent to the following snippet:
 
-    if (SvMAGICAL(sv))
-        mg_get(sv);
     if (SvROK(sv) &&
         (tmpsv = (SV*)SvRV(sv)) &&
         SvTYPE(tmpsv) == SVt_PVMG &&
@@ -316,8 +311,8 @@ and check for NULL.
 #define RXf_CANY_SEEN   	0x00100000
 
 /* Special */
-#define RXf_NOSCAN      	0x00100000
-#define RXf_CHECK_ALL   	0x00200000
+#define RXf_NOSCAN      	0x00200000
+#define RXf_CHECK_ALL   	0x00400000
 
 /* Intuit related */
 #define RXf_USE_INTUIT_NOML	0x02000000
@@ -328,8 +323,6 @@ and check for NULL.
 
 /* Copy and tainted info */
 #define RXf_COPY_DONE   	0x10000000
-#define RXf_TAINTED_SEEN	0x20000000
-#define RXf_TAINTED             0x80000000 /* this pattern is tainted */
 
 /*
  * NOTE: if you modify any RXf flags you should run regen.pl or regcomp.pl
@@ -338,13 +331,6 @@ and check for NULL.
  */
 
 #define RX_HAS_CUTGROUP(prog) ((prog)->intflags & PREGf_CUTGROUP_SEEN)
-#define RXp_MATCH_TAINTED(prog)	(RXp_EXTFLAGS(prog) & RXf_TAINTED_SEEN)
-#define RX_MATCH_TAINTED(prog)	(RX_EXTFLAGS(prog) & RXf_TAINTED_SEEN)
-#define RX_MATCH_TAINTED_on(prog) (RX_EXTFLAGS(prog) |= RXf_TAINTED_SEEN)
-#define RX_MATCH_TAINTED_off(prog) (RX_EXTFLAGS(prog) &= ~RXf_TAINTED_SEEN)
-#define RX_MATCH_TAINTED_set(prog, t) ((t) \
-				       ? RX_MATCH_TAINTED_on(prog) \
-				       : RX_MATCH_TAINTED_off(prog))
 
 #define RXp_MATCH_COPIED(prog)		(RXp_EXTFLAGS(prog) & RXf_COPY_DONE)
 #define RX_MATCH_COPIED(prog)		(RX_EXTFLAGS(prog) & RXf_COPY_DONE)
@@ -364,7 +350,7 @@ and check for NULL.
    writers? Specifically, the value 1 assumes that the wrapped version always
    has exactly one character at the end, a ')'. Will that always be true?  */
 #define RX_PRELEN(prog)		(RX_WRAPLEN(prog) - ((struct regexp *)SvANY(prog))->pre_prefix - 1)
-#define RX_WRAPPED(prog)	SvPVX(prog)
+#define RX_WRAPPED(prog)	SvPVX_mutable(reTsv(prog))
 #define RX_WRAPLEN(prog)	SvCUR(prog)
 #define RX_CHECK_SUBSTR(prog)	(((struct regexp *)SvANY(prog))->check_substr)
 #define RX_REFCNT(prog)		SvREFCNT(prog)
@@ -449,26 +435,6 @@ and check for NULL.
 #define REXEC_SCREAM	0x04		/* use scream table. */
 #define REXEC_IGNOREPOS	0x08		/* \G matches at start. */
 #define REXEC_NOT_FIRST	0x10		/* This is another iteration of //g. */
-
-#if defined(__GNUC__) && !defined(PERL_GCC_BRACE_GROUPS_FORBIDDEN)
-#  define ReREFCNT_inc(re)						\
-    ({									\
-	/* This is here to generate a casting warning if incorrect.  */	\
-	REGEXP *const zwapp = (re);					\
-	assert(SvTYPE(zwapp) == SVt_REGEXP);				\
-	SvREFCNT_inc(zwapp);						\
-	zwapp;								\
-    })
-#  define ReREFCNT_dec(re)						\
-    ({									\
-	/* This is here to generate a casting warning if incorrect.  */	\
-	REGEXP *const boff = (re);					\
-	SvREFCNT_dec(boff);						\
-    })
-#else
-#  define ReREFCNT_dec(re)	SvREFCNT_dec(re)
-#  define ReREFCNT_inc(re)	((REGEXP *) SvREFCNT_inc(re))
-#endif
 
 /* FIXME for plugins. */
 

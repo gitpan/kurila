@@ -6,14 +6,14 @@
 #
 
 package Locale::Currency;
-use strict;
+
 
 require Exporter;
 
 #-----------------------------------------------------------------------
 #	Public Global Variables
 #-----------------------------------------------------------------------
-use vars < qw($VERSION @ISA @EXPORT);
+our ($VERSION, @ISA, @EXPORT);
 $VERSION      = sprintf("\%d.\%02d", q$Revision: 2.7 $ =~ m/(\d+)\.(\d+)/);
 @ISA          = qw(Exporter);
 @EXPORT       = qw(&code2currency &currency2code
@@ -40,7 +40,7 @@ sub code2currency
     $code = lc($code);
     if (exists %CODES{$code})
     {
-        return %CODES{$code};
+        return %CODES{?$code};
     }
     else
     {
@@ -66,7 +66,7 @@ sub currency2code
     $curr = lc($curr);
     if (exists %CURRENCIES{$curr})
     {
-        return %CURRENCIES{$curr};
+        return %CURRENCIES{?$curr};
     }
     else
     {
@@ -103,23 +103,23 @@ sub all_currency_names
 #=======================================================================
 # initialisation code - stuff the DATA into the CODES hash
 #=======================================================================
-{
+do {
     my    $code;
     my    $currency;
-    local $_;
+    local $_ = undef;
 
 
     while ( ~< *DATA)
     {
         next unless m/\S/;
         chop;
-        ($code, $currency) = < split(m/:/, $_, 2);
-        %CODES{$code} = $currency;
-        %CURRENCIES{lc "$currency"} = $code;
+        @($code, $currency) =  split(m/:/, $_, 2);
+        %CODES{+$code} = $currency;
+        %CURRENCIES{+lc "$currency"} = $code;
     }
 
-    close(DATA);
-}
+    close(\*DATA);
+};
 
 1;
 

@@ -31,7 +31,6 @@
 
 PERL_CALLCONV OP * Perl_ref(pTHX_ OP *o, I32 type);
 PERL_CALLCONV void Perl_sv_unref(pTHX_ SV *sv);
-PERL_CALLCONV void Perl_sv_taint(pTHX_ SV *sv);
 PERL_CALLCONV IV Perl_sv_2iv(pTHX_ register SV *sv);
 PERL_CALLCONV UV Perl_sv_2uv(pTHX_ register SV *sv);
 PERL_CALLCONV char * Perl_sv_2pv(pTHX_ register SV *sv, STRLEN *lp);
@@ -45,10 +44,9 @@ PERL_CALLCONV void Perl_sv_catsv_mg(pTHX_ SV *dsv, register SV *ssv);
 PERL_CALLCONV char * Perl_sv_pv(pTHX_ SV *sv);
 PERL_CALLCONV char * Perl_sv_pvn_force(pTHX_ SV *sv, STRLEN *lp);
 PERL_CALLCONV NV Perl_huge(void);
-PERL_CALLCONV GV * Perl_gv_fetchmethod(pTHX_ HV *stash, const char *name);
 PERL_CALLCONV HE * Perl_hv_iternext(pTHX_ HV *hv);
 PERL_CALLCONV void Perl_hv_magic(pTHX_ HV *hv, GV *gv, int how);
-PERL_CALLCONV bool Perl_do_open(pTHX_ GV *gv, register const char *name, I32 len, int as_raw, int rawmode, int rawperm, PerlIO *supplied_fp);
+PERL_CALLCONV bool Perl_do_open(pTHX_ IO *io, register const char *name, I32 len, int as_raw, int rawmode, int rawperm, PerlIO *supplied_fp);
 PERL_CALLCONV bool Perl_do_aexec(pTHX_ SV *really, register SV **mark, register SV **sp);
 PERL_CALLCONV bool Perl_do_exec(pTHX_ const char *cmd);
 PERL_CALLCONV char * Perl_uvuni_to_utf8(pTHX_ char *d, UV uv);
@@ -90,41 +88,6 @@ Perl_sv_unref(pTHX_ SV *sv)
     sv_unref_flags(sv, 0);
 }
 
-/*
-=for apidoc sv_taint
-
-Taint an SV. Use C<SvTAINTED_on> instead.
-=cut
-*/
-
-void
-Perl_sv_taint(pTHX_ SV *sv)
-{
-    PERL_ARGS_ASSERT_SV_TAINT;
-
-    sv_magic((sv), NULL, PERL_MAGIC_taint, NULL, 0);
-}
-
-/* sv_2iv() is now a macro using Perl_sv_2iv_flags();
- * this function provided for binary compatibility only
- */
-
-IV
-Perl_sv_2iv(pTHX_ register SV *sv)
-{
-    return sv_2iv_flags(sv, SV_GMAGIC);
-}
-
-/* sv_2uv() is now a macro using Perl_sv_2uv_flags();
- * this function provided for binary compatibility only
- */
-
-UV
-Perl_sv_2uv(pTHX_ register SV *sv)
-{
-    return sv_2uv_flags(sv, SV_GMAGIC);
-}
-
 /* sv_2pv() is now a macro using Perl_sv_2pv_flags();
  * this function provided for binary compatibility only
  */
@@ -132,7 +95,7 @@ Perl_sv_2uv(pTHX_ register SV *sv)
 char *
 Perl_sv_2pv(pTHX_ register SV *sv, STRLEN *lp)
 {
-    return sv_2pv_flags(sv, lp, SV_GMAGIC);
+    return sv_2pv_flags(sv, lp, 0);
 }
 
 /*
@@ -176,7 +139,7 @@ Perl_sv_setsv(pTHX_ SV *dstr, register SV *sstr)
 {
     PERL_ARGS_ASSERT_SV_SETSV;
 
-    sv_setsv_flags(dstr, sstr, SV_GMAGIC);
+    sv_setsv_flags(dstr, sstr, 0);
 }
 
 /* sv_catpvn() is now a macro using Perl_sv_catpvn_flags();
@@ -188,7 +151,7 @@ Perl_sv_catpvn(pTHX_ SV *dsv, const char* sstr, STRLEN slen)
 {
     PERL_ARGS_ASSERT_SV_CATPVN;
 
-    sv_catpvn_flags(dsv, sstr, slen, SV_GMAGIC);
+    sv_catpvn_flags(dsv, sstr, slen, 0);
 }
 
 /*
@@ -204,7 +167,7 @@ Perl_sv_catpvn_mg(pTHX_ register SV *sv, register const char *ptr, register STRL
 {
     PERL_ARGS_ASSERT_SV_CATPVN_MG;
 
-    sv_catpvn_flags(sv,ptr,len,SV_GMAGIC|SV_SMAGIC);
+    sv_catpvn_flags(sv,ptr,len,SV_SMAGIC);
 }
 
 /* sv_catsv() is now a macro using Perl_sv_catsv_flags();
@@ -216,7 +179,7 @@ Perl_sv_catsv(pTHX_ SV *dstr, register SV *sstr)
 {
     PERL_ARGS_ASSERT_SV_CATSV;
 
-    sv_catsv_flags(dstr, sstr, SV_GMAGIC);
+    sv_catsv_flags(dstr, sstr, 0);
 }
 
 /*
@@ -232,7 +195,7 @@ Perl_sv_catsv_mg(pTHX_ SV *dsv, register SV *ssv)
 {
     PERL_ARGS_ASSERT_SV_CATSV_MG;
 
-    sv_catsv_flags(dsv,ssv,SV_GMAGIC|SV_SMAGIC);
+    sv_catsv_flags(dsv,ssv,SV_SMAGIC);
 }
 
 /*
@@ -318,7 +281,7 @@ Perl_sv_pvn(pTHX_ SV *sv, STRLEN *lp)
 
     if (SvPOK(sv)) {
 	*lp = SvCUR(sv);
-	return SvPVX(sv);
+	return SvPVX_mutable(sv);
     }
     return sv_2pv(sv, lp);
 }
@@ -331,7 +294,7 @@ Perl_sv_pvn_nomg(pTHX_ register SV *sv, STRLEN *lp)
 
     if (SvPOK(sv)) {
 	*lp = SvCUR(sv);
-	return SvPVX(sv);
+	return SvPVX_mutable(sv);
     }
     return sv_2pv_flags(sv, lp, 0);
 }
@@ -346,7 +309,7 @@ Perl_sv_pv(pTHX_ SV *sv)
     PERL_ARGS_ASSERT_SV_PV;
 
     if (SvPOK(sv))
-        return SvPVX(sv);
+        return SvPVX_mutable(sv);
 
     return sv_2pv(sv, NULL);
 }
@@ -360,7 +323,7 @@ Perl_sv_pvn_force(pTHX_ SV *sv, STRLEN *lp)
 {
     PERL_ARGS_ASSERT_SV_PVN_FORCE;
 
-    return sv_pvn_force_flags(sv, lp, SV_GMAGIC);
+    return sv_pvn_force_flags(sv, lp, 0);
 }
 
 int
@@ -450,26 +413,13 @@ Perl_av_fake(pTHX_ register I32 size, register SV **strp)
 }
 
 bool
-Perl_do_open(pTHX_ GV *gv, register const char *name, I32 len, int as_raw,
+Perl_do_open(pTHX_ IO *io, register const char *name, I32 len, int as_raw,
 	     int rawmode, int rawperm, PerlIO *supplied_fp)
 {
     PERL_ARGS_ASSERT_DO_OPEN;
 
-    return do_openn(gv, name, len, as_raw, rawmode, rawperm,
+    return do_openn(io, name, len, as_raw, rawmode, rawperm,
 		    supplied_fp, (SV **) NULL, 0);
-}
-
-bool
-Perl_do_open9(pTHX_ GV *gv, register const char *name, I32 len, int 
-as_raw,
-              int rawmode, int rawperm, PerlIO *supplied_fp, SV *svs,
-              I32 num_svs)
-{
-    PERL_ARGS_ASSERT_DO_OPEN9;
-
-    PERL_UNUSED_ARG(num_svs);
-    return do_openn(gv, name, len, as_raw, rawmode, rawperm,
-                    supplied_fp, &svs, 1);
 }
 
 int
@@ -520,11 +470,6 @@ Perl_oopsCV(pTHX_ OP *o)
     NORETURN_FUNCTION_END;
 }
 
-PP(pp_padany)
-{
-    DIE(aTHX_ "NOT IMPL LINE %d",__LINE__);
-}
-
 PP(pp_mapstart)
 {
     DIE(aTHX_ "panic: mapstart");	/* uses grepstart */
@@ -564,13 +509,6 @@ PP(pp_values)
 PP(pp_keys)
 {
     return do_kv();
-}
-
-/* Ops that are simply calls to other ops.  */
-PP(pp_dump)
-{
-    return pp_goto();
-    /*NOTREACHED*/
 }
 
 PP(pp_dofile)
@@ -1123,12 +1061,6 @@ Perl_pack_cat(pTHX_ SV *cat, const char *pat, const char *patend, register SV **
     packlist(cat, pat, patend, beglist, endlist);
 }
 
-HE *
-Perl_hv_store_ent(pTHX_ HV *hv, SV *keysv, SV *val, U32 hash)
-{
-  return (HE *)hv_common(hv, keysv, NULL, 0, 0, HV_FETCH_ISSTORE, val, hash);
-}
-
 bool
 Perl_hv_exists_ent(pTHX_ HV *hv, SV *keysv, U32 hash)
 {
@@ -1154,26 +1086,6 @@ Perl_hv_delete_ent(pTHX_ HV *hv, SV *keysv, I32 flags, U32 hash)
 
     return (SV *) hv_common(hv, keysv, NULL, 0, 0, flags | HV_DELETE, NULL,
 			    hash);
-}
-
-SV**
-Perl_hv_store_flags(pTHX_ HV *hv, const char *key, I32 klen, SV *val, U32 hash,
-		    int flags)
-{
-    return (SV**) hv_common(hv, NULL, key, klen, flags,
-			    (HV_FETCH_ISSTORE|HV_FETCH_JUST_SV), val, hash);
-}
-
-SV**
-Perl_hv_store(pTHX_ HV *hv, const char *key, I32 klen_i32, SV *val, U32 hash)
-{
-    STRLEN klen;
-    int flags;
-
-    klen = klen_i32;
-    flags = 0;
-    return (SV **) hv_common(hv, NULL, key, klen, flags,
-			     (HV_FETCH_ISSTORE|HV_FETCH_JUST_SV), val, hash);
 }
 
 bool

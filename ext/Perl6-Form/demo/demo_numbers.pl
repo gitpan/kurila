@@ -1,14 +1,14 @@
 use Perl6::Form;
 
-my $nums = do{local$/; ~< *DATA};
+my $nums = do{local$^INPUT_RECORD_SEPARATOR = undef; ~< *DATA};
 
-print < form
+print $^STDOUT, < form
 	 "Brittannia      Continental     East Indies      Tyrol           Nippon",
      "_____________   _____________   ______________   _____________   _____________",
      "\{],]]],]]].[\}   \{].]]].]]],[\}    \{]],]],]]].[\}   \{]']]]']]],[\}   \{]]]],]]]].[\}",
      "$nums",         "$nums",         "$nums",        "$nums",        "$nums";
 
-print < form
+print $^STDOUT, < form
 	 "",
 	 "Quintuple ",
      "_____________",

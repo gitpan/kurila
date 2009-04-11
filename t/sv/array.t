@@ -34,60 +34,60 @@ is(join('', @ary), '1234');
 @foo = @( () );
 $r = join(',', @( (nelems @foo)-1, < @foo));
 is($r, "-1");
-@foo[0] = '0';
+@foo[+0] = '0';
 $r = join(',', @( (nelems @foo)-1, < @foo));
 is($r, "0,0");
-@foo[2] = '2';
+@foo[+2] = '2';
 $r = join(',', @( (nelems @foo)-1, < @foo));
 is($r, "2,0,,2");
 @bar = @( () );
-@bar[0] = '0';
-@bar[1] = '1';
+@bar[+0] = '0';
+@bar[+1] = '1';
 $r = join(',', @( (nelems @bar)-1, < @bar));
 is($r, "1,0,1");
 @bar = @( () );
 $r = join(',', @( (nelems @bar)-1, < @bar));
 is($r, "-1");
-@bar[0] = '0';
+@bar[+0] = '0';
 $r = join(',', @( (nelems @bar)-1, < @bar));
 is($r, "0,0");
-@bar[2] = '2';
+@bar[+2] = '2';
 $r = join(',', @( (nelems @bar)-1, < @bar));
 is($r, "2,0,,2");
 @bar = @( () );
-@bar[0] = '0';
+@bar[+0] = '0';
 $r = join(',', @( (nelems @bar)-1, < @bar));
 is($r, "0,0");
-@bar[2] = '2';
+@bar[+2] = '2';
 $r = join(',', @( (nelems @bar)-1, < @bar));
 is($r, "2,0,,2");
 
 $foo = 'now is the time';
-ok(scalar (($F1,$F2,$Etc) = ($foo =~ m/^(\S+)\s+(\S+)\s*(.*)/)));
+ok(scalar (@($F1,$F2,$Etc) = @($foo =~ m/^(\S+)\s+(\S+)\s*(.*)/)));
 is($F1, 'now');
 is($F2, 'is');
 is($Etc, 'the time');
 
 $foo = 'lskjdf';
-ok(!($cnt = (($F1,$F2,$Etc) = ($foo =~ m/^(\S+)\s+(\S+)\s*(.*)/))))
+ok(!($cnt = (@(?$F1,?$F2,?$Etc) = @($foo =~ m/^(\S+)\s+(\S+)\s*(.*)/))))
    or diag("$cnt $F1:$F2:$Etc");
 
 %foo = %('blurfl','dyick','foo','bar','etc.','etc.');
 %bar = %( < %foo );
-is(%bar{'foo'}, 'bar');
+is(%bar{?'foo'}, 'bar');
 %bar = %( () );
-is(%bar{'foo'}, undef);
-(< %bar ) = (< %foo,'how','now');
-is(%bar{'foo'}, 'bar');
-is(%bar{'how'}, 'now');
- <%bar{[keys %foo]} = < values %foo;
-is(%bar{'foo'}, 'bar');
-is(%bar{'how'}, 'now');
+is(%bar{?'foo'}, undef);
+@(%< %bar ) = @(< %foo,'how','now');
+is(%bar{?'foo'}, 'bar');
+is(%bar{?'how'}, 'now');
+ %bar{[keys %foo]} =  values %foo;
+is(%bar{?'foo'}, 'bar');
+is(%bar{?'how'}, 'now');
 
-@foo = grep(m/e/,split(' ','now is the time for all good men to come to'));
+@foo = grep( {m/e/ },split(' ','now is the time for all good men to come to'));
 is(join(' ', @foo), 'the time men come');
 
-@foo = grep(!m/e/,split(' ','now is the time for all good men to come to'));
+@foo = grep( {!m/e/ },split(' ','now is the time for all good men to come to'));
 is(join(' ', @foo), 'now is for all good to to');
 
 $foo = join('', @('a','b','c','d','e','f')[[0..5]]);
@@ -113,7 +113,7 @@ is($foo, 'acebdf');
 @foo = @foo;
 is((join ' ', @foo), "foo bar burbl blah");				# 38
 
-(undef,<@foo) = < @foo;
+@(_,@<@foo) =  @foo;
 is((join ' ', @foo), "bar burbl blah");					# 39
 
 @foo = @('XXX',< @foo, 'YYY');
@@ -132,14 +132,14 @@ is((join ' ', @bar), "foo bar");						# 43
 
 our @bee = @( 'foo', 'bar', 'burbl', 'blah');
 our @bim;
-{
+do {
 
     local @bee = @bee;
     is((join ' ', @bee), "foo bar burbl blah");				# 44
-    {
+    do {
         local @bee = @('XXX',< @bee,'YYY');
         is((join ' ', @bee), "XXX foo bar burbl blah YYY");		# 46
-        {
+        do {
 #             local @bee = local(@bee) = @(qw(foo bar burbl blah));
 #             is((join ' ', < @bee), "foo bar burbl blah");		# 47
 #             {
@@ -148,65 +148,65 @@ our @bim;
 #                 is((join ' ', < @bim), "foo bar");			# 49
 #             }
 #             is((join ' ', < @bee), "foo bar burbl blah");		# 50
-        }
+        };
         is((join ' ', @bee), "XXX foo bar burbl blah YYY");		# 51
-    }
+    };
     is((join ' ', @bee), "foo bar burbl blah");				# 53
-}
+};
 
 # try the same with my
-{
+do {
     my @bee = @bee;
     is((join ' ',@bee), "foo bar burbl blah");				# 54
-    {
-	my (undef,<@bee) = < @bee;
+    do {
+	my @(_,@<@bee) =  @bee;
 	is((join ' ',@bee), "bar burbl blah");				# 55
-	{
+	do {
 	    my @bee = @('XXX',< @bee,'YYY');
 	    is((join ' ',@bee), "XXX bar burbl blah YYY");		# 56
-	    {
+	    do {
 		my @bee = @( my @bee = qw(foo bar burbl blah) );
 		is((join ' ',@bee), "foo bar burbl blah");		# 57
-		{
-		    my (@bim) = my(@bee) = qw(foo bar);
+		do {
+		    my @bim = my @bee = qw(foo bar);
 		    is((join ' ',@bee), "foo bar");			# 58
 		    is((join ' ',@bim), "foo bar");			# 59
-		}
+		};
 		is((join ' ',@bee), "foo bar burbl blah");		# 60
-	    }
+	    };
 	    is((join ' ',@bee), "XXX bar burbl blah YYY");		# 61
-	}
+	};
 	is((join ' ',@bee), "bar burbl blah");				# 62
-    }
+    };
     is((join ' ',@bee), "foo bar burbl blah");				# 63
-}
+};
 
 # try the same with our (except that previous values aren't restored)
-{
+do {
     our @bee = @bee;
     is((join ' ',@bee), "foo bar burbl blah");
-    {
-	our (undef,<@bee) = < @bee;
+    do {
+	our @(_,@<@bee) =  @bee;
 	is((join ' ',@bee), "bar burbl blah");
-	{
+	do {
 	    our @bee = @('XXX',< @bee,'YYY');
 	    is((join ' ',@bee), "XXX bar burbl blah YYY");
-	    {
+	    do {
 		our @bee = our @bee = qw(foo bar burbl blah);
 		is((join ' ',@bee), "foo bar burbl blah");
-		{
-		    our (@bim) = our(@bee) = qw(foo bar);
+		do {
+		    our @bim = our @bee = qw(foo bar);
 		    is((join ' ',@bee), "foo bar");
 		    is((join ' ',@bim), "foo bar");
-		}
-	    }
-	}
-    }
-}
+		};
+	    };
+	};
+    };
+};
 
 # make sure reification behaves
 my $t = curr_test();
-sub reify { @_[1] = $t++; print( (join ' ',@_), "\n"); }
+sub reify { @_[+1] = $t++; print($^STDOUT,  (join ' ',@_), "\n"); }
 reify('ok');
 reify('ok');
 
@@ -239,58 +239,58 @@ my $got = runperl (
 	stderr => 1
     );
 
-{
+do {
     local our $TODO = 1;
     $got =~ s/\n/ /g;
     is ($got, '');
-}
+};
 
 # Test negative and funky indices.
 
 
-{
+do {
     my @a = 0..4;
     is(@a[-1], 4);
     is(@a[-2], 3);
     is(@a[-5], 0);
-    ok(!defined @a[-6]);
+    ok(!defined @a[?-6]);
 
     is(@a[2.1]  , 2);
     is(@a[2.9]  , 2);
     is(@a[undef], 0);
     is(@a["3rd"], 3);
-}
+};
 
 
-{
+do {
     my @a;
-    eval '@a[-1] = 0';
-    like $@->message,
-      qr/Modification of non-creatable array value attempted, subscript -1/, "\$a[-1] = 0";
-}
+    eval '@a[+-1] = 0';
+    like $^EVAL_ERROR->message,
+      qr/Required array element -1 could not be created/, "\$a[+-1] = 0";
+};
 
-{
+do {
     # Bug #36211
     for (@(1,2)) {
-	{
+	do {
 	    local our @a;
 	    is (nelems @a, 0);
 	    @a=1..4
-	}
+	};
     }
-}
+};
 
 # more tests for AASSIGN_COMMON
 
-{
-    our($x,$y,$z) = ( <1..3);
-    our($y,$z) = ($x,$y);
+do {
+    our@($x,$y,$z) = @( <1..3);
+    our@($y,$z) = @($x,$y);
     is("$x $y $z", "1 1 2");
-}
-{
-    our($x,$y,$z) = ( <1..3);
-    (our $y, our $z) = ($x,$y);
+};
+do {
+    our@($x,$y,$z) = @( <1..3);
+    @(our $y, our $z) = @($x,$y);
     is("$x $y $z", "1 1 2");
-}
+};
 
 "We're included by lib/Tie/Array/std.t so we need to return something true";

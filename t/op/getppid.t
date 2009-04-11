@@ -7,13 +7,13 @@
 # attempt 2 reparentings and see if the PID both orphaned grandchildren get is
 # the same. (and not ours)
 
-use strict;
+
 use Config;
 
 BEGIN {
     for my $syscall (qw(pipe fork waitpid getppid)) {
-	if (!%Config{"d_$syscall"}) {
-	    print "1..0 # Skip: no $syscall\n";
+	if (!config_value("d_$syscall")) {
+	    print $^STDOUT, "1..0 # Skip: no $syscall\n";
 	    exit;
 	}
     }
@@ -23,8 +23,8 @@ BEGIN {
 
 sub fork_and_retrieve {
     my $which = shift;
-    pipe my ($r, $w) or die "pipe: $!\n";
-    my $pid = fork; defined $pid or die "fork: $!\n";
+    pipe my ($r, $w) or die "pipe: $^OS_ERROR\n";
+    my $pid = fork; defined $pid or die "fork: $^OS_ERROR\n";
 
     if ($pid) {
 	# parent
@@ -32,15 +32,15 @@ sub fork_and_retrieve {
 	$_ = ~< $r;
 	chomp;
 	die "Garbled output '$_'"
-	    unless my ($first, $second) = m/^(\d+),(\d+)\z/;
+	    unless my @($first, $second) = @: m/^(\d+),(\d+)\z/;
 	cmp_ok ($first, '+>=', 1, "Parent of $which grandchild");
 	cmp_ok ($second, '+>=', 1, "New parent of orphaned $which grandchild");
-	SKIP: {
+	SKIP: do {
 	    skip("Orphan processes are not reparented on QNX", 1)
-		if $^O eq 'nto';
+		if $^OS_NAME eq 'nto';
 	    isnt($first, $second,
                  "Orphaned $which grandchild got a new parent");
-	}
+	};
 	return $second;
     }
     else {
@@ -49,7 +49,7 @@ sub fork_and_retrieve {
 	$::NO_ENDING = 1;
 	close $r;
 
-	my $pid2 = fork; defined $pid2 or die "fork: $!\n";
+	my $pid2 = fork; defined $pid2 or die "fork: $^OS_ERROR\n";
 	if ($pid2) {
 	    close $w;
 	    sleep 1;
@@ -60,7 +60,7 @@ sub fork_and_retrieve {
 	    # Wait for immediate parent to exit
 	    sleep 2;
 	    my $ppid2 = getppid();
-	    print $w "$ppid1,$ppid2\n";
+	    print $w, "$ppid1,$ppid2\n";
 	}
 	exit 0;
     }
@@ -68,8 +68,8 @@ sub fork_and_retrieve {
 
 my $first = fork_and_retrieve("first");
 my $second = fork_and_retrieve("second");
-SKIP: {
-    skip ("Orphan processes are not reparented on QNX", 1) if $^O eq 'nto';
+SKIP: do {
+    skip ("Orphan processes are not reparented on QNX", 1) if $^OS_NAME eq 'nto';
     is ($first, $second, "Both orphaned grandchildren get the same new parent");
-}
-isnt ($first, $$, "And that new parent isn't this process");
+};
+isnt ($first, $^PID, "And that new parent isn't this process");

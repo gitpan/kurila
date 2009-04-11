@@ -2,7 +2,7 @@
 
 our @OrigINC;
 BEGIN {
-    @OrigINC = @INC;
+    @OrigINC = $^INCLUDE_PATH;
 }
 
 use Test::More tests => 13;
@@ -20,22 +20,22 @@ BEGIN {
     # lib.pm is documented to only work with Unix filepaths.
     @lib_dir  =qw(stuff moo);
     $Lib_Dir  = join "/",@lib_dir;
-    $Arch_Dir = join "/", @( <@lib_dir, %Config{archname});
+    $Arch_Dir = join "/", @( <@lib_dir, config_value("archname"));
 
     # create the auto/ directory and a module
-    $Auto_Dir = File::Spec->catdir(<@lib_dir, %Config{archname},'auto');
+    $Auto_Dir = File::Spec->catdir(<@lib_dir, config_value("archname"),'auto');
     $Module   = File::Spec->catfile(<@lib_dir, 'Yup.pm');
 
     mkpath \@($Auto_Dir);
 
-    open(MOD, ">", "$Module") || $!-> DIE();
-    print MOD <<'MODULE';
+    open(my $mod, ">", "$Module") || $^OS_ERROR-> DIE();
+    print $mod ,<<'MODULE';
 package Yup;
 our $Plan = 9;
 return '42';
 MODULE
 
-    close MOD;
+    close $mod;
 }
 
 END {
@@ -50,39 +50,39 @@ use lib $Lib_Dir;
 BEGIN { use_ok('Yup') }
 
 BEGIN {
-    if ($^O eq 'MacOS') {
+    if ($^OS_NAME eq 'MacOS') {
 	for (@($Lib_Dir, $Arch_Dir)) {
 	    s|/|:|g;
 	    $_ .= ":" unless m/:$/;
 	    $_ = ":$_" unless m/^:/; # we know this path is relative
 	}
     }
-    is( @INC[1], $Lib_Dir,          'lib adding at end of @INC' );
-    is( @INC[0], $Arch_Dir,        '    auto/ dir in front of that' );
-    is( nelems(grep(m/^\Q$Lib_Dir\E$/,@INC)), 1,   '    no duplicates' );
+    is( $^INCLUDE_PATH[1], $Lib_Dir,          'lib adding at end of $^INCLUDE_PATH' );
+    is( $^INCLUDE_PATH[0], $Arch_Dir,        '    auto/ dir in front of that' );
+    is( nelems(grep( {m/^\Q$Lib_Dir\E$/ },$^INCLUDE_PATH)), 1,   '    no duplicates' );
 
-    # Yes, %INC uses Unixy filepaths.
+    # Yes, $^INCLUDED uses Unixy filepaths.
     # Not on Mac OS, it doesn't ... it never has, at least.
     my $path = join("/", @($Lib_Dir, 'Yup.pm'));
-    if ($^O eq 'MacOS') {
+    if ($^OS_NAME eq 'MacOS') {
 	$path = $Lib_Dir . 'Yup.pm';
     }
-    is( %INC{'Yup.pm'}, $path,    '%INC set properly' );
+    is( $^INCLUDED{?'Yup.pm'}, $path,    '$^INCLUDED set properly' );
 
     is( try { do 'Yup.pm'  }, 42,  'do() works' );
     ok( try { require Yup; },      '   require()' );
     ok( eval "use Yup; 1;",         '   use()' );
-    is( $@, '' );
+    is( $^EVAL_ERROR, '' );
 
-    is_deeply(\@OrigINC, \@lib::ORIG_INC,    '@lib::ORIG_INC' );
+    is_deeply(\@OrigINC, \@lib::ORIG_INCLUDE_PATH,    '@lib::ORIG_INC' );
 }
 
 no lib $Lib_Dir;
 
-unlike( do { eval 'use lib %Config{installsitelib};'; $@ || '' },
+unlike( do { eval 'use lib config_value("installsitelib");'; $^EVAL_ERROR || '' },
 	qr/::Config is read-only/, 'lib handles readonly stuff' );
 
 BEGIN {
-    is( nelems(grep(m/stuff/,@INC)), 0, 'no lib' );
+    is( nelems(grep( {m/stuff/ },$^INCLUDE_PATH)), 0, 'no lib' );
     ok( !do 'Yup.pm',           '   do() effected' );
 }

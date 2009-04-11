@@ -30,6 +30,8 @@ use IO::Handle;
 
 use Nomad;
 
+my $version = "kurila-1.15";
+
 sub p55 {
     my ($input, $msg) = @_;
 
@@ -46,7 +48,7 @@ sub p55 {
         ok 0, "$msg" or $TODO or die;
         return;
     }
-    my $output = eval { Nomad::xml_to_p5( input => "tmp.xml", version => "kurila-1.10" ) };
+    my $output = eval { Nomad::xml_to_p5( input => "tmp.xml", version => $version ) };
     diag($@) if $@;
     is($output, $input, $msg) or $TODO or die;
 }
@@ -81,7 +83,7 @@ sub p55_file {
         fail "MAD dump failure of '$file'";
         return;
     }
-    my $output = eval { Nomad::xml_to_p5( input => "tmp.xml", version => "kurila-1.9" ) };
+    my $output = eval { Nomad::xml_to_p5( input => "tmp.xml", version => $version ) };
     if ($@) {
         fail "convert xml to p5 failed file: '$file'";
         #$TODO or die;
@@ -95,6 +97,11 @@ sub p55_file {
 undef $/;
 my @prgs = split m/^########\n/m, <DATA>;
 
+{
+    use bytes;
+    push @prgs, qq{# utf8 test\nuse bytes;\n"\xE8"};
+}
+
 use bytes;
 
 for my $prog (@prgs) {
@@ -107,15 +114,8 @@ for my $prog (@prgs) {
 use File::Find;
 
 our %failing = map { $_, 1 } qw|
-../t/op/switch.t
-
-../t/op/attrhand.t
-
-../t/op/symbolcache.t
-
-../t/op/exec.t
-
 ../t/arch/64bitint.t
+../t/run/switchp.t
 |;
 
 my @files;
@@ -131,7 +131,6 @@ for my $file (@files) {
 __DATA__
 33
 ########
-use strict;
 #ABC
 Foo->new;
 ########
@@ -140,15 +139,13 @@ my $x = pi;
 ########
 -OS_Code => $a
 ########
-sub ok($$) { }
+sub ok($ok, $name) { }
 #BEGIN { ok(1, 2, ); }
-########
-for (my $i=0; $i+<3; $i++) { }
-########
-for (; $a+<3; $a++) { }
-########
+#######
 #
-s//{m#.#}/g;
+s//$(m#.#)/g;
+########
+BEGIN { 1; }
 ########
 # Reduced test case from t/io/layers.t
 sub PerlIO::F_UTF8 () { 0x00008000 } # from perliol.h
@@ -157,32 +154,17 @@ BEGIN { PerlIO::Layer->find("encoding",1);}
 # from t/op/getppid.t
 pipe my ($r, $w)
 ########
-# TODO switch
-use feature 'switch';
-given(my $x = "bar") { }
-########
-# TODO attribute t/op/attrhand.t
-sub something : TypeCheck(
-    QNET::Util::Object,
-    QNET::Util::Object,
-    QNET::Util::Object
-) { #           WrongAttr (perl tokenizer bug)
-    # keep this ^ lined up !
-    return 42;
-}
-########
-# TODO symbol table t/op/symbolcache.t
-sub replaced2 { 'func' }
-BEGIN { undef $main::{replaced2} }
-########
 # TODO exit in begin block. from t/op/threads.t without threads
 BEGIN {
     exit 0;
 }
 use foobar;
 ########
+1; # 1
+2; # 2;
+########
 # operator with modify TARGET_MY
-my ($nc_attempt, $within);
+my ($nc_attempt, $within)  ;
 $nc_attempt = 0+ ($within eq 'other_sub') ;
 ########
 # __END__ section
@@ -192,7 +174,7 @@ __END__
 DATA
 ########
 # split with PUSHRE
-my @prgs = @( split "\n########\n", ~< DATA );
+my @prgs = @( split "\n########\n", ~< *DATA );
 ########
 # unless(eval { })
 unless (try { $a }) { $a = $b }
@@ -201,12 +183,8 @@ unless (try { $a }) { $a = $b }
 local our $TODO
 ########
 # 'my' inside prototyped subcall
-sub ok($;$) { }
+sub ok($ok, ?$name) { }
 ok my $x = "foobar";
-########
-# LABLE without a statement.
- LABLE: ;
- LABLE: $a;
 ########
 # TODO do not execute CHECK block
 CHECK { die; }
@@ -223,9 +201,9 @@ job system, though it's not on CPAN at the time of writing this.
 
 =cut
 ########
-@INC = @( qw(foo bar) );
+$^INCLUDE_PATH = @( qw(foo bar) );
 ########
-if (int(1.23) == 1) { print "1"; } else { print "2"; }
+if (int(1.23) == 1) { print \*STDOUT, "1"; } else { print \*STDOUT, "2"; }
 ########
 # TODO state; op_once
 state $x = 4;
@@ -242,40 +220,131 @@ s/$foo/$bar/;
 my ($foo, $bar);
 $a =~ s/$foo/$bar/;
 ########
-$a =~ s|(abc)|{uc($1)}|;
+$a =~ s|(abc)|$(uc($1))|;
 ########
-my $msg = "ce ºtii tu, bã ?\n";
+my $msg = "ce ºtii tu, bã ?\n"   ;
 use utf8;
 my $msg = "ce ºtii tu, bã ?\n";
 ########
 (stat "abc")[2];
 ########
 while ( ~< *DATA) {
-      print $_;
+      print \*STDOUT, $_;
 }
 ########
 for (1..5) {
-    print $_;
+    print \*STDOUT, $_;
 }
 ########
-map { $_ } 1..5;
+map { $_ }, 1..5;
 ########
 $( 3 );
 ########
 sub () { 1 }
 ########
+# assignment to hash
 my %h;
-(<%h) = (1, 2);
+%h = %(1, 2);
 ########
-my (<%hash) = (1,2);
+my %hash = %(1,2);
 ########
+# hash expand assignment
 my %h;
-(<%h) = < (%h);
+%( %< %h ) = %h;
 ########
-{
+do {
    # comment
 }
 ########
 try { }
 ########
-binmode ':foo', $a;
+# substitute with $(..)
+my $str;
+$str =~ s{(foo)}{$(sprintf("=\%02X", ord($1)))}g;
+$str;
+########
+SKIP: do {
+    print \*STDOUT, 1;
+}
+########
+print \*STDOUT, "arg";
+SKIP: do {
+    print \*STDOUT, 1;
+}
+########
+print \*STDOUT, "arg";
+SKIP: do {
+    print \*STDOUT, 1;
+}    ;
+
+sub foo {
+    print \*STDOUT, "bar";
+}
+########
+pos($a);
+########
+LABEL: for (@: 1) { warn "arg" }
+########
+# optional assignment
+my @( ? $x) = qw();
+########
+# dotdotdot operator
+my @($pw, ...) = qw(aap noot mies);
+########
+# or assignment.
+my $a;
+$a ||= 3;
+########
+# optional key
+$a{?key};
+########
+# optional assignment with our
+our $d;
+@( ? $d) = qw();
+########
+# dynascope
+dynascope;
+########
+# readpipe
+readpipe;
+########
+# optional
+push $a, $_ unless $a{$_};
+########
+# ;; at end of for loop
+for my $x ($a) {
+    do { 1 };;
+}
+########
+# @( ... , ) assignment
+@( $a, ) = $b;
+########
+@( ? $a->{x} ) = qw();
+########
+*F{IO} ;
+########
+$^WARNING += 1;
+########
+for our $_ ($a) {
+    warn $_;
+}
+########
+foo(1, , 2);
+########
+my %( 1 => $v, ...) = $a;
+########
+%() +%+ @();
+########
+%+: @: %();
+########
+sub ok($ok, ?$name) { return "$ok - $name"; }
+########
+my $sub = sub ($x) { ++$x; };
+########
+my %(aap => $aap, noot => $noot) = %();
+########
+sub (_) { 1 };
+########
+$^EVAL_ERROR =~ s/(?<=value attempted) at .*//s;
+########
+sub (?$foo) { $foo };

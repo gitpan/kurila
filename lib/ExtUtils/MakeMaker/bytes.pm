@@ -1,6 +1,5 @@
 package ExtUtils::MakeMaker::bytes;
 
-use strict;
 
 our $VERSION = 6.44;
 
@@ -12,7 +11,7 @@ sub import {
     shift;
     unshift @_, 'bytes';
 
-    goto &bytes::import;
+    return bytes::import(< @_);
 }
 
 1;

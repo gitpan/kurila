@@ -3,29 +3,28 @@
 require './test.pl';
 plan( tests => 8 );
 
-use strict;
 use warnings;
 
-use vars < qw{ @warnings };
+our (@warnings);
 
 BEGIN {
     $^WARN_HOOK = sub { push @warnings, @_[0]->message };
-    $| = 1;
+    $^OUTPUT_AUTOFLUSH = 1;
 }
 
-my $fail_odd      = 'Odd number of elements in hash assignment at ';
-my $fail_odd_anon = 'Odd number of elements in anonymous hash at ';
-my $fail_ref      = 'Reference found where even-sized list expected at ';
-my $fail_not_hr   = 'Not a HASH reference at ';
+my $fail_odd      = 'Odd number of elements in hash assignment';
+my $fail_odd_anon = 'Odd number of elements in anonymous hash';
+my $fail_ref      = 'Reference found where even-sized list expected';
+my $fail_not_hr   = 'Not a HASH reference';
 
-{
+do {
     @warnings = @( () );
-    my (<%hash) = < 1..3;
-    cmp_ok(scalar(nelems @warnings),'==',1,'odd count');
+    my @(%<%hash) =  1..3;
+    cmp_ok(nelems(@warnings),'==',1,'odd count');
     cmp_ok(substr(@warnings[0],0,length($fail_odd)),'eq',$fail_odd,'odd msg');
 
     @warnings = @( () );
-    (<%hash) = 1;
+    @(%<%hash) = @: 1;
     cmp_ok(scalar(nelems @warnings),'==',1,'scalar count');
     cmp_ok(substr(@warnings[0],0,length($fail_odd)),'eq',$fail_odd,'scalar msg');
 
@@ -36,9 +35,9 @@ my $fail_not_hr   = 'Not a HASH reference at ';
     dies_like( sub { %hash = %( \( 1..3 ) ); }, qr/reference as string/ );
 
     @warnings = @( () );
-    dies_like( sub { %hash = %( sub { print "fenice" } ); }, qr/reference as string/ );
+    dies_like( sub { %hash = %( sub { print $^STDOUT, "fenice" } ); }, qr/reference as string/ );
 
     @warnings = @( () );
     $_ = \%( < 1..10 );
     cmp_ok(scalar(nelems @warnings),'==',0,'hashref assign');
-}
+};

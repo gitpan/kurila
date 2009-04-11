@@ -1,24 +1,23 @@
 package Params::Check;
 
-use strict;
 
 use Locale::Maketext::Simple    Style => 'gettext';
 
 use Data::Dumper;
 
+our (@ISA, $VERSION, @EXPORT_OK, $VERBOSE, $ALLOW_UNKNOWN,
+     $STRICT_TYPE, $STRIP_LEADING_DASHES, $NO_DUPLICATES,
+     $PRESERVE_CASE, $ONLY_ALLOW_DEFINED, $WARNINGS_FATAL,
+     $SANITY_CHECK_TEMPLATE, $CALLER_DEPTH, $_ERROR_STRING);
+
 BEGIN {
     use Exporter    ();
-    use vars <        qw[ @ISA $VERSION @EXPORT_OK $VERBOSE $ALLOW_UNKNOWN
-                        $STRICT_TYPE $STRIP_LEADING_DASHES $NO_DUPLICATES
-                        $PRESERVE_CASE $ONLY_ALLOW_DEFINED $WARNINGS_FATAL
-                        $SANITY_CHECK_TEMPLATE $CALLER_DEPTH $_ERROR_STRING
-                    ];
 
     @ISA        =   qw[ Exporter ];
     @EXPORT_OK  =   qw[check allow last_error];
 
     $VERSION                = '0.26';
-    $VERBOSE                = $^W ? 1 : 0;
+    $VERBOSE                = $^WARNING ?? 1 !! 0;
     $NO_DUPLICATES          = 0;
     $STRIP_LEADING_DASHES   = 0;
     $STRICT_TYPE            = 0;
@@ -30,7 +29,7 @@ BEGIN {
     $CALLER_DEPTH           = 0;
 }
 
-my %known_keys = %( < map { $_ => 1 }
+my %known_keys = %( < @+: map { @: $_ => 1 },
                     qw| required allow default strict_type no_override
                         store defined | );
 
@@ -243,8 +242,7 @@ on this.
 
 =cut
 
-sub check {
-    my ($utmpl, $href, $verbose) = < @_;
+sub check($utmpl, $href, ?$verbose) {
 
     ### did we get the arguments we need? ###
     return if !$utmpl or !$href;
@@ -282,11 +280,11 @@ sub check {
     for my $key (keys %args) {
 
         ### you gave us this key, but it's not in the template ###
-        unless( %utmpl{$key} ) {
+        unless( %utmpl{?$key} ) {
 
             ### but we'll allow it anyway ###
             if( $ALLOW_UNKNOWN ) {
-                %defs{$key} = %args{$key};
+                %defs{+$key} = %args{?$key};
 
             ### warn about the error ###
             } else {
@@ -299,7 +297,7 @@ sub check {
         }
 
         ### check if you're even allowed to override this key ###
-        if( %utmpl{$key}->{'no_override'} ) {
+        if( %utmpl{$key}->{?'no_override'} ) {
             _store_error(
                 loc(q[You are not allowed to override key '%1'].
                     q[for %2 from %3], $key, _who_was_it(), _who_was_it(1)),
@@ -310,11 +308,11 @@ sub check {
         }
 
         ### copy of this keys template instructions, to save derefs ###
-        my %tmpl = %( < %{%utmpl{$key}} );
+        my %tmpl = %( < %{%utmpl{?$key}} );
 
         ### check if you were supposed to provide defined() values ###
-        if( (%tmpl{'defined'} || $ONLY_ALLOW_DEFINED) and
-            not defined %args{$key}
+        if( (%tmpl{?'defined'} || $ONLY_ALLOW_DEFINED) and
+            not defined %args{?$key}
         ) {
             _store_error(loc(q|Key '%1' must be defined when passed|, $key),
                 $verbose );
@@ -323,11 +321,11 @@ sub check {
         }
 
         ### check if they should be of a strict type, and if it is ###
-        if( (%tmpl{'strict_type'} || $STRICT_TYPE) and
-            (ref %args{$key} ne ref %tmpl{'default'})
+        if( (%tmpl{?'strict_type'} || $STRICT_TYPE) and
+            (ref %args{?$key} ne ref %tmpl{?'default'})
         ) {
             _store_error(loc(q|Key '%1' needs to be of type '%2'|,
-                        $key, ref %tmpl{'default'} || 'SCALAR'), $verbose );
+                        $key, ref %tmpl{?'default'} || 'SCALAR'), $verbose );
             $wrong ||= 1;
             next;
         }
@@ -335,22 +333,22 @@ sub check {
         ### check if we have an allow handler, to validate against ###
         ### allow() will report its own errors ###
         if( exists %tmpl{'allow'} and not do {
-                local $_ERROR_STRING;
-                allow( %args{$key}, %tmpl{'allow'} )
+                local $_ERROR_STRING = undef;
+                allow( %args{?$key}, %tmpl{?'allow'} )
             }         
         ) {
             ### stringify the value in the error report -- we don't want dumps
             ### of objects, but we do want to see *roughly* what we passed
             _store_error(loc(q|Key '%1' (%2) is of invalid type for '%3' |.
                              q|provided by %4|,
-                            $key, dump::view(%args{$key}), _who_was_it(),
+                            $key, dump::view(%args{?$key}), _who_was_it(),
                             _who_was_it(1)), $verbose);
             $wrong ||= 1;
             next;
         }
 
         ### we got here, then all must be OK ###
-        %defs{$key} = %args{$key};
+        %defs{+$key} = %args{?$key};
 
     }
 
@@ -366,8 +364,8 @@ sub check {
     ### can't do it before, because something may go wrong later,
     ### leaving the user with a few set variables
     for my $key (keys %defs) {
-        if( my $ref = %utmpl{$key}->{'store'} ) {
-            $$ref = $NO_DUPLICATES ? delete %defs{$key} : %defs{$key};
+        if( my $ref = %utmpl{?$key}->{?'store'} ) {
+            $$ref = $NO_DUPLICATES ?? delete %defs{$key} !! %defs{?$key};
         }
     }
 
@@ -422,7 +420,7 @@ sub allow {
 
     ### it's a regexp ###
     if( ref @_[1] eq 'Regexp' ) {
-        local $^W;  # silence warnings if $val is undef #
+        local $^WARNING = undef;  # silence warnings if $val is undef #
         return if @_[0] !~ m/@_[1]/;
 
     ### it's a sub ###
@@ -464,7 +462,7 @@ sub _clean_up_args {
         my $org = $key;
         $key = lc $key unless $PRESERVE_CASE;
         $key =~ s/^-// if $STRIP_LEADING_DASHES;
-        %args{$key} = delete %args{$org} if $key ne $org;
+        %args{+$key} = delete %args{$org} if $key ne $org;
     }
 
     ### return references so we always return 'true', even on empty
@@ -484,7 +482,7 @@ sub _sanity_check_and_defaults {
         ### keys are now lower cased, unless preserve case was enabled
         ### at which point, the utmpl keys must match, but that's the users
         ### problem.
-        if( %utmpl{$key}->{'required'} and not exists %args{$key} ) {
+        if( %utmpl{$key}->{?'required'} and not exists %args{$key} ) {
             _store_error(
                 loc(q|Required option '%1' is not provided for %2 by %3|,
                     $key, _who_was_it(1), _who_was_it(2)), $verbose );
@@ -495,7 +493,7 @@ sub _sanity_check_and_defaults {
         }
 
         ### next, set the default, make sure the key exists in %defs ###
-        %defs{$key} = %utmpl{$key}->{'default'}
+        %defs{+$key} = %utmpl{$key}->{?'default'}
                         if exists %utmpl{$key}->{'default'};
 
         if( $SANITY_CHECK_TEMPLATE ) {
@@ -505,15 +503,15 @@ sub _sanity_check_and_defaults {
             map {   _store_error(
                         loc(q|Template type '%1' not supported [at key '%2']|,
                         $_, $key), 1, 1 );
-            } grep {
-                not %known_keys{$_}
-            } keys %{%utmpl{$key}};
+            }, grep {
+                not %known_keys{?$_}
+            }, keys %{%utmpl{?$key}};
         
             ### make sure you passed a ref, otherwise, complain about it!
             if ( exists %utmpl{$key}->{'store'} ) {
                 _store_error( loc(
                     q|Store variable for '%1' is not a reference!|, $key
-                ), 1, 1 ) unless ref %utmpl{$key}->{'store'};
+                ), 1, 1 ) unless ref %utmpl{$key}->{?'store'};
             }
         }
     }
@@ -529,14 +527,14 @@ sub _sanity_check_and_defaults {
 sub _safe_eq {
     ### only do a straight 'eq' if they're both defined ###
     return defined(@_[0]) && defined(@_[1])
-                ? @_[0] eq @_[1]
-                : defined(@_[0]) eq defined(@_[1]);
+                ?? @_[0] eq @_[1]
+                !! defined(@_[0]) eq defined(@_[1]);
 }
 
 sub _who_was_it {
-    my $level = @_[0] || 0;
+    my $level = @_[?0] || 0;
 
-    return @(caller(2 + $CALLER_DEPTH + $level))[3] || 'ANON'
+    return @(caller(2 + $CALLER_DEPTH + $level))[?3] || 'ANON'
 }
 
 =head2 last_error()
@@ -551,10 +549,10 @@ It is exported upon request.
 
 =cut
 
-{   $_ERROR_STRING = '';
+do {   $_ERROR_STRING = '';
 
     sub _store_error {
-        my($err, $verbose, $offset) = < @_[[0..2]];
+        my@($err, $verbose, $offset) =  @_[[0..2]];
         $verbose ||= 0;
         $offset  ||= 0;
         my $level   = 1 + $offset;
@@ -569,7 +567,7 @@ It is exported upon request.
     }
 
     sub last_error { $_ERROR_STRING }
-}
+};
 
 1;
 

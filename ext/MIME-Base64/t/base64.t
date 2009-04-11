@@ -1,9 +1,9 @@
-use strict;
+
 use MIME::Base64;
 
-print "1..283\n";
+print $^STDOUT, "1..283\n";
 
-print "# Testing MIME::Base64-", $MIME::Base64::VERSION, "\n";
+print $^STDOUT, "# Testing MIME::Base64-", $MIME::Base64::VERSION, "\n";
 
 BEGIN {
  if (ord('A') == 0x41) {
@@ -19,18 +19,17 @@ my $testno = 1;
 # instead of "for my $test (...)" , which is my preference.
 # Not sure which perl version has started supporting.  MIME::Base64
 # was supposed to work with very old perl5, right?
-my $test;
 
 encodeTest();
 decodeTest();
 
 # This used to generate a warning
-print "not " unless decode_base64(encode_base64("foo")) eq "foo";
-print "ok ", $testno++, "\n";
+print $^STDOUT, "not " unless decode_base64(encode_base64("foo")) eq "foo";
+print $^STDOUT, "ok ", $testno++, "\n";
 
 sub encodeTest
 {
-    print "# encode test\n";
+    print $^STDOUT, "# encode test\n";
 
     my @encode_tests = @(
 	# All values
@@ -315,30 +314,30 @@ sub encodeTest
 
     );
 
-    for $test ( @encode_tests) {
-	my($plain, $expected) = (@$test[0], @$test[1]);
+    for my $test ( @encode_tests) {
+	my@($plain, $expected) = @(@$test[0], @$test[1]);
 
 	my $encoded = encode_base64($plain, '');
 	if ($encoded ne $expected) {
-	    print "test $testno ($plain): expected $expected, got $encoded\n";
-            print "not ";
+	    print $^STDOUT, "test $testno ($plain): expected $expected, got $encoded\n";
+            print $^STDOUT, "not ";
 	}
 	my $decoded = decode_base64($encoded);
 	if ($decoded ne $plain) {
-	    print "test $testno ($encoded): expected $plain, got $decoded\n";
-            print "not ";
+	    print $^STDOUT, "test $testno ($encoded): expected $plain, got $decoded\n";
+            print $^STDOUT, "not ";
 	}
 
-	print "ok $testno\n";
+	print $^STDOUT, "ok $testno\n";
 	$testno++;
     }
 }
 
 sub decodeTest
 {
-    print "# decode test\n";
+    print $^STDOUT, "# decode test\n";
 
-    local $^WARN_HOOK = sub { print @_[0] };  # avoid warnings on stderr
+    local $^WARN_HOOK = sub { print $^STDOUT, @_[0] };  # avoid warnings on stderr
 
     my @decode_tests = @(
 	\@('YWE='   => ASCII('aa')),
@@ -358,14 +357,14 @@ sub decodeTest
         \@(undef()    => ''),
     );
 
-    for $test ( @decode_tests) {
-	my($encoded, $expected) = (@$test[0], @$test[1]);
+    for my $test ( @decode_tests) {
+	my@($encoded, $expected) = @(@$test[0], @$test[1]);
 
 	my $decoded = decode_base64($encoded);
 	if ($decoded ne $expected) {
 	    die "test $testno ($encoded): expected $expected, got $decoded\n";
 	}
-	print "ok $testno\n";
+	print $^STDOUT, "ok $testno\n";
 	$testno++;
     }
 }

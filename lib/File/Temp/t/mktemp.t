@@ -3,14 +3,14 @@
 # Test for mktemp family of commands in File::Temp
 # Use STANDARD safe level for these tests
 
-use strict;
-use Test;
+
+use Test::More;
 BEGIN { plan tests => 9 }
 
 use File::Spec;
 use File::Path;
 use File::Temp < qw/ :mktemp unlink0 /;
-use FileHandle;
+use IO::File;
 
 ok(1);
 
@@ -19,9 +19,9 @@ ok(1);
 # Create file in temp directory
 my $template = File::Spec->catfile(File::Spec->tmpdir, 'wowserXXXX');
 
-(my $fh, $template) = < mkstemp($template);
+@(my $fh, $template) =  mkstemp($template);
 
-print "# MKSTEMP: FH is {dump::view($fh)} File is $template fileno=".fileno($fh)."\n";
+print $^STDOUT, "# MKSTEMP: FH is $(dump::view($fh)) File is $template fileno=".fileno($fh)."\n";
 # Check if the file exists
 ok( (-e $template) );
 
@@ -30,7 +30,7 @@ $fh->autoflush(1);
 
 # Try printing something to the file
 my $string = "woohoo\n";
-print $fh $string;
+print $fh, $string;
 
 # rewind the file
 ok(seek( $fh, 0, 0));
@@ -39,7 +39,7 @@ ok(seek( $fh, 0, 0));
 my $line = ~< $fh;
 
 # compare with previous string
-ok($string, $line);
+is($string, $line);
 
 # Tidy up
 # This test fails on Windows NT since it seems that the size returned by 
@@ -48,7 +48,7 @@ ok($string, $line);
 # to the file which are not recognised by stat(filename)
 # Simply waiting 3 seconds seems to be enough for the system to update
 
-if ($^O eq 'MSWin32') {
+if ($^OS_NAME eq 'MSWin32') {
   sleep 3;
 }
 my $status = unlink0($fh, $template);
@@ -65,9 +65,9 @@ if ($status) {
 $template = "suffixXXXXXX";
 my $suffix = ".dat";
 
-($fh, my $fname) = < mkstemps($template, $suffix);
+@($fh, my $fname) =  mkstemps($template, $suffix);
 
-print "# MKSTEMPS: File is $template -> $fname fileno=".fileno($fh)."\n";
+print $^STDOUT, "# MKSTEMPS: File is $template -> $fname fileno=".fileno($fh)."\n";
 # Check if the file exists
 ok( (-e $fname) );
 
@@ -88,7 +88,7 @@ $template = File::Spec->catdir(File::Spec->tmpdir, 'tmpdirXXXXXX');
 
 my $tmpdir = mkdtemp($template);
 
-print "# MKDTEMP: Name is $tmpdir from template $template\n";
+print $^STDOUT, "# MKDTEMP: Name is $tmpdir from template $template\n";
 
 ok( (-d $tmpdir ) );
 
@@ -102,7 +102,7 @@ $template = File::Spec->catfile(File::Spec->tmpdir, 'mytestXXXXXX');
 
 my $tmpfile = mktemp($template);
 
-print "# MKTEMP: Tempfile is $template -> $tmpfile\n";
+print $^STDOUT, "# MKTEMP: Tempfile is $template -> $tmpfile\n";
 
 # Okay if template no longer has XXXXX in
 

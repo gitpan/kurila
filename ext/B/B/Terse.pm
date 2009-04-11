@@ -2,13 +2,11 @@ package B::Terse;
 
 our $VERSION = '1.05';
 
-use strict;
 use B < qw(class @specialsv_name);
 use B::Concise < qw(concise_subref set_style_standard);
 use Carp;
 
-sub terse {
-    my ($order, $subref) = < @_;
+sub terse($order, ?$subref) {
     set_style_standard("terse");
     if ($order eq "exec") {
 	concise_subref('exec', $subref);
@@ -19,14 +17,14 @@ sub terse {
 
 sub compile {
     my @args = @_;
-    my $order = (nelems @args) ? shift(@args) : "";
+    my $order = (nelems @args) ?? shift(@args) !! "";
     $order = "-exec" if $order eq "exec";
     unshift @args, $order if $order ne "";
     B::Concise::compile("-terse", < @args);
 }
 
 sub indent {
-    my ($level) = (nelems @_) ? shift : 0;
+    my $level = (nelems @_) ?? shift !! 0;
     return "    " x $level;
 }
 
@@ -38,7 +36,7 @@ sub B::OP::terse {
 }
 
 sub B::SV::terse {
-    my($sv, $level) = (< @_, 0);
+    my@($sv, $level) = @(< @_, 0);
     my %info;
     B::Concise::concise_sv($sv, \%info);
     my $s = indent($level)
@@ -49,13 +47,13 @@ sub B::SV::terse {
 }
 
 sub B::NULL::terse {
-    my ($sv, $level) = (< @_, 0);
+    my @($sv, $level) = @(< @_, 0);
     my $s = indent($level) . sprintf '%s (0x%lx)', class($sv), $$sv;
     $s;
 }
 
 sub B::SPECIAL::terse {
-    my ($sv, $level) = (< @_, 0);
+    my @($sv, $level) = @(< @_, 0);
     my $s = indent($level)
 	. sprintf( '%s #%d %s', class($sv), $$sv, @specialsv_name[$$sv]);
     $s;

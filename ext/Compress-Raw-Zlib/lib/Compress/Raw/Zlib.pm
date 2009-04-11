@@ -5,8 +5,7 @@ require Exporter;
 use Carp ;
 
 #use Parse::Parameters;
-
-use strict ;
+ 
 use warnings ;
 use bytes ;
 our ($VERSION, $XS_VERSION, @ISA, @EXPORT);
@@ -102,7 +101,7 @@ sub ParseParameters
     #local $Carp::CarpLevel = 1 ;
     my $p = Compress::Raw::Zlib::Parameters->new() ;
     $p->parse(< @_)
-        or croak "$sub: $p->{Error}" ;
+        or croak "$sub: $p->{?Error}" ;
 
     return $p;
 }
@@ -124,9 +123,9 @@ sub Compress::Raw::Zlib::Parameters::setError
 {
     my $self = shift ;
     my $error = shift ;
-    my $retval = (nelems @_) ? shift : undef ;
+    my $retval = (nelems @_) ?? shift !! undef ;
 
-    $self->{Error} = $error ;
+    $self->{+Error} = $error ;
     return $retval;
 }
           
@@ -142,7 +141,7 @@ sub Compress::Raw::Zlib::Parameters::parse
 
     my $default = shift ;
 
-    my $got = $self->{Got} ;
+    my $got = $self->{?Got} ;
     my $firstTime = nkeys %{ $got } == 0 ;
 
     my (@Bad) ;
@@ -160,7 +159,7 @@ sub Compress::Raw::Zlib::Parameters::parse
  
         foreach my $key (keys %$href) {
             push @entered, $key ;
-            push @entered, \$href->{$key} ;
+            push @entered, \$href->{+$key} ;
         }
     }
     else {
@@ -175,12 +174,12 @@ sub Compress::Raw::Zlib::Parameters::parse
     }
 
 
-    while (my ($key, $v) = each %$default)
+    while (my @(?$key, ?$v) =@( each %$default))
     {
-        croak "need 4 params [{join ' ',@$v}]"
+        croak "need 4 params [$(join ' ',@$v)]"
             if (nelems @$v) != 4 ;
 
-        my ($first_only, $sticky, $type, $value) = < @$v ;
+        my @($first_only, $sticky, $type, $value) =  @$v ;
         my $x ;
         $self->_checkType($key, \$value, $type, 0, \$x) 
             or return undef ;
@@ -188,7 +187,7 @@ sub Compress::Raw::Zlib::Parameters::parse
         $key = lc $key;
 
         if ($firstTime || ! $sticky) {
-            $got->{$key} = \@(0, $type, $value, $x, $first_only, $sticky) ;
+            $got->{+$key} = \@(0, $type, $value, $x, $first_only, $sticky) ;
         }
 
         $got->{$key}->[OFF_PARSED] = 0 ;
@@ -204,7 +203,7 @@ sub Compress::Raw::Zlib::Parameters::parse
         $key =~ s/^-// ;
         my $canonkey = lc $key;
  
-        if ($got->{$canonkey} && ($firstTime ||
+        if ($got->{?$canonkey} && ($firstTime ||
                                   ! $got->{$canonkey}->[OFF_FIRST_ONLY]  ))
         {
             my $type = $got->{$canonkey}->[OFF_TYPE] ;
@@ -213,15 +212,15 @@ sub Compress::Raw::Zlib::Parameters::parse
                 or return undef ;
             #$value = $$value unless $type & Parse_store_ref ;
             $value = $$value ;
-            $got->{$canonkey} = \@(1, $type, $value, $s) ;
+            $got->{+$canonkey} = \@(1, $type, $value, $s) ;
         }
         else
           { push (@Bad, $key) }
     }
  
     if ((nelems @Bad)) {
-        my ($bad) = join(", ", @Bad) ;
-        return $self->setError("unknown key value(s) {join ' ',@Bad}") ;
+        my @($bad) = join@(", ", @Bad) ;
+        return $self->setError("unknown key value(s) $(join ' ',@Bad)") ;
     }
 
     return 1;
@@ -262,7 +261,7 @@ sub Compress::Raw::Zlib::Parameters::_checkType
         return $self->setError("Parameter '$key' must be an unsigned int, got '$value'")
             if $validate && $value !~ m/^\d+$/;
 
-        $$output = defined $value ? $value : 0 ;    
+        $$output = defined $value ?? $value !! 0 ;    
         return 1;
     }
     elsif ($type ^&^ Parse_signed)
@@ -272,19 +271,19 @@ sub Compress::Raw::Zlib::Parameters::_checkType
         return $self->setError("Parameter '$key' must be a signed int, got '$value'")
             if $validate && $value !~ m/^-?\d+$/;
 
-        $$output = defined $value ? $value : 0 ;    
+        $$output = defined $value ?? $value !! 0 ;    
         return 1 ;
     }
     elsif ($type ^&^ Parse_boolean)
     {
         return $self->setError("Parameter '$key' must be an int, got '$value'")
             if $validate && defined $value && $value !~ m/^\d*$/;
-        $$output =  defined $value ? $value != 0 : 0 ;    
+        $$output =  defined $value ?? $value != 0 !! 0 ;    
         return 1;
     }
     elsif ($type ^&^ Parse_string)
     {
-        $$output = defined $value ? $value : "" ;    
+        $$output = defined $value ?? $value !! "" ;    
         return 1;
     }
 
@@ -389,7 +388,7 @@ sub Compress::Raw::Zlib::Inflate::new
 sub Compress::Raw::Zlib::InflateScan::new
 {
     my $pkg = shift ;
-    my ($got) = < ParseParameters(0,
+    my @($got) =  ParseParameters(0,
                     \%(
                         'CRC32'         => \@(1, 1, < Parse_boolean,  0),
                         'ADLER32'       => \@(1, 1, < Parse_boolean,  0),
@@ -417,7 +416,7 @@ sub Compress::Raw::Zlib::InflateScan::new
 sub Compress::Raw::Zlib::inflateScanStream::createDeflateStream
 {
     my $pkg = shift ;
-    my ($got) = < ParseParameters(0,
+    my @($got) =  ParseParameters(0,
             \%(
                 'AppendOutput'  => \@(1, 1, < Parse_boolean,  0),
                 'CRC32'         => \@(1, 1, < Parse_boolean,  0),

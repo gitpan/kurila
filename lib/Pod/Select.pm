@@ -9,7 +9,7 @@
 
 package Pod::Select;
 
-use vars < qw($VERSION);
+our ($VERSION);
 $VERSION = 1.35;  ## Current version of this package
 
 #############################################################################
@@ -35,7 +35,7 @@ Pod::Select, podselect() - extract selected sections of POD from input
 
     ## Select the "DESCRIPTION" section of the PODs from STDIN and write
     ## the result to STDERR.
-    podselect({-output => ">&STDERR", -sections => ["DESCRIPTION"]}, \*STDIN);
+    podselect({-output => ">&STDERR", -sections => ["DESCRIPTION"]}, $^STDIN);
 
 or
 
@@ -57,7 +57,7 @@ or
     ## STDIN and write the result to STDERR.
     $parser->select("DESCRIPTION");
     $parser->add_selection("SEE ALSO");
-    $parser->parse_from_filehandle(\*STDIN, \*STDERR);
+    $parser->parse_from_filehandle($^STDIN, $^STDERR);
 
 =head1 REQUIRES
 
@@ -235,10 +235,9 @@ C</=item mine/../=(item|back)/>
 
 #############################################################################
 
-use strict;
 #use diagnostics;
 use Pod::Parser v1.04;
-use vars < qw(@ISA @EXPORT $MAX_HEADING_LEVEL);
+our (@ISA, @EXPORT, $MAX_HEADING_LEVEL);
 
 @ISA = qw(Pod::Parser);
 @EXPORT = qw(&podselect);
@@ -267,17 +266,16 @@ reference to the object itself as an implicit first parameter.
 ## 
 ## =end _PRIVATE_
 
-use vars < qw(%myData @section_headings);
+our (@section_headings);
 
 sub _init_headings {
     my $self = shift;
-    local *myData = $self;
 
     ## Initialize current section heading titles if necessary
-    unless (defined %myData{_SECTION_HEADINGS}) {
-        local *section_headings = %myData{_SECTION_HEADINGS} = \@();
-        for (my $i = 0; $i +< $MAX_HEADING_LEVEL; ++$i) {
-            @section_headings[$i] = '';
+    unless (defined %$self{?_SECTION_HEADINGS}) {
+        my $section_headings = %$self{+_SECTION_HEADINGS} = \@();
+        for my $i (0..$MAX_HEADING_LEVEL-1) {
+            @$section_headings[+$i] = '';
         }
     }
 }
@@ -302,9 +300,9 @@ level, then C<undef> is returned.
 
 sub curr_headings {
     my $self = shift;
-    $self->_init_headings()  unless (defined $self->{_SECTION_HEADINGS});
-    my @headings = @{ $self->{_SECTION_HEADINGS} };
-    return ((nelems @_) +> 0  and  @_[0] =~ m/^\d+$/) ? @headings[@_[0] - 1] : @headings;
+    $self->_init_headings()  unless (defined $self->{?_SECTION_HEADINGS});
+    my @headings = @{ $self->{?_SECTION_HEADINGS} };
+    return ((nelems @_) +> 0  and  @_[0] =~ m/^\d+$/) ?? @headings[@_[0] - 1] !! @headings;
 }
 
 ##---------------------------------------------------------------------------
@@ -332,13 +330,12 @@ This method should I<not> normally be overridden by subclasses.
 
 =cut
 
-use vars < qw(@selected_sections);
+our (@selected_sections);
 
 sub select {
     my $self = shift;
     my @sections = @_;
-    local *myData = $self;
-    local $_;
+    local $_ = undef;
 
 ### NEED TO DISCERN A SECTION-SPEC FROM A RANGE-SPEC (look for m{^/.+/$}?)
 
@@ -353,23 +350,22 @@ sub select {
     ## it seems incredibly unlikely that "+" would ever correspond to
     ## a legitimate section heading
     ##---------------------------------------------------------------------
-    my $add = (@sections[0] eq "+") ? shift(@sections) : "";
+    my $add = (@sections[0] eq "+") ?? shift(@sections) !! "";
 
     ## Reset the set of sections to use
     unless ((nelems @sections) +> 0) {
-        delete %myData{_SELECTED_SECTIONS}  unless ($add);
+        delete %$self{_SELECTED_SECTIONS}  unless ($add);
         return;
     }
-    %myData{_SELECTED_SECTIONS} = \@()
-        unless ($add  &&  exists %myData{_SELECTED_SECTIONS});
-    local *selected_sections = %myData{_SELECTED_SECTIONS};
+    %$self{+_SELECTED_SECTIONS} = \@()
+        unless ($add  &&  exists %$self{_SELECTED_SECTIONS});
+    my $selected_sections = %$self{?_SELECTED_SECTIONS};
 
     ## Compile each spec
-    my $spec;
-    for $spec ( @sections) {
+    for my $spec ( @sections) {
         if ( defined($_ = &_compile_section_spec($spec)) ) {
             ## Store them in our sections array
-            push(@selected_sections, $_);
+            push(@$selected_sections, $_);
         }
         else {
             warn "Ignoring section spec \"$spec\"!\n";
@@ -439,23 +435,22 @@ This method should I<not> normally be overridden by subclasses.
 
 sub match_section {
     my $self = shift;
-    my (@headings) = @_;
-    local *myData = $self;
+    my @headings = @_;
 
     ## Return true if no restrictions were explicitly specified
-    my $selections = (exists %myData{_SELECTED_SECTIONS})
-                       ?  %myData{_SELECTED_SECTIONS}  :  undef;
+    my $selections = (exists %$self{_SELECTED_SECTIONS})
+                       ??  %$self{?_SELECTED_SECTIONS}  !!  undef;
     return  1  unless ((defined $selections) && ((nelems @{$selections}) +> 0));
 
     ## Default any unspecified sections to the current one
     my @current_headings = $self->curr_headings();
-    for (my $i = 0; $i +< $MAX_HEADING_LEVEL; ++$i) {
-        (defined @headings[$i])  or  @headings[$i] = @current_headings[$i];
+    for my $i (0..$MAX_HEADING_LEVEL-1) {
+        (defined @headings[?$i])  or  @headings[+$i] = @current_headings[$i];
     }
 
     ## Look for a match against the specified section expressions
-    my ($section_spec, $regex, $negated, $match);
-    for $section_spec (  @{$selections} ) {
+    my ($regex, $negated, $match);
+    for my $section_spec (  @{$selections} ) {
         ##------------------------------------------------------
         ## Each portion of this spec must match in order for
         ## the spec to be matched. So we will start with a 
@@ -463,11 +458,11 @@ sub match_section {
         ## the results of matching a given element of the spec.
         ##------------------------------------------------------
         $match = 1;
-        for (my $i = 0; $i +< $MAX_HEADING_LEVEL; ++$i) {
+        for my $i (0..$MAX_HEADING_LEVEL-1) {
             $regex   = $section_spec->[$i];
             $negated = ($regex =~ s/^\!//);
-            $match  ^&^= ($negated ? (@headings[$i] !~ m/$regex/)
-                                 : (@headings[$i] =~ m/$regex/));
+            $match  ^&^= ($negated ?? (@headings[$i] !~ m/$regex/)
+                                 !! (@headings[$i] =~ m/$regex/));
             last unless ($match);
         }
         return  1  if ($match);
@@ -494,25 +489,23 @@ for processing; otherwise a false value is returned.
 
 =cut
 
-sub is_selected {
-    my ($self, $paragraph) = < @_;
-    local $_;
-    local *myData = $self;
+sub is_selected($self, $paragraph) {
+    local $_ = undef;
 
-    $self->_init_headings()  unless (defined %myData{_SECTION_HEADINGS});
+    $self->_init_headings()  unless (defined %$self{?_SECTION_HEADINGS});
 
     ## Keep track of current sections levels and headings
     $_ = $paragraph;
     if (m/^=((?:sub)*)(?:head(?:ing)?|sec(?:tion)?)(\d*)\s+(.*?)\s*$/)
     {
         ## This is a section heading command
-        my ($level, $heading) = ($2, $3);
+        my @($level, $heading) = @($2, $3);
         $level = 1 + (length($1) / 3)  if ((! length $level) || (length $1));
         ## Reset the current section heading at this level
-        %myData{_SECTION_HEADINGS}->[$level - 1] = $heading;
+        %$self{_SECTION_HEADINGS}->[$level - 1] = $heading;
         ## Reset subsection headings of this one to empty
-        for (my $i = $level; $i +< $MAX_HEADING_LEVEL; ++$i) {
-            %myData{_SECTION_HEADINGS}->[$i] = '';
+        for my $i ($level .. $MAX_HEADING_LEVEL -1) {
+            %$self{_SECTION_HEADINGS}->[$i] = '';
         }
     }
 
@@ -578,14 +571,13 @@ filenames are given).
 
 =cut 
 
-sub podselect {
-    my(@argv) = @_;
+sub podselect(@argv) {
     my %defaults = %( () );
     my $pod_parser = Pod::Select->new(< %defaults);
     my $num_inputs = 0;
     my $output = ">&STDOUT";
     my %opts;
-    local $_;
+    local $_ = undef;
     for ( @argv) {
         if (ref($_)) {
         next unless (ref($_) eq 'HASH');
@@ -597,21 +589,21 @@ sub podselect {
             ## looked like Unix command-line options.
             ## to be uppercase keywords)
             ##-------------------------------------------------------------
-            %opts = %( < map {
-                my ($key, $val) = (lc $_, %opts{$_});
+            %opts = %: < @+: map {
+                my @($key, $val) = @(lc $_, %opts{?$_});
                 $key =~ s/^(?=\w)/-/;
                 $key =~ m/^-se[cl]/  and  $key  = '-sections';
                 #! $key eq '-range'    and  $key .= 's';
-                ($key => $val);    
-            } @( ( <keys %opts)) );
+                @($key => $val);
+            }, keys %opts;
 
             ## Process the options
-            (exists %opts{'-output'})  and  $output = %opts{'-output'};
+            (exists %opts{'-output'})  and  $output = %opts{?'-output'};
 
             ## Select the desired sections
             $pod_parser->select(< @{ %opts{'-sections'} })
-                if ( (defined %opts{'-sections'})
-                     && ((ref %opts{'-sections'}) eq 'ARRAY') );
+                if ( (defined %opts{?'-sections'})
+                     && ((ref %opts{?'-sections'}) eq 'ARRAY') );
 
             #! ## Select the desired paragraph ranges
             #! $pod_parser->select(@{ $opts{'-ranges'} })
@@ -663,8 +655,7 @@ each invalid regex.
 
 =cut
 
-sub _compile_section_spec {
-    my ($section_spec) = < @_;
+sub _compile_section_spec($section_spec) {
     my (@regexs, $negated);
 
     ## Compile the spec into a list of regexs
@@ -676,8 +667,8 @@ sub _compile_section_spec {
     @regexs = split('/', $_, $MAX_HEADING_LEVEL);
 
     ## Set default regex for ommitted levels
-    for (my $i = 0; $i +< $MAX_HEADING_LEVEL; ++$i) {
-        @regexs[$i]  = '.*'  unless ((defined @regexs[$i])
+    for my $i (0 .. $MAX_HEADING_LEVEL -1) {
+        @regexs[+$i]  = '.*'  unless ((defined @regexs[?$i])
                                      && (length @regexs[$i]));
     }
     ## Modify the regexs as needed and validate their syntax
@@ -688,9 +679,9 @@ sub _compile_section_spec {
         s|\002|\\/|g;        ## restore escaped forward slashes
         $negated = s/^\!//;  ## check for negation
         eval "m/$_/";         ## check regex syntax
-        if ($@) {
+        if ($^EVAL_ERROR) {
             ++$bad_regexs;
-            warn "Bad regular expression /$_/ in \"$section_spec\": $@\n";
+            warn "Bad regular expression /$_/ in \"$section_spec\": $^EVAL_ERROR\n";
         }
         else {
             ## Add the forward and rear anchors (and put the negator back)
@@ -699,7 +690,7 @@ sub _compile_section_spec {
             $_ = '!' . $_  if ($negated);
         }
     }
-    return  (! $bad_regexs) ? \ @regexs : undef;
+    return  (! $bad_regexs) ?? \ @regexs !! undef;
 }
 
 ##---------------------------------------------------------------------------

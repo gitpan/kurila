@@ -1,30 +1,29 @@
 #!perl -w
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't';
-        @INC = @('../lib', 'lib');
+        $^INCLUDE_PATH = @('../lib', 'lib');
     }
     else {
-        unshift @INC, 't/lib';
+        unshift $^INCLUDE_PATH, 't/lib';
     }
 }
 chdir 't';
 
 
 # Can't use Test.pm, that's a 5.005 thing.
-print "1..5\n";
+print $^STDOUT, "1..5\n";
 
 my $test_num = 1;
 # Utility testing functions.
-sub ok ($;$) {
-    my($test, $name) = < @_;
+sub ok($test, ?$name) {
     my $ok = '';
     $ok .= "not " unless $test;
     $ok .= "ok $test_num";
     $ok .= " - $name" if defined $name;
     $ok .= "\n";
-    print $ok;
+    print $^STDOUT, $ok;
     $test_num++;
 
     return $test;
@@ -40,26 +39,24 @@ END { 1 while unlink($tmpfile) }
 
 ok( defined $out );
 
-print $out "hi!\n";
+print $out, "hi!\n";
 close *$out;
 
 undef $out;
-open(IN, "<", $tmpfile) or die $!;
-chomp(my $line = ~< *IN);
-close IN;
+open(my $in, "<", $tmpfile) or die $^OS_ERROR;
+chomp(my $line = ~< *$in);
+close $in;
 
 ok($line eq 'hi!');
 
-open(FOO, ">>", "$tmpfile") or die $!;
-$out = $Test->output(\*FOO);
-my $old = select *$out;
-print "Hello!\n";
-close *$out;
+open(my $foo, ">>", "$tmpfile") or die $^OS_ERROR;
+$out = $Test->output(\*$foo);
+print $out, "Hello!\n";
+close $out;
 undef $out;
-select $old;
-open(IN, "<", $tmpfile) or die $!;
-my @lines = @( ~< *IN );
-close IN;
+open($in, "<", $tmpfile) or die $^OS_ERROR;
+my @lines = @( ~< *$in );
+close $in;
 
 ok(@lines[0] =~ m/hi!/);
 ok(@lines[1] =~ m/Hello!/);
@@ -80,7 +77,7 @@ $Test->ok(1, "ok, like\nok");
 $Test->skip("wibble\nmoof");
 $Test->todo_skip("todo\nskip\n");
 
-ok( $output eq <<OUTPUT ) || print STDERR $output;
+ok( $output eq <<OUTPUT ) || print $^STDERR, $output;
 1..5
 ok 1 - ok
 ok 2 - ok

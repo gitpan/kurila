@@ -1,9 +1,9 @@
 #!/usr/bin/perl
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't';
-        @INC = @( '../lib' );
+        $^INCLUDE_PATH = @( '../lib' );
     }
 }
 
@@ -17,6 +17,6 @@ $T->no_ending(1);
 for my $num (1..10) {
     my $tnum = $num * 2;
     pass("I'm ok");
-    $T->current_test($tnum);
-    print "ok $tnum - You're ok\n";
+    $T->current_test = $tnum;
+    print $^STDOUT, "ok $tnum - You're ok\n";
 }

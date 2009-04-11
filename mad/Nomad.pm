@@ -27,6 +27,13 @@ sub xml_to_p5 {
     $::curenc = 0;		# start in utf8.
     $options{'version'} =~ m/(\w+)[-]([\d.]+)$/ or die "invalid version: '$options{version}'";
     $::version = { branch => $1, 'v' => qv($2)};
+    if ($options{'version_from'}
+         and $options{'version_from'} =~ m/(\w+)[-]([\d.]+)$/) {
+        $::version_from = { branch => $1, 'v' => qv($2)};
+    }
+    else {
+        $::version_from  = $::version;
+    }
 
     # parse file
     use XML::Parser;
@@ -662,7 +669,7 @@ sub ast {
 	push @newkids, $kid->ast($self, @_);
     }
     if (@newkids) {
-	push @retval, uc $self->key(), "(", @newkids , ")";
+	push @retval, uc $self->key(), "(", @newkids, ")";
     }
     else {
 	push @retval, $self->madness('o ( )');
@@ -1009,7 +1016,14 @@ BEGIN {
 	'nullstatement' => sub {		# null statements/blocks
 	    my $self = shift;
 	    my @newkids;
-	    push @newkids, $self->madness('{ ; }');
+	    push @newkids, $self->madness('{ ; } fake_semicolon');
+	    $::curstate = 0;
+	    return P5AST::nothing->new(Kids => [@newkids])
+	},
+	'valuestatement' => sub {		# null statements/blocks
+	    my $self = shift;
+	    my @newkids;
+	    push @newkids, $self->madness('X ;');
 	    $::curstate = 0;
 	    return P5AST::nothing->new(Kids => [@newkids])
 	},
@@ -1034,26 +1048,28 @@ BEGIN {
 	    my @newkids;
 	    my @module = $self->madness('U') or die "use should have 'U' madness";
 	    my @args = $self->madness('A');
-	    my $module = $module[-1]{Kids}[-1];
-	    if ($module->uni eq 'bytes') {
-		$::curenc = Nomad::encnum('iso-8859-1');
-	    }
-	    elsif ($module->uni eq 'utf8') {
-		if ($$self{mp}{o} eq 'no') {
-		    $::curenc = 0;
-		}
-		else {
-		    $::curenc = Nomad::encnum('utf-8');
-		}
-	    }
-	    elsif ($module->uni eq 'encoding') {
-		if ($$self{mp}{o} eq 'no') {
-		    $::curenc = Nomad::encnum('iso-8859-1');
-		}
-		else {
-		    $::curenc = Nomad::encnum(eval $args[0]->p5text); # XXX bletch
-		}
-	    }
+            if ( $::version->{branch} ne 'kurila') {
+                my $module = $module[-1]{Kids}[-1];
+                if ($module->uni eq 'bytes') {
+                    $::curenc = Nomad::encnum('iso-8859-1');
+                }
+                elsif ($module->uni eq 'utf8') {
+                    if ($$self{mp}{o} eq 'no') {
+                        $::curenc = 0;
+                    }
+                    else {
+                        $::curenc = Nomad::encnum('utf-8');
+                    }
+                }
+                elsif ($module->uni eq 'encoding') {
+                    if ($$self{mp}{o} eq 'no') {
+                        $::curenc = Nomad::encnum('iso-8859-1');
+                    }
+                    else {
+                        $::curenc = Nomad::encnum(eval $args[0]->p5text); # XXX bletch
+                    }
+                }
+            }
 	    # (Surrounding {} ends up here if use is only thing in block.)
 	    push @newkids, $self->madness('{ o');
 	    push @newkids, @module;
@@ -1077,7 +1093,7 @@ BEGIN {
 	'sub' => sub {			# subroutine
 	    my $self = shift;
 	    my @newkids;
-	    push @newkids, $self->madness('d n s a : { & } ;');
+            push @newkids, $self->madness('d n s prototype a : { & } fake_semicolon ;');
 	    $::curstate = 0;
 	    return P5AST::sub->new(Kids => [@newkids])
 	},
@@ -1450,14 +1466,24 @@ sub ast {
     local $::curstate;	# in case there are statements in subscript
     local $::curenc = $::curenc;
     my @newkids;
-    push @newkids, $self->madness('dx d');
+    push @newkids, $self->madness('dx d optional_assign');
     for my $kid (@{$$self{Kids}}) {
 	push @newkids, $kid->ast($self, @_);
     }
     splice @newkids, -1, 0, $self->madness('o {');
-    push @newkids, $self->madness('}');
+    push @newkids, $self->madness('} fake_semicolon');
 
     return $self->newtype->new(Kids => [@newkids]);
+}
+
+package PLXML::op_magicsv;
+
+sub ast {
+    my $self = shift;
+    my @args;
+    push @args, $self->madness('wrap_open optional_assign dx d ( X ) wrap_close');
+
+    return $self->newtype->new(Kids => [@args]);
 }
 
 package PLXML::op_padsv;
@@ -1465,7 +1491,7 @@ package PLXML::op_padsv;
 sub ast {
     my $self = shift;
     my @args;
-    push @args, $self->madness('dx d ( $ @ % )');
+    push @args, $self->madness('dx d ( optional_assign X $ @ % )');
 
     return $self->newtype->new(Kids => [@args]);
 }
@@ -1519,8 +1545,12 @@ package PLXML::op_rv2gv;
 sub ast {
     my $self = shift;
 
+    if ($$self{mp}{X}) {
+        return $self->newtype->new(Kids => [$self->madness('X')]);
+    }
+
     my @newkids;
-    push @newkids, $self->madness('dx d ( * $');
+    push @newkids, $self->madness('dx d optional_assign ( * $');
     for (@{$self->{Kids}}) {
         push @newkids, $_->ast($self,@_);
     }
@@ -1533,14 +1563,14 @@ package PLXML::op_rv2sv;
 
 sub astnull {
     my $self = shift;
-    return P5AST::op_rv2sv->new(Kids => [$self->madness('O o dx d ( $ ) : a')]);
+    return P5AST::op_rv2sv->new(Kids => [$self->madness('wrap_open O o optional_assign dx d ( X $ ) : a wrap_close')]);
 }
 
 sub ast {
     my $self = shift;
 
     my @newkids;
-    push @newkids, $self->madness('dx d ( $');
+    push @newkids, $self->madness('dx d optional_assign ( X $');
     if (ref $$self{Kids}[0] ne "PLXML::op_gv") {
 	push @newkids, $$self{Kids}[0]->ast();
     }
@@ -1663,7 +1693,10 @@ package PLXML::op_backtick;
 sub ast {
     my $self = shift;
     my @args;
-    if (exists $self->{mp}{q}) {
+    if (exists $self->{mp}{o}) {
+        push @args, $self->madness('o');
+    }
+    elsif (exists $self->{mp}{q}) {
 	push @args, $self->madness('q');
 	if ($args[-1]->uni =~ /^<</) {
 	    my $opstub = bless { start => $args[-1] }, 'P5AST::heredoc';
@@ -1801,7 +1834,7 @@ sub ast {
     my @rfirst = $self->madness('z');
     my @rlast = $self->madness('Z');
     my @mods = $self->madness('m');
-    if ($rfirst[-1]->uni ne $llast[-1]->uni) {
+    if (not (@rfirst and @rlast and $rfirst[-1]->uni eq $llast[-1]->uni)) {
 	push @newkids, @rfirst;
     }
     # remove the fake '\n' if /e and '#' in replacement.
@@ -1859,6 +1892,7 @@ sub ast {
 
     my $right = $$self{Kids}[1];
     eval { push @newkids, $right->ast($self, @_); };
+    die if $@;
 
     push @newkids, $self->madness('o');
 
@@ -1893,6 +1927,22 @@ package PLXML::op_chomp;
 package PLXML::op_schomp;
 package PLXML::op_defined;
 package PLXML::op_undef;
+package PLXML::op_dotdotdot;
+
+sub ast {
+    my $self = shift;
+    my @newkids = $self->madness('X');
+    return $self->newtype->new(Kids => [@newkids]);
+}
+
+package PLXML::op_placeholder;
+
+sub ast {
+    my $self = shift;
+    my @newkids = $self->madness('( optional_assign X )');
+    return $self->newtype->new(Kids => [@newkids]);
+}
+
 package PLXML::op_study;
 package PLXML::op_pos;
 package PLXML::op_preinc;
@@ -2138,7 +2188,7 @@ package PLXML::op_rv2av;
 
 sub astnull {
     my $self = shift;
-    return P5AST::op_rv2av->new(Kids => [$self->madness('$ @')]);
+    return P5AST::op_rv2av->new(Kids => [$self->madness('X $ @')]);
 }
 
 sub ast {
@@ -2149,10 +2199,10 @@ sub ast {
     }
 
     my @before;
-    push @before, $self->madness('dx d (');
+    push @before, $self->madness('dx d optional_assign (');
 
     my @newkids;
-    push @newkids, $self->madness('$ @ K');
+    push @newkids, $self->madness('X $ @ K');
     if (ref $$self{Kids}[0] ne "PLXML::op_gv") {
 	push @newkids, $$self{Kids}[0]->ast();
     }
@@ -2173,7 +2223,7 @@ package PLXML::op_aelem;
 sub astnull {
     my $self = shift;
     my @newkids;
-    push @newkids, $self->madness('dx d');
+    push @newkids, $self->madness('dx d optional_assign');
     for my $kid (@{$$self{Kids}}) {
 	push @newkids, $kid->ast($self, @_);
     }
@@ -2185,7 +2235,7 @@ sub astnull {
 sub ast {
     my $self = shift;
 
-    my @before = $self->madness('dx d (');
+    my @before = $self->madness('dx d optional_assign (');
     my @newkids;
     for my $kid (@{$$self{Kids}}) {
 	push @newkids, $kid->ast(@_);
@@ -2206,7 +2256,7 @@ sub astnull {
 	push @newkids, $kid->ast(@_);
     }
     unshift @newkids, pop @newkids;
-    unshift @newkids, $self->madness('dx d');
+    unshift @newkids, $self->madness('dx d optional_assign');
     push @newkids, $self->madness('slice_close ]');
     return P5AST::op_aslice->new(Kids => [@newkids]);
 }
@@ -2220,7 +2270,7 @@ sub ast {
 	push @newkids, $kid->ast(@_);
     }
     unshift @newkids, pop @newkids;
-    unshift @newkids, $self->madness('dx d');
+    unshift @newkids, $self->madness('dx d optional_assign');
     push @newkids, $self->madness('slice_close ]');
 
     return $self->newtype->new(Kids => [@newkids]);
@@ -2243,8 +2293,7 @@ sub ast {
     my @newkids = $self->madness('wrap_open d ( o');
 
     if (exists $$self{Kids}) {
-	my $arg = $$self{Kids}[0];
-	push @newkids, $arg->ast($self, @_) if defined $arg;
+	push @newkids, map { $_->ast($self, @_) } @{ $self->{Kids} };
     }
     push @newkids, $self->madness(') wrap_close');
 
@@ -2255,17 +2304,17 @@ package PLXML::op_rv2hv;
 
 sub astnull {
     my $self = shift;
-    return P5AST::op_rv2hv->new(Kids => [$self->madness('$')]);
+    return P5AST::op_rv2hv->new(Kids => [$self->madness('X $')]);
 }
 
 sub ast {
     my $self = shift;
 
     my @before;
-    push @before, $self->madness('dx d (');
+    push @before, $self->madness('dx d optional_assign (');
 
     my @newkids;
-    push @newkids, $self->madness('$ @ % K');
+    push @newkids, $self->madness('X $ @ % K');
     if (ref $$self{Kids}[0] ne "PLXML::op_gv") {
 	push @newkids, $$self{Kids}[0]->ast();
     }
@@ -2282,12 +2331,12 @@ sub astnull {
     local $::curenc = $::curenc;
 
     my @newkids;
-    push @newkids, $self->madness('dx d');
+    push @newkids, $self->madness('dx d optional_assign');
     for my $kid (@{$$self{Kids}}) {
 	push @newkids, $kid->ast($self, @_);
     }
     splice @newkids, -1, 0, $self->madness('a {');
-    push @newkids, $self->madness('}');
+    push @newkids, $self->madness('} fake_semicolon');
     return P5AST::op_helem->new(Kids => [@newkids]);
 }
 
@@ -2296,13 +2345,13 @@ sub ast {
     local $::curstate;	# hash subscript potentially a lineseq
     local $::curenc = $::curenc;
 
-    my @before = $self->madness('dx d');
+    my @before = $self->madness('dx d optional_assign');
     my @newkids;
     for my $kid (@{$$self{Kids}}) {
 	push @newkids, $kid->ast($self, @_);
     }
     splice @newkids, -1, 0, $self->madness('a {');
-    push @newkids, $self->madness('}');
+    push @newkids, $self->madness('} fake_semicolon');
 
     return $self->newtype->new(Kids => [@before, @newkids]);
 }
@@ -2318,8 +2367,8 @@ sub astnull {
 	push @newkids, $kid->ast(@_);
     }
     unshift @newkids, pop @newkids;
-    unshift @newkids, $self->madness('dx d'); 
-    push @newkids, $self->madness('slice_close }');
+    unshift @newkids, $self->madness('dx d optional_assign'); 
+    push @newkids, $self->madness('slice_close } fake_semicolon');
     return P5AST::op_hslice->new(Kids => [@newkids]);
 }
 
@@ -2332,8 +2381,8 @@ sub ast {
 	push @newkids, $kid->ast(@_);
     }
     unshift @newkids, pop @newkids;
-    unshift @newkids, $self->madness('dx d'); 
-    push @newkids, $self->madness('slice_close }');
+    unshift @newkids, $self->madness('dx d optional_assign'); 
+    push @newkids, $self->madness('slice_close } fake_semicolon');
 
     return $self->newtype->new(Kids => [@newkids]);
 }
@@ -2342,6 +2391,21 @@ package PLXML::op_unpack;
 package PLXML::op_pack;
 package PLXML::op_split;
 package PLXML::op_join;
+package PLXML::op_listfirst;
+
+sub ast {
+    my $self = shift;
+    my $mainop = $self->{Kids}->[1];
+    for (keys %{$self->{mp}}) {
+        if (exists($mainop->{mp}{$_})) {
+            die "exists $_";
+        }
+        $mainop->{mp}{$_} = $self->{mp}{$_};
+    }
+    my @kids = ( $mainop->ast(@_) );
+    return $self->newtype->new(Kids => [@kids]);
+}
+
 package PLXML::op_list;
 
 sub astnull {
@@ -2422,6 +2486,7 @@ sub ast {
 }
 
 package PLXML::op_anonlist;
+package PLXML::op_anonarray;
 package PLXML::op_anonhash;
 package PLXML::op_nkeys;
 package PLXML::op_nelems;
@@ -2440,8 +2505,26 @@ sub astnull {
 
 package PLXML::op_grepstart;
 package PLXML::op_grepwhile;
+
+*ast = \&PLXML::op_mapwhile::ast;
+
 package PLXML::op_mapstart;
 package PLXML::op_mapwhile;
+
+sub ast {
+    my $self = shift;
+
+    my @newkids;
+    push @newkids, $self->madness('wrap_open o (');
+    my @kids = @{$$self{Kids}};
+    pop @kids;
+    for my $kid (@kids) {
+	push @newkids, $kid->ast($self, @_);
+    }
+    push @newkids, $self->madness(') wrap_close');
+    return $self->newtype->new(Kids => [@newkids]);
+}
+
 package PLXML::op_range;
 
 sub ast {
@@ -2693,28 +2776,49 @@ sub lineseq {
 	my $kid = shift @kids;
 	my $thing = $kid->ast($self, @_);
 	next unless defined $thing;
-	if ($::curstate ne $::prevstate) {
-	    if ($::prevstate) {
-		push @newstuff, $::prevstate->madness(';');
-		push @{$newprev->{Kids}}, @newstuff if $newprev;
-		@newstuff = ();
-	    }
-	    $::prevstate = $::curstate;
-	    $newprev = $thing;
-	    push @retval, $thing;
-	}
-	elsif ($::prevstate) {
-	    push @newstuff, $thing;
-	}
-	else {
-	    push @retval, $thing;
-	}
+        if ( $::version_from->{branch} eq 'kurila' and $::version_from->{'v'} > v1.14 ) {
+            if ($kid->{mp}{U} or $kid->{mp}{n} or $kid->{mp}{'&'} or
+                  ( ($kid->{mp}{null_type} || '') =~ m/^(peg|package|.*statement)$/ )
+              ) {
+                push @newstuff, $thing;
+            }
+            else {
+                push @retval, $thing;
+                push @retval, @newstuff;
+                @newstuff = ();
+            }
+        }
+        else {
+            if ($::curstate ne $::prevstate) {
+                if ($::prevstate) {
+                    push @newstuff, $::prevstate->madness(';');
+                    push @{$newprev->{Kids}}, @newstuff if $newprev;
+                    @newstuff = ();
+                }
+                $::prevstate = $::curstate;
+                $newprev = $thing;
+                push @retval, $thing;
+            }
+            elsif ($::prevstate) {
+                push @newstuff, $thing;
+            }
+            else {
+                push @retval, $thing;
+            }
+        }
     }
-    if ($::prevstate) {
-	push @newstuff, $::prevstate->madness(';');
-	push @{$newprev->{Kids}}, @newstuff if $newprev;
-	@newstuff = ();
-	$::prevstate = 0;
+
+    if ( $::version_from->{branch} eq 'kurila' and $::version_from->{'v'} > v1.14 ) {
+        push @retval, $self->madness(';');
+        push @retval, @newstuff;
+    }
+    else {
+        if ($::prevstate) {
+            push @newstuff, $::prevstate->madness(';');
+            push @{$newprev->{Kids}}, @newstuff if $newprev;
+            @newstuff = ();
+            $::prevstate = 0;
+        }
     }
     return @retval;
 }
@@ -2729,8 +2833,22 @@ sub blockast {
     my @newkids = $self->PLXML::op_lineseq::lineseq(@_);
     push @retval, @newkids;
 
-    push @retval, $self->madness('; }');
+    if ( not ( $::version_from->{branch} eq 'kurila' 
+                 and $::version_from->{'v'} > v1.14 ) ) {
+        push @retval, $self->madness(';');
+    }
+    push @retval, $self->madness('} fake_semicolon');
     return $self->newtype->new(Kids => [@retval]);
+}
+
+sub ast {
+    my $self = shift;
+    if ( $::version_from->{branch} eq 'kurila' and $::version_from->{'v'} > v1.14 ) {
+        return $self->blockast(@_);
+    }
+    else {
+        return $self->SUPER::ast(@_);
+    }
 }
 
 package PLXML::op_nextstate;
@@ -2740,7 +2858,13 @@ sub newtype { return "P5AST::statement" }
 sub astnull {
     my $self = shift;
     my @newkids;
-    push @newkids, $self->madness('L');
+    if ( $::version_from->{branch} eq 'kurila' 
+           and $::version_from->{'v'} > v1.14 ) {
+        push @newkids, $self->madness(';');
+    }
+    else {
+        push @newkids, $self->madness('L');
+    }
     $::curstate = $self;
     return P5AST::statement->new(Kids => [@newkids]);
 }
@@ -2749,7 +2873,13 @@ sub ast {
     my $self = shift;
 
     my @newkids;
-    push @newkids, $self->madness('L');
+    if ( $::version_from->{branch} eq 'kurila' 
+           and $::version_from->{'v'} > v1.14 ) {
+        push @newkids, $self->madness(';');
+    }
+    else {
+        push @newkids, $self->madness('L');
+    }
     $::curstate = $self;
     return $self->newtype->new(Kids => [@newkids]);
 }
@@ -2785,11 +2915,15 @@ sub ast {
     }
 
     local $::curstate;
-    push @retval, $self->madness('o {');
+    push @retval, $self->madness('L o {');
 
     my @newkids = $self->PLXML::op_lineseq::lineseq(@_);
     push @retval, @newkids;
-    push @retval, $self->madness(q/; }/);
+    if ( not ( $::version_from->{branch} eq 'kurila' 
+                 and $::version_from->{'v'} > v1.14 ) ) {
+        push @retval, $self->madness(';');
+    }
+    push @retval, $self->madness(q/} fake_semicolon/);
     my $retval = $self->newtype->new(Kids => [@retval]);
 
     if ($$self{mp}{C}) {
@@ -2816,11 +2950,12 @@ sub ast {
     local $::curstate;
 
     my @newkids;
-    push @newkids, $self->madness('o');
-
-    push @newkids, $self->madness('{');
+    push @newkids, $self->madness('L o {');
     push @newkids, $self->PLXML::op_lineseq::lineseq(@_);
-    push @newkids, $self->madness('; }');
+    if ( $::version_from->{branch} eq 'kurila' and $::version_from->{'v'} > v1.14 ) {
+        push @newkids, $self->madness(';');
+    }
+    push @newkids, $self->madness('} fake_semicolon');
 
     my @folded = $self->madness('C');
     if (@folded) {
@@ -2863,7 +2998,8 @@ sub ast {
     else {
 	push @retval, '';
     }
-    if (ref $range eq 'PLXML::op_null' and $$self{flags} =~ /SPECIAL/) {
+    if (ref $range eq 'PLXML::op_null'
+          and ($::version->{branch} eq "perl" ? $$self{flags} =~ m/STACKED/ : $$self{flags} =~ m/SPECIAL/) ) {
 	my (undef,$min,$max) = @{$range->{Kids}};
 	push @retval, $min->ast($self,@_);
 	if (defined $max) {
@@ -2943,6 +3079,7 @@ sub ast {
                 eval {
                     push @newkids, $$andor{Kids}[1]->blockast($self, @_);
                 };
+                die if $@;
             } else {
                 push @newkids, $nextthing->ast($self, @_);
             }
@@ -3098,6 +3235,13 @@ sub ast {
     my $self = shift;
     local $::curstate;		# eval {} has own statement sequence
     return $self->SUPER::ast(@_);
+}
+
+package PLXML::op_root;
+
+sub ast {
+    my $self = shift;
+    return $self->{'Kids'}[0]->ast(@_);
 }
 
 package PLXML::op_leaveeval;

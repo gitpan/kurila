@@ -52,11 +52,11 @@ __END__
 # sv.c
 use integer ;
 use warnings 'uninitialized' ; our (@a, @b);
-my $x = 1 + @a[0] ; # a
+my $x = 1 + @a[?0] ; # a
 no warnings 'uninitialized' ;
-$x = 1 + @b[0] ; # a
+$x = 1 + @b[?0] ; # a
 EXPECT
-Use of uninitialized value @main::a[0] in integer addition (+) at - line 4 character 10.
+Use of uninitialized value @main::a[0] in integer addition (+) at - line 4 character 11.
 ########
 # sv.c
 use integer ;
@@ -70,32 +70,32 @@ Use of uninitialized value $x in integer multiplication (*) at - line 4 characte
 # sv.c
 use warnings 'uninitialized' ;
 my $Y = 1 ;  our @a;
-my $x = 1 ^|^ @a[$Y] ;
+my $x = 1 ^|^ @a[?$Y] ;
 no warnings 'uninitialized' ;
 my $Y = 1 ; our @b;
-$x = 1 ^|^ @b[$Y] ;
+$x = 1 ^|^ @b[?$Y] ;
 EXPECT
-Use of uninitialized value within @main::a in bitwise or (^|^) at - line 4 character 10.
+Use of uninitialized value within @main::a in bitwise or (^|^) at - line 4 character 11.
 ########
 # sv.c
 use warnings 'uninitialized' ;
 my $Y = 1 ; our @a;
-my $x = 1 ^&^ @a[$Y] ;
+my $x = 1 ^&^ @a[?$Y] ;
 no warnings 'uninitialized' ;
 my $Y = 1 ; our @b;
-$x = 1 ^&^ @b[$Y] ;
+$x = 1 ^&^ @b[?$Y] ;
 EXPECT
-Use of uninitialized value within @main::a in bitwise and (^&^) at - line 4 character 10.
+Use of uninitialized value within @main::a in bitwise and (^&^) at - line 4 character 11.
 ########
 # sv.c
 use warnings 'uninitialized' ;
 my $Y = 1 ;  our @a;
-my $x = ^~^@a[$Y] ;
+my $x = ^~^@a[?$Y] ;
 no warnings 'uninitialized' ;
 my $Y = 1 ;  our @b;
-$x = ^~^@b[$Y] ;
+$x = ^~^@b[?$Y] ;
 EXPECT
-Use of uninitialized value within @main::a in 1's complement (^~^) at - line 4 character 8.
+Use of uninitialized value within @main::a in 1's complement (^~^) at - line 4 character 9.
 ########
 # sv.c
 use warnings 'uninitialized' ;
@@ -107,11 +107,11 @@ Use of uninitialized value $x in multiplication (*) at - line 3 character 7.
 ########
 # sv.c
 use warnings 'uninitialized' ; our (@a, @b);
-my $x = 1 + @a[0] ; # e
+my $x = 1 + @a[?0] ; # e
 no warnings 'uninitialized' ;
-$x = 1 + @b[0] ; # e
+$x = 1 + @b[?0] ; # e
 EXPECT
-Use of uninitialized value @main::a[0] in addition (+) at - line 3 character 10.
+Use of uninitialized value @main::a[0] in addition (+) at - line 3 character 11.
 ########
 # sv.c
 use warnings 'uninitialized' ;
@@ -135,7 +135,7 @@ my $x = chop my $y ; # h
 no warnings 'uninitialized' ;
 $x = chop my $z ; # h
 EXPECT
-Use of uninitialized value $y in scalar chop at - line 3 character 9.
+Use of uninitialized value $y in chop at - line 3 character 9.
 ########
 # perlbug 20011116.125
 use warnings 'uninitialized';
@@ -154,7 +154,7 @@ my $x = 1 + "def" ;
 no warnings 'numeric' ;
 my $z = 1 + "def" ;
 EXPECT
-Argument "def" isn't numeric in addition (+) at - line 3 character 10.
+Argument "def" isn't numeric in addition (+) at - line 3 character 11.
 ########
 # sv.c
 use warnings 'numeric' ;
@@ -163,7 +163,7 @@ my $x = 1 + $a ;
 no warnings 'numeric' ;
 my $y = 1 + $a ;
 EXPECT
-Argument "def" isn't numeric in addition (+) at - line 4 character 10.
+Argument "def" isn't numeric in addition (+) at - line 4 character 11.
 ########
 # sv.c
 use warnings 'numeric' ; use integer ;
@@ -172,7 +172,7 @@ my $x = 1 + $a ;
 no warnings 'numeric' ;
 my $z = 1 + $a ;
 EXPECT
-Argument "def" isn't numeric in integer addition (+) at - line 4 character 10.
+Argument "def" isn't numeric in integer addition (+) at - line 4 character 11.
 ########
 # sv.c
 use warnings 'numeric' ;
@@ -180,7 +180,7 @@ my $x = 1 ^&^ "def" ;
 no warnings 'numeric' ;
 my $z = 1 ^&^ "def" ;
 EXPECT
-Argument "def" isn't numeric in bitwise and (^&^) at - line 3 character 10.
+Argument "def" isn't numeric in bitwise and (^&^) at - line 3 character 11.
 ########
 # sv.c
 use warnings 'numeric' ;
@@ -197,7 +197,7 @@ my $x = 1 + $a ;
 no warnings 'numeric' ;
 my $z = 1 + $a ;
 EXPECT
-Argument "d\x{0}f" isn't numeric in addition (+) at - line 4 character 10.
+Argument "d\x{0}f" isn't numeric in addition (+) at - line 4 character 11.
 ########
 # sv.c
 use warnings 'redefine' ;
@@ -208,23 +208,23 @@ no warnings 'redefine' ;
 sub jim {} 
 *jim = \&joe ;
 EXPECT
-Subroutine main::fred redefined at - line 5 character 6.
+Subroutine main::fred redefined at - line 5 character 1.
 ########
 # sv.c
 use warnings 'printf' ;
-open F, ">", ($^O eq 'VMS'? 'NL:' : '/dev/null') ;
-printf F "\%z\n" ;
+open my $f, ">", ($^OS_NAME eq 'VMS' ?? 'NL:' !! '/dev/null') ;
+printf $f, "\%z\n" ;
 my $a = sprintf "\%z" ;
-printf F "\%" ;
+printf $f, "\%" ;
 $a = sprintf "\%" ;
-printf F "\%\x{02}" ;
+printf $f, "\%\x{02}" ;
 $a = sprintf "\%\x{02}" ;
 no warnings 'printf' ;
-printf F "\%z\n" ;
+printf $f, "\%z\n" ;
 $a = sprintf "\%z" ;
-printf F "\%" ;
+printf $f, "\%" ;
 $a = sprintf "\%" ;
-printf F "\%\x{02}" ;
+printf $f, "\%\x{02}" ;
 $a = sprintf "\%\x{02}" ;
 EXPECT
 Invalid conversion in printf: "%z" at - line 4 character 1.
@@ -240,7 +240,7 @@ use warnings 'misc' ;
 no warnings 'misc' ;
 *b = undef ;
 EXPECT
-Undefined value assigned to typeglob at - line 3 character 3.
+Undefined value assigned to typeglob at - line 3 character 1.
 ########
 # sv.c
 use warnings 'numeric' ;
@@ -249,7 +249,7 @@ $a = "\x{100}\x{200}" * 42;
 no warnings 'numeric' ;
 $a = "\x{100}\x{200}" * 42;
 EXPECT
-Argument "\x{100}\x{200}" isn't numeric in multiplication (*) at - line 4 character 22.
+Argument "\x{100}\x{200}" isn't numeric in multiplication (*) at - line 4 character 23.
 ########
 # TODO numeric negation.
 # sv.c

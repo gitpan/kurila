@@ -9,12 +9,12 @@ my @tests=@(
   'q'=>'[q]',
 );
 while ((nelems @tests)) {
-    my ($str,$pat)=splice @tests,0,2;
-    print STDERR "\n";
+    my @($str,$pat)=@(splice @tests,0,2);
+    print $^STDERR, "\n";
     $pat="m/$pat/" if substr($pat,0,2) ne 'm/';
     # string eval to get the free regex message in the right place.
     eval qq[
-        print STDERR "$str"=~$pat ? '\%MATCHED\%' : '\%FAILED\%',"\n";
+        print \$^STDERR, "$str"=~$pat ?? '\%MATCHED\%' !! '\%FAILED\%',"\n";
     ];
-    die $@ if $@;
+    die $^EVAL_ERROR if $^EVAL_ERROR;
 }

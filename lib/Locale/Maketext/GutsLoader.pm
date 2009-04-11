@@ -1,6 +1,6 @@
 
 package Locale::Maketext::GutsLoader;
-use strict;
+
 sub zorp { return scalar nelems @_ }
 
 BEGIN {
@@ -10,9 +10,9 @@ BEGIN {
 }
 
 $Locale::Maketext::GUTSPATH = '';
-Locale::Maketext::DEBUG and print "Requiring Locale::Maketext::Guts...\n";
+Locale::Maketext::DEBUG and print $^STDOUT, "Requiring Locale::Maketext::Guts...\n";
 require Locale::Maketext::Guts;
-Locale::Maketext::DEBUG and print "Loaded Locale::Maketext::Guts fine\n";
+Locale::Maketext::DEBUG and print $^STDOUT, "Loaded Locale::Maketext::Guts fine\n";
 
 1;
 

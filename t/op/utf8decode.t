@@ -1,22 +1,22 @@
 #!./perl
 
-{
+do {
     my $wide = "\x{100}";
     use bytes;
     my $ordwide = ord($wide);
-    printf "# under use bytes ord(v256) = 0x\%02x\n", $ordwide;
+    printf $^STDOUT, "# under use bytes ord(v256) = 0x\%02x\n", $ordwide;
     if ($ordwide == 140) {
-	print "1..0 # Skip: UTF-EBCDIC (not UTF-8) used here\n";
+	print $^STDOUT, "1..0 # Skip: UTF-EBCDIC (not UTF-8) used here\n";
 	exit 0;
     }
     elsif ($ordwide != 196) {
-	printf "# v256 starts with 0x\%02x\n", $ordwide;
+	printf $^STDOUT, "# v256 starts with 0x\%02x\n", $ordwide;
     }
-}
+};
 
 no utf8;
 
-print "1..78\n";
+print $^STDOUT, "1..78\n";
 
 my $test = 1;
 
@@ -130,17 +130,17 @@ my @MK = split(m/\n/, <<__EOMK__);
 __EOMK__
 
 # 104..181
-{
+do {
     my $id;
 
     my $x_warn;
     local $^WARN_HOOK = sub {
-	print "# $id: " . @_[0]->{description} . "\n";
-	$x_warn = @_[0]->{description};
+	print $^STDOUT, "# $id: " . @_[0]->{?description} . "\n";
+	$x_warn = @_[0]->{?description};
     };
 
     sub moan {
-	print "$id: {join ' ',@_}";
+	print $^STDOUT, "$id: $(join ' ',@_)";
     }
 
     sub warn_unpack_U {
@@ -154,36 +154,36 @@ __EOMK__
 	    # print "# $_\n";
 	} elsif (m/^(\d+\.\d+\.\d+[bu]?)\s+([yn])\s+"(.+)"\s+([0-9a-f]{1,8}|-)\s+(\d+)\s+([0-9a-f]{2}(?::[0-9a-f]{2})*)(?:\s+((?:\d+|-)(?:\s+(.+))?))?$/) {
 	    $id = $1;
-	    my ($okay, $bytes, $Unicode, $byteslen, $hex, $charslen, $experr) =
-		($2, $3, $4, $5, $6, $7, $8);
+	    my @($okay, $bytes, $Unicode, $byteslen, $hex, $charslen, $experr) =
+		@($2, $3, $4, $5, $6, $7, $8);
 	    my @hex = split(m/:/, $hex);
 	    unless ((nelems @hex) == $byteslen) {
 		my $nhex = (nelems @hex);
 		moan "amount of hex ($nhex) not equal to byteslen ($byteslen)\n";
 	    }
-	    {
+	    do {
 		use bytes;
 		my $bytesbyteslen = length($bytes);
 		unless ($bytesbyteslen == $byteslen) {
 		    moan "bytes length() ($bytesbyteslen) not equal to $byteslen\n";
 		}
-	    }
+	    };
 	    my $warn = warn_unpack_U($bytes);
 	    if ($okay eq 'y') {
 		if ($warn) {
 		    moan "unpack('U0U*') false negative\n";
-		    print "not ";
+		    print $^STDOUT, "not ";
 		}
 	    } elsif ($okay eq 'n') {
 		if (not $warn || ($experr ne '' && $warn !~ m/$experr/)) {
 		    moan "unpack('U0U*') false positive\n";
-		    print "not ";
+		    print $^STDOUT, "not ";
 		}
 	    }
-	    print "ok $test # $id $okay\n";
+	    print $^STDOUT, "ok $test # $id $okay\n";
 	    $test++;
  	} else {
 	    moan "unknown format\n";
 	}
     }
-}
+};

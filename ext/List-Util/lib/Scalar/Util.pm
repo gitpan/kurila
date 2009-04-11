@@ -6,26 +6,25 @@
 
 package Scalar::Util;
 
-use strict;
-use vars < qw(@ISA @EXPORT_OK $VERSION);
+our (@ISA, @EXPORT_OK, $VERSION);
 require Exporter;
 require List::Util; # List::Util loads the XS
 
 @ISA       = qw(Exporter);
-@EXPORT_OK = qw(blessed dualvar reftype weaken isweak tainted readonly openhandle refaddr isvstring looks_like_number set_prototype);
+@EXPORT_OK = qw(blessed dualvar reftype weaken isweak tainted readonly openhandle refaddr isvstring looks_like_number);
 $VERSION    = "1.19";
 $VERSION   = eval $VERSION;
 
 sub export_fail {
-  if (grep { m/^(weaken|isweak)$/ } @_ ) {
+  if (grep { m/^(weaken|isweak)$/ }, @_ ) {
     require Carp;
     Carp::croak("Weak references are not implemented in the version of perl");
   }
-  if (grep { m/^(isvstring)$/ } @_ ) {
+  if (grep { m/^(isvstring)$/ }, @_ ) {
     require Carp;
     Carp::croak("Vstrings are not implemented in the version of perl");
   }
-  if (grep { m/^(dualvar|set_prototype)$/ } @_ ) {
+  if (grep { m/^(dualvar)$/ }, @_ ) {
     require Carp;
     Carp::croak("$1 is only avaliable with the XS version");
   }
@@ -33,11 +32,10 @@ sub export_fail {
   < @_;
 }
 
-sub openhandle ($) {
-  my $fh = shift;
+sub openhandle($fh) {
   my $rt = reftype($fh) || '';
 
-  return defined(fileno($fh)) ? $fh : undef
+  return defined(fileno($fh)) ?? $fh !! undef
     if $rt eq 'IO';
 
   if (reftype(\$fh) eq 'GLOB') { # handle  openhandle(*DATA)
@@ -47,14 +45,13 @@ sub openhandle ($) {
     return undef;
   }
 
-  (tied(*$fh) or defined(fileno($fh)))
-    ? $fh : undef;
+  defined(fileno($fh)) ?? $fh !! undef;
 }
 
 eval <<'ESQ' unless defined &dualvar;
 
-use vars qw(@EXPORT_FAIL);
-push @EXPORT_FAIL, qw(weaken isweak dualvar isvstring set_prototype);
+our @EXPORT_FAIL;
+push @EXPORT_FAIL, qw(weaken isweak dualvar isvstring);
 
 # The code beyond here is only used if the XS is not installed
 
@@ -153,7 +150,7 @@ Scalar::Util - A selection of general-utility scalar subroutines
 =head1 SYNOPSIS
 
     use Scalar::Util qw(blessed dualvar isweak readonly refaddr reftype tainted
-                        weaken isvstring looks_like_number set_prototype);
+                        weaken isvstring looks_like_number);
 
 =head1 DESCRIPTION
 
@@ -222,8 +219,8 @@ L<perlapi/looks_like_number>.
 Returns FH if FH may be used as a filehandle and is open, or FH is a tied
 handle. Otherwise C<undef> is returned.
 
-    $fh = openhandle(*STDIN);		# \*STDIN
-    $fh = openhandle(\*STDIN);		# \*STDIN
+    $fh = openhandle($^STDIN);		# \*STDIN
+    $fh = openhandle($^STDIN);		# \*STDIN
     $fh = openhandle(*NOTOPEN);		# undef
     $fh = openhandle("scalar");		# undef
     
@@ -259,13 +256,6 @@ is returned. Otherwise C<undef> is returned.
 
     $obj  = bless {}, "Foo";
     $type = reftype $obj;               # HASH
-
-=item set_prototype CODEREF, PROTOTYPE
-
-Sets the prototype of the given function, or deletes it if PROTOTYPE is
-undef. Returns the CODEREF.
-
-    set_prototype \&foo, '$$';
 
 =item tainted EXPR
 

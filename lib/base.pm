@@ -1,9 +1,6 @@
 package base;
 
-use strict;
-no strict < qw(refs subs);
-
-use vars < qw($VERSION);
+our ($VERSION);
 $VERSION = '2.13';
 
 # constant.pm is slow
@@ -18,31 +15,31 @@ sub PROTECTED  () { 2**3  }
 my $Fattr = \%fields::attr;
 
 sub has_fields {
-    my($base) = shift;
+    my@($base) =@( shift);
     my $fglob = Symbol::fetch_glob("$base\::FIELDS");
-    return ($fglob && 'GLOB' eq ref($fglob) && *$fglob{HASH}) ? 1 : 0;
+    return ($fglob && 'GLOB' eq ref($fglob) && *$fglob{HASH}) ?? 1 !! 0;
 }
 
 sub has_version {
-    my($base) = shift;
+    my@($base) =@( shift);
     my $vglob = Symbol::fetch_glob($base.'::VERSION');
-    return ($vglob && *$vglob{SCALAR}) ? 1 : 0;
+    return ($vglob && *$vglob{SCALAR}) ?? 1 !! 0;
 }
 
 sub has_attr {
-    my($proto) = shift;
-    my($class) = ref $proto || $proto;
+    my $proto = shift;
+    my $class = ref $proto || $proto;
     return exists $Fattr->{$class};
 }
 
 sub get_attr {
-    $Fattr->{@_[0]} = \@(1) unless $Fattr->{@_[0]};
-    return $Fattr->{@_[0]};
+    $Fattr->{+@_[0]} = \@(1) unless $Fattr->{?@_[0]};
+    return $Fattr->{?@_[0]};
 }
 
 sub get_fields {
     # Shut up a possible typo warning.
-    () = \%{*{Symbol::fetch_glob(@_[0].'::FIELDS')}};
+    my $x = \%{*{Symbol::fetch_glob(@_[0].'::FIELDS')}};
     return \%{*{Symbol::fetch_glob(@_[0].'::FIELDS')}};
 }
 
@@ -51,10 +48,14 @@ sub import {
 
     return SUCCESS unless (nelems @_);
 
+    return import_into($(caller(0)), < @_);
+}
+
+sub import_into {
+    my $inheritor = shift;
+
     # List of base classes from which we will inherit %FIELDS.
     my $fields_base;
-
-    my $inheritor = caller(0);
 
     my @bases;
     foreach my $base ( @_) {
@@ -62,21 +63,21 @@ sub import {
             warn "Class '$inheritor' tried to inherit from itself\n";
         }
 
-        next if grep $_->isa($base), @( ($inheritor, < @bases));
+        next if grep { $_->isa($base) }, @( ($inheritor, < @bases));
 
-        {
+        do {
             eval "require $base";
             # Only ignore "Can't locate" errors from our eval require.
             # Other fatal errors (syntax etc) must be reported.
-            die if $@ && $@->{description} !~ m/^Can't locate .*?/;
+            die if $^EVAL_ERROR && $^EVAL_ERROR->{?description} !~ m/^Can't locate .*?/;
             unless (%{*{Symbol::fetch_glob("$base\::")}}) {
                 die(<<ERROR);
 Base class package "$base" is empty.
     (Perhaps you need to 'use' the module which defines that package first,
-    or make that module available in \@INC (\@INC contains: {join ' ',@INC}).
+    or make that module available in \$^INCLUDE_PATH (\$^INCLUDE_PATH contains: $(join ' ',$^INCLUDE_PATH)).
 ERROR
             }
-        }
+        };
         push @bases, $base;
 
         if ( has_fields($base) || has_attr($base) ) {
@@ -97,8 +98,7 @@ ERROR
 }
 
 
-sub inherit_fields {
-    my($derived, $base) = < @_;
+sub inherit_fields($derived, $base) {
 
     return SUCCESS unless $base;
 
@@ -121,24 +121,24 @@ END
     # ones to the derived class.  Hang on to the original attribute
     # (Public, Private, etc...) and add Inherited.
     # This is all too complicated to do efficiently with add_fields().
-    while (my($k,$v) = each %$bfields) {
+    while (my@(?$k,?$v) =@( each %$bfields)) {
         my $fno;
-        if ($fno = $dfields->{$k} and $fno != $v) {
+        if ($fno = $dfields->{?$k} and $fno != $v) {
             die("Inherited fields can't override existing fields");
         }
 
         if( $battr->[$v] ^&^ PRIVATE ) {
-            $dattr->[$v] = PRIVATE ^|^ INHERITED;
+            $dattr->[+$v] = PRIVATE ^|^ INHERITED;
         }
         else {
-            $dattr->[$v] = INHERITED ^|^ $battr->[$v];
-            $dfields->{$k} = $v;
+            $dattr->[+$v] = INHERITED ^|^ $battr->[$v];
+            $dfields->{+$k} = $v;
         }
     }
 
     foreach my $idx (1..(nelems @$battr)-1) {
-        next if defined $dattr->[$idx];
-        $dattr->[$idx] = $battr->[$idx] ^&^ INHERITED;
+        next if defined $dattr->[?$idx];
+        $dattr->[+$idx] = $battr->[$idx] ^&^ INHERITED;
     }
 }
 

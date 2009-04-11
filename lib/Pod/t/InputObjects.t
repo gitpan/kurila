@@ -1,4 +1,4 @@
-#!perl -Tw
+#!perl -w
 
 use Test::More;
 
@@ -7,9 +7,9 @@ plan tests => 33;
 use_ok( 'Pod::InputObjects' );
 
 
-{ # test package Pod::InputSource
-    local *FH;
-    my $p_is = Pod::InputSource->new( -handle => \*FH );
+do { # test package Pod::InputSource
+    my $fh;
+    my $p_is = Pod::InputSource->new( handle => $fh );
 
     isa_ok( $p_is, 'Pod::InputSource', 'Pod::InputSource constructor' );
 
@@ -17,14 +17,14 @@ use_ok( 'Pod::InputObjects' );
     is( $p_is->name( 'test' ), 'test', 'set Pod::InputSource->name( test )' );
     is( $p_is->filename, 'test', 'Pod::InputSource->filename() alias' );
 
-    is( $p_is->handle, \*FH, 'Pod::InputSource->handle()' );
+    is( $p_is->handle, $fh, 'Pod::InputSource->handle()' );
 
     is( $p_is->was_cutting(), 0, 'Pod::InputSource->was_cutting()' );
     is( $p_is->was_cutting( 1 ), 1, 'set Pod::InputSource->was_cutting( 1 )' );
-}
+};
 
-{ # test package Pod::Paragraph
-    my $p_p1 = Pod::Paragraph->new( -text => 'NAME', -name => 'head2' );
+do { # test package Pod::Paragraph
+    my $p_p1 = Pod::Paragraph->new( text => 'NAME', name => 'head2' );
     my $p_p2 = Pod::Paragraph->new( 'test - This is the test suite' );
     isa_ok( $p_p1, 'Pod::Paragraph', 'Pod::Paragraph constuctor' );
     isa_ok( $p_p2, 'Pod::Paragraph', 'Pod::Paragraph constructor revisited' );
@@ -56,12 +56,12 @@ use_ok( 'Pod::InputObjects' );
     
     is( (join ':',$p_p1->file_line()), '<unknown-file>:0', 
         'Pod::Paragraph->file_line()' );
-    $p_p2->{ '-file' } = 'test'; $p_p2->{ '-line' } = 3;
+    $p_p2->{+'file' } = 'test'; $p_p2->{+'line' } = 3;
     is( (join ':',$p_p2->file_line()), 'test:3', 
         'Pod::Paragraph->file_line()' );
-}
+};
 
-{ # test package Pod::InteriorSequence
+do { # test package Pod::InteriorSequence
 
     my $p_pt = Pod::ParseTree->new();
     my $pre_txt = 'test - This is the ';
@@ -70,8 +70,8 @@ use_ok( 'Pod::InputObjects' );
 	$p_pt->append( $cmd_txt );
 
     my $p_is = Pod::InteriorSequence->new( 
-        -name => 'I', -ldelim => '<', -rdelim => '>',
-        -ptree => $p_pt
+        name => 'I', ldelim => '<', rdelim => '>',
+        ptree => $p_pt
     );
     isa_ok( $p_is, 'Pod::InteriorSequence', 'P::InteriorSequence constructor' );
 	
@@ -89,9 +89,9 @@ use_ok( 'Pod::InputObjects' );
     $p_is->append( $pst_txt );
     is( $p_is->raw_text(), "B<$pre_txt$cmd_txt$pst_txt>",
         'raw_text() after append()' );    
-}
+};
 
-{ # test package Pod::ParseTree
+do { # test package Pod::ParseTree
     my $p_pt1 = Pod::ParseTree->new();
     my $p_pt2 = Pod::ParseTree->new();
     isa_ok( $p_pt1, 'Pod::ParseTree', 
@@ -107,7 +107,7 @@ use_ok( 'Pod::InputObjects' );
 	my $text = 'This is the test suite.';
 	$p_pt2->append( $text );
 	is( $p_pt2->raw_text(), $text, 'Pod::ParseTree->append()' );
-}
+};
 
 __END__
 

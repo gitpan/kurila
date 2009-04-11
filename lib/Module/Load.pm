@@ -2,33 +2,32 @@ package Module::Load;
 
 our $VERSION = '0.12';
 
-use strict;
 use File::Spec ();
 
 sub import {
     my $who = _who();
 
-    *{Symbol::fetch_glob("{$who}::load")} = \&load;
+    *{Symbol::fetch_glob("$($who)::load")} = \&load;
 }
 
-sub load (*;@)  {
-    my $mod = shift or return;
+sub load ($mod, @< @args)  {
+    $mod or return;
     my $who = _who();
 
     if( _is_file( $mod ) ) {
         require $mod;
     } else {
-        LOAD: {
+        LOAD: do {
             my $err;
             for my $flag ( qw[1 0] ) {
                 my $file = _to_file( $mod, $flag);
                 try { require $file };
-                $@ ? $err .= $@->message : last LOAD;
+                $^EVAL_ERROR ?? ($err .= $^EVAL_ERROR->message) !! last LOAD;
             }
             die $err if $err;
-        }
+        };
     }
-    __PACKAGE__->_export_to_level(1, $mod, < @_) if (nelems @_);
+    __PACKAGE__->_export_to_level(1, $mod, < @args) if @args;
 }
 
 ### 5.004's Exporter doesn't have export_to_level.
@@ -43,24 +42,24 @@ sub _export_to_level {
 }
 
 sub _to_file{
-    local $_    = shift;
+    local $_ = shift;
     my $pm      = shift || '';
 
     my @parts = split m/::/;
 
     ### because of [perl #19213], see caveats ###
-    my $file = $^O eq 'MSWin32'
-                    ? join "/", @parts
-                    : File::Spec->catfile( < @parts );
+    my $file = $^OS_NAME eq 'MSWin32'
+                    ?? join "/", @parts
+                    !! File::Spec->catfile( < @parts );
 
     $file   .= '.pm' if $pm;
     
     ### on perl's before 5.10 (5.9.5@31746) if you require
-    ### a file in VMS format, it's stored in %INC in VMS
+    ### a file in VMS format, it's stored in $^INCLUDED in VMS
     ### format. Therefor, better unixify it first
     ### Patch in reply to John Malmbergs patch (as mentioned
     ### above) on p5p Tue 21 Aug 2007 04:55:07
-    $file = VMS::Filespec::unixify($file) if $^O eq 'VMS';
+    $file = VMS::Filespec::unixify($file) if $^OS_NAME eq 'VMS';
 
     return $file;
 }
@@ -69,8 +68,8 @@ sub _who { @(caller(1))[0] }
 
 sub _is_file {
     local $_ = shift;
-    return  m/^\./               ? 1 :
-            m/[^\w:']/           ? 1 :
+    return  m/^\./               ?? 1 !!
+            m/[^\w:']/           ?? 1 !!
             undef
     #' silly bbedit..
 }
@@ -140,8 +139,8 @@ If the argument matches only C<[\w:']>, it must be a module
 =item *
 
 If the argument matches only C<\w>, it could either be a module or a
-file. We will try to find C<file> first in C<@INC> and if that fails,
-we will try to find C<file.pm> in @INC.
+file. We will try to find C<file> first in C<$^INCLUDE_PATH> and if that fails,
+we will try to find C<file.pm> in $^INCLUDE_PATH.
 If both fail, we die with the respective error messages.
 
 =back
@@ -151,7 +150,7 @@ If both fail, we die with the respective error messages.
 Because of a bug in perl (#19213), at least in version 5.6.1, we have
 to hardcode the path separator for a require on Win32 to be C</>, like
 on Unix rather than the Win32 C<\>. Otherwise perl will not read its
-own %INC accurately double load files if they are required again, or
+own $^INCLUDED accurately double load files if they are required again, or
 in the worst case, core dump.
 
 C<Module::Load> cannot do implicit imports, only explicit imports.

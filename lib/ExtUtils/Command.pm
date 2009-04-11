@@ -1,18 +1,17 @@
 package ExtUtils::Command;
 
-use strict;
 use File::Copy;
 use File::Compare;
 use File::Basename;
 use File::Path < qw(rmtree);
 require Exporter;
-use vars < qw(@ISA @EXPORT @EXPORT_OK $VERSION);
+our (@ISA, @EXPORT, @EXPORT_OK, $VERSION);
 @ISA       = qw(Exporter);
 @EXPORT    = qw(cp rm_f rm_rf mv cat eqtime mkpath touch test_f test_d chmod
                 dos2unix);
 $VERSION = '1.13';
 
-my $Is_VMS = $^O eq 'VMS';
+my $Is_VMS = $^OS_NAME eq 'VMS';
 
 =head1 NAME
 
@@ -57,10 +56,10 @@ Filenames with * and ? will be glob expanded.
 =cut
 
 # VMS uses % instead of ? to mean "one character"
-my $wild_regex = $Is_VMS ? '*%' : '*?';
+my $wild_regex = $Is_VMS ?? '*%' !! '*?';
 sub expand_wildcards
 {
- @ARGV = map(m/[$wild_regex]/o ? < glob($_) : $_, @ARGV);
+ @ARGV = @+: map( { m/[$wild_regex]/o ?? glob($_) !! @: $_ }, @ARGV);
 }
 
 
@@ -74,8 +73,8 @@ Concatenates all files mentioned on command line to STDOUT.
 
 sub cat ()
 {
- expand_wildcards();
- print while ( ~< *ARGV);
+    expand_wildcards();
+    print $^STDOUT, $_ while ( ~< *ARGV);
 }
 
 =item eqtime
@@ -88,7 +87,7 @@ Sets modified time of destination to that of source.
 
 sub eqtime
 {
- my ($src,$dst) = < @ARGV;
+ my @($src,$dst) =  @ARGV;
  local @ARGV = @($dst);  touch();  # in case $dst doesn't exist
  utime(< @(stat($src))[[8..9]],$dst);
 }
@@ -104,7 +103,7 @@ Removes files and directories - recursively (even if readonly)
 sub rm_rf
 {
  expand_wildcards();
- rmtree(< grep -e $_, @ARGV );
+ rmtree(< grep { -e $_ }, @ARGV );
 }
 
 =item rm_f
@@ -127,7 +126,7 @@ sub rm_f {
 
         next if _unlink($file);
 
-        warn "Cannot delete $file: $!";
+        warn "Cannot delete $file: $^OS_ERROR";
     }
 }
 
@@ -154,8 +153,8 @@ sub touch {
     my $t    = time;
     expand_wildcards();
     foreach my $file ( @ARGV) {
-        open(FILE, ">>","$file") || die "Cannot write $file:$!";
-        close(FILE);
+        open(my $fh, ">>","$file") || die "Cannot write $file:$^OS_ERROR";
+        close($fh);
         utime($t,$t,$file);
     }
 }
@@ -240,7 +239,7 @@ sub chmod {
         }
     }
 
-    chmod(oct $mode,< @ARGV) || die "Cannot chmod ".join(' ', @($mode,< @ARGV)).":$!";
+    chmod(oct $mode,< @ARGV) || die "Cannot chmod ".join(' ', @($mode,< @ARGV)).":$^OS_ERROR";
 }
 
 =item mkpath
@@ -253,8 +252,8 @@ Creates directories, including any parent directories.
 
 sub mkpath
 {
- expand_wildcards();
- File::Path::mkpath(\ @ARGV,0,0777);
+    expand_wildcards();
+    File::Path::mkpath(\ @ARGV,0,0777);
 }
 
 =item test_f
@@ -268,7 +267,7 @@ shell's idea of true and false).
 
 sub test_f
 {
- exit(-f @ARGV[0] ? 0 : 1);
+ exit(-f @ARGV[0] ?? 0 !! 1);
 }
 
 =item test_d
@@ -282,7 +281,7 @@ not (ie. shell's idea of true and false).
 
 sub test_d
 {
- exit(-d @ARGV[0] ? 0 : 1);
+ exit(-d @ARGV[0] ?? 0 !! 1);
 }
 
 =item dos2unix
@@ -301,19 +300,19 @@ sub dos2unix {
         return unless -r _;
         return if -B _;
 
-        local $\;
+        local $^OUTPUT_RECORD_SEPARATOR = undef;
 
 	my $orig = $_;
 	my $temp = '.dos2unix_tmp';
-	open ORIG, "<", $_ or do { warn "dos2unix can't open $_: $!"; return };
-	open TEMP, ">", "$temp" or 
-	    do { warn "dos2unix can't create .dos2unix_tmp: $!"; return };
-        while (my $line = ~< *ORIG) { 
+	open my $orig_fh, "<", $_ or do { warn "dos2unix can't open $_: $^OS_ERROR"; return };
+	open my $temp_fh, ">", "$temp" or 
+	    do { warn "dos2unix can't create .dos2unix_tmp: $^OS_ERROR"; return };
+        while (my $line = ~< $orig_fh) { 
             $line =~ s/\015\012/\012/g;
-            print TEMP $line;
+            print $temp_fh ,$line;
         }
-	close ORIG;
-	close TEMP;
+	close $orig_fh;
+	close $temp_fh;
 	rename $temp, $orig;
 
     }, < @ARGV);

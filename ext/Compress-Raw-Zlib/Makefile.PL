@@ -1,6 +1,6 @@
 #! perl -w
 
-use strict ;
+ 
 
 use private::MakeUtil;
 use ExtUtils::MakeMaker v5.16 ;
@@ -12,7 +12,7 @@ my $BUILD_ZLIB = 0 ;
 my $OLD_ZLIB = '' ;
 my $WALL = '' ;
 my $GZIP_OS_CODE = -1 ;
-my $USE_PPPORT_H = (%ENV{PERL_CORE}) ? '' : '-DUSE_PPPORT_H';
+my $USE_PPPORT_H = (env::var('PERL_CORE')) ?? '' !! '-DUSE_PPPORT_H';
 
 #$WALL = ' -pedantic ' if $Config{'cc'} =~ /gcc/ ;
 #$WALL = ' -Wall -Wno-comment ' if $Config{'cc'} =~ /gcc/ ;
@@ -22,10 +22,10 @@ my $USE_PPPORT_H = (%ENV{PERL_CORE}) ? '' : '-DUSE_PPPORT_H';
 # ExtUtils::Install.
 
 # Don't ask if MM_USE_DEFAULT is set -- enables perl core building on cygwin
-if ($^O =~ m/cygwin/i and $ExtUtils::Install::VERSION +< 1.39 
-        and not (%ENV{PERL_MM_USE_DEFAULT} or %ENV{PERL_CORE}))
+if ($^OS_NAME =~ m/cygwin/i and $ExtUtils::Install::VERSION +< 1.39 
+        and not (env::var('PERL_MM_USE_DEFAULT') or env::var('PERL_CORE')))
 {
-    print <<EOM ;
+    print $^STDOUT, <<EOM ;
 
 I see you are running Cygwin.
 
@@ -40,16 +40,16 @@ by hand by running 'make install' under the directory
 
 EOM
 
-    print "Do you want to continue? [Y/N]: " ;
-    my $answer = ~< STDIN ;
+    print $^STDOUT, "Do you want to continue? [Y/N]: " ;
+    my $answer = ~< $^STDIN ;
 
     if ($answer =~ m/^yes|y/i)
     {
-	print "continuing...\n" 
+	print $^STDOUT, "continuing...\n" 
     }
     else
     {
-	print "exiting...\n" ;
+	print $^STDOUT, "exiting...\n" ;
 	exit 1 ;
     }
 
@@ -59,7 +59,7 @@ EOM
 ParseCONFIG() ;
 
 UpDowngrade( <getPerlFiles('MANIFEST')) 
-    unless %ENV{PERL_CORE};
+    unless env::var('PERL_CORE');
 
 WriteMakefile( 
     NAME         => 'Compress::Raw::Zlib',
@@ -72,8 +72,8 @@ WriteMakefile(
 
     (
       $BUILD_ZLIB
-        ? < zlib_files($ZLIB_LIB)
-        : (LIBS => \@( "-L$ZLIB_LIB -lz " ))
+        ?? < zlib_files($ZLIB_LIB)
+        !! (LIBS => \@( "-L$ZLIB_LIB -lz " ))
     ),
       
     ABSTRACT_FROM => 'lib/Compress/Raw/Zlib.pm',
@@ -126,22 +126,22 @@ my @names = qw(
 
 require ExtUtils::Constant;
 
-{
+do {
     # Check the constants above all appear in @EXPORT in Zlib.pm
-    my %names = %( < map { $_, 1} @( < @names, 'ZLIB_VERSION') );
-    open F, "<", "lib/Compress/Raw/Zlib.pm" or die "Cannot open Zlib.pm: $!\n";
-    while (~< *F)
+    my %names = %( < @+: map { @: $_, 1 }, @( < @names, 'ZLIB_VERSION') );
+    open my $f, "<", "lib/Compress/Raw/Zlib.pm" or die "Cannot open Zlib.pm: $^OS_ERROR\n";
+    while (~< $f)
     {
         last if m/^ \s* \@EXPORT \s+ = \s+ qw \( /x ;
     }
 
-    while (~< *F)
+    while (~< $f)
     {
         last if m/^\s*\)/ ;
         m/(\S+)/ ;
         delete %names{$1} if defined $1 ;
     }
-    close F ;
+    close $f ;
 
     if ( %names )
     {
@@ -159,7 +159,7 @@ require ExtUtils::Constant;
                                        XS_FILE  => 'constants.xs',
                                        PROXYSUBS => 1,
                                     );
-} 
+}; 
 
 sub ParseCONFIG
 {
@@ -167,50 +167,50 @@ sub ParseCONFIG
     my @badkey = @( () ) ;
     my %Info = %( () ) ;
     my @Options = qw( INCLUDE LIB BUILD_ZLIB OLD_ZLIB GZIP_OS_CODE ) ;
-    my %ValidOption = %( < map {$_, 1} @Options ) ;
+    my %ValidOption = %( < @+: map { @: $_, 1 }, @Options ) ;
     my %Parsed = %( < %ValidOption ) ;
     my $CONFIG = 'config.in' ;
 
-    print "Parsing $CONFIG...\n" ;
+    print $^STDOUT, "Parsing $CONFIG...\n" ;
 
-    open(F, "<", "$CONFIG") or die "Cannot open file $CONFIG: $!\n" ;
-    while (~< *F) {
+    open(my $f, "<", "$CONFIG") or die "Cannot open file $CONFIG: $^OS_ERROR\n" ;
+    while (~< $f) {
 	s/^\s*|\s*$//g ;
 	next if m/^\s*$/ or m/^\s*#/ ;
 	s/\s*#\s*$// ;
 
-	($k, $v) = < split(m/\s+=\s+/, $_, 2) ;
+	@($k, $v) =  split(m/\s+=\s+/, $_, 2) ;
 	$k = uc $k ;
-	if (%ValidOption{$k}) {
+	if (%ValidOption{?$k}) {
 	    delete %Parsed{$k} ;
-	    %Info{$k} = $v ;
+	    %Info{+$k} = $v ;
 	}
 	else {
 	    push(@badkey, $k) ;
 	}
     }
-    close F ;
+    close $f ;
 
-    print "Unknown keys in $CONFIG ignored [{join ' ',@badkey}]\n"
+    print $^STDOUT, "Unknown keys in $CONFIG ignored [$(join ' ',@badkey)]\n"
 	if (nelems @badkey) ;
 
     # check parsed values
     my @missing = @( () ) ;
-    die "The following keys are missing from $CONFIG  [{join ' ',@missing}]\n" 
+    die "The following keys are missing from $CONFIG  [$(join ' ',@missing)]\n" 
         if @missing = keys %Parsed ;
 
-    $ZLIB_INCLUDE = %ENV{'ZLIB_INCLUDE'} || %Info{'INCLUDE'} ;
-    $ZLIB_LIB = %ENV{'ZLIB_LIB'} || %Info{'LIB'} ;
+    $ZLIB_INCLUDE = env::var('ZLIB_INCLUDE') || %Info{?'INCLUDE'} ;
+    $ZLIB_LIB = env::var('ZLIB_LIB') || %Info{?'LIB'} ;
 
-    if ($^O eq 'VMS') {
+    if ($^OS_NAME eq 'VMS') {
         $ZLIB_INCLUDE = VMS::Filespec::vmspath($ZLIB_INCLUDE);
         $ZLIB_LIB = VMS::Filespec::vmspath($ZLIB_LIB);
     }
 
-    my $y = %ENV{'OLD_ZLIB'} || %Info{'OLD_ZLIB'} ;
+    my $y = env::var('OLD_ZLIB') || %Info{?'OLD_ZLIB'} ;
     $OLD_ZLIB = '-DOLD_ZLIB' if $y and $y =~ m/^yes|on|true|1$/i;
 
-    my $x = %ENV{'BUILD_ZLIB'} || %Info{'BUILD_ZLIB'} ;
+    my $x = env::var('BUILD_ZLIB') || %Info{?'BUILD_ZLIB'} ;
 
     if ($x and $x =~ m/^yes|on|true|1$/i ) {
 
@@ -231,12 +231,12 @@ sub ParseCONFIG
 
 
 	# write the Makefile
-	print "Building Zlib enabled\n" ;
+	print $^STDOUT, "Building Zlib enabled\n" ;
     }
 
-    $GZIP_OS_CODE = defined %ENV{'GZIP_OS_CODE'} 
-                          ? %ENV{'GZIP_OS_CODE'} 
-                          : %Info{'GZIP_OS_CODE'} ;
+    $GZIP_OS_CODE = defined env::var('GZIP_OS_CODE') 
+                          ?? env::var('GZIP_OS_CODE') 
+                          !! %Info{?'GZIP_OS_CODE'} ;
 
 	die "GZIP_OS_CODE not 'AUTO_DETECT' or a number between 0 and 255\n"
 	   unless uc $GZIP_OS_CODE eq 'AUTO_DETECT'
@@ -244,14 +244,14 @@ sub ParseCONFIG
 
     if (uc $GZIP_OS_CODE eq 'AUTO_DETECT')
     {
-        print "Auto Detect Gzip OS Code..\n" ;
+        print $^STDOUT, "Auto Detect Gzip OS Code..\n" ;
         $GZIP_OS_CODE = getOSCode() ;
     }
     
     my $name = getOSname($GZIP_OS_CODE);
-    print "Setting Gzip OS Code to $GZIP_OS_CODE [$name]\n" ;
+    print $^STDOUT, "Setting Gzip OS Code to $GZIP_OS_CODE [$name]\n" ;
 
-    print <<EOM if 0 ;
+    print $^STDOUT, <<EOM if 0 ;
     INCLUDE         [$ZLIB_INCLUDE]
     LIB             [$ZLIB_LIB]
     GZIP_OS_CODE    [$GZIP_OS_CODE]
@@ -260,7 +260,7 @@ sub ParseCONFIG
 
 EOM
 
-    print "Looks Good.\n" ;
+    print $^STDOUT, "Looks Good.\n" ;
 
 }
 
@@ -297,9 +297,9 @@ sub zlib_files
     		 );
     }
     
-    @h_files = map { catfile($dir, $_)  } @h_files ;
-    my @o_files = map { "$_\$(OBJ_EXT)" } @( 'Zlib', < @c_files);
-    @c_files = map { "$_.c" } @( 'Zlib', < @c_files) ;
+    @h_files = map { catfile($dir, $_)  }, @h_files ;
+    my @o_files = map { "$_\$(OBJ_EXT)" }, @( 'Zlib', < @c_files);
+    @c_files = map { "$_.c" }, @( 'Zlib', < @c_files) ;
 
     foreach my $file ( @c_files)
       { copy( catfile($dir, $file), '.') }
@@ -316,7 +316,7 @@ sub zlib_files
 
 
 
-use vars < qw ( @GZIP_OS_Names  %OSnames) ;
+our (@GZIP_OS_Names,  %OSnames) ;
 
 BEGIN
 {
@@ -343,7 +343,7 @@ BEGIN
     \@( ''        => 255,  'Unknown OS'                   ),
   );
 
-  %OSnames = %( < map { @$_[1] => @$_[2] }  
+  %OSnames = %( < @+: map { @: @$_[1] => @$_[2] },
  @GZIP_OS_Names ) ;
 }
 
@@ -351,11 +351,11 @@ sub getOSCode
 {
     my $default = 3 ; # Unix is the default
 
-    my $uname = $^O;
+    my $uname = $^OS_NAME;
 
     for my $h ( @GZIP_OS_Names)
     {
-        my ($pattern, $code, $name) = < @$h;
+        my @($pattern, $code, $name) =  @$h;
 
         return $code
             if $pattern && $uname eq $pattern ;
@@ -368,7 +368,7 @@ sub getOSname
 {
     my $code = shift ;
 
-    return %OSnames{$code} || 'Unknown OS' ;
+    return %OSnames{?$code} || 'Unknown OS' ;
 }
 
 # end of file Makefile.PL

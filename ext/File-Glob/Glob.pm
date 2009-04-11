@@ -1,6 +1,5 @@
 package File::Glob;
 
-use strict;
 our($VERSION, @ISA, @EXPORT_OK, @EXPORT_FAIL, %EXPORT_TAGS,
     $DEFAULT_FLAGS);
 
@@ -65,23 +64,20 @@ sub import {
 	    $DEFAULT_FLAGS ^&^= ^~^GLOB_NOCASE() if $1 eq 'case';
 	    $DEFAULT_FLAGS ^|^= GLOB_NOCASE() if $1 eq 'nocase';
 	    if ($1 eq 'globally') {
-		local $^W;
+		local $^WARNING = undef;
 		*CORE::GLOBAL::glob = \&File::Glob::csh_glob;
 	    }
 	    next;
 	}
 	++$i;
     }
-    goto &Exporter::import;
+    local $Exporter::ExportLevel = $Exporter::ExportLevel + 1;
+    return Exporter::import(< @_);
 }
 
 XSLoader::load 'File::Glob', $VERSION;
 
 # Preloaded methods go here.
-
-sub GLOB_ERROR {
-    return ( <constant('GLOB_ERROR'))[[1]];
-}
 
 sub GLOB_CSH () {
     GLOB_BRACE()
@@ -92,12 +88,12 @@ sub GLOB_CSH () {
 }
 
 $DEFAULT_FLAGS = GLOB_CSH();
-if ($^O =~ m/^(?:MSWin32|VMS|os2|dos|riscos|MacOS)$/) {
+if ($^OS_NAME =~ m/^(?:MSWin32|VMS|os2|dos|riscos|MacOS)$/) {
     $DEFAULT_FLAGS ^|^= GLOB_NOCASE();
 }
 
 sub bsd_glob {
-    my ($pat,$flags) = < @_;
+    my @($pat,?$flags) =  @_;
     $flags = $DEFAULT_FLAGS if (nelems @_) +< 2;
     return doglob($pat,$flags);
 }
@@ -128,15 +124,15 @@ sub csh_glob {
 
     # assume global context if not provided one
     $cxix = '_G_' unless defined $cxix;
-    %iter{$cxix} = 0 unless exists %iter{$cxix};
+    %iter{+$cxix} = 0 unless exists %iter{$cxix};
 
     # if we're just beginning, do it all first
-    if (%iter{$cxix} == 0) {
+    if (%iter{?$cxix} == 0) {
 	if ((nelems @pat)) {
-	    %entries{$cxix} = \ map { < doglob($_, $DEFAULT_FLAGS) } @pat;
+	    %entries{+$cxix} = \ @+: map { doglob($_, $DEFAULT_FLAGS) }, @pat;
 	}
 	else {
-	    %entries{$cxix} = \ doglob($pat, $DEFAULT_FLAGS);
+	    %entries{+$cxix} = \ doglob($pat, $DEFAULT_FLAGS);
 	}
     }
 

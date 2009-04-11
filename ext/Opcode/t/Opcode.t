@@ -1,15 +1,8 @@
 #!./perl -w
 
-$|=1;
+$^OUTPUT_AUTOFLUSH=1;
 
 use Config;
-
-BEGIN {
-    if (%Config{'extensions'} !~ m/\bOpcode\b/ && %Config{'osname'} ne 'VMS') {
-        print "1..0\n";
-        exit 0;
-    }
-}
 
 use Test::More;
 
@@ -19,7 +12,6 @@ use Opcode < qw(
 	opmask_add full_opset empty_opset define_optag
 );
 
-use strict;
 
 plan tests => 16;
 
@@ -32,16 +24,16 @@ my @empty_l = opset_to_ops(empty_opset);
 is((nelems @empty_l), 0);
 
 my @full_l1  = opset_to_ops(full_opset);
-is((nelems @full_l1), opcodes());
+is((nelems @full_l1), $: opcodes());
 my @full_l2 = @full_l1;	# = opcodes();	# XXX to be fixed
-is("{join ' ',@full_l1}", "{join ' ',@full_l2}");
+is("$(join ' ',@full_l1)", "$(join ' ',@full_l2)");
 
 @empty_l = opset_to_ops(opset(':none'));
 is((nelems @empty_l), 0);
 
 my @full_l3 = opset_to_ops(opset(':all'));
 is((nelems @full_l1), nelems @full_l3);
-is("{join ' ',@full_l1}", "{join ' ',@full_l3}");
+is("$(join ' ',@full_l1)", "$(join ' ',@full_l3)");
 
 # --- define_optag
 
@@ -52,13 +44,13 @@ ok( try { opset(':_tst_') } );
 # --- opdesc and opcodes
 
 is( opdesc("gv"), "glob value" );
-ok( opcodes() );
+ok( $: opcodes() );
 
 # --- invert_opset
 
 $s1 = opset( <qw(fileno padsv));
 @o2 = opset_to_ops(invert_opset($s1));
-is((nelems @o2), opcodes-2);
+is((nelems @o2), opcodes()-2);
 
 # --- opmask
 
@@ -73,7 +65,7 @@ ok( verify_opset($s1) && !verify_opset(42) );
 
 opmask_add(opset( <qw(fileno)));	# add to global op_mask
 ok( ! eval 'fileno STDOUT' ); # fail
-ok( $@ && $@->{description} =~ m/'fileno' trapped/ );
+ok( $^EVAL_ERROR && $^EVAL_ERROR->{?description} =~ m/'fileno' trapped/ );
 
 # --- finally, check some opname assertions
 

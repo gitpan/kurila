@@ -1,12 +1,11 @@
 BEGIN {
-    if(%ENV{PERL_CORE}) {
+    if(env::var('PERL_CORE')) {
         chdir 't';
-        @INC = @( '../lib' );
+        $^INCLUDE_PATH = @( '../lib' );
     }
 }
 
-use strict;
-use Test;
+use Test::More;
 BEGIN { plan tests => 3 };
 
 my $d;
@@ -17,21 +16,21 @@ ok 1;
 
 use Pod::Simple::DumpAsXML;
 use Pod::Simple::XMLOutStream;
-print "# Pod::Simple version $Pod::Simple::VERSION\n";
-sub e     ($$) { Pod::Simple::XMLOutStream->_duo(\&nowhine, < @_) }
+print $^STDOUT, "# Pod::Simple version $Pod::Simple::VERSION\n";
+sub e     ($x, $y) { Pod::Simple::XMLOutStream->_duo(\&nowhine, $x, $y) }
 
 sub nowhine {
 #  $_[0]->{'no_whining'} = 1;
   @_[0]->accept_targets("*");
 }
 
-&ok( <e(
+is( <e(
 "=begin :foo\n\n=begin :bar\n\nZaz\n\n",
 "=begin :foo\n\n=begin :bar\n\nZaz\n\n=end :bar\n\n=end :foo\n\n",
 ));
 
 
-print "# Ending ", __FILE__, "\n";
+print $^STDOUT, "# Ending ", __FILE__, "\n";
 ok 1;
 
 __END__

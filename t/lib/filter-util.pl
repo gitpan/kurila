@@ -1,13 +1,12 @@
-
-use strict ;
+ 
 use warnings;
 
-use vars < qw( $Perl $Inc);
+our (, $Perl, $Inc);
 
 sub readFile
 {
-    my ($filename) = < @_ ;
-    my ($string) = '' ;
+    my @($filename) =  @_ ;
+    my @($string) = '' ;
 
     open (F, "<", "$filename") 
 	or die "Cannot open $filename: $!\n" ;
@@ -19,7 +18,7 @@ sub readFile
 
 sub writeFile
 {
-    my($filename, < @strings) = < @_ ;
+    my@($filename, @< @strings) =  @_ ;
     open (F, ">", "$filename") 
 	or die "Cannot open $filename: $!\n" ;
     binmode(F) if $filename =~ m/bin$/i;
@@ -30,7 +29,7 @@ sub writeFile
 
 sub ok
 {
-    my($number, $result, $note) = < @_ ;
+    my@($number, $result, $note) =  @_ ;
  
     $note = "" if ! defined $note ;
     if ($note) {
@@ -39,16 +38,16 @@ sub ok
     }
 
     print "not " if !$result ;
-    print "ok {$number}{$note}\n";
+    print "ok $($number)$($note)\n";
 }
 
 $Inc = '' ;
-foreach ( @INC)
+foreach ( $^INCLUDE_PATH)
  { $Inc .= "\"-I$_\" " }
 $Inc = "-I::lib" if $^O eq 'MacOS';
 
 $Perl = '' ;
-$Perl = (%ENV{'FULLPERL'} or $^X or 'perl') ;
+$Perl = (env::var('FULLPERL') or $^X or 'perl') ;
 
 $Perl = "$Perl -MMac::err=unix" if $^O eq 'MacOS';
 $Perl = "$Perl -w" ;

@@ -5,66 +5,66 @@ BEGIN {
     $bytes::hint_bits = 0x00000008;
     $utf8::codepoints_hint_bits = 0x00800000;
 
-    $^H ^|^= $utf8::codepoints_hint_bits;
-    $^H ^&^= ^~^$bytes::hint_bits;
+    $^HINT_BITS ^|^= $utf8::codepoints_hint_bits;
+    $^HINT_BITS ^&^= ^~^$bytes::hint_bits;
 }
 
 our $VERSION = '1.07';
 
 # toggle utf8/codepoints hints
 sub import {
-    $^H ^|^= $utf8::hint_bits;
-    $^H ^|^= $utf8::codepoints_hint_bits;
-    $^H ^&^= ^~^$bytes::hint_bits;
+    $^HINT_BITS ^|^= $utf8::hint_bits;
+    $^HINT_BITS ^|^= $utf8::codepoints_hint_bits;
+    $^HINT_BITS ^&^= ^~^$bytes::hint_bits;
 }
 
 sub unimport {
-    $^H ^&^= ^~^$utf8::hint_bits;
-    $^H ^&^= ^~^$utf8::codepoints_hint_bits;
+    $^HINT_BITS ^&^= ^~^$utf8::hint_bits;
+    $^HINT_BITS ^&^= ^~^$utf8::codepoints_hint_bits;
 }
 
 # SWASHNEW
 sub SWASHNEW {
     require "utf8_heavy.pl";
-    goto &utf8::SWASHNEW_real;
+    return utf8::SWASHNEW_real(< @_);
 }
 
 # utf version of string functions
 
-sub length (_) {
+sub length($s) {
     BEGIN { utf8::import() }
-    return CORE::length(@_[0]);
+    return CORE::length($s);
 }
 
-sub substr ($$;$$) {
+sub substr {
     BEGIN { utf8::import() }
     return
-	(nelems @_) == 2 ? CORE::substr(@_[0], @_[1]) :
-	(nelems @_) == 3 ? CORE::substr(@_[0], @_[1], @_[2]) :
+	(nelems @_) == 2 ?? CORE::substr(@_[0], @_[1]) !!
+	(nelems @_) == 3 ?? CORE::substr(@_[0], @_[1], @_[2]) !!
 	          CORE::substr(@_[0], @_[1], @_[2], @_[3]) ;
 }
 
-sub ord (_) {
+sub ord($s) {
     BEGIN { utf8::import() }
-    return CORE::ord(@_[0]);
+    return CORE::ord($s);
 }
 
-sub chr (_) {
+sub chr ($s) {
     BEGIN { utf8::import() }
-    return CORE::chr(@_[0]);
+    return CORE::chr($s);
 }
 
-sub index ($$;$) {
+sub index {
     BEGIN { utf8::import() }
     return
-	(nelems @_) == 2 ? CORE::index(@_[0], @_[1]) :
+	(nelems @_) == 2 ?? CORE::index(@_[0], @_[1]) !!
 	          CORE::index(@_[0], @_[1], @_[2]) ;
 }
 
-sub rindex ($$;$) {
+sub rindex {
     BEGIN { utf8::import() }
     return
-	(nelems @_) == 2 ? CORE::rindex(@_[0], @_[1]) :
+	(nelems @_) == 2 ?? CORE::rindex(@_[0], @_[1]) !!
 	          CORE::rindex(@_[0], @_[1], @_[2]) ;
 }
 

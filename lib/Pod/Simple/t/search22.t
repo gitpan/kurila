@@ -1,16 +1,8 @@
-BEGIN {
-    if(%ENV{PERL_CORE}) {
-        chdir 't';
-        @INC = @( '../lib' );
-    }
-}
 
-use strict;
 use Pod::Simple::Search;
-use Test;
-BEGIN { plan tests => 13 }
+use Test::More tests => 13;
 
-print "# ", __FILE__,
+print $^STDOUT, "# ", __FILE__,
  ": Testing the scanning of several docroots...\n";
 
 my $x = Pod::Simple::Search->new;
@@ -22,11 +14,11 @@ $x->shadows(1);
 use File::Spec;
 use Cwd;
 my $cwd = cwd();
-print "# CWD: $cwd\n";
+print $^STDOUT, "# CWD: $cwd\n";
 
 sub source_path {
     my $file = shift;
-    if (%ENV{PERL_CORE}) {
+    if (env::var('PERL_CORE')) {
         my $updir = File::Spec->updir;
         my $dir = File::Spec->catdir($updir, 'lib', 'Pod', 'Simple', 't');
         return File::Spec->catdir ($dir, $file);
@@ -52,67 +44,67 @@ if(        -e ($here1 = source_path('testlib1'      ))) {
 } else {
   die "Can't find the test corpora";
 }
-print "# OK, found the test corpora\n#  as $here1\n# and $here2\n# and $here3\n#\n";
+print $^STDOUT, "# OK, found the test corpora\n#  as $here1\n# and $here2\n# and $here3\n#\n";
 ok 1;
 
-print $x->_state_as_string;
+print $^STDOUT, $x->_state_as_string;
 #$x->verbose(12);
 
 use Pod::Simple;
 *pretty = \&Pod::Simple::BlackBox::pretty;
 
-my($name2where, $where2name) = ($x->survey($here1, $here2, $here3), $x->path2name);
+my@($name2where, $where2name) = @($x->survey($here1, $here2, $here3), $x->path2name);
 
 my $p = pretty( $where2name, $name2where )."\n";
 $p =~ s/, +/,\n/g;
 $p =~ s/^/#  /mg;
-print $p;
+print $^STDOUT, $p;
 
-{
-print "# won't show any shadows, since we're just looking at the name2where keys\n";
-my $names = join "|", sort keys %$name2where;
-skip $^O eq 'VMS' ? '-- case may or may not be preserved' : 0, 
-     $names, 
-     "Blorm|Suzzle|Zonk::Pronk|hinkhonk::Glunk|hinkhonk::Vliff|perlflif|perlthng|perlzuk|squaa|squaa::Glunk|squaa::Vliff|squaa::Wowo|zikzik";
-}
+do {
+    print $^STDOUT, "# won't show any shadows, since we're just looking at the name2where keys\n";
+    my $names = join "|", sort keys %$name2where;
+    skip '-- case may or may not be preserved', 1 if $^OS_NAME eq 'VMS';
+    is( $names,
+        "Blorm|Suzzle|Zonk::Pronk|hinkhonk::Glunk|hinkhonk::Vliff|perlflif|perlthng|perlzuk|squaa|squaa::Glunk|squaa::Vliff|squaa::Wowo|zikzik" );
+};
 
-{
-print "# but here we'll see shadowing:\n";
-my $names = join "|", sort values %$where2name;
-skip $^O eq 'VMS' ? '-- case may or may not be preserved' : 0, 
-     $names, 
-     "Blorm|Suzzle|Zonk::Pronk|hinkhonk::Glunk|hinkhonk::Glunk|hinkhonk::Vliff|hinkhonk::Vliff|perlflif|perlthng|perlthng|perlzuk|squaa|squaa::Glunk|squaa::Vliff|squaa::Vliff|squaa::Vliff|squaa::Wowo|zikzik";
+do {
+    print $^STDOUT, "# but here we'll see shadowing:\n";
+    my $names = join "|", sort values %$where2name;
+    skip '-- case may or may not be preserved', 1 if $^OS_NAME eq 'VMS';
+    is( $names,
+     "Blorm|Suzzle|Zonk::Pronk|hinkhonk::Glunk|hinkhonk::Glunk|hinkhonk::Vliff|hinkhonk::Vliff|perlflif|perlthng|perlthng|perlzuk|squaa|squaa::Glunk|squaa::Vliff|squaa::Vliff|squaa::Vliff|squaa::Wowo|zikzik" );
 
 my %count;
-for(values %$where2name) { ++%count{$_} };
+for(values %$where2name) { ++%count{+$_} };
 #print pretty(\%count), "\n\n";
-delete %count{[ grep %count{$_} +< 2, keys %count ]};
+delete %count{[ grep { %count{?$_} +< 2 }, keys %count ]};
 my $shadowed = join "|", sort keys %count;
-ok $shadowed, "hinkhonk::Glunk|hinkhonk::Vliff|perlthng|squaa::Vliff";
+is $shadowed, "hinkhonk::Glunk|hinkhonk::Vliff|perlthng|squaa::Vliff";
 
-sub thar { print "# Seen @_[0] :\n", < map "#  \{$_\}\n", sort grep $where2name->{$_} eq @_[0],keys %$where2name; return; }
+sub thar { print $^STDOUT, "# Seen @_[0] :\n", < map { "#  \{$_\}\n" }, sort grep { $where2name->{?$_} eq @_[0] },keys %$where2name; return; }
 
-ok %count{'perlthng'}, 2;
+is %count{?'perlthng'}, 2;
 thar 'perlthng';
-ok %count{'squaa::Vliff'}, 3;
+is %count{?'squaa::Vliff'}, 3;
 thar 'squaa::Vliff';
-}
+};
 
 
-ok( ($name2where->{'squaa'} || 'huh???'), '/squaa\.pm$/');
+like( ($name2where->{?'squaa'} || 'huh???'), qr/squaa\.pm$/);
 
-ok nelems(grep( m/squaa\.pm/, keys %$where2name) ), 1;
+is nelems(grep( { m/squaa\.pm/ }, keys %$where2name) ), 1;
 
-ok( ($name2where->{'perlthng'}    || 'huh???'), '/[^\^]testlib1/' );
-ok( ($name2where->{'squaa::Vliff'} || 'huh???'), '/[^\^]testlib1/' );
+like( ($name2where->{?'perlthng'}    || 'huh???'), qr/[^\^]testlib1/ );
+like( ($name2where->{?'squaa::Vliff'} || 'huh???'), qr/[^\^]testlib1/ );
 
 # Some sanity:
-ok( ($name2where->{'squaa::Wowo'}  || 'huh???'), '/testlib2/' );
+like( ($name2where->{?'squaa::Wowo'}  || 'huh???'), qr/testlib2/ );
 
 
 
 
-print "# OK, bye from ", __FILE__, "\n";
+print $^STDOUT, "# OK, bye from ", __FILE__, "\n";
 ok 1;
 
 __END__

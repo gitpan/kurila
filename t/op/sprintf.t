@@ -9,26 +9,26 @@
 use warnings;
 use version;
 use Config;
-use strict;
+
 
 my @tests = @( () );
 my ($i, $template, $data, $result, $comment, $w, $x, $evalData, $n, $p);
 
 my $Is_VMS_VAX = 0;
 # We use HW_MODEL since ARCH_NAME was not in VMS V5.*
-if ($^O eq 'VMS') {
+if ($^OS_NAME eq 'VMS') {
     my $hw_model;
     chomp($hw_model = `write sys\$output f\$getsyi("HW_MODEL")`);
-    $Is_VMS_VAX = $hw_model +< 1024 ? 1 : 0;
+    $Is_VMS_VAX = $hw_model +< 1024 ?? 1 !! 0;
 }
 
 # No %Config.
-my $Is_Ultrix_VAX = $^O eq 'ultrix' && `uname -m` =~ m/^VAX$/;
+my $Is_Ultrix_VAX = $^OS_NAME eq 'ultrix' && `uname -m` =~ m/^VAX$/;
 
 while ( ~< *DATA) {
     s/^\s*>//; s/<\s*$//;
-    ($template, $data, $result, $comment) = < split(m/<\s*>/, $_, 4);
-    if ($^O eq 'os390' || $^O eq 's390') { # non-IEEE (s390 is UTS)
+    @($template, $data, $result, ?$comment) =  split(m/<\s*>/, $_, 4);
+    if ($^OS_NAME eq 'os390' || $^OS_NAME eq 's390') { # non-IEEE (s390 is UTS)
         $data   =~ s/([eE])96$/$163/;      # smaller exponents
         $result =~ s/([eE]\+)102$/$169/;   #  "       "
         $data   =~ s/([eE])\-101$/$1-56/;  # larger exponents
@@ -45,25 +45,25 @@ while ( ~< *DATA) {
     }
 
     $evalData = eval $data;
-    die if $@;
-    $evalData = ref $evalData ? $evalData : \@($evalData);
+    die if $^EVAL_ERROR;
+    $evalData = ref $evalData ?? $evalData !! \@($evalData);
     push @tests, \@($template, $evalData, $result, $comment, $data);
 }
 
-print '1..', scalar nelems @tests, "\n";
+print $^STDOUT, '1..', scalar nelems @tests, "\n";
 
 $^WARN_HOOK = sub {
-    if (@_[0]->{description} =~ m/^Invalid conversion/) {
+    if (@_[0]->{?description} =~ m/^Invalid conversion/) {
 	$w = ' INVALID';
-    } elsif (@_[0]->{description}=~ m/^Use of uninitialized value/) {
+    } elsif (@_[0]->{?description}=~ m/^Use of uninitialized value/) {
 	$w = ' UNINIT';
     } else {
-	warn @_[0]->{description};
+	warn @_[0]->{?description};
     }
 };
 
-for ($i = 1; (nelems @tests); $i++) {
-    ($template, $evalData, $result, $comment, $data) = < @{shift @tests};
+for my  $i (1 .. nelems(@tests)) {
+    @($template, $evalData, $result, $comment, $data) =  @{shift @tests};
     $w = undef;
     $x = sprintf(">$template<", < @$evalData);
     substr($x, -1, 0, $w) if $w;
@@ -87,44 +87,44 @@ for ($i = 1; (nelems @tests); $i++) {
     my $skip = 0;
     if ($comment =~ s/\s+skip:\s*(.*)//) {
 	my $os  = $1;
-	my $osv = exists %Config{osvers} ? %Config{osvers} : "0";
+	my $osv = config_value('osvers');
 	# >comment skip: all<
 	if ($os =~ m/\ball\b/i) {
 	    $skip = 1;
 	# >comment skip: VMS hpux:10.20<
-	} elsif ($os =~ m/\b$^O(?::(\S+))?\b/i) {
-	    my $vsn = defined $1 ? $1 : "0";
+	} elsif ($os =~ m/\b$^OS_NAME(?::(\S+))?\b/i) {
+	    my $vsn = defined $1 ?? $1 !! "0";
 	    # Only compare on the the first pair of digits, as numeric
 	    # compares don't like 2.6.10-3mdksmp or 2.6.8-24.10-default
 	    s/^(\d+(\.\d+)?).*/$1/ for @( $osv, $vsn);
-	    $skip = $vsn ? ($osv +<= $vsn ? 1 : 0) : 1;
+	    $skip = $vsn ?? ($osv +<= $vsn ?? 1 !! 0) !! 1;
 	}
-	$skip and $comment =~ s/$/, failure expected on $^O $osv/;
+	$skip and $comment =~ s/$/, failure expected on $^OS_NAME $osv/;
     }
 
     if ($x eq ">$result<") {
-        print "ok $i\n";
+        print $^STDOUT, "ok $i\n";
     }
     elsif ($skip) {
-	print "ok $i # skip $comment\n";
+	print $^STDOUT, "ok $i # skip $comment\n";
     }
     elsif ($y eq ">$result<")	# Some C libraries always give
     {				# three-digit exponent
-		print("ok $i # >$result< $x three-digit exponent accepted\n");
+		print($^STDOUT, "ok $i # >$result< $x three-digit exponent accepted\n");
     }
 	elsif ($result =~ m/[-+]\d{3}$/ &&
 		   # Suppress tests with modulo of exponent >= 100 on platforms
 		   # which can't handle such magnitudes (or where we can't tell).
 		   ((!try {require POSIX}) || # Costly: only do this if we must!
-			(length(&POSIX::DBL_MAX) - rindex(&POSIX::DBL_MAX, '+')) == 3))
+			(length(&POSIX::DBL_MAX( < @_ )) - rindex(&POSIX::DBL_MAX( < @_ ), '+')) == 3))
 	{
-		print("ok $i # >$template< >$data< >$result<",
+		print($^STDOUT, "ok $i # >$template< >$data< >$result<",
 			  " Suppressed: exponent out of range?\n");
 	}
     else {
-	$y = ($x eq $y ? "" : " => $y");
-	print("not ok $i >$template< >$data< >$result< $x$y",
-	    $comment ? " # $comment\n" : "\n");
+	$y = ($x eq $y ?? "" !! " => $y");
+	print($^STDOUT, "not ok $i >$template< >$data< >$result< $x$y",
+	    $comment ?? " # $comment\n" !! "\n");
     }
 }
 

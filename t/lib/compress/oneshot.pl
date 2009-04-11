@@ -1,5 +1,4 @@
 use lib 't';
-use strict;
 use warnings;
 use bytes;
 
@@ -28,7 +27,7 @@ sub run
     my $TopFuncName     = getTopFuncName($CompressClass);
 
 
-    my @MultiValues     = @( < getMultiValues($CompressClass) );
+    my @MultiValues     = getMultiValues($CompressClass);
 
     foreach my $bit ($CompressClass, $UncompressClass,
                      'IO::Uncompress::AnyUncompress',
@@ -473,7 +472,7 @@ sub run
                     my $lex = LexFile->new(my $in_file, my $out_file) ;
                     writeFile($in_file, $buffer);
 
-                       open(SAVEIN, "<&", \*STDIN);
+                       open(SAVEIN, "<&", $^STDIN);
                     my $dummy = fileno SAVEIN ;
                     ok open(STDIN, "<", "$in_file"), "  redirect STDIN";
 
@@ -522,7 +521,7 @@ sub run
         my @expected = @("data1", "data2");
         my @uexpected = @("data1", "data2");
 
-        my @keep = @( < @input ) ;
+        my @keep =  @input;
 
         {
             title "$TopType - From Array Ref to Array Ref" ;
@@ -555,7 +554,7 @@ sub run
                 my $got = anyUncompress(\@( \$output, MultiStream => $ms ));
 
                 is $got, join('', < @uexpected), "  Got Expected uncompressed data";
-                my @headers = @( < getHeaders(\$output) );
+                my @headers = getHeaders(\$output);
                 is (nelems @headers), $ms ? (nelems @input) : 1, "  Header count ok";
             }
 
@@ -573,7 +572,7 @@ sub run
                 my $got = anyUncompress(\@( $file3, MultiStream => $ms ));
 
                 is $got, join('', < @uexpected), "  Got Expected uncompressed data";
-                my @headers = @( < getHeaders($file3) );
+                my @headers = getHeaders($file3);
                 is (nelems @headers), $ms ? (nelems @input) : 1, "  Header count ok";
             }
 
@@ -595,7 +594,7 @@ sub run
                 my $got = anyUncompress(\@( $file3, MultiStream => $ms ));
 
                 is $got, join('', < @uexpected), "  Got Expected uncompressed data";
-                my @headers = @( < getHeaders($file3) );
+                my @headers = getHeaders($file3);
                 is (nelems @headers), $ms ? (nelems @input) : 1, "  Header count ok";
             }
         }
@@ -872,8 +871,8 @@ sub run
                 ok &$Func("<$tmpDir1/a*.tmp>" => "<$tmpDir2/a#1.tmp>"), '  Compressed ok' 
                     or diag $$Error ;
 
-                my @copy = @( < @expected );
-                for my $file (< @outFiles)
+                my @copy = @expected;
+                for my $file (@outFiles)
                 {
                     is anyUncompress($file), shift @copy, "  got expected from $file" ;
                 }
@@ -1186,7 +1185,7 @@ sub run
                 my $lex = LexFile->new(my $in_file) ;
                 writeFile($in_file, $comp);
 
-                open(SAVEIN, "<&", \*STDIN);
+                open(SAVEIN, "<&", $^STDIN);
                 my $dummy = fileno SAVEIN ;
                 ok open(STDIN, "<", "$in_file"), "  redirect STDIN";
 
@@ -1233,7 +1232,7 @@ sub run
             is $buff, $appended, "  Appended data ok";
         }
 
-        for my $stdin ('-', *STDIN) # , \*STDIN)
+        for my $stdin ('-', $^TDIN) # , \*STDIN)
         {
             title "$TopType - From stdin to Buffer content, InputLength" ;
 
@@ -1243,7 +1242,7 @@ sub run
             my $len_appended = length $appended;
             writeFile($in_file, $comp . $appended ) ;
 
-               open(SAVEIN, "<&", \*STDIN);
+               open(SAVEIN, "<&", $^STDIN);
             my $dummy = fileno SAVEIN ;
             ok open(STDIN, "<", "$in_file"), "  redirect STDIN";
 

@@ -1,8 +1,6 @@
 package Exporter;
 
-# Be lean.
-use strict;
-no strict 'refs';
+use Exporter::Heavy;
 
 our $Debug = 0;
 our $ExportLevel = 0;
@@ -11,19 +9,6 @@ our $VERSION = '5.62';
 our (%Cache);
 # Carp does this now for us, so we can finally live w/o Carp
 #$Carp::Internal{Exporter} = 1;
-
-sub as_heavy {
-  require Exporter::Heavy;
-  # Unfortunately, this does not work if the caller is aliased as *name = \&foo
-  # Thus the need to create a lot of identical subroutines
-  my $c = @(caller(1))[3];
-  $c =~ s/.*:://;
-  \&{*{Symbol::fetch_glob("Exporter::Heavy::heavy_$c")}};
-}
-
-sub export {
-  goto &{as_heavy()};
-}
 
 sub import {
   my $pkg = shift;
@@ -35,30 +20,33 @@ sub import {
   }
 
   # We *need* to treat @{"$pkg\::EXPORT_FAIL"} since Carp uses it :-(
-  my($exports, $fail) = (\@{*{Symbol::fetch_glob("$pkg\::EXPORT")}}, 
-                         \@{*{Symbol::fetch_glob("$pkg\::EXPORT_FAIL")}});
+  my @($exports, $fail) = @(\@{*{Symbol::fetch_glob("$pkg\::EXPORT")}},
+                            \@{*{Symbol::fetch_glob("$pkg\::EXPORT_FAIL")}});
   return export $pkg, $callpkg, < @_
     if $Verbose or $Debug or (nelems @$fail) +> 1;
-  my $export_cache = (%Cache{$pkg} ||= \%());
+  my $export_cache = (%Cache{+$pkg} ||= \%());
   my $args = (nelems @_) or @_ = @$exports;
 
-  local $_;
+  local $_ = undef;
   if ($args and not %$export_cache) {
-    s/^&//, $export_cache->{$_} = 1
-      foreach @( (< @$exports, < @{*{Symbol::fetch_glob("$pkg\::EXPORT_OK")}}));
+      foreach (@$exports +@+  @{*{Symbol::fetch_glob("$pkg\::EXPORT_OK")}}) {
+          s/^&//;
+          $export_cache->{+$_} = 1;
+      }
   }
   my $heavy;
   # Try very hard not to use {} and hence have to  enter scope on the foreach
   # We bomb out of the loop with last as soon as heavy is set.
   if ($args or $fail) {
-    ($heavy = (m/\W/ or $args and not exists $export_cache->{$_}
-               or (nelems @$fail) and $_ eq $fail->[0])) and last
-                 foreach @_;
+      for (@_) {
+          ($heavy = (m/\W/ or $args and not exists $export_cache->{$_}
+                       or (nelems @$fail) and $_ eq $fail->[0])) and last;
+      }
   } else {
     ($heavy = m/\W/) and last
       foreach @( (< @_));
   }
-  return export $pkg, $callpkg, ($args ? < @_ : ()) if $heavy;
+  return export $pkg, $callpkg, ($args ?? < @_ !! ()) if $heavy;
   # shortcut for the common case of no type character
   *{Symbol::fetch_glob("$callpkg\::$_")} = \&{*{Symbol::fetch_glob("$pkg\::$_")}} foreach  @_;
 }
@@ -68,26 +56,6 @@ sub import {
 sub export_fail {
     my $self = shift;
     < @_;
-}
-
-# Unfortunately, caller(1)[3] "does not work" if the caller is aliased as
-# *name = \&foo.  Thus the need to create a lot of identical subroutines
-# Otherwise we could have aliased them to export().
-
-sub export_to_level {
-  goto &{as_heavy()};
-}
-
-sub export_tags {
-  goto &{as_heavy()};
-}
-
-sub export_ok_tags {
-  goto &{as_heavy()};
-}
-
-sub require_version {
-  goto &{as_heavy()};
 }
 
 1;
@@ -420,13 +388,6 @@ variables C<@EXPORT_OK>, C<@EXPORT>, C<@ISA>, etc.
 
   our @ISA = qw(Exporter);
   our @EXPORT_OK = qw(munge frobnicate);
-
-If backward compatibility for Perls under 5.6 is important,
-one must write instead a C<use vars> statement.
-
-  use vars qw(@ISA @EXPORT_OK);
-  @ISA = qw(Exporter);
-  @EXPORT_OK = qw(munge frobnicate);
 
 =head2 Playing Safe
 

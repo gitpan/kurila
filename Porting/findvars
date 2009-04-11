@@ -69,7 +69,6 @@ comppad_name
 comppad_name_fill
 comppad_name_floor
 cop_seqmax
-copline
 cryptseen
 cshlen
 cshname
@@ -234,7 +233,6 @@ padix
 padix_floor
 patchlevel
 patleave
-pending_ident
 perl_destruct_level
 perldb
 pidstatus

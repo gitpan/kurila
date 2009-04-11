@@ -7,7 +7,7 @@ use version;
 
 my %versions = %(q[$VERSION = '1.00']        => '1.00',
                 q[*VERSION = \'1.01']       => '1.01',
-                q[($VERSION) = q$Revision: 32208 $ =~ m/(\d+)/g;] => 32208,
+                q[@($VERSION) = @: q$Revision: 32208 $ =~ m/(\d+)/g;] => 32208,
                 q[$FOO::VERSION = '1.10';]  => '1.10',
                 q[*FOO::VERSION = \'1.11';] => '1.11',
                 '$VERSION = 0.02'   => 0.02,
@@ -23,7 +23,7 @@ my %versions = %(q[$VERSION = '1.00']        => '1.00',
 
 plan tests => (2 * nkeys %versions) + 8;
 
-while( my($code, $expect) = each %versions ) {
+while( my@(?$code, ?$expect) =@( each %versions) ) {
     is( parse_version_string($code), $expect, $code );
 }
 
@@ -35,9 +35,9 @@ for my $v (@: @(q[use version; $VERSION = v1.2.3;], v1.2.3),
 sub parse_version_string {
     my $code = shift;
 
-    open(FILE, ">", "VERSION.tmp") || die $!;
-    print FILE "$code\n";
-    close FILE;
+    open(my $fh, ">", "VERSION.tmp") || die $^OS_ERROR;
+    print $fh, "$code\n";
+    close $fh;
 
     $_ = 'foo';
     my $version = MM->parse_version('VERSION.tmp');
@@ -52,9 +52,9 @@ sub parse_version_string {
 # This is a specific test to see if a version subroutine in the $VERSION
 # declaration confuses later calls to the version class.
 # [rt.cpan.org 30747]
-{
+do {
     is parse_version_string(q[ $VERSION = '1.00'; sub version { $VERSION } ]),
        '1.00';
     is parse_version_string(q[ use version; $VERSION = version->new("1.2.3") ]),
        qv("1.2.3")->stringify;
-}
+};

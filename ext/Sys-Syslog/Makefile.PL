@@ -1,4 +1,4 @@
-use strict;
+
 use Config;
 use ExtUtils::MakeMaker;
 eval 'use ExtUtils::MakeMaker::Coverage';
@@ -18,32 +18,32 @@ my (@extra_params, @extra_prereqs);
 my $use_eventlog = eval "use Win32::EventLog; 1";
 
 if ($use_eventlog) {
-    print " * Win32::EventLog detected.\n";
+    print $^STDOUT, " * Win32::EventLog detected.\n";
     my $name = "PerlLog";
 
     push @extra_prereqs, "Win32::TieRegistry" => 0, "Win32::EventLog" => 0;
 
-    %virtual_path{'win32/Win32.pm'   } = '$(INST_LIBDIR)/Syslog/Win32.pm';
-    %virtual_path{'win32/PerlLog.dll'} = '$(INST_ARCHAUTODIR)/PerlLog.dll';
+    %virtual_path{+'win32/Win32.pm'   } = '$(INST_LIBDIR)/Syslog/Win32.pm';
+    %virtual_path{+'win32/PerlLog.dll'} = '$(INST_ARCHAUTODIR)/PerlLog.dll';
 
     # recreate the DLL from its uuencoded form if it's not here
     if (! -f File::Spec->catfile("win32", "$name.dll")) {
         # read the uuencoded data
-        open(UU, "<", '' . File::Spec->catfile("win32", "$name\_dll.uu"))
-            or die "fatal: Can't read file '$name\_dll.uu': $!";
-        my $uudata = do { local $/; ~< *UU };
-        close(UU);
+        open(my $uu, "<", '' . File::Spec->catfile("win32", "$name\_dll.uu"))
+            or die "fatal: Can't read file '$name\_dll.uu': $^OS_ERROR";
+        my $uudata = do { local $^INPUT_RECORD_SEPARATOR = undef; ~< *UU };
+        close($uu);
 
         # write the DLL
-        open(DLL, ">", '' . File::Spec->catfile("win32", "$name.dll"))
-            or die "fatal: Can't write DLL '$name.dll': $!";
-        binmode(DLL);
-        print DLL unpack "u", $uudata;
-        close(DLL);
+        open(my $dll, ">", '' . File::Spec->catfile("win32", "$name.dll"))
+            or die "fatal: Can't write DLL '$name.dll': $^OS_ERROR";
+        binmode($dll);
+        print $dll, unpack "u", $uudata;
+        close($dll);
     }
 }
-elsif ($^O =~ m/Win32/) {
-    print <<"NOTICE"
+elsif ($^OS_NAME =~ m/Win32/) {
+    print $^STDOUT, <<"NOTICE"
  *** You're running on a Win32 system,  but you lack the Win32::EventLog\a
  *** module, part of the libwin32 distribution. Although Sys::Syslog can 
  *** be used without Win32::EventLog, it won't be very useful except for 
@@ -53,7 +53,7 @@ NOTICE
 }
 
 # detect when being built in Perl core
-if (not grep { $_ eq 'PERL_CORE=1' } @ARGV) {
+if (not grep { $_ eq 'PERL_CORE=1' }, @ARGV) {
     push @extra_params, 
         DEFINE      => '-DUSE_PPPORT_H';
 }
@@ -153,14 +153,14 @@ if(try {require ExtUtils::Constant; 1}) {
         NAMES => \@( < @levels, < @facilities, < @options, < @others_macros ),
     );
 
-    my @names = map { ref $_ ? $_->{name} : $_ } @( < @levels, < @facilities, < @options);
-    open(MACROS, ">", 'macros.all') or warn "warning: Can't write 'macros.all': $!\n";
-    print MACROS join $/, @names;
-    close(MACROS);
+    my @names = map { ref $_ ?? $_->{?name} !! $_ }, @( < @levels, < @facilities, < @options);
+    open(my $macros, ">", 'macros.all') or warn "warning: Can't write 'macros.all': $^OS_ERROR\n";
+    print $macros, join $^INPUT_RECORD_SEPARATOR, @names;
+    close($macros);
 }
 else {
     foreach my $file (@('const-c.inc', 'const-xs.inc')) {
         my $fallback = File::Spec->catfile('fallback', $file);
-        copy($fallback, $file) or die "fatal: Can't copy $fallback to $file: $!";
+        copy($fallback, $file) or die "fatal: Can't copy $fallback to $file: $^OS_ERROR";
     }
 }

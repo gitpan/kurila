@@ -2,17 +2,17 @@
 # Tests to ensure that we don't unexpectedly change prototypes of builtins
 
 BEGIN { require './test.pl'; }
-plan tests => 225;
+plan tests => 218;
 
 while ( ~< *DATA) {
     chomp;
-    (my $keyword, my $proto, local our $TODO) = < split " ", $_, 3;
+    @(my $keyword, my $proto, ?local our $TODO) =  split " ", $_, 3;
     if ($proto eq 'undef') {
 	ok( !defined prototype "CORE::".$keyword, $keyword );
     }
     elsif ($proto eq 'unknown') {
 	try { prototype "CORE::".$keyword };
-	like( $@->{description}, qr/Can't find an opnumber for/, $keyword );
+	like( $^EVAL_ERROR->{?description}, qr/Can't find an opnumber for/, $keyword );
     }
     else {
 	is( "(".prototype("CORE::".$keyword).")", $proto, $keyword );
@@ -38,7 +38,7 @@ chop undef
 chown (@)
 chr (_)
 chroot (_)
-close (;*)
+close (*)
 closedir (*)
 cmp unknown
 connect (*$)
@@ -48,7 +48,6 @@ defined undef
 delete undef
 die (@)
 do undef
-dump ()
 each (\%)
 else undef
 elsif undef
@@ -73,7 +72,7 @@ foreach undef
 fork ()
 format unknown
 formline unknown
-getc (;*)
+getc (*)
 getgrent ()
 getgrgid ($)
 getgrnam ($)
@@ -101,7 +100,6 @@ getsockname (*)
 getsockopt (*$$)
 glob undef
 gmtime (;$)
-goto undef
 grep undef
 hex (_)
 if undef
@@ -143,12 +141,12 @@ our undef
 pack ($@)
 package undef
 pipe (**)
-pop (;\@)
+pop (;$)
 pos undef
 print undef
 printf undef
 prototype undef
-push (\@@)
+push ($@)
 q undef
 qq undef
 qr undef
@@ -167,7 +165,7 @@ ref (_)
 rename ($$)
 require undef
 return undef
-reverse (@)
+reverse ($)
 rewinddir (*)
 rindex ($$;$)
 rmdir (_)
@@ -175,7 +173,7 @@ s undef
 scalar undef
 seek (*$$)
 seekdir (*$)
-select (;*)
+select ($$$$)
 semctl ($$$$)
 semget ($$$)
 semop ($$)
@@ -189,7 +187,7 @@ setprotoent ($)
 setpwent ()
 setservent ($)
 setsockopt (*$$$)
-shift (;\@)
+shift (;$)
 shmctl ($$$)
 shmget ($$$)
 shmread ($$$$)
@@ -206,7 +204,6 @@ sprintf ($@)
 sqrt (_)
 srand (;$)
 stat (*)
-state undef
 study undef
 sub undef
 substr ($$;$$)
@@ -219,8 +216,6 @@ system undef
 syswrite (*$;$$)
 tell (;*)
 telldir (*)
-tie undef
-tied undef
 time ()
 times ()
 tr undef
@@ -232,16 +227,14 @@ undef undef
 unless undef
 unlink (@)
 unpack ($;$)
-unshift (\@@)
-untie undef
+unshift ($@)
 until undef
 use undef
 utime (@)
 values (\%)
-vec ($$$)
+vec ($$$;$)
 wait ()
 waitpid ($$)
-wantarray ()
 warn (@)
 while undef
 x unknown

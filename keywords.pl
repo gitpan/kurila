@@ -1,12 +1,11 @@
 #!/usr/bin/perl -w
-use strict;
+
 
 require 'regen_lib.pl';
 
 my $kw = safer_open("keywords.h-new");
-select $kw;
 
-print <<EOM;
+print $kw, <<EOM;
 /* -*- buffer-read-only: t -*-
  *
  *    keywords.h
@@ -30,19 +29,18 @@ while ( ~< *DATA) {
     chop;
     next unless $_;
     next if m/^#/;
-    my ($keyword) = < split;
-    print &tab(5, "#define KEY_$keyword"), $keynum++, "\n";
+    my @($keyword) =  split;
+    print $kw, &tab(5, "#define KEY_$keyword"), $keynum++, "\n";
 }
 
-print $kw "\n/* ex: set ro: */\n";
+print $kw, "\n/* ex: set ro: */\n";
 
 safer_close($kw);
 
 rename_if_different("keywords.h-new", "keywords.h");
 
 ###########################################################################
-sub tab {
-    my ($l, $t) = < @_;
+sub tab($l, $t) {
     $t .= "\t" x ($l - (length($t) + 1) / 8);
     $t;
 }
@@ -89,7 +87,7 @@ defined
 delete
 die
 do
-dump
+dynascope
 each
 else
 elsif
@@ -140,7 +138,6 @@ getsockname
 getsockopt
 glob
 gmtime
-goto
 grep
 hex
 if
@@ -247,7 +244,6 @@ sprintf
 sqrt
 srand
 stat
-state
 study
 sub
 substr
@@ -260,8 +256,6 @@ system
 syswrite
 tell
 telldir
-tie
-tied
 time
 times
 tr
@@ -275,7 +269,6 @@ unless
 unlink
 unpack
 unshift
-untie
 until
 use
 utime
@@ -283,7 +276,6 @@ values
 vec
 wait
 waitpid
-wantarray
 warn
 while
 write

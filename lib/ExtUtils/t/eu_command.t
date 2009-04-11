@@ -1,12 +1,12 @@
 #!/usr/bin/perl -w
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't';
-        @INC = @('../lib', 'lib/');
+        $^INCLUDE_PATH = @('../lib', 'lib/');
     }
     else {
-        unshift @INC, 't/lib/';
+        unshift $^INCLUDE_PATH, 't/lib/';
     }
 }
 chdir 't';
@@ -31,19 +31,19 @@ BEGIN {
 BEGIN {
     # bad neighbor, but test_f() uses exit()
     *CORE::GLOBAL::exit = '';   # quiet 'only once' warning.
-    *CORE::GLOBAL::exit = sub (;$) { return @_[0] };
+    *CORE::GLOBAL::exit = sub { return @_[0] };
     use_ok( 'ExtUtils::Command' );
 }
 
-{
+do {
     # concatenate this file with itself
     # be extra careful the regex doesn't match itself
     my $out = '';
-    close STDOUT;
-    open STDOUT, '>>', \$out or die;
-    my $self = $0;
+    close $^STDOUT;
+    open $^STDOUT, '>>', \$out or die;
+    my $self = $^PROGRAM_NAME;
     unless (-f $self) {
-        my ($vol, $dirs, $file) = < File::Spec->splitpath($self);
+        my @($vol, $dirs, $file) =  File::Spec->splitpath($self);
         my @dirs = File::Spec->splitdir($dirs);
         unshift(@dirs, File::Spec->updir);
         $dirs = File::Spec->catdir(< @dirs);
@@ -73,7 +73,7 @@ BEGIN {
     @ARGV = @( $Testfile );
     ok( -e @ARGV[0], 'created!' );
 
-    my ($now) = time;
+    my @($now) = @: time;
     utime ($now, $now, @ARGV[0]);
     sleep 2;
 
@@ -97,20 +97,20 @@ BEGIN {
     cmp_ok( abs($new_stamp - $stamp), '+<=', 1, 'eqtime' );
 
     # eqtime use to clear the contents of the file being equalized!
-    open(FILE, ">>", "$Testfile") || die $!;
-    print FILE "Foo";
-    close FILE;
+    open(my $fh, ">>", "$Testfile") || die $^OS_ERROR;
+    print $fh, "Foo";
+    close $fh;
 
     @ARGV = @('newfile', $Testfile);
     eqtime();
     ok( -s $Testfile, "eqtime doesn't clear the file being equalized" );
 
-    SKIP: {
-        if ($^O eq 'amigaos' || $^O eq 'os2' || $^O eq 'MSWin32' ||
-            $^O eq 'NetWare' || $^O eq 'dos' || $^O eq 'cygwin'  ||
-            $^O eq 'MacOS'
+    SKIP: do {
+        if ($^OS_NAME eq 'amigaos' || $^OS_NAME eq 'os2' || $^OS_NAME eq 'MSWin32' ||
+            $^OS_NAME eq 'NetWare' || $^OS_NAME eq 'dos' || $^OS_NAME eq 'cygwin'  ||
+            $^OS_NAME eq 'MacOS'
            ) {
-            skip( "different file permission semantics on $^O", 3);
+            skip( "different file permission semantics on $^OS_NAME", 3);
         }
 
         # change a file to execute-only
@@ -125,15 +125,15 @@ BEGIN {
         ExtUtils::Command::chmod();
 
         is( (@(stat($Testfile))[2] ^&^ 07777) ^&^ 0700,
-            ($^O eq 'vos' ? 0500 : 0400), 'change a file to read-only' );
+            ($^OS_NAME eq 'vos' ?? 0500 !! 0400), 'change a file to read-only' );
 
         # change a file to write-only
         @ARGV = @( '0200', $Testfile );
         ExtUtils::Command::chmod();
 
         is( (@(stat($Testfile))[2] ^&^ 07777) ^&^ 0700,
-            ($^O eq 'vos' ? 0700 : 0200), 'change a file to write-only' );
-    }
+            ($^OS_NAME eq 'vos' ?? 0700 !! 0200), 'change a file to write-only' );
+    };
 
     # change a file to read-write
     @ARGV = @( '0600', $Testfile );
@@ -142,15 +142,15 @@ BEGIN {
     is_deeply( \@ARGV, \@orig_argv, 'chmod preserves @ARGV' );
 
     is( (@(stat($Testfile))[2] ^&^ 07777) ^&^ 0700,
-        ($^O eq 'vos' ? 0700 : 0600), 'change a file to read-write' );
+        ($^OS_NAME eq 'vos' ?? 0700 !! 0600), 'change a file to read-write' );
 
 
-    SKIP: {
-        if ($^O eq 'amigaos' || $^O eq 'os2' || $^O eq 'MSWin32' ||
-            $^O eq 'NetWare' || $^O eq 'dos' || $^O eq 'cygwin'  ||
-            $^O eq 'MacOS' || $^O eq 'vos'
+    SKIP: do {
+        if ($^OS_NAME eq 'amigaos' || $^OS_NAME eq 'os2' || $^OS_NAME eq 'MSWin32' ||
+            $^OS_NAME eq 'NetWare' || $^OS_NAME eq 'dos' || $^OS_NAME eq 'cygwin'  ||
+            $^OS_NAME eq 'MacOS' || $^OS_NAME eq 'vos'
            ) {
-            skip( "different file permission semantics on $^O", 5);
+            skip( "different file permission semantics on $^OS_NAME", 5);
         }
 
         @ARGV = @('testdir');
@@ -169,19 +169,19 @@ BEGIN {
         ExtUtils::Command::chmod();
 
         is( (@(stat('testdir'))[2] ^&^ 07777) ^&^ 0700,
-            ($^O eq 'vos' ? 0500 : 0400), 'change a dir to read-only' );
+            ($^OS_NAME eq 'vos' ?? 0500 !! 0400), 'change a dir to read-only' );
 
         # change a dir to write-only
         @ARGV = @( '0200', 'testdir' );
         ExtUtils::Command::chmod();
 
         is( (@(stat('testdir'))[2] ^&^ 07777) ^&^ 0700,
-            ($^O eq 'vos' ? 0700 : 0200), 'change a dir to write-only' );
+            ($^OS_NAME eq 'vos' ?? 0700 !! 0200), 'change a dir to write-only' );
 
         @ARGV = @('testdir');
         rm_rf;
         ok( ! -e 'testdir', 'rm_rf can delete a read-only dir' );
-    }
+    };
 
 
     # mkpath
@@ -205,10 +205,10 @@ BEGIN {
     ok( -e File::Spec->join( 'ecmddir', 'temp2', $Testfile ), 'copied okay' );
 
     # cp should croak if destination isn't directory (not a great warning)
-    @ARGV = @( ( $Testfile ) x 3 );
+    @ARGV = @( $Testfile ) x 3 ;
     try { cp() };
 
-    like( $@->{description}, qr/Too many arguments/, 'cp croaks on error' );
+    like( $^EVAL_ERROR->{?description}, qr/Too many arguments/, 'cp croaks on error' );
 
     # move a file to a subdirectory
     @ARGV = @( $Testfile, 'ecmddir' );
@@ -220,20 +220,20 @@ BEGIN {
     ok( -e File::Spec->join( 'ecmddir', $Testfile ), 'file in new location' );
 
     # mv should also croak with the same wacky warning
-    @ARGV = @( ( $Testfile ) x 3 );
+    @ARGV = @( $Testfile ) x 3 ;
 
     try { mv() };
-    like( $@->{description}, qr/Too many arguments/, 'mv croaks on error' );
+    like( $^EVAL_ERROR->{?description}, qr/Too many arguments/, 'mv croaks on error' );
 
     # Test expand_wildcards()
-    {
+    do {
         my $file = $Testfile;
         @ARGV = @( () );
         chdir 'ecmddir';
 
         # % means 'match one character' on VMS.  Everything else is ?
-        my $match_char = $^O eq 'VMS' ? '%' : '?';
-        (@ARGV[0] = $file) =~ s/.\z/$match_char/;
+        my $match_char = $^OS_NAME eq 'VMS' ?? '%' !! '?';
+        (@ARGV[+0] = $file) =~ s/.\z/$match_char/;
 
         # this should find the file
         ExtUtils::Command::expand_wildcards();
@@ -247,7 +247,7 @@ BEGIN {
         is_deeply( \@ARGV, \@($file), 'expanded wildcard * successfully' );
 
         chdir File::Spec->updir;
-    }
+    };
 
     # remove some files
     my @files = @( @ARGV = @( File::Spec->catfile( 'ecmddir', $Testfile ),
@@ -260,35 +260,35 @@ BEGIN {
     @ARGV = @( my $dir = File::Spec->catfile( 'ecmddir' ) );
     rm_rf();
     ok( ! -e $dir, "removed $dir successfully" );
-}
+};
 
-{
-    { local @ARGV = @( 'd2utest' ); mkpath; }
-    open(FILE, ">", 'd2utest/foo');
-    binmode(FILE);
-    print FILE "stuff\015\012and thing\015\012";
-    close FILE;
+do {
+    do { local @ARGV = @( 'd2utest' ); mkpath; };
+    open(my $fh, ">", 'd2utest/foo');
+    binmode($fh);
+    print $fh, "stuff\015\012and thing\015\012";
+    close $fh;
 
-    open(FILE, ">", 'd2utest/bar');
-    binmode(FILE);
+    open($fh, ">", 'd2utest/bar');
+    binmode($fh);
     my $bin = "\c@\c@\c@\c@\c@\c@\cA\c@\c@\c@\015\012".
               "\@\c@\cA\c@\c@\c@8__LIN\015\012";
-    print FILE $bin;
-    close FILE;
+    print $fh, $bin;
+    close $fh;
 
     local @ARGV = @( 'd2utest' );
     ExtUtils::Command::dos2unix();
 
-    open(FILE, "<", 'd2utest/foo');
-    is( join('', @( ~< *FILE)), "stuff\012and thing\012", 'dos2unix' );
-    close FILE;
+    open($fh, "<", 'd2utest/foo');
+    is( join('', @( ~< *$fh)), "stuff\012and thing\012", 'dos2unix' );
+    close $fh;
 
-    open(FILE, "<", 'd2utest/bar');
-    binmode(FILE);
+    open($fh, "<", 'd2utest/bar');
+    binmode($fh);
     ok( -B 'd2utest/bar' );
-    is( join('', @( ~< *FILE)), $bin, 'dos2unix preserves binaries');
-    close FILE;
-}
+    is( join('', @( ~< *$fh)), $bin, 'dos2unix preserves binaries');
+    close $fh;
+};
 
 END {
     1 while unlink $Testfile, 'newfile';

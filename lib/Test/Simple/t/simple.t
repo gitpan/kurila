@@ -1,13 +1,12 @@
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't';
-        @INC = @( '../lib' );
+        $^INCLUDE_PATH = @( '../lib' );
     }
 }
 
-use strict;
 
-BEGIN { $| = 1; $^W = 1; }
+BEGIN { $^OUTPUT_AUTOFLUSH = 1; $^WARNING = 1; }
 
 use Test::Simple tests => 3;
 

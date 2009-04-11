@@ -39,7 +39,7 @@ Nick Ing-Simmons nik@tiuk.ti.com
 use Cwd;
 use File::Spec;
 
-use vars < qw($VERSION $Verbose);
+our ($VERSION, $Verbose);
 $VERSION = '1.03';
 $Verbose = 0;
 
@@ -47,18 +47,18 @@ sub import
 {
  my $package = shift;
  my $dir;
- if ($^O eq "MSWin32" && -f "Win32.xs") {
+ if ($^OS_NAME eq "MSWin32" && -f "Win32.xs") {
      # We don't use getcwd() on Windows because it will internally
      # call Win32::GetCwd(), which will get the Win32 module loaded.
      # That means that it would not be possible to run `make test`
      # for the Win32 module because blib.pm would always load the
-     # installed version before @INC gets updated with the blib path.
+     # installed version before $^INCLUDE_PATH gets updated with the blib path.
      chomp($dir = `cd`);
  }
  else {
      $dir = getcwd;
  }
- if ($^O eq 'VMS') { ($dir = VMS::Filespec::unixify($dir)) =~ s-/\z--; }
+ if ($^OS_NAME eq 'VMS') { ($dir = VMS::Filespec::unixify($dir)) =~ s-/\z--; }
  if ((nelems @_))
   {
    $dir = shift;
@@ -74,7 +74,7 @@ sub import
    $blib = File::Spec->catdir($dir, "blib");
    $blib_lib = File::Spec->catdir($blib, "lib");
 
-   if ($^O eq 'MacOS')
+   if ($^OS_NAME eq 'MacOS')
     {
      $blib_arch = File::Spec->catdir($blib_lib, $MacPerl::Architecture);
     }
@@ -85,7 +85,7 @@ sub import
 
    if (-d $blib && -d $blib_arch && -d $blib_lib)
     {
-     unshift(@INC,$blib_arch,$blib_lib);
+     unshift($^INCLUDE_PATH,$blib_arch,$blib_lib);
      warn "Using $blib\n" if $Verbose;
      return;
     }

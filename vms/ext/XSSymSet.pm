@@ -1,28 +1,27 @@
 package ExtUtils::XSSymSet;
 
-use strict;
-use vars < qw( $VERSION );
+our (, $VERSION, );
 $VERSION = '1.1';
 
 
 sub new { 
-  my($pkg,$maxlen,$silent) = < @_;
+  my@($pkg,$maxlen,$silent) =  @_;
   $maxlen ||= 31;
   $silent ||= 0;
-  my($obj) = \%( '__M@xLen' => $maxlen, '__S!lent' => $silent );
+  my@($obj) = \%( '__M@xLen' => $maxlen, '__S!lent' => $silent );
   bless $obj, $pkg;
 }
 
 
 sub trimsym {
-  my($self,$name,$maxlen,$silent) = < @_;
+  my@($self,$name,$maxlen,$silent) =  @_;
 
   unless (defined $maxlen) {
-    if (ref $self) { $maxlen ||= $self->{'__M@xLen'}; }
+    if (ref $self) { $maxlen ||= $self->{?'__M@xLen'}; }
     $maxlen ||= 31;
   }
   unless (defined $silent) {
-    if (ref $self) { $silent ||= $self->{'__S!lent'}; }
+    if (ref $self) { $silent ||= $self->{?'__S!lent'}; }
     $silent ||= 0;
   }
   return $name if (length $name +<= $maxlen);
@@ -35,7 +34,7 @@ sub trimsym {
     $trimmed =~ s/(.)\1+/$1/g;
     if (length $trimmed +> $maxlen) {
       my $squeezed = $trimmed;
-      my($xs,$prefix,$func) = $trimmed =~ m/^(XS_)?(.*)_([^_]*)$/;
+      my@($xs,$prefix,$func) = $trimmed =~ m/^(XS_)?(.*)_([^_]*)$/;
       $xs ||= '';
       my $frac = 3; # replaces broken length-based calculations but w/same result
       my $pat = '([^_])';
@@ -73,34 +72,34 @@ sub trimsym {
 
 
 sub addsym {
-  my($self,$sym,$maxlen,$silent) = < @_;
+  my@($self,$sym,$maxlen,$silent) =  @_;
   my $trimmed = $self->get_trimmed($sym);
 
   return $trimmed if defined $trimmed;
 
-  $maxlen ||= $self->{'__M@xLen'} || 31;
-  $silent ||= $self->{'__S!lent'} || 0;    
+  $maxlen ||= $self->{?'__M@xLen'} || 31;
+  $silent ||= $self->{?'__S!lent'} || 0;    
   $trimmed = $self->trimsym($sym,$maxlen,1);
   if (exists $self->{$trimmed}) {
-    my($i) = "00";
+    my@($i) = "00";
     $trimmed = $self->trimsym($sym,$maxlen-3,$silent);
-    while (exists $self->{"{$trimmed}_$i"}) { $i++; }
-    warn "Warning: duplicate symbol $trimmed\n\tchanged to {$trimmed}_$i\n\t(original was $sym)\n\t"
+    while (exists $self->{"$($trimmed)_$i"}) { $i++; }
+    warn "Warning: duplicate symbol $trimmed\n\tchanged to $($trimmed)_$i\n\t(original was $sym)\n\t"
       unless $silent;
     $trimmed .= "_$i";
   }
   elsif (not $silent and $trimmed ne $sym) {
     warn "Warning: long symbol $sym\n\ttrimmed to $trimmed\n\t";
   }
-  $self->{$trimmed} = $sym;
-  $self->{'__N+Map'}->{$sym} = $trimmed;
+  $self->{+$trimmed} = $sym;
+  $self->{'__N+Map'}->{+$sym} = $trimmed;
   $trimmed;
 }
 
 
 sub delsym {
-  my($self,$sym) = < @_;
-  my $trimmed = $self->{'__N+Map'}->{$sym};
+  my@($self,$sym) =  @_;
+  my $trimmed = $self->{'__N+Map'}->{?$sym};
   if (defined $trimmed) {
     delete $self->{'__N+Map'}->{$sym};
     delete $self->{$trimmed};
@@ -110,18 +109,18 @@ sub delsym {
 
 
 sub get_trimmed {
-  my($self,$sym) = < @_;
-  $self->{'__N+Map'}->{$sym};
+  my@($self,$sym) =  @_;
+  $self->{'__N+Map'}->{?$sym};
 }
 
 
 sub get_orig {
-  my($self,$trimmed) = < @_;
-  $self->{$trimmed};
+  my@($self,$trimmed) =  @_;
+  $self->{?$trimmed};
 }
 
 
-sub all_orig { (keys %{@_[0]->{'__N+Map'}}); }
+sub all_orig { (keys %{@_[0]->{?'__N+Map'}}); }
 sub all_trimmed { (grep { m/^\w+$/ } keys %{@_[0]}); }
 
 __END__

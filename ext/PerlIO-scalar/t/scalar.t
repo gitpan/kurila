@@ -2,21 +2,17 @@
 
 BEGIN {
     unless (PerlIO::Layer->find( 'perlio')) {
-	print "1..0 # Skip: not perlio\n";
+	print $^STDOUT, "1..0 # Skip: not perlio\n";
 	exit 0;
     }
     require Config;
-    if ((%Config::Config{'extensions'} !~ m!\bPerlIO/scalar\b!) ){
-        print "1..0 # Skip -- Perl configured without PerlIO::scalar module\n";
-        exit 0;
-    }
 }
 
-use Fcntl qw(SEEK_SET SEEK_CUR SEEK_END); # Not 0, 1, 2 everywhere.
+use Fcntl < qw(SEEK_SET SEEK_CUR SEEK_END); # Not 0, 1, 2 everywhere.
 
-$| = 1;
+$^OUTPUT_AUTOFLUSH = 1;
 
-use Test::More tests => 55;
+use Test::More tests => 52;
 
 my $fh;
 my $var = "aaa\n";
@@ -29,13 +25,13 @@ ok(eof($fh));
 ok(seek($fh,0,SEEK_SET));
 ok(!eof($fh));
 
-ok(print $fh "bbb\n");
+ok(print $fh, "bbb\n");
 is($var, "bbb\n");
 $var = "foo\nbar\n";
 ok(seek($fh,0,SEEK_SET));
 ok(!eof($fh));
-is( ~< $fh, "foo\n");
-ok(close $fh, $!);
+is(($: ~< $fh), "foo\n");
+ok(close $fh, $^OS_ERROR);
 
 # Test that semantics are similar to normal file-based I/O
 # Check that ">" clobbers the scalar
@@ -47,7 +43,7 @@ my $off = tell($fh);
 is($off, 0);
 # Check that writes go where they should and update the offset
 $var = "Something";
-print $fh "Brea";
+print $fh, "Brea";
 $off = tell($fh);
 is($off, 4);
 is($var, "Breathing");
@@ -66,7 +62,7 @@ is($var, "Something else ");
 $off = tell($fh);
 is($off, 10);
 
-print $fh "is here";
+print $fh, "is here";
 is($var, "Something else is here");
 close $fh;
 
@@ -84,12 +80,12 @@ is($var, "foo");
 
 $var = '';
 open $fh, "+>", \$var;
-print $fh "xxx\n";
+print $fh, "xxx\n";
 open my $dup,'+<&',$fh;
-print $dup "yyy\n";
+print $dup, "yyy\n";
 seek($dup,0,SEEK_SET);
-is( ~< $dup, "xxx\n");
-is( ~< $dup, "yyy\n");
+is(($: ~< $dup), "xxx\n");
+is(($: ~< $dup), "yyy\n");
 close($fh);
 close($dup);
 
@@ -97,21 +93,17 @@ open $fh, '<', \42;
 is( ~< $fh, "42", "reading from non-string scalars");
 close $fh;
 
-{ package P; sub TIESCALAR {bless \%()} sub FETCH { "shazam" } }
-tie my $p, 'P'; open $fh, '<', \$p;
-is( ~< $fh, "shazam", "reading from magic scalars");
-
-{
+do {
     use warnings;
     my $warn = 0;
     local $^WARN_HOOK = sub { $warn++ };
     open my $fh, '>', \my $scalar;
-    print $fh "foo";
+    print $fh, "foo";
     close $fh;
     is($warn, 0, "no warnings when writing to an undefined scalar");
-}
+};
 
-{
+do {
     use warnings;
     my $warn = 0;
     local $^WARN_HOOK = sub { $warn++ };
@@ -120,28 +112,9 @@ is( ~< $fh, "shazam", "reading from magic scalars");
         close $fh;
     }
     is($warn, 0, "no warnings when reusing a lexical");
-}
+};
 
-{
-    use warnings;
-    my $warn = 0;
-    local $^WARN_HOOK = sub { $warn++ };
-
-    my $fetch = 0;
-    {
-        package MgUndef;
-        sub TIESCALAR { bless \@() }
-        sub FETCH { $fetch++; return undef }
-    }
-    tie my $scalar, 'MgUndef';
-
-    open my $fh, '<', \$scalar;
-    close $fh;
-    is($warn, 0, "no warnings reading a magical undef scalar");
-    is($fetch, 1, "FETCH only called once");
-}
-
-{
+do {
     use warnings;
     my $warn = 0;
     local $^WARN_HOOK = sub { $warn++ };
@@ -150,82 +123,82 @@ is( ~< $fh, "shazam", "reading from magic scalars");
     open my $fh, '<', \$scalar;
     close $fh;
     is($warn, 0, "no warnings reading an undef, allocated scalar");
-}
+};
 
 my $data = "a non-empty PV";
 $data = undef;
-open(MEM, '<', \$data) or die "Fail: $!\n";
-my $x = join '', ~< *MEM;
+open(my $mem, '<', \$data) or die "Fail: $^OS_ERROR\n";
+my $x = join '', @: ~< *$mem;
 is($x, '');
 
-{
+do {
     # [perl #35929] verify that works with $/ (i.e. test PerlIOScalar_unread)
     my $s = <<'EOF';
 line A
 line B
 a third line
 EOF
-    open(F, '<', \$s) or die "Could not open string as a file";
-    local $/ = "";
-    my $ln = ~< *F;
-    close F;
+    open(my $f, '<', \$s) or die "Could not open string as a file";
+    local $^INPUT_RECORD_SEPARATOR = "";
+    my $ln = ~< *$f;
+    close $f;
     is($ln, $s, "[perl #35929]");
-}
+};
 
 # [perl #40267] PerlIO::scalar doesn't respect readonly-ness
-{
-    ok(!(defined open(F, '>', \undef)), "[perl #40267] - $!");
-    close F;
+do {
+    ok(!(defined open(my $f, '>', \undef)), "[perl #40267] - $^OS_ERROR");
+    close $f;
 
     my $ro = \43;
-    ok(!(defined open(F, '>', $ro)), $!);
-    close F;
+    ok(!(defined open($f, '>', $ro)), $^OS_ERROR);
+    close $f;
     # but we can read from it
-    ok(open(F, '<', $ro), $!);
-    is( ~< *F, 43);
-    close F;
-}
+    ok(open($f, '<', $ro), $^OS_ERROR);
+    is( ~< *$f, 43);
+    close $f;
+};
 
-{
+do {
     # Check that we zero fill when needed when seeking,
     # and that seeking negative off the string does not do bad things.
 
     my $foo;
 
-    ok(open(F, '>', \$foo));
+    ok(open(my $f, '>', \$foo));
 
     # Seeking forward should zero fill.
 
-    ok(seek(F, 50, SEEK_SET));
-    print F "x";
+    ok(seek($f, 50, SEEK_SET));
+    print $f, "x";
     is(length($foo), 51);
     like($foo, qr/^\0{50}x$/);
 
-    is(tell(F), 51);
-    ok(seek(F, 0, SEEK_SET));
+    is(tell($f), 51);
+    ok(seek($f, 0, SEEK_SET));
     is(length($foo), 51);
 
     # Seeking forward again should zero fill but only the new bytes.
 
-    ok(seek(F, 100, SEEK_SET));
-    print F "y";
+    ok(seek($f, 100, SEEK_SET));
+    print $f, "y";
     is(length($foo), 101);
     like($foo, qr/^\0{50}x\0{49}y$/);
-    is(tell(F), 101);
+    is(tell($f), 101);
 
     # Seeking back and writing should not zero fill.
 
-    ok(seek(F, 75, SEEK_SET));
-    print F "z";
+    ok(seek($f, 75, SEEK_SET));
+    print $f, "z";
     is(length($foo), 101);
     like($foo, qr/^\0{50}x\0{24}z\0{24}y$/);
-    is(tell(F), 76);
+    is(tell($f), 76);
 
     # Seeking negative should not do funny business.
 
-    ok(!seek(F,  -50, SEEK_SET), $!);
-    ok(seek(F, 0, SEEK_SET));
-    ok(!seek(F,  -50, SEEK_CUR), $!);
-    ok(!seek(F, -150, SEEK_END), $!);
-}
+    ok(!seek($f,  -50, SEEK_SET), $^OS_ERROR);
+    ok(seek($f, 0, SEEK_SET));
+    ok(!seek($f,  -50, SEEK_CUR), $^OS_ERROR);
+    ok(!seek($f, -150, SEEK_END), $^OS_ERROR);
+};
 

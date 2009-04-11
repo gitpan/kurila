@@ -1,10 +1,9 @@
 package ExtUtils::MakeMaker::vmsish;
 
-use strict;
 
 our $VERSION = 6.44;
 
-my $IsVMS = $^O eq 'VMS';
+my $IsVMS = $^OS_NAME eq 'VMS';
 
 require vmsish if $IsVMS;
 
@@ -15,7 +14,7 @@ sub import {
     shift;
     unshift @_, 'vmsish';
 
-    goto &vmsish::import;
+    return vmsish::import(< @_);
 }
 
 1;

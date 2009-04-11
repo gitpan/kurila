@@ -1,8 +1,8 @@
 package POSIX;
-use strict;
+
 use warnings;
 
-our(@ISA, %EXPORT_TAGS, @EXPORT_OK, @EXPORT, %SIGRT);
+our(@ISA, %EXPORT_TAGS, @EXPORT_OK, @EXPORT);
 
 our $VERSION = "1.13";
 
@@ -19,48 +19,30 @@ my $loaded;
 sub import {
     load_imports() unless $loaded++;
     my $this = shift;
-    my @list = map { m/^\w+_h$/ ? ":$_" : $_ } @_;
+    my @list = map { m/^\w+_h$/ ?? ":$_" !! $_ }, @_;
     local $Exporter::ExportLevel = 1;
     Exporter::import($this,< @list);
 }
 
 XSLoader::load 'POSIX', $VERSION;
 
-my %NON_CONSTS = %(< map {($_,1)}
+my %NON_CONSTS = %(< @+: map {@($_,1)},
                   qw(S_ISBLK S_ISCHR S_ISDIR S_ISFIFO S_ISREG WEXITSTATUS
                      WIFEXITED WIFSIGNALED WIFSTOPPED WSTOPSIG WTERMSIG));
 
 for my $name (keys %NON_CONSTS) {
-    *{Symbol::fetch_glob($name)} = sub { int_macro_int($name, @_[0]) };
+    *{Symbol::fetch_glob($name)} = sub { int_macro_int($name, @_[?0]) };
 }
 
-package POSIX::SigRt;
-
-use Tie::Hash;
-
-use vars < qw($SIGACTION_FLAGS $_SIGRTMIN $_SIGRTMAX $_sigrtn @ISA);
-@POSIX::SigRt::ISA = qw(Tie::StdHash);
-
-$SIGACTION_FLAGS = 0;
-
-tie %POSIX::SIGRT, 'POSIX::SigRt';
-
-sub DESTROY {};
-
-package POSIX;
-
-sub usage {
-    my ($mess) = < @_;
+sub usage($mess) {
     die "Usage: POSIX::$mess";
 }
 
-sub redef {
-    my ($mess) = < @_;
+sub redef($mess) {
     die "Use method $mess instead";
 }
 
-sub unimpl {
-    my ($mess) = < @_;
+sub unimpl($mess) {
     $mess =~ s/xxx//;
     die "Unimplemented: POSIX::$mess";
 }
@@ -91,8 +73,8 @@ sub opendir {
     usage "opendir(directory)" if (nelems @_) != 1;
     my $dirhandle;
     CORE::opendir($dirhandle, @_[0])
-	? $dirhandle
-	: undef;
+	?? $dirhandle
+	!! undef;
 }
 
 sub readdir {
@@ -107,12 +89,12 @@ sub rewinddir {
 
 sub errno {
     usage "errno()" if (nelems @_) != 0;
-    $! + 0;
+    $^OS_ERROR + 0;
 }
 
 sub creat {
     usage "creat(filename, mode)" if (nelems @_) != 2;
-    &open(@_[0], &O_WRONLY ^|^ &O_CREAT ^|^ &O_TRUNC, @_[1]);
+    &open(@_[0], &O_WRONLY( < @_ ) ^|^ &O_CREAT( < @_ ) ^|^ &O_TRUNC( < @_ ), @_[1]);
 }
 
 sub fcntl {
@@ -203,7 +185,7 @@ sub kill {
 
 sub raise {
     usage "raise(sig)" if (nelems @_) != 1;
-    CORE::kill @_[0], $$;	# Is this good enough?
+    CORE::kill @_[0], $^PID;	# Is this good enough?
 }
 
 sub offsetof {
@@ -305,22 +287,22 @@ sub getc {
 
 sub getchar {
     usage "getchar()" if (nelems @_) != 0;
-    CORE::getc(STDIN);
+    CORE::getc($^STDIN);
 }
 
 sub gets {
     usage "gets()" if (nelems @_) != 0;
-    scalar ~< *STDIN;
+    scalar ~< $^STDIN;
 }
 
 sub perror {
-    print STDERR "{join ' ',@_}: " if (nelems @_);
-    print STDERR $!,"\n";
+    print $^STDERR, "$(join ' ',@_): " if (nelems @_);
+    print $^STDERR, $^OS_ERROR,"\n";
 }
 
 sub printf {
     usage "printf(pattern, args...)" if (nelems @_) +< 1;
-    CORE::printf STDOUT < @_;
+    CORE::printf $^STDOUT, < @_;
 }
 
 sub putc {
@@ -337,7 +319,7 @@ sub puts {
 
 sub remove {
     usage "remove(filename)" if (nelems @_) != 1;
-    (-d @_[0]) ? CORE::rmdir(@_[0]) : CORE::unlink(@_[0]);
+    (-d @_[0]) ?? CORE::rmdir(@_[0]) !! CORE::unlink(@_[0]);
 }
 
 sub rename {
@@ -427,7 +409,7 @@ sub free {
 
 sub getenv {
     usage "getenv(name)" if (nelems @_) != 1;
-    %ENV{@_[0]};
+    env::var(@_[0]);
 }
 
 sub labs {
@@ -505,8 +487,8 @@ sub strcspn {
 
 sub strerror {
     usage "strerror(errno)" if (nelems @_) != 1;
-    local $! = @_[0];
-    $! . "";
+    local $^OS_ERROR = @_[0];
+    $^OS_ERROR . "";
 }
 
 sub strlen {
@@ -553,10 +535,9 @@ sub chmod {
 
 sub fstat {
     usage "fstat(fd)" if (nelems @_) != 1;
-    local *TMP;
-    CORE::open(TMP, "<&", @_[0]);		# Gross.
-    my @l = @( CORE::stat(*TMP) );
-    CORE::close(TMP);
+    CORE::open(my $tmp, "<&", @_[0]);		# Gross.
+    my @l = @( CORE::stat($tmp) );
+    CORE::close($tmp);
     @l;
 }
 
@@ -651,7 +632,7 @@ sub getegid {
 
 sub geteuid {
     usage "geteuid()" if (nelems @_) != 0;
-    $> + 0;
+    $^EUID + 0;
 }
 
 sub getgid {
@@ -662,7 +643,7 @@ sub getgid {
 sub getgroups {
     usage "getgroups()" if (nelems @_) != 0;
     my %seen;
-    grep(!%seen{$_}++, split(' ', $^EGID ));
+    grep( {!%seen{+$_}++ }, split(' ', $^EGID ));
 }
 
 sub getlogin {
@@ -677,7 +658,7 @@ sub getpgrp {
 
 sub getpid {
     usage "getpid()" if (nelems @_) != 0;
-    $$;
+    $^PID;
 }
 
 sub getppid {
@@ -687,7 +668,7 @@ sub getppid {
 
 sub getuid {
     usage "getuid()" if (nelems @_) != 0;
-    $<;
+    $^UID;
 }
 
 sub isatty {
@@ -800,7 +781,7 @@ sub load_imports {
     signal_h =>	\qw(SA_NOCLDSTOP SA_NOCLDWAIT SA_NODEFER SA_ONSTACK
 		SA_RESETHAND SA_RESTART SA_SIGINFO SIGABRT SIGALRM
 		SIGCHLD SIGCONT SIGFPE SIGHUP SIGILL SIGINT SIGKILL
-		SIGPIPE %SIGRT SIGRTMIN SIGRTMAX SIGQUIT SIGSEGV SIGSTOP
+		SIGPIPE SIGRTMIN SIGRTMAX SIGQUIT SIGSEGV SIGSTOP
 		SIGTERM SIGTSTP SIGTTIN	SIGTTOU SIGUSR1 SIGUSR2
 		SIG_BLOCK SIG_DFL SIG_ERR SIG_IGN SIG_SETMASK SIG_UNBLOCK
 		raise sigaction sigpending sigprocmask sigsuspend),
@@ -879,14 +860,14 @@ sub load_imports {
 );
 
 # Exporter::export_tags();
-{
+do {
   # De-duplicate the export list: 
   my %export;
- <  %export{[ map {< @$_} values %EXPORT_TAGS]} = ();
+   %export{[ @+: map {@$_}, values %EXPORT_TAGS]} = @();
   # Doing the de-dup with a temporary hash has the advantage that the SVs in
   # @EXPORT are actually shared hash key sacalars, which will save some memory.
   push @EXPORT, < keys %export;
-}
+};
 
 @EXPORT_OK = qw(
 		abs
@@ -952,63 +933,10 @@ require Exporter;
 
 package POSIX::SigAction;
 
-sub new { bless \%(HANDLER => @_[1], MASK => @_[2], FLAGS => @_[3] || 0, SAFE => 0), @_[0] }
-sub handler { @_[0]->{HANDLER} = @_[1] if (nelems @_) +> 1; @_[0]->{HANDLER} };
-sub mask    { @_[0]->{MASK}    = @_[1] if (nelems @_) +> 1; @_[0]->{MASK} };
-sub flags   { @_[0]->{FLAGS}   = @_[1] if (nelems @_) +> 1; @_[0]->{FLAGS} };
-sub safe    { @_[0]->{SAFE}    = @_[1] if (nelems @_) +> 1; @_[0]->{SAFE} };
+sub new { bless \%(HANDLER => @_[?1], MASK => @_[?2], FLAGS => @_[?3] || 0, SAFE => 0), @_[0] }
+sub handler { @_[0]->{+HANDLER} = @_[1] if (nelems @_) +> 1; @_[0]->{?HANDLER} };
+sub mask    { @_[0]->{+MASK}    = @_[1] if (nelems @_) +> 1; @_[0]->{?MASK} };
+sub flags   { @_[0]->{+FLAGS}   = @_[1] if (nelems @_) +> 1; @_[0]->{?FLAGS} };
+sub safe    { @_[0]->{+SAFE}    = @_[1] if (nelems @_) +> 1; @_[0]->{?SAFE} };
 
-package POSIX::SigRt;
-
-
-sub _init {
-    $_SIGRTMIN = &POSIX::SIGRTMIN;
-    $_SIGRTMAX = &POSIX::SIGRTMAX;
-    $_sigrtn   = $_SIGRTMAX - $_SIGRTMIN;
-}
-
-sub _croak {
-    &_init unless defined $_sigrtn;
-    die "POSIX::SigRt not available" unless defined $_sigrtn && $_sigrtn +> 0;
-}
-
-sub _getsig {
-    &_croak;
-    my $rtsig = @_[0];
-    # Allow (SIGRT)?MIN( + n)?, a common idiom when doing these things in C.
-    $rtsig = $_SIGRTMIN + ($1 || 0)
-	if $rtsig =~ m/^(?:(?:SIG)?RT)?MIN(\s*\+\s*(\d+))?$/;
-    return $rtsig;
-}
-
-sub _exist {
-    my $rtsig = _getsig(@_[1]);
-    my $ok    = $rtsig +>= $_SIGRTMIN && $rtsig +<= $_SIGRTMAX;
-    return @($rtsig, $ok);
-}
-
-sub _check {
-    my ($rtsig, $ok) = < &_exist;
-    die "No POSIX::SigRt signal @_[1] (valid range SIGRTMIN..SIGRTMAX, or $_SIGRTMIN..$_SIGRTMAX)"
-	unless $ok;
-    return $rtsig;
-}
-
-sub new {
-    my ($rtsig, $handler, $flags) = < @_;
-    my $sigset = POSIX::SigSet->new($rtsig);
-    my $sigact = POSIX::SigAction->new($handler,
-				       $sigset,
-				       $flags);
-    POSIX::sigaction($rtsig, $sigact);
-}
-
-sub EXISTS { &_exist }
-sub FETCH  { my $rtsig = &_check;
-	     my $oa = POSIX::SigAction->new();
-	     POSIX::sigaction($rtsig, undef, $oa);
-	     return $oa->{HANDLER} }
-sub STORE  { my $rtsig = &_check; new($rtsig, @_[2], $SIGACTION_FLAGS) }
-sub DELETE { delete %SIG{ &_check } }
-sub CLEAR  { &_exist; delete %SIG{[ <&POSIX::SIGRTMIN .. &POSIX::SIGRTMAX ]} }
-sub SCALAR { &_croak; $_sigrtn + 1 }
+1;

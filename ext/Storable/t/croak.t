@@ -5,7 +5,7 @@
 # with 5.005_03. This test shows it up, whereas malice.t does not.
 # In particular, don't use Test; as this covers up the problem.
 
-use strict;
+
 
 BEGIN {
   die "Oi! No! Don't change this test so that Carp is used before Storable"
@@ -13,15 +13,15 @@ BEGIN {
 }
 use Storable < qw(freeze thaw);
 
-print "1..2\n";
+print $^STDOUT, "1..2\n";
 
 for my $test (@(1,2)) {
   try {thaw "\xFF\xFF"};
-  if ($@->{description} =~ m/Storable binary image v127.255 more recent than I am \(v2\.\d+\)/)
+  if ($^EVAL_ERROR->{?description} =~ m/Storable binary image v127.255 more recent than I am \(v2\.\d+\)/)
     {
-      print "ok $test\n";
+      print $^STDOUT, "ok $test\n";
     } else {
-      chomp $@;
-      print "not ok $test # Expected a meaningful croak. Got '$@'\n";
+      chomp $^EVAL_ERROR;
+      print $^STDOUT, "not ok $test # Expected a meaningful croak. Got '$^EVAL_ERROR'\n";
     }
 }

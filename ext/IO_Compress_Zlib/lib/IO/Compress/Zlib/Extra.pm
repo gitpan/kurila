@@ -1,7 +1,6 @@
 package IO::Compress::Zlib::Extra;
 
-
-use strict ;
+ 
 use warnings;
 use bytes;
 
@@ -162,18 +161,20 @@ sub parseExtraField
             return ExtraFieldError("Not even number of elements")
                 unless (nelems @$data) % 2  == 0;
 
-            for (my $ix = 0; $ix +<= length(nelems @$data) -1 ; $ix += 2) {
+            my $ix = 0;
+            while ($ix +<= length(nelems @$data) -1) {
                 my $bad = validateExtraFieldPair(\@($data->[$ix],
                                                   $data->[$ix+1]), 
                                                  $strict, $gzipMode) ;
                 return $bad if $bad ;
 
                 $out .= mkSubField($data->[$ix], $data->[$ix+1]);
+                $ix += 2;
             }   
         }
     }   
     elsif (ref $data eq 'HASH') {    
-        while (my ($id, $info) = each %$data) {
+        while (my @($id, $info) =@( each %$data)) {
             my $bad = validateExtraFieldPair(\@($id, $info), $strict, $gzipMode);
             return $bad if $bad ;
 

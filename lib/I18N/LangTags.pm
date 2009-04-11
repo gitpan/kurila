@@ -3,11 +3,11 @@
 # Sean M. Burke <sburke@cpan.org>
 
 package I18N::LangTags;
-use strict;
-use vars < qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION %Panic);
+
+our (@ISA, @EXPORT, @EXPORT_OK, %EXPORT_TAGS, $VERSION, %Panic);
 require Exporter;
 @ISA = qw(Exporter);
-@EXPORT = @( qw() );
+@EXPORT = qw();
 @EXPORT_OK = qw(is_language_tag same_language_tag
                 extract_language_tags super_languages
                 similarity_language_tag is_dialect_of
@@ -20,7 +20,7 @@ require Exporter;
 
 $VERSION = "0.35";
 
-sub uniq { my %seen; return grep(!(%seen{$_}++), @_); } # a util function
+sub uniq { my %seen; return grep( {!(%seen{+$_}++) }, @_); } # a util function
 
 
 =head1 NAME
@@ -97,7 +97,7 @@ sub is_language_tag {
 
   ## Changes in the language tagging standards may have to be reflected here.
 
-  my($tag) = lc(@_[0]);
+  my $tag = lc(@_[0]);
 
   return 0 if $tag eq "i" or $tag eq "x";
   # Bad degenerate cases that the following
@@ -111,7 +111,7 @@ sub is_language_tag {
          -           # separator
          [a-z0-9]{1,8}  # subtag  
       )*
-    $/xs ? 1 : 0;
+    $/xs ?? 1 !! 0;
 }
 
 ###########################################################################
@@ -138,12 +138,12 @@ sub extract_language_tags {
 
   ## Changes in the language tagging standards may have to be reflected here.
 
-  my($text) =
+  my@($text) =
     @_[0] =~ m/(.+)/  # to make for an untainted result
-    ? $1 : ''
+    ?? $1 !! ''
   ;
   
-  return grep(!m/^[ixIX]$/s, @( # 'i' and 'x' aren't good tags
+  return grep( {!m/^[ixIX]$/s }, @( # 'i' and 'x' aren't good tags
     $text =~ 
     m/
       \b
@@ -193,7 +193,7 @@ sub same_language_tag {
    # encode_language_tag($lang1) eq and encode_language_tag($lang2)
    # being true if $lang1 and $lang2 are both undef
 
-  return $el1 eq &encode_language_tag(@_[1]) ? 1 : 0;
+  return $el1 eq &encode_language_tag(@_[1]) ?? 1 !! 0;
 }
 
 ###########################################################################
@@ -302,7 +302,7 @@ sub is_dialect_of {
   $lang1 .= '-';
   $lang2 .= '-';
   return
-    (substr($lang1, 0, length($lang2)) eq $lang2) ? 1 : 0;
+    (substr($lang1, 0, length($lang2)) eq $lang2) ?? 1 !! 0;
 }
 
 ###########################################################################
@@ -357,7 +357,7 @@ sub super_languages {
   my @supers = @( () );
   foreach my $bit ( @l1_subtags) {
     push @supers, 
-      scalar(nelems @supers) ? (@supers[-1] . '-' . $bit) : $bit;
+      scalar(nelems @supers) ?? (@supers[-1] . '-' . $bit) !! $bit;
   }
   pop @supers if (nelems @supers);
   shift @supers if (nelems @supers) && @supers[0] =~ m<^[iIxX]$>s;
@@ -396,7 +396,7 @@ don't worry about it.
 sub locale2language_tag {
   my $lang =
     @_[0] =~ m/(.+)/  # to make for an untainted result
-    ? $1 : ''
+    ?? $1 !! ''
   ;
 
   return $lang if &is_language_tag($lang); # like "en"
@@ -526,7 +526,7 @@ sub encode_language_tag {
 
   ## Changes in the language tagging standards may have to be reflected here.
 
-  my($tag) = @_[0] || return undef;
+  my $tag = @_[0] || return undef;
   return undef unless &is_language_tag($tag);
 
   # For the moment, these legacy variances are few enough that
@@ -629,13 +629,13 @@ sub alternate_language_tags {
   } elsif($tag =~ m/^no-nyn\b(.*)/i) { push @em, "nn$1";
   }
 
-  push @em, %alt{$1} . $2 if $tag =~ m/^([XIxi])(-.+)/;
+  push @em, %alt{?$1} . $2 if $tag =~ m/^([XIxi])(-.+)/;
   return @em;
 }
 
 ###########################################################################
 
-{
+do {
   # Init %Panic...
   
   my @panic = @(  # MUST all be lowercase!
@@ -676,7 +676,7 @@ sub alternate_language_tags {
    # And the panic languages for English is, of course, nil!
 
    # My guesses at Slavic intelligibility:
-   (\qw(ru be uk)) x 2,  # Russian, Belarusian, Ukranian
+   < (@(\qw(ru be uk)) x 2),  # Russian, Belarusian, Ukranian
    'sr' => 'hr', 'hr' => 'sr', # Serb + Croat
    'cs' => 'sk', 'sk' => 'cs', # Czech + Slovak
 
@@ -689,14 +689,14 @@ sub alternate_language_tags {
   );
   my($k,$v);
   while((nelems @panic)) {
-    ($k,$v) = splice(@panic,0,2);
-    foreach my $k (@(ref($k) ? < @$k : $k)) {
-      foreach my $v (@(ref($v) ? < @$v : $v)) {
-        push @{%Panic{$k} ||= \@()}, $v unless $k eq $v;
+    @($k,$v) = @: splice(@panic,0,2);
+    foreach my $k (@(ref($k) ?? < @$k !! $k)) {
+      foreach my $v (@(ref($v) ?? < @$v !! $v)) {
+        push @{%Panic{+$k} ||= \@()}, $v unless $k eq $v;
       }
     }
   }
-}
+};
 
 =item * the function @langs = panic_languages(@accept_languages)
 
@@ -734,11 +734,11 @@ sub panic_languages {
   my(@out, %seen);
   foreach my $t ( @_) {
     next unless $t;
-    next if %seen{$t}++; # so we don't return it or hit it again
+    next if %seen{+$t}++; # so we don't return it or hit it again
     # push @out, super_languages($t); # nah, keep that separate
-    push @out, < @{ %Panic{lc $t} || next };
+    push @out, < @{ %Panic{?lc $t} || next };
   }
-  return grep !%seen{$_}++, @(  < @out, 'en');
+  return grep { !%seen{+$_}++ }, @(  < @out, 'en');
 }
 
 #---------------------------------------------------------------------------
@@ -793,10 +793,10 @@ as far as I'm concerned) you'd use implicate_supers.
 =cut
 
 sub implicate_supers {
-  my @languages = grep is_language_tag($_), @_;
+  my @languages = grep { is_language_tag($_) }, @_;
   my %seen_encoded;
   foreach my $lang ( @languages) {
-    %seen_encoded{ I18N::LangTags::encode_language_tag($lang) } = 1
+    %seen_encoded{+I18N::LangTags::encode_language_tag($lang) } = 1
   }
 
   my(@output_languages);
@@ -804,7 +804,7 @@ sub implicate_supers {
     push @output_languages, $lang;
     foreach my $s (  I18N::LangTags::super_languages($lang) ) {
       # Note that super_languages returns the longest first.
-      last if %seen_encoded{ I18N::LangTags::encode_language_tag($s) };
+      last if %seen_encoded{?I18N::LangTags::encode_language_tag($s) };
       push @output_languages, $s;
     }
   }
@@ -813,8 +813,8 @@ sub implicate_supers {
 }
 
 sub implicate_supers_strictly {
-  my @tags = grep is_language_tag($_), @_;
-  return uniq( < @_,   < map < super_languages($_), @_ );
+  my @tags = grep { is_language_tag($_) }, @_;
+  return uniq( < @_,   < @+: map { super_languages($_) }, @_ );
 }
 
 

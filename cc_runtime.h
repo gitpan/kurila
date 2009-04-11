@@ -21,11 +21,6 @@
 	}				\
    } while (0)
 
-#define MAYBE_TAINT_SASSIGN_SRC(sv) \
-    if (PL_tainting && PL_tainted && (!SvGMAGICAL(left) || !SvSMAGICAL(left) || \
-        !((mg=mg_find(left, PERL_MAGIC_taint)) && mg->mg_len & 1)))\
-        TAINT_NOT
-
 #define PP_PREINC(sv) do {	\
 	if (SvIOK(sv)) {	\
             ++SvIVX(sv);	\
@@ -37,7 +32,6 @@
     } while (0)
 
 #define PP_UNSTACK do {		\
-	TAINT_NOT;		\
 	PL_stack_sp = PL_stack_base + cxstack[cxstack_ix].blk_oldsp;	\
 	FREETMPS;		\
 	oldsave = PL_scopestack[PL_scopestack_ix - 1]; \

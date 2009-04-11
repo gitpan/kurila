@@ -5,12 +5,12 @@
 # A use_ok() inside a BEGIN block lacking a plan would be silently ignored.
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't';
-        @INC = @('../lib', 'lib');
+        $^INCLUDE_PATH = @('../lib', 'lib');
     }
     else {
-        unshift @INC, 't/lib';
+        unshift $^INCLUDE_PATH, 't/lib';
     }
 }
 
@@ -21,8 +21,8 @@ BEGIN {
     try {
         use_ok("Wibble");
     };
-    $result = $@;
+    $result = $^EVAL_ERROR;
 }
 
 plan tests => 1;
-like $result->{description}, '/^You tried to run a test without a plan/';
+like $result->{?description}, '/^You tried to run a test without a plan/';

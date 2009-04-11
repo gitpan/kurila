@@ -1127,7 +1127,7 @@ Perl_vform(pTHX_ const char *pat, va_list *args)
     SV * const sv = mess_alloc();
     PERL_ARGS_ASSERT_VFORM;
     sv_vsetpvfn(sv, pat, strlen(pat), args, NULL, 0, NULL);
-    return SvPVX(sv);
+    return SvPVX_mutable(sv);
 }
 
 #if defined(PERL_IMPLICIT_CONTEXT)
@@ -1197,8 +1197,7 @@ bool
 Perl_vdie_common(pTHX_ SV *msv, bool warn)
 {
     dVAR;
-    GV *gv;
-    CV *cv;
+    CV *cv = NULL;
     SV **const hook = warn ? &PL_warnhook : &PL_diehook;
     /* sv_2cv might call Perl_croak() or Perl_warner() */
     SV * const oldhook = *hook;
@@ -1240,21 +1239,20 @@ Perl_vdie_common(pTHX_ SV *msv, bool warn)
 	return FALSE;
     }
 
+    if ( SvCVOK(oldhook) ) {
+	cv = svTcv(oldhook);
+    }
+    else if ( SvROK(oldhook) && SvRV(oldhook) && SvCVOK(SvRV(oldhook)) ) {
+	cv = svTcv(SvRV(oldhook));
+    }
 
-    ENTER;
-    SAVESPTR(*hook);
-    *hook = PERL_DIEHOOK_IGNORE;
-    cv = sv_2cv(oldhook, &gv, 0);
-    LEAVE;
     if (cv && !CvDEPTH(cv) && (CvROOT(cv) || CvXSUB(cv))) {
 	dSP;
 
 	ENTER;
 	save_re_context();
-/* 	if (warn) { */
 	SAVESPTR(*hook);
-	*hook = PERL_DIEHOOK_FATAL;
-/* 	} */
+	SVcpREPLACE(*hook, PERL_DIEHOOK_FATAL);
 
 	PUSHSTACKi(warn ? PERLSI_WARNHOOK : PERLSI_DIEHOOK);
 	PUSHMARK(SP);
@@ -1294,9 +1292,8 @@ S_vdie_croak_common(pTHX_ SV* location, const char* pat, va_list* args)
 	    XPUSHs(location);
 
 	    PUTBACK;
-	    call_sv(PL_errorcreatehook, G_SCALAR);
+	    msv = call_sv(PL_errorcreatehook, G_SCALAR);
 	    SPAGAIN;
-	    msv = TOPs;
 	    PUTBACK;
 	    POPSTACK;
 	    LEAVE;
@@ -1323,7 +1320,7 @@ Perl_vdie(pTHX_ const char* pat, va_list *args)
 	av_push(locav, newSViv(PL_parser->lex_line_number));
 	av_push(locav, newSViv((PL_parser->bufptr - PL_parser->linestart +
 		    PL_parser->lex_charoffset) + 1));
-	location = AvSV(locav);
+	location = avTsv(locav);
     }
     msv = vdie_croak_common(location, pat, args);
     die_where(msv);
@@ -1417,8 +1414,6 @@ Perl_vwarn_at(pTHX_ SV* location, const char* pat, va_list *args)
 {
     SV* msv;
 
-    PERL_ARGS_ASSERT_VWARN;
-
     {
 	dSP;
 	msv = vmess(pat, args);
@@ -1438,9 +1433,8 @@ Perl_vwarn_at(pTHX_ SV* location, const char* pat, va_list *args)
 	    XPUSHs(location);
 
 	    PUTBACK;
-	    call_sv(PL_errorcreatehook, G_SCALAR);
+	    msv = call_sv(PL_errorcreatehook, G_SCALAR);
 	    SPAGAIN;
-	    msv = POPs;
 	    PUTBACK;
 	    POPSTACK;
 	    LEAVE;
@@ -1509,7 +1503,7 @@ void
 Perl_warner_at(pTHX_ SV* location, U32  err, const char* pat,...)
 {
     va_list args;
-    PERL_ARGS_ASSERT_WARNER;
+    PERL_ARGS_ASSERT_WARNER_AT;
     va_start(args, pat);
     vwarner_at(location, err, pat, &args);
     va_end(args);
@@ -1519,6 +1513,7 @@ void
 Perl_vwarner(pTHX_ U32  err, const char* pat, va_list* args)
 {
     SV* location;
+    PERL_ARGS_ASSERT_VWARNER;
     if (PL_op) {
 	location = PL_op->op_location;
     }
@@ -1540,7 +1535,7 @@ void
 Perl_vwarner_at(pTHX_ SV* location, U32  err, const char* pat, va_list* args)
 {
     dVAR;
-    PERL_ARGS_ASSERT_VWARNER;
+    PERL_ARGS_ASSERT_VWARNER_AT;
     if (PL_warnhook == PERL_WARNHOOK_FATAL || ckDEAD(err)) {
 	SV* msv;
 	msv = vdie_croak_common(location, pat, args);
@@ -1638,10 +1633,6 @@ void
 Perl_my_setenv(pTHX_ const char *nam, const char *val)
 {
   dVAR;
-#ifdef USE_ITHREADS
-  /* only parent thread can modify process environment */
-  if (PL_curinterp == aTHX)
-#endif
   {
 #ifndef PERL_USE_SAFE_PUTENV
     if (!PL_use_safe_putenv) {
@@ -2265,10 +2256,6 @@ Perl_my_popen_list(pTHX_ const char *mode, int n, SV * const *args)
     PERL_FLUSHALL_FOR_CHILD;
     This = (*mode == 'w');
     that = !This;
-    if (PL_tainting) {
-	taint_env();
-	taint_proper("Insecure %s%s", "EXEC");
-    }
     if (PerlProc_pipe(p) < 0)
 	return NULL;
     /* Try for another pipe pair for error return */
@@ -2412,10 +2399,6 @@ Perl_my_popen(pTHX_ const char *cmd, const char *mode)
 #endif
     This = (*mode == 'w');
     that = !This;
-    if (doexec && PL_tainting) {
-	taint_env();
-	taint_proper("Insecure %s%s", "EXEC");
-    }
     if (PerlProc_pipe(p) < 0)
 	return NULL;
     if (doexec && PerlProc_pipe(pp) >= 0)
@@ -2435,7 +2418,7 @@ Perl_my_popen(pTHX_ const char *cmd, const char *mode)
 	sleep(5);
     }
     if (pid == 0) {
-	GV* tmpgv;
+	SV** tmpsvp;
 
 #undef THIS
 #undef THAT
@@ -2476,16 +2459,14 @@ Perl_my_popen(pTHX_ const char *cmd, const char *mode)
 #endif	/* defined OS2 */
 
 #ifdef PERLIO_USING_CRLF
-   /* Since we circumvent IO layers when we manipulate low-level
-      filedescriptors directly, need to manually switch to the
-      default, binary, low-level mode; see PerlIOBuf_open(). */
-   PerlLIO_setmode((*mode == 'r'), O_BINARY);
+	/* Since we circumvent IO layers when we manipulate low-level
+	   filedescriptors directly, need to manually switch to the
+	   default, binary, low-level mode; see PerlIOBuf_open(). */
+	PerlLIO_setmode((*mode == 'r'), O_BINARY);
 #endif 
 
-	if ((tmpgv = gv_fetchpvs("$", GV_ADD|GV_NOTQUAL, SVt_PV))) {
-	    SvREADONLY_off(GvSV(tmpgv));
-	    sv_setiv(GvSV(tmpgv), PerlProc_getpid());
-	    SvREADONLY_on(GvSV(tmpgv));
+	if ((tmpsvp = hv_fetchs(PL_magicsvhv, "^PID", 1))) {
+	    sv_setiv(*tmpsvp, PerlProc_getpid());
 	}
 #ifdef THREADS_HAVE_PIDS
 	PL_ppid = (IV)getppid();
@@ -2591,13 +2572,6 @@ void
 Perl_atfork_lock(void)
 {
    dVAR;
-#if defined(USE_ITHREADS)
-    /* locks must be held in locking order (if any) */
-#  ifdef MYMALLOC
-    MUTEX_LOCK(&PL_malloc_mutex);
-#  endif
-    OP_REFCNT_LOCK;
-#endif
 }
 
 /* this is called in both parent and child after the fork() */
@@ -2605,13 +2579,6 @@ void
 Perl_atfork_unlock(void)
 {
     dVAR;
-#if defined(USE_ITHREADS)
-    /* locks must be released in same order as in atfork_lock() */
-#  ifdef MYMALLOC
-    MUTEX_UNLOCK(&PL_malloc_mutex);
-#  endif
-    OP_REFCNT_UNLOCK;
-#endif
 }
 
 Pid_t
@@ -2619,15 +2586,9 @@ Perl_my_fork(void)
 {
 #if defined(HAS_FORK)
     Pid_t pid;
-#if defined(USE_ITHREADS) && !defined(HAS_PTHREAD_ATFORK)
-    atfork_lock();
-    pid = fork();
-    atfork_unlock();
-#else
     /* atfork_lock() and atfork_unlock() are installed as pthread_atfork()
      * handlers elsewhere in the code */
     pid = fork();
-#endif
     return pid;
 #else
     /* this "canna happen" since nothing should be calling here if !HAS_FORK */
@@ -2703,12 +2664,6 @@ Perl_rsignal(pTHX_ int signo, Sighandler_t handler)
     dVAR;
     struct sigaction act, oact;
 
-#ifdef USE_ITHREADS
-    /* only "parent" interpreter can diddle signals */
-    if (PL_curinterp != aTHX)
-	return (Sighandler_t) SIG_ERR;
-#endif
-
     act.sa_handler = (void(*)(int))handler;
     sigemptyset(&act.sa_mask);
     act.sa_flags = 0;
@@ -2746,12 +2701,6 @@ Perl_rsignal_save(pTHX_ int signo, Sighandler_t handler, Sigsave_t *save)
 
     PERL_ARGS_ASSERT_RSIGNAL_SAVE;
 
-#ifdef USE_ITHREADS
-    /* only "parent" interpreter can diddle signals */
-    if (PL_curinterp != aTHX)
-	return -1;
-#endif
-
     act.sa_handler = (void(*)(int))handler;
     sigemptyset(&act.sa_mask);
     act.sa_flags = 0;
@@ -2770,11 +2719,6 @@ int
 Perl_rsignal_restore(pTHX_ int signo, Sigsave_t *save)
 {
     dVAR;
-#ifdef USE_ITHREADS
-    /* only "parent" interpreter can diddle signals */
-    if (PL_curinterp != aTHX)
-	return -1;
-#endif
 
     return sigaction(signo, save, (struct sigaction *)NULL);
 }
@@ -2784,12 +2728,6 @@ Perl_rsignal_restore(pTHX_ int signo, Sigsave_t *save)
 Sighandler_t
 Perl_rsignal(pTHX_ int signo, Sighandler_t handler)
 {
-#if defined(USE_ITHREADS) && !defined(WIN32)
-    /* only "parent" interpreter can diddle signals */
-    if (PL_curinterp != aTHX)
-	return (Sighandler_t) SIG_ERR;
-#endif
-
     return PerlProc_signal(signo, handler);
 }
 
@@ -2806,12 +2744,6 @@ Perl_rsignal_state(pTHX_ int signo)
     dVAR;
     Sighandler_t oldsig;
 
-#if defined(USE_ITHREADS) && !defined(WIN32)
-    /* only "parent" interpreter can diddle signals */
-    if (PL_curinterp != aTHX)
-	return (Sighandler_t) SIG_ERR;
-#endif
-
     PL_sig_trapped = 0;
     oldsig = PerlProc_signal(signo, sig_trap);
     PerlProc_signal(signo, oldsig);
@@ -2823,11 +2755,6 @@ Perl_rsignal_state(pTHX_ int signo)
 int
 Perl_rsignal_save(pTHX_ int signo, Sighandler_t handler, Sigsave_t *save)
 {
-#if defined(USE_ITHREADS) && !defined(WIN32)
-    /* only "parent" interpreter can diddle signals */
-    if (PL_curinterp != aTHX)
-	return -1;
-#endif
     *save = PerlProc_signal(signo, handler);
     return (*save == (Sighandler_t) SIG_ERR) ? -1 : 0;
 }
@@ -2835,11 +2762,6 @@ Perl_rsignal_save(pTHX_ int signo, Sighandler_t handler, Sigsave_t *save)
 int
 Perl_rsignal_restore(pTHX_ int signo, Sigsave_t *save)
 {
-#if defined(USE_ITHREADS) && !defined(WIN32)
-    /* only "parent" interpreter can diddle signals */
-    if (PL_curinterp != aTHX)
-	return -1;
-#endif
     return (PerlProc_signal(signo, *save) == (Sighandler_t) SIG_ERR) ? -1 : 0;
 }
 
@@ -3348,22 +3270,7 @@ void *
 Perl_get_context(void)
 {
     dVAR;
-#if defined(USE_ITHREADS)
-#  ifdef OLD_PTHREADS_API
-    pthread_addr_t t;
-    if (pthread_getspecific(PL_thr_key, &t))
-	Perl_croak_nocontext("panic: pthread_getspecific");
-    return (void*)t;
-#  else
-#    ifdef I_MACH_CTHREADS
-    return (void*)cthread_data(cthread_self());
-#    else
-    return (void*)PTHREAD_GETSPECIFIC(PL_thr_key);
-#    endif
-#  endif
-#else
     return (void*)NULL;
-#endif
 }
 
 void
@@ -3371,16 +3278,7 @@ Perl_set_context(void *t)
 {
     dVAR;
     PERL_ARGS_ASSERT_SET_CONTEXT;
-#if defined(USE_ITHREADS)
-#  ifdef I_MACH_CTHREADS
-    cthread_set_data(cthread_self(), t);
-#  else
-    if (pthread_setspecific(PL_thr_key, t))
-	Perl_croak_nocontext("panic: pthread_setspecific");
-#  endif
-#else
     PERL_UNUSED_ARG(t);
-#endif
 }
 
 #endif /* !PERL_GET_CONTEXT_DEFINED */
@@ -3450,27 +3348,6 @@ Perl_get_vtbl(pTHX_ int vtbl_id)
     PERL_UNUSED_CONTEXT;
 
     switch(vtbl_id) {
-    case want_vtbl_sv:
-	result = &PL_vtbl_sv;
-	break;
-    case want_vtbl_env:
-	result = &PL_vtbl_env;
-	break;
-    case want_vtbl_envelem:
-	result = &PL_vtbl_envelem;
-	break;
-    case want_vtbl_sig:
-	result = &PL_vtbl_sig;
-	break;
-    case want_vtbl_sigelem:
-	result = &PL_vtbl_sigelem;
-	break;
-    case want_vtbl_pack:
-	result = &PL_vtbl_pack;
-	break;
-    case want_vtbl_packelem:
-	result = &PL_vtbl_packelem;
-	break;
     case want_vtbl_dbline:
 	result = &PL_vtbl_dbline;
 	break;
@@ -3483,23 +3360,11 @@ Perl_get_vtbl(pTHX_ int vtbl_id)
     case want_vtbl_mglob:
 	result = &PL_vtbl_mglob;
 	break;
-    case want_vtbl_taint:
-	result = &PL_vtbl_taint;
-	break;
-    case want_vtbl_vec:
-	result = &PL_vtbl_vec;
-	break;
-    case want_vtbl_pos:
-	result = &PL_vtbl_pos;
-	break;
     case want_vtbl_bm:
 	result = &PL_vtbl_bm;
 	break;
     case want_vtbl_uvar:
 	result = &PL_vtbl_uvar;
-	break;
-    case want_vtbl_defelem:
-	result = &PL_vtbl_defelem;
 	break;
     case want_vtbl_regexp:
 	result = &PL_vtbl_regexp;
@@ -3568,9 +3433,9 @@ Perl_my_fflush_all(pTHX)
 }
 
 void
-Perl_report_evil_fh(pTHX_ const GV *gv, const IO *io, I32 op)
+Perl_report_evil_fh(pTHX_ IO *io, I32 op)
 {
-    const char * const name = gv && isGV(gv) ? GvENAME(gv) : NULL;
+    const char * const name = io ? SvPVX_const(SvNAME(ioTsv(io))) : NULL;
 
     if (op == OP_phoney_OUTPUT_ONLY || op == OP_phoney_INPUT_ONLY) {
 	if (ckWARN(WARN_IO)) {
@@ -3589,7 +3454,7 @@ Perl_report_evil_fh(pTHX_ const GV *gv, const IO *io, I32 op)
         const char *vile;
 	I32   warn_type;
 
-	if (gv && io && IoTYPE(io) == IoTYPE_CLOSED) {
+	if (io && IoTYPE(io) == IoTYPE_CLOSED) {
 	    vile = "closed";
 	    warn_type = WARN_CLOSED;
 	}
@@ -3609,7 +3474,7 @@ Perl_report_evil_fh(pTHX_ const GV *gv, const IO *io, I32 op)
 	    const char * const type =
 		(const char *)
 		(OP_IS_SOCKET(op) ||
-		 (gv && io && IoTYPE(io) == IoTYPE_SOCKET) ?
+		 (io && IoTYPE(io) == IoTYPE_SOCKET) ?
 		 "socket" : "filehandle");
 	    if (name && *name) {
 		Perl_warner(aTHX_ packWARN(warn_type),
@@ -3624,7 +3489,7 @@ Perl_report_evil_fh(pTHX_ const GV *gv, const IO *io, I32 op)
 	    else {
 		Perl_warner(aTHX_ packWARN(warn_type),
 			    "%s%s on %s %s", func, pars, vile, type);
-		if (gv && io && IoDIRP(io) && !(IoFLAGS(io) & IOf_FAKE_DIRP))
+		if (io && IoDIRP(io) && !(IoFLAGS(io) & IOf_FAKE_DIRP))
 		    Perl_warner(
 			aTHX_ packWARN(warn_type),
 			"\t(Are you trying to call %s%s on dirhandle?)\n",
@@ -4028,9 +3893,6 @@ Perl_getcwd_sv(pTHX_ register SV *sv)
 {
 #ifndef PERL_MICRO
     dVAR;
-#ifndef INCOMPLETE_TAINTS
-    SvTAINTED_on(sv);
-#endif
 
     PERL_ARGS_ASSERT_GETCWD_SV;
 
@@ -4125,12 +3987,12 @@ Perl_getcwd_sv(pTHX_ register SV *sv)
 
 	if (pathlen) {
 	    /* shift down */
-	    Move(SvPVX_const(sv), SvPVX(sv) + namelen + 1, pathlen, char);
+	    Move(SvPVX_const(sv), SvPVX_mutable(sv) + namelen + 1, pathlen, char);
 	}
 
 	/* prepend current directory to the front */
-	*SvPVX(sv) = '/';
-	Move(dp->d_name, SvPVX(sv)+1, namelen, char);
+	*SvPVX_mutable(sv) = '/';
+	Move(dp->d_name, SvPVX_mutable(sv)+1, namelen, char);
 	pathlen += (namelen + 1);
 
 #ifdef VOID_CLOSEDIR
@@ -5283,24 +5145,6 @@ Perl_get_hash_seed(pTHX)
      return myseed;
 }
 
-#ifdef USE_ITHREADS
-bool
-Perl_stashpv_hvname_match(pTHX_ const COP *c, const HV *hv)
-{
-    const char * const stashpv = CopSTASHPV(c);
-    const char * const name = HvNAME_get(hv);
-    PERL_UNUSED_CONTEXT;
-    PERL_ARGS_ASSERT_STASHPV_HVNAME_MATCH;
-
-    if (stashpv == name)
-	return TRUE;
-    if (stashpv && name)
-	if (strEQ(stashpv, name))
-	    return TRUE;
-    return FALSE;
-}
-#endif
-
 
 #ifdef PERL_GLOBAL_STRUCT
 
@@ -5655,10 +5499,6 @@ Perl_my_clearenv(pTHX)
     PerlEnv_clearenv();
 #  else /* ! (PERL_IMPLICIT_SYS || WIN32) */
 #    if defined(USE_ENVIRON_ARRAY)
-#      if defined(USE_ITHREADS)
-    /* only the parent thread can clobber the process environment */
-    if (PL_curinterp == aTHX)
-#      endif /* USE_ITHREADS */
     {
 #      if ! defined(PERL_USE_SAFE_PUTENV)
     if ( !PL_use_safe_putenv) {
@@ -5737,7 +5577,7 @@ Perl_my_cxt_init(pTHX_ int *index, size_t size)
 	}
     }
     /* newSV() allocates one more than needed */
-    p = (void*)SvPVX(newSV(size-1));
+    p = (void*)SvPVX_mutable(newSV(size-1));
     PL_my_cxt_list[*index] = p;
     Zero(p, size, char);
     return p;
@@ -5803,7 +5643,7 @@ Perl_my_cxt_init(pTHX_ const char *my_cxt_key, size_t size)
     }
     PL_my_cxt_keys[index] = my_cxt_key;
     /* newSV() allocates one more than needed */
-    p = (void*)SvPVX(newSV(size-1));
+    p = (void*)SvPVX-mutable(newSV(size-1));
     PL_my_cxt_list[index] = p;
     Zero(p, size, char);
     return p;
@@ -5861,23 +5701,13 @@ Perl_get_db_sub(pTHX_ SV **svp, CV *cv)
 
     PERL_ARGS_ASSERT_GET_DB_SUB;
 
+    PERL_UNUSED_ARG(svp);
+
     save_item(dbsv);
     if (!PERLDB_SUB_NN) {
-	GV * const gv = CvGV(cv);
-
-	if ( svp && ((CvFLAGS(cv) & (CVf_ANON | CVf_CLONED))
-	     || strEQ(GvNAME(gv), "END")
-	     || ((GvCV(gv) != cv) && /* Could be imported, and old sub redefined. */
-		 !( (SvTYPE(*svp) == SVt_PVGV) && (GvCV((GV*)*svp) == cv) )))) {
-	    /* Use GV from the stack as a fallback. */
-	    /* GV is potentially non-unique, or contain different CV. */
-	    SV * const tmp = newRV((SV*)cv);
-	    sv_setsv(dbsv, tmp);
-	    SvREFCNT_dec(tmp);
-	}
-	else {
-	    gv_efullname3(dbsv, gv, NULL);
-	}
+	SV * const tmp = newRV((SV*)cv);
+	sv_setsv(dbsv, tmp);
+	SvREFCNT_dec(tmp);
     }
     else {
 	sv_setiv(dbsv, PTR2IV(cv));
@@ -5906,8 +5736,6 @@ Perl_get_re_arg(pTHX_ SV *sv) {
     SV    *tmpsv;
 
     if (sv) {
-        if (SvMAGICAL(sv))
-            mg_get(sv);
         if (SvROK(sv) &&
             (tmpsv = (SV*)SvRV(sv)) &&            /* assign deliberate */
             SvTYPE(tmpsv) == SVt_REGEXP)

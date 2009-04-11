@@ -1,6 +1,5 @@
 package XS::APItest;
 
-use strict;
 use warnings;
 use Carp;
 
@@ -16,7 +15,7 @@ our @EXPORT = qw( print_double print_int print_long
 		  mpushp mpushn mpushi mpushu
 		  mxpushp mxpushn mxpushi mxpushu
 		  call_sv call_pv call_method eval_sv eval_pv require_pv
-		  G_SCALAR G_ARRAY G_VOID G_DISCARD G_EVAL G_NOARGS
+		  G_SCALAR G_ARRAY G_VOID G_DISCARD G_EVAL
 		  G_KEEPERR G_NODEBUG G_METHOD G_WANT
 		  apitest_exception mycroak strtab
 		  my_cxt_getint my_cxt_getsv my_cxt_setint my_cxt_setsv
@@ -26,8 +25,9 @@ our @EXPORT = qw( print_double print_int print_long
 
 our $VERSION = '0.14';
 
-use vars '$WARNINGS_ON_BOOTSTRAP';
-use vars < map "\${$_}_called_PP", qw(BEGIN UNITCHECK CHECK INIT END);
+our $WARNINGS_ON_BOOTSTRAP;
+our ($BEGIN_called_PP, $UNITCHECK_called_PP, $CHECK_called_PP,
+     $INIT_called_PP, $END_called_PP);
 
 # Do these here to verify that XS code and Perl code get called at the same
 # times
@@ -37,7 +37,7 @@ BEGIN {
 UNITCHECK {
     $UNITCHECK_called_PP++;
 };
-{
+do {
     # Need $W false by default, as some tests run under -w, and under -w we
     # can get warnings about "Too late to run CHECK" block (and INIT block)
     no warnings 'void';
@@ -47,7 +47,7 @@ UNITCHECK {
     INIT {
 	$INIT_called_PP++;
     }
-}
+};
 END {
     $END_called_PP++;
 }
@@ -56,7 +56,7 @@ if ($WARNINGS_ON_BOOTSTRAP) {
     XS::APItest->bootstrap( $VERSION);
 } else {
     # More CHECK and INIT blocks that could warn:
-    local $^W;
+    local $^WARNING = 0;
     XS::APItest->bootstrap( $VERSION);
 }
 

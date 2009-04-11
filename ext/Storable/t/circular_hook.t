@@ -18,7 +18,7 @@ use Test::More tests => 9;
 
 my $ddd = bless \%( ), 'Foo';
 my $eee = bless \%( Bar => $ddd ), 'Bar';
-$ddd->{Foo} = $eee;
+$ddd->{+Foo} = $eee;
 
 my $array = \@( $ddd );
 
@@ -31,10 +31,10 @@ is( ref($thawed), 'ARRAY', 'Top level ARRAY' );
 is( scalar(nelems @$thawed), 1, 'ARRAY contains one element' );
 isa_ok( $thawed->[0], 'Foo' );
 is( nkeys(%{$thawed->[0]}), 1, 'Foo contains one element' );
-isa_ok( $thawed->[0]->{Foo}, 'Bar' );
-is( nkeys(%{$thawed->[0]->{Foo}}), 1, 'Bar contains one element' );
-isa_ok( $thawed->[0]->{Foo}->{Bar}, 'Foo' );
-is( $thawed->[0], $thawed->[0]->{Foo}->{Bar}, 'Circular is... well... circular' );
+isa_ok( $thawed->[0]->{?Foo}, 'Bar' );
+is( nkeys(%{$thawed->[0]->{?Foo}}), 1, 'Bar contains one element' );
+isa_ok( $thawed->[0]->{Foo}->{?Bar}, 'Foo' );
+is( $thawed->[0], $thawed->[0]->{Foo}->{?Bar}, 'Circular is... well... circular' );
 
 # Make sure the thawing went the way we expected
 is_deeply( \@Foo::order, \@( 'Bar', 'Foo' ), 'thaw order is correct (depth first)' );
@@ -47,22 +47,20 @@ package Foo;
 
 our @order = @( () );
 
-sub STORABLE_freeze {
-	my ($self, $clone) = < @_;
+sub STORABLE_freeze($self, $clone) {
 	my $class = ref $self;
 	
 	# print "# Freezing $class\n";
 
-	return  @($class, $self->{$class});
+	return  @($class, $self->{?$class});
 }
 
-sub STORABLE_thaw {
-	my ($self, $clone, $string, < @refs) = < @_;
+sub STORABLE_thaw($self, $clone, $string, @< @refs) {
 	my $class = ref $self;
 
 	# print "# Thawing $class\n";
 
-	$self->{$class} = shift @refs;
+	$self->{+$class} = shift @refs;
 
 	push @order, $class;
 

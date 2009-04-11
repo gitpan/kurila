@@ -1,25 +1,19 @@
 package ExtUtils::Liblist;
 
-use strict;
 
 our $VERSION = '6.44';
 
 use File::Spec;
 require ExtUtils::Liblist::Kid;
-use strict;
-our @ISA = qw(ExtUtils::Liblist::Kid File::Spec);
 
-# Backwards compatibility with old interface.
-sub ext {
-    goto &ExtUtils::Liblist::Kid::ext;
-}
+our @ISA = qw(ExtUtils::Liblist::Kid File::Spec);
 
 sub lsdir {
   shift;
   my $rex = qr/@_[1]/;
-  opendir DIR, @_[0];
-  my @out = grep m/$rex/, @( readdir DIR);
-  closedir DIR;
+  opendir my $dir, @_[0];
+  my @out = grep { m/$rex/ }, @: readdir $dir;
+  closedir $dir;
   return @out;
 }
 

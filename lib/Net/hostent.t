@@ -3,15 +3,14 @@
 use Test::More;
 
 BEGIN {
-    our %Config;
-    require Config; Config->import;
-    if (%Config{'extensions'} !~ m/\bSocket\b/ && 
-        !(($^O eq 'VMS') && %Config{d_socket})) 
+    require Config;
+    if (Config::config_value('extensions') !~ m/\bSocket\b/ && 
+        !(($^OS_NAME eq 'VMS') && Config::config_value('d_socket'))) 
     {
 	plan skip_all => "Test uses Socket, Socket not built";
     }
-    if ($^O eq 'MacOS' || ($^O eq 'irix' && %Config{osvers} == 5)) {
-	plan skip_all => "Test relies on resolution of localhost, fails on $^O (%Config{osvers})";
+    if ($^OS_NAME eq 'MacOS' || ($^OS_NAME eq 'irix' && Config::config_value('osvers') == 5)) {
+	plan skip_all => "Test relies on resolution of localhost, fails on $^OS_NAME ($(Config::config_value('osvers')))";
     }
 }
 
@@ -21,7 +20,7 @@ BEGIN { use_ok 'Net::hostent' }
 
 # Remind me to add this to Test::More.
 sub DIE {
-    print "# {join ' ',@_}\n";
+    print $^STDOUT, "# $(join ' ',@_)\n";
     exit 1;
 }
 
@@ -30,13 +29,13 @@ use Socket;
 
 my $h = gethost('localhost');
 ok(defined $h,  "gethost('localhost')") ||
-  DIE("Can't continue without working gethost: $!");
+  DIE("Can't continue without working gethost: $^OS_ERROR");
 
 is( inet_ntoa($h->addr), "127.0.0.1",   'addr from gethost' );
 
 my $i = gethostbyaddr(inet_aton("127.0.0.1"));
 ok(defined $i,  "gethostbyaddr('127.0.0.1')") || 
-  DIE("Can't continue without working gethostbyaddr: $!");
+  DIE("Can't continue without working gethostbyaddr: $^OS_ERROR");
 
 is( inet_ntoa($i->addr), "127.0.0.1",   'addr from gethostbyaddr' );
 
@@ -47,11 +46,11 @@ is( inet_ntoa($i->addr), "127.0.0.1",   'addr from gethostbyaddr' );
 # - VMS returns "LOCALHOST" under tcp/ip services V4.1 ECO 2, possibly others
 # - OS/390 returns localhost.YADDA.YADDA
 
-SKIP: {
+SKIP: do {
     skip "Windows will return the machine name instead of 'localhost'", 2
-      if $^O eq 'MSWin32' or $^O eq 'NetWare' or $^O eq 'cygwin';
+      if $^OS_NAME eq 'MSWin32' or $^OS_NAME eq 'NetWare' or $^OS_NAME eq 'cygwin';
 
-    print "# name = " . $h->name . ", aliases = " . join (",", @{$h->aliases}) . "\n";
+    print $^STDOUT, "# name = " . $h->name . ", aliases = " . join (",", @{$h->aliases}) . "\n";
 
     my $in_alias;
     unless ($h->name =~ m/^localhost(?:\..+)?$/i) {
@@ -82,6 +81,6 @@ SKIP: {
     }
     else {
         ok( !$in_alias );
-        print "# " . $h->name . " " . join (",", @{$h->aliases}) . "\n";
+        print $^STDOUT, "# " . $h->name . " " . join (",", @{$h->aliases}) . "\n";
     }
-}
+};

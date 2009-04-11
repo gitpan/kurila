@@ -1,11 +1,10 @@
 BEGIN {
-    if (%ENV{PERL_CORE}) {
-	push @INC, "lib/compress";
+    if (env::var('PERL_CORE')) {
+	push $^INCLUDE_PATH, "lib/compress";
     }
 }
 
 use lib < qw(t t/compress);
-use strict;
 use warnings;
 use bytes;
 
@@ -17,7 +16,7 @@ BEGIN
     try { require Encode; Encode->import(); };
 
     plan skip_all => "Encode is not available"
-        if $@ ;
+        if $^EVAL_ERROR ;
 
     # use Test::NoWarnings, if available
     my $extra = 0 ;

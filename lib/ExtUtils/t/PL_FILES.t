@@ -1,17 +1,16 @@
 #!/usr/bin/perl -w
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't' if -d 't';
-        @INC = @('../lib', 'lib');
+        $^INCLUDE_PATH = @('../lib', 'lib');
     }
     else {
-        unshift @INC, 't/lib';
+        unshift $^INCLUDE_PATH, 't/lib';
     }
 }
 chdir 't';
 
-use strict;
 use Test::More tests => 9;
 
 use File::Spec;
@@ -32,10 +31,10 @@ END {
 ok chdir('PL_FILES-Module');
 
 run(qq{$perl Makefile.PL});
-cmp_ok( $?, '==', 0 );
+cmp_ok( $^CHILD_ERROR, '==', 0 );
 
 my $make_out = run("$make");
-is( $?, 0 ) || diag $make_out;
+is( $^CHILD_ERROR, 0 ) || diag $make_out;
 
 foreach my $file (qw(single.out 1.out 2.out blib/lib/PL/Bar.pm)) {
     ok( -e $file, "$file was created" );

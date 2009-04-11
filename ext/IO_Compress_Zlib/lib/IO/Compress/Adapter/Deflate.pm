@@ -1,6 +1,5 @@
 package IO::Compress::Adapter::Deflate ;
 
-use strict;
 use warnings;
 use bytes;
 
@@ -18,13 +17,13 @@ sub mkCompObject
     my $level    = shift ;
     my $strategy = shift ;
 
-    my ($def, $status) = < Compress::Raw::Zlib::Deflate->new(
-                                -AppendOutput   => 1,
-                                -CRC32          => $crc32,
-                                -ADLER32        => $adler32,
-                                -Level          => $level,
-                                -Strategy       => $strategy,
-                                -WindowBits     => - MAX_WBITS);
+    my @($def, $status) =  Compress::Raw::Zlib::Deflate->new(
+                                AppendOutput   => 1,
+                                CRC32          => $crc32,
+                                ADLER32        => $adler32,
+                                Level          => $level,
+                                Strategy       => $strategy,
+                                WindowBits     => - MAX_WBITS);
 
     return  @(undef, "Cannot create Deflate object: $status", $status) 
         if $status != Z_OK;    
@@ -38,14 +37,14 @@ sub compr
 {
     my $self = shift ;
 
-    my $def   = $self->{Def};
+    my $def   = $self->{?Def};
 
     my $status = $def->deflate(@_[0], @_[1]) ;
-    $self->{ErrorNo} = $status;
+    $self->{+ErrorNo} = $status;
 
     if ($status != Z_OK)
     {
-        $self->{Error} = "Deflate Error: $status"; 
+        $self->{+Error} = "Deflate Error: $status"; 
         return STATUS_ERROR;
     }
 
@@ -56,15 +55,15 @@ sub flush
 {
     my $self = shift ;
 
-    my $def   = $self->{Def};
+    my $def   = $self->{?Def};
 
     my $opt = @_[1] || Z_FINISH;
     my $status = $def->flush(@_[0], $opt);
-    $self->{ErrorNo} = $status;
+    $self->{+ErrorNo} = $status;
 
     if ($status != Z_OK)
     {
-        $self->{Error} = "Deflate Error: $status"; 
+        $self->{+Error} = "Deflate Error: $status"; 
         return STATUS_ERROR;
     }
 
@@ -76,7 +75,7 @@ sub close
 {
     my $self = shift ;
 
-    my $def   = $self->{Def};
+    my $def   = $self->{?Def};
 
     $def->flush(@_[0], Z_FINISH)
         if defined $def ;
@@ -86,13 +85,13 @@ sub reset
 {
     my $self = shift ;
 
-    my $def   = $self->{Def};
+    my $def   = $self->{?Def};
 
     my $status = $def->deflateReset() ;
-    $self->{ErrorNo} = $status;
+    $self->{+ErrorNo} = $status;
     if ($status != Z_OK)
     {
-        $self->{Error} = "Deflate Error: $status"; 
+        $self->{+Error} = "Deflate Error: $status"; 
         return STATUS_ERROR;
     }
 

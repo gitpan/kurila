@@ -24,14 +24,13 @@ C<Pod::LaTeX> is a derived class from L<Pod::Select|Pod::Select>.
 =cut
 
 
-use strict;
 require Pod::ParseUtils;
 use base < qw/ Pod::Select /;
 
 # use Data::Dumper; # for debugging
 use Carp;
 
-use vars < qw/ $VERSION %HTML_Escapes @LatexSections /;
+our ($VERSION, %HTML_Escapes, @LatexSections);
 
 $VERSION = '0.58';
 
@@ -393,10 +392,10 @@ sub initialize {
   # print Dumper($self);
 
   # Internals
-  $self->{_Lists} = \@();             # For nested lists
-  $self->{_suppress_all_para}  = 0; # For =begin blocks
-  $self->{_dont_modify_any_para}=0; # For =begin blocks
-  $self->{_CURRENT_HEAD1}   = '';   # Name of current HEAD1 section
+  $self->{+_Lists} = \@();             # For nested lists
+  $self->{+_suppress_all_para}  = 0; # For =begin blocks
+  $self->{+_dont_modify_any_para}=0; # For =begin blocks
+  $self->{+_CURRENT_HEAD1}   = '';   # Name of current HEAD1 section
 
   # Options - only initialise if not already set
 
@@ -407,26 +406,26 @@ sub initialize {
   # Assumes:  'Module - purpose' format
   # Also creates a purpose field
   # The name is used for Labeling of the subsequent subsections
-  $self->{ReplaceNAMEwithSection} = 0
+  $self->{+ReplaceNAMEwithSection} = 0
     unless exists $self->{ReplaceNAMEwithSection};
-  $self->{AddPreamble}      = 1    # make full latex document
+  $self->{+AddPreamble}      = 1    # make full latex document
     unless exists $self->{AddPreamble};
-  $self->{StartWithNewPage} = 0    # Start new page for pod section
+  $self->{+StartWithNewPage} = 0    # Start new page for pod section
     unless exists $self->{StartWithNewPage};
-  $self->{TableOfContents}  = 0    # Add table of contents
+  $self->{+TableOfContents}  = 0    # Add table of contents
     unless exists $self->{TableOfContents};  # only relevent if AddPreamble=1
-   $self->{AddPostamble}     = 1          # Add closing latex code at end
+   $self->{+AddPostamble}     = 1          # Add closing latex code at end
     unless exists $self->{AddPostamble}; #  effectively end{document} and index
-  $self->{MakeIndex}        = 1         # Add index (only relevant AddPostamble
+  $self->{+MakeIndex}        = 1         # Add index (only relevant AddPostamble
     unless exists $self->{MakeIndex};   # and AddPreamble)
 
-  $self->{UniqueLabels}     = 1          # Use label unique for each pod
+  $self->{+UniqueLabels}     = 1          # Use label unique for each pod
     unless exists $self->{UniqueLabels}; # either based on the filename
                                          # or supplied
 
   # Control the level of =head1. default is \section
   # 
-  $self->{Head1Level}     = 1   # Offset in latex sections
+  $self->{+Head1Level}     = 1   # Offset in latex sections
     unless exists $self->{Head1Level}; # 0 is chapter, 2 is subsection
 
   # Control at which level numbering of sections is turned off
@@ -434,7 +433,7 @@ sub initialize {
   # The numbering is relative to the latex sectioning commands
   # and is independent of Pod heading level
   # default is to number \section but not \subsection
-  $self->{LevelNoNum} = 2
+  $self->{+LevelNoNum} = 2
     unless exists $self->{LevelNoNum};
 
   # Label to be used as prefix to all internal section names
@@ -443,16 +442,16 @@ sub initialize {
   # hence the ability to set the label externally
   # The label could then be Pod::Parser_DESCRIPTION or somesuch
 
-  $self->{Label}            = undef # label to be used as prefix
+  $self->{+Label}            = undef # label to be used as prefix
     unless exists $self->{Label};   # to all internal section names
 
   # These allow the caller to add arbritrary latex code to
   # start and end of document. AddPreamble and AddPostamble are ignored
   # if these are set.
   # Also MakeIndex and TableOfContents are also ignored.
-  $self->{UserPreamble}     = undef # User supplied start (AddPreamble =1)
+  $self->{+UserPreamble}     = undef # User supplied start (AddPreamble =1)
     unless exists $self->{Label};
-  $self->{UserPostamble}    = undef # Use supplied end    (AddPostamble=1)
+  $self->{+UserPostamble}    = undef # Use supplied end    (AddPostamble=1)
     unless exists $self->{Label};
 
   # Run base initialize
@@ -501,9 +500,9 @@ package. This is not yet added to the preamble automatically.
 sub AddPreamble {
    my $self = shift;
    if ((nelems @_)) {
-     $self->{AddPreamble} = shift;
+     $self->{+AddPreamble} = shift;
    }
-   return $self->{AddPreamble};
+   return $self->{?AddPreamble};
 }
 
 =item B<AddPostamble>
@@ -528,9 +527,9 @@ be written that could be immediately processed by C<latex>.
 sub AddPostamble {
    my $self = shift;
    if ((nelems @_)) {
-     $self->{AddPostamble} = shift;
+     $self->{+AddPostamble} = shift;
    }
-   return $self->{AddPostamble};
+   return $self->{?AddPostamble};
 }
 
 =item B<Head1Level>
@@ -570,12 +569,12 @@ sub Head1Level {
    if ((nelems @_)) {
      my $arg = shift;
      if ($arg =~ m/^\d$/ && $arg +< nelems @LatexSections) {
-       $self->{Head1Level} = $arg;
+       $self->{+Head1Level} = $arg;
      } else {
        carp "Head1Level supplied ($arg) must be integer in range 0 to ".((nelems @LatexSections)-1) . "- Ignoring\n";
      }
    }
-   return $self->{Head1Level};
+   return $self->{?Head1Level};
 }
 
 =item B<Label>
@@ -606,9 +605,9 @@ Default value is C<undef>.
 sub Label {
    my $self = shift;
    if ((nelems @_)) {
-     $self->{Label} = shift;
+     $self->{+Label} = shift;
    }
-   return $self->{Label};
+   return $self->{?Label};
 }
 
 =item B<LevelNoNum>
@@ -634,9 +633,9 @@ but sections are numbered).
 sub LevelNoNum {
    my $self = shift;
    if ((nelems @_)) {
-     $self->{LevelNoNum} = shift;
+     $self->{+LevelNoNum} = shift;
    }
-   return $self->{LevelNoNum};
+   return $self->{?LevelNoNum};
 }
 
 =item B<MakeIndex>
@@ -657,9 +656,9 @@ Default is for an index to be created.
 sub MakeIndex {
    my $self = shift;
    if ((nelems @_)) {
-     $self->{MakeIndex} = shift;
+     $self->{+MakeIndex} = shift;
    }
-   return $self->{MakeIndex};
+   return $self->{?MakeIndex};
 }
 
 =item B<ReplaceNAMEwithSection>
@@ -703,9 +702,9 @@ Default is to translate the pod literally.
 sub ReplaceNAMEwithSection {
    my $self = shift;
    if ((nelems @_)) {
-     $self->{ReplaceNAMEwithSection} = shift;
+     $self->{+ReplaceNAMEwithSection} = shift;
    }
-   return $self->{ReplaceNAMEwithSection};
+   return $self->{?ReplaceNAMEwithSection};
 }
 
 =item B<StartWithNewPage>
@@ -723,9 +722,9 @@ Default is false.
 sub StartWithNewPage {
    my $self = shift;
    if ((nelems @_)) {
-     $self->{StartWithNewPage} = shift;
+     $self->{+StartWithNewPage} = shift;
    }
-   return $self->{StartWithNewPage};
+   return $self->{?StartWithNewPage};
 }
 
 =item B<TableOfContents>
@@ -744,9 +743,9 @@ Default is false.
 sub TableOfContents {
    my $self = shift;
    if ((nelems @_)) {
-     $self->{TableOfContents} = shift;
+     $self->{+TableOfContents} = shift;
    }
-   return $self->{TableOfContents};
+   return $self->{?TableOfContents};
 }
 
 =item B<UniqueLabels>
@@ -767,9 +766,9 @@ Default is true.
 sub UniqueLabels {
    my $self = shift;
    if ((nelems @_)) {
-     $self->{UniqueLabels} = shift;
+     $self->{+UniqueLabels} = shift;
    }
-   return $self->{UniqueLabels};
+   return $self->{?UniqueLabels};
 }
 
 =item B<UserPreamble>
@@ -786,9 +785,9 @@ C<MakeIndex> and C<TableOfContents> will also be ignored.
 sub UserPreamble {
    my $self = shift;
    if ((nelems @_)) {
-     $self->{UserPreamble} = shift;
+     $self->{+UserPreamble} = shift;
    }
-   return $self->{UserPreamble};
+   return $self->{?UserPreamble};
 }
 
 =item B<UserPostamble>
@@ -805,9 +804,9 @@ C<MakeIndex> will also be ignored.
 sub UserPostamble {
    my $self = shift;
    if ((nelems @_)) {
-     $self->{UserPostamble} = shift;
+     $self->{+UserPostamble} = shift;
    }
-   return $self->{UserPostamble};
+   return $self->{?UserPostamble};
 }
 
 =begin __PRIVATE__
@@ -830,7 +829,7 @@ Returns array ref in scalar context
 
 sub lists {
   my $self = shift;
-  return $self->{_Lists};
+  return $self->{?_Lists};
 }
 
 =end __PRIVATE__
@@ -984,9 +983,7 @@ Process basic pod commands.
 
 =cut
 
-sub command {
-  my $self = shift;
-  my ($command, $paragraph, $line_num, $parobj) = < @_;
+sub command($self, $command, $paragraph, $line_num, $parobj) {
 
   # return if we dont care
   return if $command eq 'pod';
@@ -1022,7 +1019,7 @@ sub command {
   } elsif ($command eq 'head1') {
 
     # Store the name of the section
-    $self->{_CURRENT_HEAD1} = $paragraph;
+    $self->{+_CURRENT_HEAD1} = $paragraph;
 
     # Print it
     $self->head(1, $paragraph, $parobj);
@@ -1052,12 +1049,12 @@ sub command {
     # pass through if latex
     if ($paragraph =~ m/^latex/i) {
       # Make sure that subsequent paragraphs are not modfied before printing
-      $self->{_dont_modify_any_para} = 1;
+      $self->{+_dont_modify_any_para} = 1;
 
     } else {
       # Suppress all subsequent paragraphs unless 
       # it is explcitly intended for latex
-      $self->{_suppress_all_para} = 1;
+      $self->{+_suppress_all_para} = 1;
     }
 
   } elsif ($command eq 'for') {
@@ -1072,7 +1069,7 @@ sub command {
 
     # The first line contains the format and the rest is the
     # raw code.
-    my ($format, $chunk) = < split(m/\n/, $rawpara, 2);
+    my @($format, $chunk) =  split(m/\n/, $rawpara, 2);
 
     # If we have got some latex code print it out immediately
     # unmodified. Else do nothing.
@@ -1085,8 +1082,8 @@ sub command {
   } elsif ($command eq 'end') {
 
     # Reset suppression
-    $self->{_suppress_all_para} = 0;
-    $self->{_dont_modify_any_para} = 0;
+    $self->{+_suppress_all_para} = 0;
+    $self->{+_dont_modify_any_para} = 0;
 
   } elsif ($command eq 'pod') {
 
@@ -1104,12 +1101,9 @@ Verbatim text
 
 =cut
 
-sub verbatim {
-  my $self = shift;
-  my ($paragraph, $line_num, $parobj) = < @_;
-
+sub verbatim($self, $paragraph, $line_num, $parobj) {
   # Expand paragraph unless in =begin block
-  if ($self->{_dont_modify_any_para}) {
+  if ($self->{?_dont_modify_any_para}) {
     # Just print as is
     $self->_output($paragraph);
 
@@ -1125,11 +1119,11 @@ sub verbatim {
     # slightly modified by hsmyers@sdragons.com 10/22/01
     my @l = split("\n",$paragraph);
     foreach ( @l) {
-      1 while s/(^|\n)([^\t\n]*)(\t+)/{
+      1 while s/(^|\n)([^\t\n]*)(\t+)/$(
 	$1. $2 . (" " x 
 		  (8 * length($3)
 		   - (length($2) % 8)))
-	  }/sx;
+	  )/sx;
     }
     $paragraph = join("\n", @l);
     # End of change.
@@ -1146,14 +1140,12 @@ Plain text paragraph.
 
 =cut
 
-sub textblock {
-  my $self = shift;
-  my ($paragraph, $line_num, $parobj) = < @_;
+sub textblock($self, $paragraph, $line_num, $parobj) {
 
   # print Dumper($self);
 
   # Expand paragraph unless in =begin block
-  if ($self->{_dont_modify_any_para}) {
+  if ($self->{?_dont_modify_any_para}) {
     # Just print as is
     $self->_output($paragraph);
 
@@ -1176,17 +1168,17 @@ sub textblock {
   # Need to make sure this is called only on the first paragraph
   # following 'head1 NAME' and not on subsequent paragraphs that may be
   # present.
-  if ($self->{_CURRENT_HEAD1} =~ m/^NAME/i && $self->ReplaceNAMEwithSection()) {
+  if ($self->{?_CURRENT_HEAD1} =~ m/^NAME/i && $self->ReplaceNAMEwithSection()) {
 
     # Strip white space from start and end
     $paragraph =~ s/^\s+//;
     $paragraph =~ s/\s$//;
 
     # Split the string into 2 parts
-    my ($name, $purpose) = < split(m/\s+-\s+/, $expansion,2);
+    my @($name, $purpose) =  split(m/\s+-\s+/, $expansion,2);
 
     # Now prevent this from triggering until a new head1 NAME is set
-    $self->{_CURRENT_HEAD1} = '_NAME';
+    $self->{+_CURRENT_HEAD1} = '_NAME';
 
     # Might want to clear the Label() before doing this (CHECK)
 
@@ -1219,10 +1211,7 @@ Interior sequence expansion
 
 =cut
 
-sub interior_sequence {
-  my $self = shift;
-
-  my ($seq_command, $seq_argument, $pod_seq) = < @_;
+sub interior_sequence($self, $seq_command, $seq_argument, $pod_seq) {
 
   if ($seq_command eq 'B') {
     return "\\textbf\{$seq_argument\}";
@@ -1237,10 +1226,10 @@ sub interior_sequence {
       return chr($seq_argument);
     # Look up escape in hash table
     } elsif (exists %HTML_Escapes{$seq_argument}) {
-      return %HTML_Escapes{$seq_argument};
+      return %HTML_Escapes{?$seq_argument};
 
     } else {
-      my ($file, $line) = < $pod_seq->file_line();
+      my @($file, $line) =  $pod_seq->file_line();
       warn "Escape sequence $seq_argument not recognised at line $line of file $file\n";
       return;
     }
@@ -1268,7 +1257,7 @@ sub interior_sequence {
 
     # undef on failure
     unless (defined $link) {
-      carp $@;
+      carp $^EVAL_ERROR;
       return;
     }
 
@@ -1289,7 +1278,7 @@ sub interior_sequence {
       # Use default markup for external references
       # (although Starlink would use \xlabel)
       my $markup = $link->markup;
-      my ($file, $line) = < $pod_seq->file_line();
+      my @($file, $line) =  $pod_seq->file_line();
 
       return $self->interpolate( $link->markup, $line);
     }
@@ -1418,7 +1407,7 @@ sub add_item {
 
   # If paragraphs printing is turned off via =begin/=end or whatver
   # simply return immediately
-  return if $self->{_suppress_all_para};
+  return if $self->{?_suppress_all_para};
 
   # Check to see whether we are starting a new lists
   if (nelems($self->lists->[-1]->item) == 0) {
@@ -1449,7 +1438,7 @@ sub add_item {
     # If the string is longer than 40 characters we split
     # it into a real item header and some bold text.
     my $maxlen = 40;
-    my ($hunk1, $hunk2) = < $self->_split_delimited( $paragraph, $maxlen );
+    my @($hunk1, $hunk2) =  $self->_split_delimited( $paragraph, $maxlen );
 
     # Print the first hunk
     $self->_output("\n\\item[\{$hunk1\}] ");
@@ -1503,7 +1492,7 @@ sub head {
   # If we are replace 'head1 NAME' with a section
   # we return immediately if we get it
   return 
-    if ($self->{_CURRENT_HEAD1} =~ m/^NAME/i && $self->ReplaceNAMEwithSection());
+    if ($self->{?_CURRENT_HEAD1} =~ m/^NAME/i && $self->ReplaceNAMEwithSection());
 
   # Create a label
   my $label = $self->_create_label($paragraph);
@@ -1525,7 +1514,7 @@ sub head {
   }
 
   # Check to see whether section should be unnumbered
-  my $star = ($level +>= $self->LevelNoNum ? '*' : '');
+  my $star = ($level +>= $self->LevelNoNum ?? '*' !! '');
 
   # Section
   $self->_output("\\" .@LatexSections[$level] .$star ."\{$paragraph\\label\{".$label ."\}\\index\{".$index."\}\}\n");
@@ -1562,8 +1551,8 @@ sub _output {
   my $self = shift;
   my $text = shift;
 
-  print { $self->output_handle } $text
-    unless $self->{_suppress_all_para};
+  print  $self->output_handle  ,$text
+    unless $self->{?_suppress_all_para};
 
 }
 
@@ -1646,7 +1635,7 @@ sub _replace_special_chars_late {
   $paragraph =~ s/(<|>)/\$$1\$/g;
 
   # Replace | with $|$
-  $paragraph =~ s/\|/{'$|$'}/g;
+  $paragraph =~ s/\|/$('$|$')/g;
 
 
   return $paragraph;
@@ -1674,7 +1663,7 @@ be called to create a Label() without prefixing a previous setting.
 sub _create_label {
   my $self = shift;
   my $paragraph = shift;
-  my $suppress = ((nelems @_) ? 1 : 0 );
+  my $suppress = ((nelems @_) ?? 1 !! 0 );
 
   # Remove latex commands
   $paragraph = $self->_clean_latex_commands($paragraph);
@@ -1715,7 +1704,7 @@ sub-entries in an index.
 sub _create_index {
   my $self = shift;
   my $paragraph = shift;
-  my $suppress = ((nelems @_) ? 1 : 0 );
+  my $suppress = ((nelems @_) ?? 1 !! 0 );
 
   # Remove latex commands
   $paragraph = $self->_clean_latex_commands($paragraph);

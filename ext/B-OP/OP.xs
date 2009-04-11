@@ -24,7 +24,6 @@ static char *svclassnames[] = {
     "B::PVMG",
     "B::REGEXP",
     "B::GV",
-    "B::PVLV",
     "B::AV",
     "B::HV",
     "B::CV",
@@ -43,7 +42,8 @@ typedef enum {
     OPc_PADOP,	/* 8 */
     OPc_PVOP,	/* 9 */
     OPc_LOOP,	/* 10 */
-    OPc_COP	/* 11 */
+    OPc_COP,	/* 11 */
+    OPc_ROOTOP	/* 12 */
 } opclass;
 
 static char *opclassnames[] = {
@@ -58,7 +58,8 @@ static char *opclassnames[] = {
     "B::PADOP",
     "B::PVOP",
     "B::LOOP",
-    "B::COP"
+    "B::COP",
+    "B::ROOTOP"
 };
 
 static const size_t opsizes[] = {
@@ -73,7 +74,8 @@ static const size_t opsizes[] = {
     sizeof(PADOP),
     sizeof(PVOP),
     sizeof(LOOP),
-    sizeof(COP)	
+    sizeof(COP),
+    sizeof(ROOTOP)	
 };
 
 static int walkoptree_debug = 0; /* Flag for walkoptree debug hook */
@@ -106,85 +108,6 @@ set_active_sub(SV *sv)
     svp = AvARRAY(padlist);
     my_current_pad = AvARRAY((AV*)svp[1]);
 }
-
-static SV *
-find_cv_by_root(OP* o) {
-  dTHX;
-  OP* root = o;
-  SV* key;
-  SV* val;
-  HE* cached;
-
-  if(PL_compcv && SvTYPE(PL_compcv) == SVt_PVCV &&
-        !PL_eval_root) {
-    if(SvROK(PL_compcv))
-       sv_dump(SvRV(PL_compcv));
-    return newRV((SV*)PL_compcv);
-  }     
-
-
-  if(!root_cache)
-    root_cache = newHV();
-
-  while(root->op_next)
-    root = root->op_next;
-
-  key = newSViv(PTR2IV(root));
-  
-  cached = hv_fetch_ent(root_cache, key, 0, 0);
-  if(cached) {
-    return HeVAL(cached);
-  }
-  
-
-  if(PL_main_root == root) {
-    /* Special case, this is the main root */
-    cached = hv_store_ent(root_cache, key, newRV((SV*)PL_main_cv), 0);
-  } else if(PL_eval_root == root && PL_compcv) { 
-    SV* tmpcv = (SV*)NEWSV(1104,0);
-    sv_upgrade((SV *)tmpcv, SVt_PVCV);
-    CvPADLIST(tmpcv) = CvPADLIST(PL_compcv);
-    SvREFCNT_inc(CvPADLIST(tmpcv));
-    CvROOT(tmpcv) = root;
-    OP_REFCNT_LOCK;
-    OpREFCNT_inc(root);
-    OP_REFCNT_UNLOCK;
-    cached = hv_store_ent(root_cache, key, newRV((SV*)tmpcv), 0);
-  } else {
-    /* Need to walk the symbol table, yay */
-    CV* cv = 0;
-    SV* sva;
-    SV* sv;
-    register SV* svend;
-
-    for (sva = PL_sv_arenaroot; sva; sva = (SV*)SvANY(sva)) {
-      svend = &sva[SvREFCNT(sva)];
-      for (sv = sva + 1; sv < svend; ++sv) {
-        if (SvTYPE(sv) != SVTYPEMASK && SvREFCNT(sv)) {
-          if(SvTYPE(sv) == SVt_PVCV &&
-             CvROOT(sv) == root
-             ) {
-            cv = (CV*) sv;
-          } else if(SvTYPE(sv) == SVt_PVGV && GvGP(sv) &&
-                    GvCV(sv) && !CvXSUB(GvCV(sv)) &&
-                    CvROOT(GvCV(sv)) == root)
-                     {
-            cv = (CV*) GvCV(sv);
-          }
-        }
-      }
-    }
-
-    if(!cv) {
-      Perl_die(aTHX_ "I am sorry but we couldn't find this root!\n");
-    }
-
-    cached = hv_store_ent(root_cache, key, newRV((SV*)cv), 0);
-  }
-
-  return (SV*) HeVAL(cached);
-}
-
 
 static SV *
 make_sv_object(pTHX_ SV *arg, SV *sv)
@@ -280,25 +203,15 @@ cc_opclass(pTHX_ const OP *o)
 	return (o->op_flags & OPf_KIDS) ? OPc_UNOP : OPc_BASEOP;
 
     if (o->op_type == OP_SASSIGN)
-	return ((o->op_private & OPpASSIGN_BACKWARDS) ? OPc_UNOP : OPc_BINOP);
+	return (OPc_BINOP);
 
     if (o->op_type == OP_AELEMFAST) {
 	if (o->op_flags & OPf_SPECIAL)
 	    return OPc_BASEOP;
 	else
-#ifdef USE_ITHREADS
-	    return OPc_PADOP;
-#else
 	    return OPc_SVOP;
-#endif
     }
     
-#ifdef USE_ITHREADS
-    if (o->op_type == OP_GV || o->op_type == OP_GVSV ||
-	o->op_type == OP_RCATLINE)
-	return OPc_PADOP;
-#endif
-
     switch (PL_opargs[o->op_type] & OA_CLASS_MASK) {
     case OA_BASEOP:
 	return OPc_BASEOP;
@@ -372,6 +285,8 @@ cc_opclass(pTHX_ const OP *o)
 	    return OPc_BASEOP;
 	else
 	    return OPc_PVOP;
+    case OA_ROOTOP:
+        return OPc_ROOTOP;
     }
     warn("can't determine class of operator %s, assuming BASEOP\n",
 	 PL_op_name[o->op_type]);
@@ -413,11 +328,13 @@ walkoptree(pTHX_ SV *opsv, const char *method)
 	XPUSHs(opsv);
 	PUTBACK;
 	perl_call_method("walkoptree_debug", G_DISCARD);
+        SPAGAIN;
     }
     PUSHMARK(sp);
     XPUSHs(opsv);
     PUTBACK;
     perl_call_method(method, G_DISCARD);
+    SPAGAIN;
     if (o && (o->op_flags & OPf_KIDS)) {
 	for (kid = ((UNOP*)o)->op_first; kid; kid = kid->op_sibling) {
 	    /* Use the same opsv. Rely on methods not to mess it up. */
@@ -499,7 +416,7 @@ make_temp_object(pTHX_ SV *arg, SV *temp)
     /* Need to keep our "temp" around as long as the target exists.
        Simplest way seems to be to hang it from magic, and let that clear
        it up.  No vtable, so won't actually get in the way of anything.  */
-    sv_magicext(target, temp, PERL_MAGIC_sv, NULL, NULL, 0);
+    sv_magicext(target, temp, PERL_MAGIC_ext, NULL, NULL, 0);
     /* magic object has had its reference count increased, so we must drop
        our reference.  */
     SvREFCNT_dec(temp);
@@ -565,7 +482,6 @@ typedef SV      *B__IV;
 typedef SV      *B__PV;
 typedef SV      *B__NV;
 typedef SV      *B__PVMG;
-typedef SV      *B__PVLV;
 typedef SV      *B__BM;
 typedef SV      *B__RV;
 typedef AV      *B__AV;
@@ -587,14 +503,6 @@ typedef MAGIC   *B__MAGIC;
 #define OP_spare(o)	o->op_spare
 
 MODULE = B::OP    PACKAGE = B::OP         PREFIX = OP_
-
-B::CV
-OP_find_cv(o)
-        B::OP   o
-    CODE:
-        RETVAL = (CV*)SvRV(find_cv_by_root((OP*)o));
-    OUTPUT:
-        RETVAL
 
 void
 OP_set_next(o, next)
@@ -655,7 +563,7 @@ void
 OP_clean(o)
     B::OP o
     CODE:
-        if (o == PL_main_root)
+        if (o == RootopOp(PL_main_root))
             o->op_next = Nullop;
 
 void
@@ -832,7 +740,7 @@ BINOP_new(class, type, flags, sv_first, sv_last, location)
 
         PL_curpad = AvARRAY(PL_comppad);
         
-        if (typenum == OP_SASSIGN || typenum == OP_AASSIGN) 
+        if (typenum == OP_SASSIGN) 
             o = newASSIGNOP(flags, first, 0, last, newSVsv(location));
         else {
             o = newBINOP(typenum, flags, first, last, newSVsv(location));
@@ -1039,21 +947,10 @@ SVOP_set_sv(o, ...)
     PREINIT:
         SV *sv;
     CODE:
-        GEN_PAD;
         if (items > 1) {
             sv = newSVsv(ST(1));
-#ifdef USE_ITHREADS
-            if ( cSVOPx(o)->op_sv ) {
-                cSVOPx(o)->op_sv = sv;
-            }
-            else {
-                PAD_SVl(o->op_targ) = sv;
-            }
-#else
             cSVOPx(o)->op_sv = sv;
-#endif
         }
-        OLD_PAD;
 
 void
 SVOP_new(class, type, flags, sv, location)
@@ -1074,7 +971,7 @@ SVOP_new(class, type, flags, sv, location)
         typenum = op_name_to_num(type); /* XXX More classes here! */
         if (typenum == OP_GVSV) {
             if (*(SvPV_nolen(sv)) == '$') 
-                param = (SV*)gv_fetchpv(SvPVX(sv)+1, TRUE, SVt_PV);
+                param = (SV*)gv_fetchpv(SvPVX_const(sv)+1, TRUE, SVt_PV);
             else
             Perl_croak(aTHX_ 
             "First character to GVSV was not dollar");
@@ -1196,7 +1093,7 @@ SvPV(sv,...)
   } 
   ST(0) = sv_newmortal();
   if( SvPOK(sv) ) { 
-    sv_setpvn(ST(0), SvPVX(sv), SvCUR(sv));
+    sv_setpvn(ST(0), SvPVX_const(sv), SvCUR(sv));
   }
   else {
     /* XXX for backward compatibility, but should fail */
@@ -1241,7 +1138,7 @@ OP_ppaddr(o)
 	sv_setpvn(sv, "PL_ppaddr[OP_", 13);
 	sv_catpv(sv, PL_op_name[o->op_type]);
 	for (i=13; (STRLEN)i < SvCUR(sv); ++i)
-	    SvPVX(sv)[i] = toUPPER(SvPVX(sv)[i]);
+	    SvPVX_mutable(sv)[i] = toUPPER(SvPVX_const(sv)[i]);
 	sv_catpv(sv, "]");
 	ST(0) = sv;
 
@@ -1344,14 +1241,10 @@ PMOP_pmreplroot(o)
     CODE:
 	ST(0) = sv_newmortal();
 	if (o->op_type == OP_PUSHRE) {
-#  ifdef USE_ITHREADS
-            sv_setiv(ST(0), o->op_pmreplrootu.op_pmtargetoff);
-#  else
 	    GV *const target = o->op_pmreplrootu.op_pmtargetgv;
 	    sv_setiv(newSVrv(ST(0), target ?
 			     svclassnames[SvTYPE((SV*)target)] : "B::SV"),
 		     PTR2IV(target));
-#  endif
 	}
 	else {
 	    OP *const root = o->op_pmreplrootu.op_pmreplroot; 
@@ -1529,7 +1422,7 @@ B::OP
 CvROOT(cv)
 	B::CV	cv
     CODE:
-	RETVAL = CvISXSUB(cv) ? NULL : CvROOT(cv);
+	RETVAL = CvISXSUB(cv) ? NULL : RootopOp(CvROOT(cv));
     OUTPUT:
 	RETVAL
 
@@ -1543,8 +1436,8 @@ Cvnewsub_simple(class, name, block)
 
     CODE:
         o = newSVOP(OP_CONST, 0, name, NULL);
-        mycv = newSUB(start_subparse(0), o, Nullop, block);
-        /*op_free(o); */
+        mycv = newNAMEDSUB(start_subparse(0), o, Nullop, block);
+        /* op_free(o); */
         RETVAL = mycv;
     OUTPUT:
         RETVAL
@@ -1583,28 +1476,7 @@ B_fudge()
         SSCHECK(2);
         SSPUSHPTR((SV*)PL_comppad);  
         SSPUSHINT(SAVEt_COMPPAD);
-
-B::OP
-B_set_main_root(...)
-    PROTOTYPE: ;$
-    CODE:
-        if (items > 0)
-            PL_main_root = SVtoO(ST(0));
-        RETVAL = PL_main_root;
-    OUTPUT:
-        RETVAL
     
-B::OP
-B_set_main_start(...)
-    PROTOTYPE: ;$
-    CODE:
-        if (items > 0)
-            PL_main_start = SVtoO(ST(0));
-        RETVAL = PL_main_start;
-    OUTPUT:
-        RETVAL
-
-
 MODULE = B::PAD    PACKAGE = B::PAD     PREFIX = B_PAD_
 
 int
@@ -1616,7 +1488,7 @@ B_PAD_allocmy(char* name)
         PL_comppad =           *(AV**) av_fetch(CvPADLIST(PL_compcv), 1, 0);
         PL_curpad            = AvARRAY(PL_comppad);
         
-        RETVAL = Perl_pad_add_name(aTHX_ name, NULL, FALSE, FALSE);
+        RETVAL = Perl_pad_add_name(aTHX_ name, NULL, FALSE);
 
         PL_comppad = old_comppad;
         PL_curpad  = old_curpad;

@@ -1,11 +1,11 @@
 BEGIN {
-    if (%ENV{PERL_CORE}) {
-	push @INC, "lib/compress";
+    if (env::var('PERL_CORE')) {
+	push $^INCLUDE_PATH, "lib/compress";
     }
 }
 
 use lib < qw(t t/compress);
-use strict ;
+ 
 use warnings ;
 
 use Test::More ;

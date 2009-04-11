@@ -1,7 +1,6 @@
 
 package Pod::Simple::Transcode;
 
-use strict;
 
 our @ISA;
 
@@ -17,12 +16,12 @@ foreach my $class (@(
   '',)
 ) {
   $class or die "Couldn't load any encoding classes";
-  DEBUG and print "About to try loading $class...\n";
+  DEBUG and print $^STDOUT, "About to try loading $class...\n";
   eval "require $class;";
-  if($@) {
-    DEBUG and print "Couldn't load $class: {$@->message}\n";
+  if($^EVAL_ERROR) {
+    DEBUG and print $^STDOUT, "Couldn't load $class: $($^EVAL_ERROR->message)\n";
   } else {
-    DEBUG and print "OK, loaded $class.\n";
+    DEBUG and print $^STDOUT, "OK, loaded $class.\n";
     @ISA = @($class);
     last;
   }

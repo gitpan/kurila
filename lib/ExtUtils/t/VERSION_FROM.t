@@ -1,18 +1,17 @@
 #!/usr/bin/perl -w
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't' if -d 't';
-        @INC = @('../lib', 'lib');
+        $^INCLUDE_PATH = @('../lib', 'lib');
     }
     else {
-        unshift @INC, 't/lib';
+        unshift $^INCLUDE_PATH, 't/lib';
     }
 }
 
 chdir 't';
 
-use strict;
 use Test::More tests => 1;
 use MakeMaker::Test::Utils;
 use ExtUtils::MakeMaker;
@@ -24,14 +23,14 @@ mkdir('Odd-Version', 0777);
 END { chdir File::Spec->updir;  rmtree 'Odd-Version' }
 chdir 'Odd-Version';
 
-open(MPL, ">", "Version") || die $!;
-print MPL "\$VERSION = 0\n";
-close MPL;
+open(my $mpl, ">", "Version") || die $^OS_ERROR;
+print $mpl, "\$VERSION = 0\n";
+close $mpl;
 END { unlink 'Version' }
 
 my $stdout = '';
-close STDOUT;
-open STDOUT, '>>', \$stdout or die;
+close $^STDOUT;
+open $^STDOUT, '>>', \$stdout or die;
 my $mm = WriteMakefile(
     NAME         => 'Version',
     VERSION_FROM => 'Version'

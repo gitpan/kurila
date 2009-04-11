@@ -1,21 +1,21 @@
 #! perl -w
 
-use strict ;
+ 
 
 use private::MakeUtil;
 use ExtUtils::MakeMaker v5.16 ;
 
 UpDowngrade( <getPerlFiles('MANIFEST')) 
-    unless %ENV{PERL_CORE};
+    unless env::var('PERL_CORE');
 
 WriteMakefile( 
     NAME         => 'IO::Compress::Base',
     VERSION_FROM => 'lib/IO/Compress/Base.pm',
 
     (
-      %ENV{SKIP_FOR_CORE}
-        ? (MAN3PODS    => \%())
-        : (PREREQ_PM   => \%( 'Scalar::Util'  => 0, )
+      env::var('SKIP_FOR_CORE')
+        ?? (MAN3PODS    => \%())
+        !! (PREREQ_PM   => \%( 'Scalar::Util'  => 0, )
 	      )
     ),
        

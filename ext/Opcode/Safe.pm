@@ -1,6 +1,5 @@
 package Safe;
 
-use strict;
 
 $Safe::VERSION = "2.16";
 
@@ -20,8 +19,8 @@ sub lexless_anon_sub {
     # Uses a closure (on $__ExPr__) to pass in the code to be executed.
     # (eval on one line to keep line numbers as expected by caller)
     eval sprintf
-    'package %s; %s strict; sub { @_= @(); eval q[my $__ExPr__;] . $__ExPr__; }',
-		@_[0], @_[1] ? 'use' : 'no';
+    'package %s; sub { @_= @(); eval q[my $__ExPr__;] . $__ExPr__; }',
+		@_[0];
 }
 
 use Carp;
@@ -62,15 +61,6 @@ my $default_share = \qw[
     &re::regname
     &re::regnames
     &re::regnames_count
-    &Tie::Hash::NamedCapture::FETCH
-    &Tie::Hash::NamedCapture::STORE
-    &Tie::Hash::NamedCapture::DELETE
-    &Tie::Hash::NamedCapture::CLEAR
-    &Tie::Hash::NamedCapture::EXISTS
-    &Tie::Hash::NamedCapture::FIRSTKEY
-    &Tie::Hash::NamedCapture::NEXTKEY
-    &Tie::Hash::NamedCapture::SCALAR
-    &Tie::Hash::NamedCapture::flags
     &UNIVERSAL::DOES
     &version::new
     &version::stringify
@@ -83,24 +73,25 @@ my $default_share = \qw[
     &re::regexp_pattern
     &error::create
     &error::message
+    &error::description
+    &error::stacktrace
     &error::write_to_stderr
     &Symbol::fetch_glob
 ];
 
-sub new {
-    my($class, $root, $mask) = < @_;
+sub new($class, ?$root, ?$mask) {
     my $obj = \%();
     bless $obj, $class;
 
     if (defined($root)) {
 	croak "Can't use \"$root\" as root name"
 	    if $root =~ m/^main\b/ or $root !~ m/^\w+::\w[:\w]*$/;
-	$obj->{Root}  = $root;
-	$obj->{Erase} = 0;
+	$obj->{+Root}  = $root;
+	$obj->{+Erase} = 0;
     }
     else {
-	$obj->{Root}  = "Safe::Root".$default_root++;
-	$obj->{Erase} = 1;
+	$obj->{+Root}  = "Safe::Root".$default_root++;
+	$obj->{+Erase} = 1;
     }
 
     # use permit/deny methods instead till interface issues resolved
@@ -115,23 +106,21 @@ sub new {
     # the whole glob *_ rather than $_ and @_ separately, otherwise
     # @_ in non default packages within the compartment don't work.
     $obj->share_from('', $default_share);
-    Opcode::_safe_pkg_prep($obj->{Root}) if($Opcode::VERSION +> 1.04);
+    Opcode::_safe_pkg_prep($obj->{?Root}) if($Opcode::VERSION +> 1.04);
     return $obj;
 }
 
 sub DESTROY {
     my $obj = shift;
-    $obj->erase('DESTROY') if $obj->{Erase};
+    $obj->erase('DESTROY') if $obj->{?Erase};
 }
 
-sub erase {
-    my ($obj, $action) = < @_;
+sub erase($obj, $action) {
     my $pkg = $obj->root();
     my ($stem, $leaf);
 
-    no strict 'refs';
-    $pkg = "{$pkg}::";	# expand to full symbol table name
-    ($stem, $leaf) = $pkg =~ m/(.*)::(\w+::)$/;
+    $pkg = "$($pkg)::";	# expand to full symbol table name
+    @($stem, $leaf) = @: $pkg =~ m/(.*)::(\w+::)$/;
 
     # The 'my $foo' is needed! Without it you get an
     # 'Attempt to free unreferenced scalar' warning!
@@ -146,7 +135,7 @@ sub erase {
     delete $stem_symtab->{$leaf};
     return;
 
-    my $leaf_globref   = \($stem_symtab->{$leaf});
+    my $leaf_globref   = \($stem_symtab->{+$leaf});
     my $leaf_symtab = *{$leaf_globref}{HASH};
 #    warn " leaf_symtab ", join(', ', %$leaf_symtab),"\n";
     # FIXME this does not clear properly yet: %$leaf_symtab = %( () );
@@ -177,13 +166,13 @@ sub reinit {
 sub root {
     my $obj = shift;
     croak("Safe root method now read-only") if (nelems @_);
-    return $obj->{Root};
+    return $obj->{?Root};
 }
 
 
 sub mask {
     my $obj = shift;
-    return $obj->{Mask} unless (nelems @_);
+    return $obj->{?Mask} unless (nelems @_);
     $obj->deny_only(< @_);
 }
 
@@ -193,33 +182,32 @@ sub untrap { shift->permit(< @_) }
 
 sub deny {
     my $obj = shift;
-    $obj->{Mask} ^|^= opset(< @_);
+    $obj->{+Mask} ^|^= opset(< @_);
 }
 sub deny_only {
     my $obj = shift;
-    $obj->{Mask} = opset(< @_);
+    $obj->{+Mask} = opset(< @_);
 }
 
 sub permit {
     my $obj = shift;
     # XXX needs testing
-    $obj->{Mask} ^&^= invert_opset opset(< @_);
+    $obj->{+Mask} ^&^= invert_opset opset(< @_);
 }
 sub permit_only {
     my $obj = shift;
-    $obj->{Mask} = invert_opset opset(< @_);
+    $obj->{+Mask} = invert_opset opset(< @_);
 }
 
 
 sub dump_mask {
     my $obj = shift;
-    print < opset_to_hex($obj->{Mask}),"\n";
+    print $^STDOUT, < opset_to_hex($obj->{?Mask}),"\n";
 }
 
 
 
-sub share {
-    my($obj, < @vars) = < @_;
+sub share($obj, @< @vars) {
     $obj->share_from(scalar(caller), \@vars);
 }
 
@@ -230,23 +218,21 @@ sub share_from {
     my $no_record = shift || 0;
     my $root = $obj->root();
     croak("vars not an array ref") unless ref $vars eq 'ARRAY';
-    no strict 'refs';
     # Check that 'from' package actually exists
 #     croak("Package \"$pkg\" does not exist")
 # 	unless %{Symbol::stash("$pkg")};
-    my $arg;
-    foreach $arg ( @$vars) {
+    foreach my $arg ( @$vars) {
 	# catch some $safe->share($var) errors:
 	my ($var, $type);
 	$type = $1 if ($var = $arg) =~ s/^(\W)//;
 	# warn "share_from $pkg $type $var";
-	*{Symbol::fetch_glob($root."::$var")} = (!$type)       ? \&{*{Symbol::fetch_glob($pkg."::$var")}}
-			  : ($type eq '&') ? \&{*{Symbol::fetch_glob($pkg."::$var")}}
-			  : ($type eq '$') ? \${*{Symbol::fetch_glob($pkg."::$var")}}
-			  : ($type eq '@') ? \@{*{Symbol::fetch_glob($pkg."::$var")}}
-			  : ($type eq '%') ? \%{*{Symbol::fetch_glob($pkg."::$var")}}
-			  : ($type eq '*') ?  *{Symbol::fetch_glob($pkg."::$var")}
-			  : croak(qq(Can't share "$type$var" of unknown type));
+	*{Symbol::fetch_glob($root."::$var")} = (!$type)       ?? \&{*{Symbol::fetch_glob($pkg."::$var")}}
+			  !! ($type eq '&') ?? \&{*{Symbol::fetch_glob($pkg."::$var")}}
+			  !! ($type eq '$') ?? \${*{Symbol::fetch_glob($pkg."::$var")}}
+			  !! ($type eq '@') ?? \@{*{Symbol::fetch_glob($pkg."::$var")}}
+			  !! ($type eq '%') ?? \%{*{Symbol::fetch_glob($pkg."::$var")}}
+			  !! ($type eq '*') ??  *{Symbol::fetch_glob($pkg."::$var")}
+			  !! croak(qq(Can't share "$type$var" of unknown type));
     }
     $obj->share_record($pkg, $vars) unless $no_record or !$vars;
 }
@@ -255,15 +241,15 @@ sub share_record {
     my $obj = shift;
     my $pkg = shift;
     my $vars = shift;
-    my $shares = \%{$obj->{Shares} ||= \%()};
- <    # Record shares using keys of $obj->{Shares}. See reinit.
-    %{$shares}{[ @$vars]} = ($pkg) x nelems @$vars if (nelems @$vars);
+    my $shares = \%{$obj->{+Shares} ||= \%()};
+     # Record shares using keys of $obj->{Shares}. See reinit.
+    %{$shares}{[ @$vars]} = @($pkg) x nelems @$vars if (nelems @$vars);
 }
 sub share_redo {
     my $obj = shift;
-    my $shares = \%{$obj->{Shares} ||= \%()};
+    my $shares = \%{$obj->{+Shares} ||= \%()};
     my($var, $pkg);
-    while(($var, $pkg) = each %$shares) {
+    while(@($var, $pkg) =@( each %$shares)) {
 	# warn "share_redo $pkg\:: $var";
 	$obj->share_from($pkg,  \@( $var ), 1);
     }
@@ -272,27 +258,24 @@ sub share_forget {
     delete shift->{Shares};
 }
 
-sub varglob {
-    my ($obj, $var) = < @_;
+sub varglob($obj, $var) {
     return Symbol::fetch_glob($obj->root()."::$var");
 }
 
 
-sub reval {
-    my ($obj, $expr, $strict) = < @_;
-    my $root = $obj->{Root};
+sub reval($obj, $expr, ?$strict) {
+    my $root = $obj->{?Root};
 
     my $evalsub = lexless_anon_sub($root,$strict, $expr);
-    return Opcode::_safe_call_sv($root, $obj->{Mask}, $evalsub);
+    return Opcode::_safe_call_sv($root, $obj->{?Mask}, $evalsub);
 }
 
-sub rdo {
-    my ($obj, $file) = < @_;
-    my $root = $obj->{Root};
+sub rdo($obj, $file) {
+    my $root = $obj->{?Root};
 
     my $evalsub = eval
 	    sprintf('package %s; sub { @_ = (); do $file }', $root);
-    return Opcode::_safe_call_sv($root, $obj->{Mask}, $evalsub);
+    return Opcode::_safe_call_sv($root, $obj->{?Mask}, $evalsub);
 }
 
 

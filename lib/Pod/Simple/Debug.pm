@@ -1,6 +1,6 @@
 
 package Pod::Simple::Debug;
-use strict;
+
 
 sub import {
   my($value,$variable);
@@ -8,9 +8,9 @@ sub import {
   if((nelems @_) == 2) {
     $value = @_[1];
   } elsif((nelems @_) == 3) {
-    ($variable, $value) = < @_[[@(1,2)]];
+    @($variable, $value) =  @_[[@(1,2)]];
     
-    ($variable, $value) = ($value, $variable)
+    @($variable, $value) = @($value, $variable)
        if     defined $value    and ref($value)    eq 'SCALAR'
       and not(defined $variable and ref($variable) eq 'SCALAR')
     ; # tolerate getting it backwards
@@ -45,10 +45,10 @@ sub import {
     # make a not-really-constant
     *Pod::Simple::DEBUG = sub () { $$variable } ;
     $$variable = $value;
-    print "# Starting Pod::Simple::DEBUG = non-constant $variable with val $value\n";
+    print $^STDOUT, "# Starting Pod::Simple::DEBUG = non-constant $variable with val $value\n";
   } else {
     *Pod::Simple::DEBUG = eval " sub () \{ $value \} ";
-    print "# Starting Pod::Simple::DEBUG = $value\n";
+    print $^STDOUT, "# Starting Pod::Simple::DEBUG = $value\n";
   }
   
   require Pod::Simple;

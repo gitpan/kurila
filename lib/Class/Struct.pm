@@ -3,7 +3,6 @@ package Class::Struct;
 ## See POD after __END__
 
 
-use strict;
 use warnings::register;
 our(@ISA, @EXPORT, $VERSION);
 
@@ -29,7 +28,11 @@ sub import {
 	# do we ever export anything else than 'struct'...?
       $self->export_to_level( 1, $self, < @_ );
     } else {
-      goto &struct;
+        if (not ref @_[1]) {
+            return struct( @(caller)[0] => \@_);
+        } else {
+            return struct(< @_);
+        }
     }
 }
 
@@ -64,7 +67,7 @@ sub struct {
     # Create constructor.
 
     die "function 'new' already defined in package $class"
-        if do { no strict 'refs'; defined &{Symbol::fetch_glob($class . "::new")} };
+        if do { defined &{Symbol::fetch_glob($class . "::new")} };
 
     my @methods = @( () );
     my %refs = %( () );
@@ -74,8 +77,8 @@ sub struct {
     my $got_class = 0;
     my $out = '';
 
-    $out = "\{\n  package $class;\n  sub new \{\n";
-    $out .= "    my (\$class, < \%init) = < \@_;\n";
+    $out = "do \{\n  package $class;\n  sub new \{\n";
+    $out .= "    my \@(?\$class, \%< \%init) = \@_;\n";
     $out .= "    \$class = __PACKAGE__ unless \@_;\n";
 
     my $cnt = 0;
@@ -94,42 +97,42 @@ sub struct {
         $type = @decls[$idx+1];
         push( @methods, $name );
         if( $base_type eq 'HASH' ){
-            $elem = "\{'{$class}::$name'\}";
+            $elem = "\{+'$($class)::$name'\}";
         }
         elsif( $base_type eq 'ARRAY' ){
-            $elem = "[$cnt]";
+            $elem = "[+$cnt]";
             ++$cnt;
             $cmt = " # $name";
         }
         if( $type =~ m/^\*(.)/ ){
-            %refs{$name}++;
+            %refs{+$name}++;
             $type = $1;
         }
-        my $init = "defined(\%init\{'$name'\}) ? \%init\{'$name'\} :";
+        my $init = "defined(\%init\{?'$name'\}) ?? \%init\{'$name'\} !! ";
         if( $type eq '@' ){
             $out .= "    die 'Initializer for $name must be array reference'\n"; 
-            $out .= "        if defined(\%init\{'$name'\}) && ref(\%init\{'$name'\}) ne 'ARRAY';\n";
+            $out .= "        if defined(\%init\{?'$name'\}) && ref(\%init\{'$name'\}) ne 'ARRAY';\n";
             $out .= "    \$r->$elem = $init \\\@();$cmt\n";
-            %arrays{$name}++;
+            %arrays{+$name}++;
         }
         elsif( $type eq '%' ){
             $out .= "    die 'Initializer for $name must be hash reference'\n";
-            $out .= "        if defined(\%init\{'$name'\}) && ref(\%init\{'$name'\}) ne 'HASH';\n";
+            $out .= "        if defined(\%init\{?'$name'\}) && ref(\%init\{'$name'\}) ne 'HASH';\n";
             $out .= "    \$r->$elem = $init \\\%();$cmt\n";
-            %hashes{$name}++;
+            %hashes{+$name}++;
         }
         elsif ( $type eq '$') {
             $out .= "    \$r->$elem = $init undef;$cmt\n";
         }
         elsif( $type =~ m/^\w+(?:::\w+)*$/ ){
-            $out .= "    if (defined(\%init\{'$name'\})) \{\n";
+            $out .= "    if (defined(\%init\{?'$name'\})) \{\n";
            $out .= "       if (ref \%init\{'$name'\} eq 'HASH')\n";
             $out .= "            \{ \$r->$elem = $type->new(\%\{\%init\{'$name'\}\}) \} $cmt\n";
            $out .= "       elsif (UNIVERSAL::isa(\%init\{'$name'\}, '$type'))\n";
             $out .= "            \{ \$r->$elem = \%init\{'$name'\} \} $cmt\n";
             $out .= "       else \{ die 'Initializer for $name must be hash or $type reference' \}\n";
             $out .= "    \}\n";
-            %classes{$name} = $type;
+            %classes{+$name} = $type;
             $got_class = 1;
         }
         else{
@@ -143,50 +146,50 @@ sub struct {
 
     my( $pre, $pst, $sel );
     $cnt = 0;
-    foreach $name ( @methods){
-        if ( do { no strict 'refs'; defined &{Symbol::fetch_glob($class . "::$name")} } ) {
+    foreach my $name ( @methods){
+        if ( defined &{Symbol::fetch_glob($class . "::$name")} ) {
             warnings::warnif("function '$name' already defined, overrides struct accessor method");
         }
         else {
             $pre = $pst = $cmt = $sel = '';
-            if( defined %refs{$name} ){
+            if( defined %refs{?$name} ){
                 $pre = "\\(";
                 $pst = ")";
                 $cmt = " # returns ref";
             }
             $out .= "  sub $name \{$cmt\n    my \$r = shift;\n";
             if( $base_type eq 'ARRAY' ){
-                $elem = "[$cnt]";
+                $elem = "[+$cnt]";
                 ++$cnt;
             }
             elsif( $base_type eq 'HASH' ){
-                $elem = "\{'{$class}::$name'\}";
+                $elem = "\{+'$($class)::$name'\}";
             }
-            if( defined %arrays{$name} ){
+            if( defined %arrays{?$name} ){
                 $out .= "    my \$i;\n";
-                $out .= "    \@_ ? (\$i = shift) : return \$r->$elem;\n"; 
+                $out .= "    \@_ ?? (\$i = shift) !! return \$r->$elem;\n"; 
                 $out .= "    if (ref(\$i) eq 'ARRAY' && !\@_) \{ \$r->$elem = \$i; return \$r \}\n";
-                $sel = "->[\$i]";
+                $sel = "->[+\$i]";
             }
-            elsif( defined %hashes{$name} ){
+            elsif( defined %hashes{?$name} ){
                 $out .= "    my \$i;\n";
-                $out .= "    \@_ ? (\$i = shift) : return \$r->$elem;\n";
+                $out .= "    \@_ ?? (\$i = shift) !! return \$r->$elem;\n";
                 $out .= "    if (ref(\$i) eq 'HASH' && !\@_) \{ \$r->$elem = \$i; return \$r \}\n";
-                $sel = "->\{\$i\}";
+                $sel = "->\{+\$i\}";
             }
-            elsif( defined %classes{$name} ){
-                $out .= "    die '$name argument is wrong class' if \@_ && ! UNIVERSAL::isa(\@_[0], '%classes{$name}');\n";
+            elsif( defined %classes{?$name} ){
+                $out .= "    die '$name argument is wrong class' if \@_ && ! UNIVERSAL::isa(\@_[0], '%classes{?$name}');\n";
             }
             $out .= "    die 'Too many args to $name' if nelems(\@_) +> 1;\n";
-            $out .= "    \@_ ? ($pre\$r->$elem$sel = shift$pst) : $pre\$r->$elem$sel$pst;\n";
+            $out .= "    \@_ ?? ($pre\$r->$elem$sel = shift$pst) !! $pre\$r->$elem$sel$pst;\n";
             $out .= "  \}\n";
         }
     }
-    $out .= "\}\n1;\n";
+    $out .= "\};\n1;\n";
 
-    print $out if $print;
+    print $^STDOUT, $out if $print;
     my $result = eval $out;
-    warn $@ if $@;
+    warn $^EVAL_ERROR if $^EVAL_ERROR;
 }
 
 sub _usage_error {
@@ -460,7 +463,7 @@ accessor accordingly.
     sub count {
         my $self = shift;
         if ( @_ ) {
-            die 'count must be nonnegative' if $_[0] < 0;
+            die 'count must be nonnegative' if @_[0] < 0;
             $self->{'MyObj::count'} = shift;
             warn "Too many args to count" if @_;
         }

@@ -1,6 +1,5 @@
 package File::Compare;
 
-use strict;
 use warnings;
 our($VERSION, @ISA, @EXPORT, @EXPORT_OK, $Too_Big);
 
@@ -13,16 +12,11 @@ $VERSION = '1.1005';
 
 $Too_Big = 1024 * 1024 * 2;
 
-sub croak {
-    require Carp;
-    goto &Carp::croak;
-}
-
 sub compare {
-    croak("Usage: compare( file1, file2 [, buffersize]) ")
+    die("Usage: compare( file1, file2 [, buffersize]) ")
       unless((nelems @_) == 2 || (nelems @_) == 3);
 
-    my ($from,$to,$size) = < @_;
+    my @($from,$to,?$size) =  @_;
     my $text_mode = defined($size) && (ref($size) eq 'CODE' || $size +< 0);
 
     my ($fromsize,$closefrom,$closeto);
@@ -30,8 +24,28 @@ sub compare {
     my $from_fh;
     my $to_fh;
 
-    croak("from undefined") unless (defined $from);
-    croak("to undefined") unless (defined $to);
+    my $fail_open1 = sub { return -1; };
+    my $fail_open2 =
+      sub {
+          if ($closefrom) {
+              my $status = $^OS_ERROR;
+              $^OS_ERROR = 0;
+              close $from_fh;
+              $^OS_ERROR = $status unless $^OS_ERROR;
+          }
+          return $fail_open1->();
+      };
+
+  # All of these contortions try to preserve error messages...
+    my $fail_inner =
+      sub {
+          close($to_fh) || return $fail_open2->() if $closeto;
+          close($from_fh) || return $fail_open1->() if $closefrom;
+          return 1;
+      };
+
+    die("from undefined") unless (defined $from);
+    die("to undefined") unless (defined $to);
 
     if (ref($from) && 
         (UNIVERSAL::isa($from,'GLOB') || UNIVERSAL::isa($from,'IO::Handle'))) {
@@ -39,7 +53,7 @@ sub compare {
     } elsif (ref(\$from) eq 'GLOB') {
 	$from_fh = \$from;
     } else {
-	open($from_fh,"<",$from) or goto fail_open1;
+	open($from_fh,"<",$from) or return $fail_open1->();
 	unless ($text_mode) {
 	    binmode $from_fh;
 	    $fromsize = -s $from_fh;
@@ -53,29 +67,29 @@ sub compare {
     } elsif (ref(\$to) eq 'GLOB') {
 	$to_fh = \$to;
     } else {
-	open($to_fh,"<",$to) or goto fail_open2;
+	open($to_fh,"<",$to) or return $fail_open2->();
 	binmode $to_fh unless $text_mode;
 	$closeto = 1;
     }
 
     if (!$text_mode && $closefrom && $closeto) {
 	# If both are opened files we know they differ if their size differ
-	goto fail_inner if $fromsize != -s $to_fh;
+	return $fail_inner->() if $fromsize != -s $to_fh;
     }
 
     if ($text_mode) {
-	local $/ = "\n";
+	local $^INPUT_RECORD_SEPARATOR = "\n";
 	my ($fline,$tline);
 	while (defined($fline = ~< $from_fh)) {
-	    goto fail_inner unless defined($tline = ~< $to_fh);
+	    return $fail_inner->() unless defined($tline = ~< $to_fh);
 	    if (ref $size) {
 		# $size contains ref to comparison function
-		goto fail_inner if &$size($fline, $tline);
+		return $fail_inner->() if &$size($fline, $tline);
 	    } else {
-		goto fail_inner if $fline ne $tline;
+		return $fail_inner->() if $fline ne $tline;
 	    }
 	}
-	goto fail_inner if defined($tline = ~< $to_fh);
+	return $fail_inner->() if defined($tline = ~< $to_fh);
     }
     else {
 	unless (defined($size) && $size +> 0) {
@@ -88,42 +102,25 @@ sub compare {
 	$fbuf = $tbuf = '';
 	while(defined($fr = read($from_fh,$fbuf,$size)) && $fr +> 0) {
 	    unless (defined($tr = read($to_fh,$tbuf,$fr)) && $tbuf eq $fbuf) {
-		goto fail_inner;
+		return $fail_inner->();
 	    }
 	}
-	goto fail_inner if defined($tr = read($to_fh,$tbuf,$size)) && $tr +> 0;
+	return $fail_inner->() if defined($tr = read($to_fh,$tbuf,$size)) && $tr +> 0;
     }
 
-    close($to_fh) || goto fail_open2 if $closeto;
-    close($from_fh) || goto fail_open1 if $closefrom;
+    close($to_fh) || return $fail_open2->() if $closeto;
+    close($from_fh) || return $fail_open1->() if $closefrom;
 
     return 0;
-    
-  # All of these contortions try to preserve error messages...
-  fail_inner:
-    close($to_fh) || goto fail_open2 if $closeto;
-    close($from_fh) || goto fail_open1 if $closefrom;
-
-    return 1;
-
-  fail_open2:
-    if ($closefrom) {
-	my $status = $!;
-	$! = 0;
-	close $from_fh;
-	$! = $status unless $!;
-    }
-  fail_open1:
-    return -1;
 }
 
 *cmp = \&compare;
 
 sub compare_text {
-    my ($from,$to,$cmp) = < @_;
-    croak("Usage: compare_text( file1, file2 [, cmp-function])")
+    my @($from,$to,?$cmp) =  @_;
+    die("Usage: compare_text( file1, file2 [, cmp-function])")
 	unless (nelems @_) == 2 || (nelems @_) == 3;
-    croak("Third arg to compare_text() function must be a code reference")
+    die("Third arg to compare_text() function must be a code reference")
 	if (nelems @_) == 3 && ref($cmp) ne 'CODE';
 
     # Using a negative buffer size puts compare into text_mode too

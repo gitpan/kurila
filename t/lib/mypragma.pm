@@ -26,20 +26,19 @@ Rafael Garcia-Suarez
 
 package mypragma;
 
-use strict;
 use warnings;
 
 sub import {
-    %^H{mypragma} = 42;
+    $^HINTS{+mypragma} = 42;
 }
 
 sub unimport {
-    %^H{mypragma} = 0;
+    $^HINTS{+mypragma} = 0;
 }
 
 sub in_effect {
     my $hinthash = @(caller(0))[10];
-    return $hinthash->{mypragma};
+    return $hinthash->{?mypragma};
 }
 
 1;

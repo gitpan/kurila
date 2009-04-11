@@ -6,8 +6,8 @@
 #   Variant provided by
 #       Adriano Rodrigues Ferreira <ferreira@triang.com.br>
 
-use Test;
-use strict;
+use Test::More;
+
 
 BEGIN { plan tests => 17 }
 
@@ -55,26 +55,26 @@ my $parser = Pod::LaTeX->new(< %params);
 ok($parser);
 
 # Create an output file
-open(OUTFH, ">", "test.tex" ) or die "Unable to open test tex file: $!\n";
+open(my $outfh, ">", "test.tex" ) or die "Unable to open test tex file: $^OS_ERROR\n";
 
 # Read from the DATA filehandle and write to a new output file
 # Really want to write this to a scalar
-$parser->parse_from_filehandle(\*DATA,\*OUTFH);
+$parser->parse_from_filehandle(\*DATA, $outfh);
 
-close(OUTFH) or die "Error closing OUTFH test.tex: $!\n";
+close($outfh) or die "Error closing OUTFH test.tex: $^OS_ERROR\n";
 
 # Now read in OUTFH and compare
-open(INFH, "<", "test.tex") or die "Unable to read test tex file: $!\n";
-my @output = @( ~< *INFH );
+open(my $infh, "<", "test.tex") or die "Unable to read test tex file: $^OS_ERROR\n";
+my @output = @( ~< $infh );
 
-ok((nelems @output), nelems @reference);
+is((nelems @output), nelems @reference);
 
 for my $i (0..((nelems @reference)-1)) {
   next if @reference[$i] =~ m/^%%/; # skip timestamp comments
-  ok(@output[$i], @reference[$i]);
+  is(@output[$i], @reference[$i]);
 }
 
-close(INFH) or die "Error closing INFH test.tex: $!\n";
+close($infh) or die "Error closing INFH test.tex: $^OS_ERROR\n";
 
 
 __DATA__

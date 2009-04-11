@@ -2,8 +2,8 @@
 
 BEGIN {
     chdir 't' if -d 't';
-    @INC = @( '../lib' );
-    %ENV{PERL5LIB} = '../lib';
+    $^INCLUDE_PATH = @( '../lib' );
+    env::var('PERL5LIB' ) = '../lib';
 }
 
 our $pragma_name = "feature";

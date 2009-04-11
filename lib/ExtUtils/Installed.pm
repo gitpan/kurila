@@ -1,7 +1,5 @@
 package ExtUtils::Installed;
 
-use strict;
-use Carp qw();
 use ExtUtils::Packlist;
 use ExtUtils::MakeMaker;
 use Config;
@@ -9,17 +7,16 @@ use File::Find;
 use File::Basename;
 use File::Spec;
 
-my $Is_VMS = $^O eq 'VMS';
-my $DOSISH = ($^O =~ m/^(MSWin\d\d|os2|dos|mint)$/);
+my $Is_VMS = $^OS_NAME eq 'VMS';
+my $DOSISH = ($^OS_NAME =~ m/^(MSWin\d\d|os2|dos|mint)$/);
 
 require VMS::Filespec if $Is_VMS;
 
-use vars < qw($VERSION);
+our ($VERSION);
 $VERSION = '1.43';
 $VERSION = eval $VERSION;
 
-sub _is_prefix {
-    my ($self, $path, $prefix) = < @_;
+sub _is_prefix($self, $path, $prefix) {
     return unless defined $prefix && defined $path;
 
     if( $Is_VMS ) {
@@ -41,35 +38,32 @@ sub _is_prefix {
     return 0;
 }
 
-sub _is_doc {
-    my ($self, $path) = < @_;
+sub _is_doc($self, $path) {
 
-    my $man1dir = $self->{':private:'}->{Config}->{man1direxp};
-    my $man3dir = $self->{':private:'}->{Config}->{man3direxp};
+    my $man1dir = $self->{':private:'}->{Config}->{?man1direxp};
+    my $man3dir = $self->{':private:'}->{Config}->{?man3direxp};
     return ($man1dir && $self->_is_prefix($path, $man1dir))
            ||
            ($man3dir && $self->_is_prefix($path, $man3dir))
-           ? 1 : 0;
+           ?? 1 !! 0;
 }
 
-sub _is_type {
-    my ($self, $path, $type) = < @_;
+sub _is_type($self, $path, $type) {
     return 1 if $type eq "all";
 
     return $self->_is_doc($path) if $type eq "doc";
 
     if ($type eq "prog") {
-        return ($self->_is_prefix($path, $self->{':private:'}->{Config}->{prefix} || $self->{':private:'}->{Config}->{prefixexp})
+        return ($self->_is_prefix($path, $self->{':private:'}->{Config}->{?prefix} || $self->{':private:'}->{Config}->{prefixexp})
                &&
                !($self->_is_doc($path))
-               ? 1 : 0);
+               ?? 1 !! 0);
     }
     return 0;
 }
 
-sub _is_under {
-    my ($self, $path, < @under) = < @_;
-    @under[0] = "" if (! nelems @under);
+sub _is_under($self, $path, @< @under) {
+    @under[+0] = "" if (! nelems @under);
     foreach my $dir ( @under) {
         return 1 if ($self->_is_prefix($path, $dir));
     }
@@ -78,51 +72,54 @@ sub _is_under {
 }
 
 sub new {
-    my ($class) = shift(@_);
+    my $class = shift(@_);
     $class = ref($class) || $class;
 
     my %args = %( < @_ );
 
-    my $self = \%();
+    my $self = \%( ':private:' => \%(),
+                   'Perl' => \%(),
+               );
 
-    if (%args{config_override}) {
+    if (%args{?config_override}) {
         try {
-            $self->{':private:'}->{Config} = \%( < %{%args{config_override}} );
+            $self->{':private:'}->{+Config} = \%( < %{%args{?config_override}} );
         } or die(
             "The 'config_override' parameter must be a hash reference."
         );
     }
     else {
-        $self->{':private:'}->{Config} = \%Config;
+        $self->{':private:'}->{+Config} = \%:<
+          @+: map { @($_ => config_value($_)) }, config_keys();
     }
     
-    for my $tuple (@(\@(inc_override => INC => \ @INC ),
+    for my $tuple (@(\@(inc_override => INC => \$($^INCLUDE_PATH) ),
                    \@( extra_libs => EXTRA => \@() ))) 
     {
-        my ($arg,$key,$val)=< @$tuple;
-        if ( %args{$arg} ) {
+        my @($arg,$key,$val)= @$tuple;
+        if ( %args{?$arg} ) {
             try {
-                $self->{':private:'}->{$key} = \ @{%args{$arg}};
-            } or Carp::croak(
+                $self->{':private:'}->{+$key} = \ @{%args{$arg}};
+            } or die(
                 "The '$arg' parameter must be an array reference."
             );
         }
         elsif ($val) {
-            $self->{':private:'}->{$key} = $val;
+            $self->{':private:'}->{+$key} = $val;
         }
     }
-    {
+    do {
         my %dupe;
-        @{$self->{':private:'}->{INC}} = grep { -e $_ && !%dupe{$_}++ }
- @(            < @{$self->{':private:'}->{INC}}, < @{$self->{':private:'}->{EXTRA}});        
-    }                
-    my $perl5lib = defined %ENV{PERL5LIB} ? %ENV{PERL5LIB} : "";
+        @{$self->{':private:'}->{INC}} = grep { -e $_ && !%dupe{+$_}++ },
+          @: < @{$self->{':private:'}->{?INC}}, < @{$self->{':private:'}->{?EXTRA}};
+    };
+    my $perl5lib = defined env::var('PERL5LIB') ?? env::var('PERL5LIB') !! "";
 
-    my @dirs = @( $self->{':private:'}->{Config}->{archlibexp},
-                 $self->{':private:'}->{Config}->{sitearchexp}, <
-                 split(m/\Q%Config{path_sep}\E/, $perl5lib),
-                 < @{$self->{':private:'}->{EXTRA}},
-               );   
+    my @dirs = @( $self->{':private:'}->{Config}->{?archlibexp},
+                 $self->{':private:'}->{Config}->{?sitearchexp},
+                 < split(m/\Q$(config_value("path_sep"))\E/, $perl5lib),
+                 < @{$self->{':private:'}->{?EXTRA}},
+               );
     
     # File::Find does not know how to deal with VMS filepaths.
     if( $Is_VMS ) {
@@ -136,9 +133,9 @@ sub new {
     my $archlib = @dirs[0];
     
     # Read the core packlist
-    $self->{Perl}->{packlist} =
+    $self->{Perl}->{+packlist} =
       ExtUtils::Packlist->new( File::Spec->catfile($archlib, '.packlist') );
-    $self->{Perl}->{version} = $self->{':private:'}->{Config}->{version};
+    $self->{Perl}->{+version} = $self->{':private:'}->{Config}->{?version};
 
     # Read the module packlists
     my $sub = sub {
@@ -160,25 +157,25 @@ sub new {
         my $modfile = "$module.pm";
         $module =~ s!/!::!g;
 
-        # Find the top-level module file in @INC
-        $self->{$module}->{version} = '';
-        foreach my $dir ( @{$self->{':private:'}->{INC}}) {
+        # Find the top-level module file in $^INCLUDE_PATH
+        $self->{+$module}->{+version} = '';
+        foreach my $dir ( @{$self->{':private:'}->{INC}} ) {
             my $p = File::Spec->catfile($dir, $modfile);
             if (-r $p) {
                 $module = _module_name($p, $module) if $Is_VMS;
 
-                $self->{$module}->{version} = MM->parse_version($p);
+                $self->{$module}->{+version} = MM->parse_version($p);
                 last;
             }
         }
 
         # Read the .packlist
-        $self->{$module}->{packlist} =
+        $self->{$module}->{+packlist} =
           ExtUtils::Packlist->new($File::Find::name);
     };
     my %dupe;
-    @dirs= grep { -e $_ && !%dupe{$_}++ } @dirs;
-    $self->{':private:'}->{LIBDIRS} = \@dirs;    
+    @dirs= grep { -e $_ && !%dupe{+$_}++ }, @dirs;
+    $self->{':private:'}->{+LIBDIRS} = \@dirs;    
     find($sub, < @dirs) if (nelems @dirs);
 
     return bless($self, $class);
@@ -186,12 +183,11 @@ sub new {
 
 # VMS's non-case preserving file-system means the package name can't
 # be reconstructed from the filename.
-sub _module_name {
-    my($file, $orig_module) = < @_;
+sub _module_name($file, $orig_module) {
 
     my $module = '';
-    if (open PACKFH, "<", $file) {
-        while ( ~< *PACKFH) {
+    if (open my $packfh, "<", $file) {
+        while ( ~< *$packfh) {
             if (m/package\s+(\S+)\s*;/) {
                 my $pack = $1;
                 # Make a sanity check, that lower case $module
@@ -203,10 +199,10 @@ sub _module_name {
                 }
             }
         }
-        close PACKFH;
+        close $packfh;
     }
 
-    print STDERR "Couldn't figure out the package name for $file\n"
+    print $^STDERR, "Couldn't figure out the package name for $file\n"
       unless $module;
 
     return $module;
@@ -214,15 +210,13 @@ sub _module_name {
 
 
 
-sub modules {
-    my ($self) = < @_;
+sub modules($self) {
 
     # Bug/feature of sort in scalar context requires this.
-    return sort grep { not m/^:private:$/ } keys %$self;
+    return sort grep { not m/^:private:$/ }, keys %$self;
 }
 
-sub files {
-    my ($self, $module, $type, < @under) = < @_;
+sub files($self, $module, ?$type, @< @under) {
 
     # Validate arguments
     die("$module is not installed") if (! exists($self->{$module}));
@@ -231,7 +225,7 @@ sub files {
         if ($type ne "all" && $type ne "prog" && $type ne "doc");
 
     my (@files);
-    foreach my $file (keys(%{$self->{$module}->{packlist}})) {
+    foreach my $file (keys(%{$self->{$module}->{?packlist}})) {
         push(@files, $file)
           if ($self->_is_type($file, $type) &&
               $self->_is_under($file, < @under));
@@ -239,47 +233,42 @@ sub files {
     return @files;
 }
 
-sub directories {
-    my ($self, $module, $type, < @under) = < @_;
+sub directories($self, $module, ?$type, @< @under) {
     my (%dirs);
     foreach my $file ( $self->files($module, $type, < @under)) {
-        %dirs{dirname($file)}++;
+        %dirs{+dirname($file)}++;
     }
     return sort keys %dirs;
 }
 
-sub directory_tree {
-    my ($self, $module, $type, < @under) = < @_;
+sub directory_tree($self, $module, $type, @< @under) {
     my (%dirs);
     foreach my $dir ( $self->directories($module, $type, < @under)) {
-        %dirs{$dir}++;
-        my ($last) = ("");
+        %dirs{+$dir}++;
+        my @($last) = @("");
         while ($last ne $dir) {
             $last = $dir;
             $dir = dirname($dir);
             last if !$self->_is_under($dir, < @under);
-            %dirs{$dir}++;
+            %dirs{+$dir}++;
         }
     }
     return sort(keys(%dirs));
 }
 
-sub validate {
-    my ($self, $module, $remove) = < @_;
-    Carp::croak("$module is not installed") if (! exists($self->{$module}));
-    return $self->{$module}->{packlist}->validate($remove);
+sub validate($self, $module, ?$remove) {
+    die("$module is not installed") if (! exists($self->{$module}));
+    return $self->{$module}->{?packlist}->validate($remove);
 }
 
-sub packlist {
-    my ($self, $module) = < @_;
-    Carp::croak("$module is not installed") if (! exists($self->{$module}));
-    return $self->{$module}->{packlist};
+sub packlist($self, $module) {
+    die("$module is not installed") if (! exists($self->{$module}));
+    return $self->{$module}->{?packlist};
 }
 
-sub version {
-    my ($self, $module) = < @_;
-    Carp::croak("$module is not installed") if (! exists($self->{$module}));
-    return $self->{$module}->{version};
+sub version($self, $module) {
+    die("$module is not installed") if (! exists($self->{$module}));
+    return $self->{$module}->{?version};
 }
 
 
@@ -316,7 +305,7 @@ information from the .packlist files.
 The new() function searches for all the installed .packlists on the system, and
 stores their contents. The .packlists can be queried with the functions
 described below. Where it searches by default is determined by the settings found
-in C<%Config::Config>, and what the value is of the PERL5LIB environment variable.
+in C<Config::config_value>, and what the value is of the PERL5LIB environment variable.
 
 =head1 FUNCTIONS
 
@@ -326,13 +315,13 @@ in C<%Config::Config>, and what the value is of the PERL5LIB environment variabl
 
 This takes optional named parameters. Without parameters, this
 searches for all the installed .packlists on the system using
-information from C<%Config::Config> and the default module search
-paths C<@INC>. The packlists are read using the
+information from C<Config::config_value> and the default module search
+paths C<$^INCLUDE_PATH>. The packlists are read using the
 L<ExtUtils::Packlist> module.
 
 If the named parameter C<config_override> is specified,
 it should be a reference to a hash which contains all information
-usually found in C<%Config::Config>. For example, you can obtain
+usually found in C<Config::config_value>. For example, you can obtain
 the configuration information for a separate perl installation and
 pass that in.
 
@@ -341,7 +330,7 @@ pass that in.
 
 Similarly, the parameter C<inc_override> may be a reference to an
 array which is used in place of the default module search paths
-from C<@INC>. 
+from C<$^INCLUDE_PATH>. 
 
     use Config;
     my @dirs = split(/\Q$Config{path_sep}\E/, $ENV{PERL5LIB});

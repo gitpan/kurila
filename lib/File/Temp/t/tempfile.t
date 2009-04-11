@@ -1,8 +1,8 @@
 #!/usr/local/bin/perl -w
 # Test for File::Temp - tempfile function
 
-use strict;
-use Test;
+
+use Test::More;
 BEGIN { plan tests => 22}
 use File::Spec;
 
@@ -40,7 +40,7 @@ ok(1);
 
 # Tempfile
 # Open tempfile in some directory, unlink at end
-my ($fh, $tempfile) = < tempfile(
+my @($fh, $tempfile) =  tempfile(
 			       UNLINK => 1,
 			       SUFFIX => '.txt',
 			      );
@@ -55,32 +55,32 @@ push(@files, $tempfile);
 # TEMPDIR test
 # Create temp directory in current dir
 my $template = 'tmpdirXXXXXX';
-print "# Template: $template\n";
+print $^STDOUT, "# Template: $template\n";
 my $tempdir = tempdir( $template ,
 		       DIR => File::Spec->curdir,
 		       CLEANUP => 1,
 		     );
 
-print "# TEMPDIR: $tempdir\n";
+print $^STDOUT, "# TEMPDIR: $tempdir\n";
 
 ok( (-d $tempdir) );
 push(@dirs, $tempdir);
 
 # Create file in the temp dir
-($fh, $tempfile) = < tempfile(
+@($fh, $tempfile) =  tempfile(
 			    DIR => $tempdir,
 			    UNLINK => 1,
 			    SUFFIX => '.dat',
 			   );
 
-print "# TEMPFILE: Created $tempfile\n";
+print $^STDOUT, "# TEMPFILE: Created $tempfile\n";
 
 ok( (-f $tempfile));
 push(@files, $tempfile);
 
 # Test tempfile
 # ..and again
-($fh, $tempfile) = < tempfile(
+@($fh, $tempfile) =  tempfile(
 			    DIR => $tempdir,
 			   );
 
@@ -90,7 +90,7 @@ push(@files, $tempfile);
 
 # Test tempfile
 # ..and another with changed permissions (read-only)
-($fh, $tempfile) = < tempfile(
+@($fh, $tempfile) =  tempfile(
                            DIR => $tempdir,
                           );
 chmod 0444, $tempfile;
@@ -98,17 +98,17 @@ chmod 0444, $tempfile;
 ok( (-f $tempfile ));
 push(@files, $tempfile);
 
-print "# TEMPFILE: Created $tempfile\n";
+print $^STDOUT, "# TEMPFILE: Created $tempfile\n";
 
 # and another (with template)
 
-($fh, $tempfile) = < tempfile( 'helloXXXXXXX',
+@($fh, $tempfile) =  tempfile( 'helloXXXXXXX',
 			    DIR => $tempdir,
 			    UNLINK => 1,
 			    SUFFIX => '.dat',
 			   );
 
-print "# TEMPFILE: Created $tempfile\n";
+print $^STDOUT, "# TEMPFILE: Created $tempfile\n";
 
 ok( (-f $tempfile) );
 push(@files, $tempfile);
@@ -116,8 +116,8 @@ push(@files, $tempfile);
 
 # Create a temporary file that should stay around after
 # it has been closed
-($fh, $tempfile) = < tempfile( 'permXXXXXXX', UNLINK => 0 );
-print "# TEMPFILE: Created $tempfile\n";
+@($fh, $tempfile) =  tempfile( 'permXXXXXXX', UNLINK => 0 );
+print $^STDOUT, "# TEMPFILE: Created $tempfile\n";
 ok( -f $tempfile );
 ok( close( $fh ) );
 push( @still_there, $tempfile); # check at END
@@ -132,19 +132,17 @@ push( @still_there, $tempfile); # check at END
 # Tempfile croaks on error so we need an eval
 $fh = try { tempfile( 'ftmpXXXXX', DIR => < File::Spec->tmpdir ) };
 
-if ($fh) {
+SKIP:
+do {
+  skip "Skip Failed probably due to NFS", 2 if not $fh;
 
   # print something to it to make sure something is there
-  ok( print $fh "Test\n" );
+  ok( print $fh, "Test\n" );
 
   # Close it - can not check it is gone since we dont know the name
   ok( close($fh) );
-
-} else {
-  skip "Skip Failed probably due to NFS", 1;
-  skip "Skip Failed probably due to NFS", 1;
-}
+};
 
 # Now END block will execute to test the removal of directories
-print "# End of tests. Execute END blocks\n";
+print $^STDOUT, "# End of tests. Execute END blocks\n";
 

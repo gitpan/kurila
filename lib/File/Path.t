@@ -1,6 +1,5 @@
 # Path.t -- tests for module File::Path
 
-use strict;
 
 use Test::More tests => 94;
 
@@ -10,9 +9,9 @@ BEGIN {
 }
 
 eval "use Test::Output";
-my $has_Test_Output = $@ ? 0 : 1;
+my $has_Test_Output = $^EVAL_ERROR ?? 0 !! 1;
 
-my $Is_VMS   = $^O eq 'VMS';
+my $Is_VMS   = $^OS_NAME eq 'VMS';
 
 # first check for stupid permissions second for full, so we clean up
 # behind ourselves
@@ -33,7 +32,7 @@ for my $perm (@(0111,0777)) {
 my ($error, $list, $file, $message);
 my $tmp_base = catdir(
     curdir(),
-    sprintf( 'test-%x-%x-%x', time, $$, rand(99999) ),
+    sprintf( 'test-%x-%x-%x', time, $^PID, rand(99999) ),
 );
 
 # invent some names
@@ -52,7 +51,7 @@ is(scalar(nelems @created), 7, "created list of directories");
 # pray for no race conditions blowing them out from under us
 @created = mkpath(\@($tmp_base));
 is(scalar(nelems @created), 0, "skipped making existing directory")
-    or diag("unexpectedly recreated {join ' ',@created}");
+    or diag("unexpectedly recreated $(join ' ',@created)");
 
 @created = mkpath('');
 is(scalar(nelems @created), 0, "Can't create a directory named ''");
@@ -60,19 +59,19 @@ is(scalar(nelems @created), 0, "Can't create a directory named ''");
 my $dir;
 my $dir2;
 
-SKIP: {
+SKIP: do {
     $dir = catdir($tmp_base, 'B');
     $dir2 = catdir($dir, updir());
     # IOW: File::Spec->catdir( qw(foo bar), File::Spec->updir ) eq 'foo'
     # rather than foo/bar/..    
     skip "updir() canonicalises path on this platform", 2
         if $dir2 eq $tmp_base
-            or $^O eq 'cygwin';
+            or $^OS_NAME eq 'cygwin';
         
     @created = mkpath($dir2, \%(mask => 0700));
     is(scalar(nelems @created), 1, "make directory with trailing parent segment");
     is(@created[0], $dir, "made parent");
-};
+};;
 
 my $count = rmtree(\%(error => \$error));
 is( $count, 0, 'rmtree of nothing, count of zero' );
@@ -80,7 +79,7 @@ is( scalar(nelems @$error), 0, 'no diagnostic captured' );
 
 @created = mkpath($tmp_base, 0);
 is(scalar(nelems @created), 0, "skipped making existing directories (old style 1)")
-    or diag("unexpectedly recreated {join ' ',@created}");
+    or diag("unexpectedly recreated $(join ' ',@created)");
 
 $dir = catdir($tmp_base,'C');
 # mkpath returns unix syntax filespecs on VMS
@@ -91,7 +90,7 @@ is(@created[0], $dir, "created directory (new style 1) cross-check");
 
 @created = mkpath($tmp_base, 0, 0700);
 is(scalar(nelems @created), 0, "skipped making existing directories (old style 2)")
-    or diag("unexpectedly recreated {join ' ',@created}");
+    or diag("unexpectedly recreated $(join ' ',@created)");
 
 $dir2 = catdir($tmp_base,'D');
 # mkpath returns unix syntax filespecs on VMS
@@ -126,7 +125,7 @@ rmtree( $dir, $dir2,
 
 is(scalar(nelems @$error), 0, "no errors unlinking a and z");
 is(scalar(nelems @$list),  4, "list contains 4 elements")
-    or diag("{join ' ',@$list}");
+    or diag("$(join ' ',@$list)");
 
 ok(-d $dir,  "dir a still exists");
 ok(-d $dir2, "dir z still exists");
@@ -163,7 +162,7 @@ if (chdir $tmp_base) {
     pass("chdir to temp dir");
 }
 else {
-    fail("chdir to temp dir: $!");
+    fail("chdir to temp dir: $^OS_ERROR");
 }
 
 $dir   = catdir('a', 'd1');
@@ -191,32 +190,32 @@ if (chdir updir()) {
     pass("chdir parent");
 }
 else {
-    fail("chdir parent: $!");
+    fail("chdir parent: $^OS_ERROR");
 }
 
 # see what happens if a file exists where we want a directory
-SKIP: {
+SKIP: do {
     my $entry = catdir($tmp_base, "file");
-    skip "Cannot create $entry", 4 unless open OUT, ">", " $entry";
-    print OUT "test file, safe to delete\n", scalar(localtime), "\n";
-    close OUT;
+    skip "Cannot create $entry", 4 unless open my $out, ">", " $entry";
+    print $out, "test file, safe to delete\n", scalar(localtime), "\n";
+    close $out;
     ok(-e $entry, "file exists in place of directory");
 
     mkpath( $entry, \%(error => \$error) );
     is( scalar(nelems @$error), 1, "caught error condition" );
-    ($file, $message) = each %{$error->[0]};
+    @($file, $message) =@( each %{$error->[0]});
     is( $entry, $file, "and the message is: $message");
 
     try {@created = mkpath($entry, 0, 0700)};
-    $error = $@;
+    $error = $^EVAL_ERROR;
     chomp $error; # just to remove silly # in TAP output
     cmp_ok( $error, 'ne', "", "no directory created (old-style) err=$error" )
         or diag(< @created);
-}
+};
 
 my $extra =  catdir(curdir(), < qw(EXTRA 1 a));
 
-SKIP: {
+SKIP: do {
     skip "extra scenarios not set up, see eg/setup-extra-tests", 14
         unless -e $extra;
 
@@ -234,21 +233,21 @@ SKIP: {
     $dir = catdir('EXTRA', '3', 'S');
     rmtree($dir, \%(error => \$error));
     is( scalar(nelems @$error), 1, 'one error for an unreadable dir' );
-    try { ($file, $message) = each %{$error->[0]}};
+    try { @($file, $message) =@( each %{$error->[0]})};
     is( $file, $dir, 'unreadable dir reported in error' )
         or diag($message);
 
     $dir = catdir('EXTRA', '3', 'T');
     rmtree($dir, \%(error => \$error));
     is( scalar(nelems @$error), 1, 'one error for an unreadable dir T' );
-    try { ($file, $message) = each %{$error->[0]}};
+    try { @($file, $message) =@( each %{$error->[0]})};
     is( $file, $dir, 'unreadable dir reported in error T' );
 
     $dir = catdir( 'EXTRA', '4' );
     rmtree($dir,  \%(result => \$list, error => \$err) );
     is( scalar(nelems @$list), 0, q{don't follow a symlinked dir} );
     is( scalar(nelems @$err),  2, q{two errors when removing a symlink in r/o dir} );
-    try { ($file, $message) = each %{$err->[0]} };
+    try { @($file, $message) =@( each %{$err->[0]}) };
     is( $file, $dir, 'symlink reported in error' );
 
     $dir  = catdir('EXTRA', '3', 'U');
@@ -256,15 +255,15 @@ SKIP: {
     rmtree($dir, $dir2, \%(verbose => 0, error => \$err, result => \$list));
     is( scalar(nelems @$list),  1, q{deleted 1 out of 2 directories} );
     is( scalar(nelems @$error), 1, q{left behind 1 out of 2 directories} );
-    try { ($file, $message) = each %{$err->[0]} };
+    try { @($file, $message) =@( each %{$err->[0]}) };
     is( $file, $dir, 'first dir reported in error' );
-}
+};
 
-SKIP: {
+SKIP: do {
     skip 'Test::Output not available', 14
         unless $has_Test_Output;
 
-    SKIP: {
+    SKIP: do {
         $dir = catdir('EXTRA', '3');
         skip "extra scenarios not set up, see eg/setup-extra-tests", 3
             unless -e $dir;
@@ -301,7 +300,7 @@ cannot remove directory for [^:]+: .* at \1 line \2
 cannot restore permissions to \d+ for [^:]+: .* at \1 line \2},
             'rmtree with insufficient privileges'
         );
-    }
+    };
 
     my $base = catdir($tmp_base,'output');
     $dir  = catdir($base,'A');
@@ -352,11 +351,11 @@ cannot restore permissions to \d+ for [^:]+: .* at \1 line \2},
         'mkpath verbose (new style 2)'
     );
 
-    SKIP: {
+    SKIP: do {
         $file = catdir($dir2, "file");
-        skip "Cannot create $file", 2 unless open OUT, ">", " $file";
-        print OUT "test file, safe to delete\n", scalar(localtime), "\n";
-        close OUT;
+        skip "Cannot create $file", 2 unless open my $out, ">", " $file";
+        print $out, "test file, safe to delete\n", scalar(localtime), "\n";
+        close $out;
 
         ok(-e $file, "file created in directory");
 
@@ -365,10 +364,10 @@ cannot restore permissions to \d+ for [^:]+: .* at \1 line \2},
             "rmdir $dir\nunlink $file\nrmdir $dir2\n",
             'rmtree safe verbose (new style)'
         );
-    }
-}
+    };
+};
 
-SKIP: {
+SKIP: do {
     skip "extra scenarios not set up, see eg/setup-extra-tests", 11
         unless -d catdir( <qw(EXTRA 1));
 
@@ -378,7 +377,7 @@ SKIP: {
     rmtree 'EXTRA', \%(safe => 1, error => \$error);
     is( scalar(nelems @$error), 9, 'safe is better' );
     for ( @$error) {
-        ($file, $message) = each %$_;
+        @($file, $message) =@( each %$_);
         if ($file =~  m/[123]\z/) {
             is(index($message, 'cannot remove directory: '), 0, "failed to remove $file with rmdir")
                 or diag($message);
@@ -388,7 +387,7 @@ SKIP: {
                 or diag($message)
         }
     }
-}
+};
 
 rmtree($tmp_base, \%(result => \$list) );
 is(ref($list), 'ARRAY', "received a final list of results");

@@ -1,40 +1,39 @@
 #!/usr/bin/perl -w
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't';
-        @INC = @('../lib', 'lib');
+        $^INCLUDE_PATH = @('../lib', 'lib');
     }
     else {
-        unshift @INC, 't/lib';
+        unshift $^INCLUDE_PATH, 't/lib';
     }
 }
 
-use strict;
 
 require Test::Simple::Catch;
-my($out, $err) = < Test::Simple::Catch::caught();
-local %ENV{HARNESS_ACTIVE} = 0;
+use env;
+my@($out, $err) =  Test::Simple::Catch::caught();
+local env::var('HARNESS_ACTIVE' ) = 0;
 
 
 # Can't use Test.pm, that's a 5.005 thing.
 package My::Test;
 
-print "1..2\n";
+print $^STDOUT, "1..2\n";
 
 my $test_num = 1;
 # Utility testing functions.
-sub ok ($;$) {
-    my($test, $name) = < @_;
+sub ok($test, ?$name) {
     my $ok = '';
     $ok .= "not " unless $test;
     $ok .= "ok $test_num";
     $ok .= " - $name" if defined $name;
     $ok .= "\n";
-    print $ok;
+    print $^STDOUT, $ok;
     $test_num++;
 
-    return $test ? 1 : 0;
+    return $test ?? 1 !! 0;
 }
 
 
@@ -52,8 +51,8 @@ END {
 not ok 1
 OUT
 
-    My::Test::ok($$err eq <<ERR) || print $$err;
-#   Failed test at $0 line 45.
+    My::Test::ok($$err eq <<ERR) || print $^STDOUT, $$err;
+#   Failed test at $^PROGRAM_NAME line 45.
 # Looks like you failed 1 test of 1.
 ERR
 

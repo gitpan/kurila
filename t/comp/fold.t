@@ -4,7 +4,6 @@ BEGIN {
     require './test.pl';
 }
 
-use strict;
 use warnings;
 
 plan (13);
@@ -20,25 +19,25 @@ plan (13);
 my $a;
 $a = eval '$b = 0/0 if 0; 3';
 is ($a, 3);
-is ($@, "");
+is ($^EVAL_ERROR, "");
 
 my $b = 0;
 $a = eval 'if ($b) {return sqrt -3} 3';
 is ($a, 3);
-is ($@, "");
+is ($^EVAL_ERROR, "");
 
 $a = eval q{
 	$b = eval q{if ($b) {return log 0} 4};
  	is ($b, 4);
-	is ($@, "");
+	is ($^EVAL_ERROR, "");
 	5;
 };
 is ($a, 5);
-is ($@, "");
+is ($^EVAL_ERROR, "");
 
 # warn and die hooks should be disabled during constant folding
 
-{
+do {
     my $c = 0;
     local $^WARN_HOOK = sub { $c++   };
     eval q{
@@ -50,6 +49,6 @@ is ($@, "");
 	$c = 0;
 	$x = 1/0;
     };
-    like ($@->{description}, qr/division/, "eval caught division");
+    like ($^EVAL_ERROR->{?description}, qr/division/, "eval caught division");
     is($c, 2, "missing die hook");
-}
+};

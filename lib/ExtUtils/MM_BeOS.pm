@@ -1,6 +1,5 @@
 package ExtUtils::MM_BeOS;
 
-use strict;
 
 =head1 NAME
 
@@ -46,12 +45,12 @@ libperl.a equivalent to be linked to dynamic extensions.
 =cut
 
 sub init_linker {
-    my($self) = shift;
+    my@($self) =@( shift);
 
-    $self->{PERL_ARCHIVE} ||= 
+    $self->{+PERL_ARCHIVE} ||= 
       File::Spec->catdir('$(PERL_INC)',%Config{libperl});
-    $self->{PERL_ARCHIVE_AFTER} ||= '';
-    $self->{EXPORT_LIST}  ||= '';
+    $self->{+PERL_ARCHIVE_AFTER} ||= '';
+    $self->{+EXPORT_LIST}  ||= '';
 }
 
 =back

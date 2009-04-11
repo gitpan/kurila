@@ -8,52 +8,64 @@ BEGIN {
 # skip all tests unless perl was compiled with -DDEBUGGING
 BEGIN {
     require Config;
-    if (%Config::Config{'ccflags'} !~ m/-DDEBUGGING\b/) {
-        print "1..0 # Skip -- Perl built w/o -DDEBUGGING\n";
-        exit 0;
+    if (Config::config_value('ccflags') !~ m/-DDEBUGGING\b/) {
+        skip_all("Perl built w/o -DDEBUGGING");
     }
 }
 
 plan(tests => 1);
 
-my $result = runperl( prog	=> 'print "foo"',
+my $result = runperl( prog	=> 'print $^STDOUT, "foo"',
 		       args	=> \@( '-Dx' ),
 		       stderr	=> 1,
 		       );
 
 my $refdump = <<'EO_DX_OUT';
 {
-1   TYPE = leave  ===> DONE
+1   TYPE = root  ===> DONE
     TARG = 1
     LOCATION = -e 1 1 
-    FLAGS = (VOID,KIDS,PARENS)
-    PRIVATE = (REFCOUNTED)
+    FLAGS = (UNKNOWN,KIDS)
     REFCNT = 1
     {
-2       TYPE = enter  ===> 3
+2       TYPE = leave  ===> DONE
         LOCATION = -e 1 1 
-    }
-    {
-3       TYPE = nextstate  ===> 4
-        LOCATION = -e 1 1 
-        FLAGS = (VOID)
-        PACKAGE = "main"
-    }
-    {
-6       TYPE = print  ===> 1
-        LOCATION = -e 1 1 
-        FLAGS = (VOID,KIDS)
+        FLAGS = (VOID,KIDS,PARENS)
         {
-4           TYPE = pushmark  ===> 5
+3           TYPE = enter  ===> 4
             LOCATION = -e 1 1 
-            FLAGS = (SCALAR)
         }
         {
-5           TYPE = const  ===> 6
-            LOCATION = -e 1 12 
-            TARG = 1@THR
-            FLAGS = (SCALAR)
-            SV = PV("foo"\0) [UTF8 "foo"]@NO_THR
+4           TYPE = nextstate  ===> 5
+            LOCATION = -e 1 1 
+            FLAGS = (VOID)
+            PACKAGE = "main"
+        }
+        {
+9           TYPE = print  ===> 2
+            LOCATION = -e 1 1 
+            FLAGS = (VOID,KIDS)
+            {
+5               TYPE = pushmark  ===> 6
+                LOCATION = -e 1 7 
+                FLAGS = (SCALAR)
+            }
+            {
+7               TYPE = rv2gv  ===> 8
+                LOCATION = -e 1 7 
+                FLAGS = (SCALAR,KIDS,SPECIAL)
+                {
+6                   TYPE = magicsv  ===> 7
+                    LOCATION = -e 1 7 
+                    FLAGS = (SCALAR)
+                }
+            }
+            {
+8               TYPE = const  ===> 9
+                LOCATION = -e 1 22 
+                FLAGS = (SCALAR)
+                SV = PV("foo"\0) [UTF8 "foo"]
+            }
         }
     }
 }
@@ -61,8 +73,8 @@ EO_DX_OUT
 
 # escape the regex chars in the reference dump
 $refdump =~ s/([{}()\\\[\]])/\\$1/gms;
-$refdump =~ s/(.*)\@THR\n/{ %Config::Config{useithreads} ? $1 . "\n" : '' }/g;
-$refdump =~ s/(.*)\@NO_THR\n/{ %Config::Config{useithreads} ? '' : $1."\n" }/g;
+$refdump =~ s/(.*)\@THR\n/$( Config::config_value("useithreads") ?? $1 . "\n" !! '' )/g;
+$refdump =~ s/(.*)\@NO_THR\n/$( Config::config_value("useithreads") ?? '' !! $1."\n" )/g;
 
 my $qr = qr/$refdump/;
 # diag($qr);

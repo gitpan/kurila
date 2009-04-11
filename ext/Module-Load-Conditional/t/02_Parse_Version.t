@@ -1,28 +1,27 @@
 
-use strict;
 use Test::More  'no_plan';
 
 my $Class   = 'Module::Load::Conditional';
 my $Meth    = '_parse_version';
-my $Verbose = (nelems @ARGV) ? 1 : 0;
+my $Verbose = (nelems @ARGV) ?? 1 !! 0;
 
 use_ok( $Class );
 
 ### versions that should parse
-{   for my $str (  __PACKAGE__->_succeed ) {
+do {   for my $str (  __PACKAGE__->_succeed ) {
         my $res = $Class->?$Meth( $str, $Verbose );
         ok( defined $res,       "String '$str' identified as version string" );
 
-        is( $res->vcmp(0), 1,              "   Version is '{$res->stringify}'" );
+        is( $res->vcmp(0), 1,              "   Version is '$($res->stringify)'" );
     }             
-}
+};
 
 ### version that should fail
-{   for my $str (  __PACKAGE__->_fail ) {
+do {   for my $str (  __PACKAGE__->_fail ) {
         my $res = $Class->?$Meth( $str, $Verbose );
         ok( ! defined $res,     "String '$str' is not a version string" );
     }
-}    
+};    
 
 
 ################################
@@ -32,7 +31,7 @@ use_ok( $Class );
 ################################
 
 sub _succeed {
-    return grep { m/\S/ } map { s/^\s*//; $_ } split "\n", q[
+    return grep { m/\S/ }, map { s/^\s*//; $_ }, split "\n", q[
         our $VERSION = 1;
         *VERSION = \'1.01';
         use version; our $VERSION = qv('0.0.2');
@@ -57,8 +56,8 @@ sub _succeed {
 }
 
 sub _fail {
-    return grep { m/\S/ } map { s/^\s*//; $_ } split "\n", q[
-        use vars qw($VERSION %ERROR $ERROR $Warn $Die);
+    return grep { m/\S/ }, map { s/^\s*//; $_ }, split "\n", q[
+        our ($VERSION, %ERROR, $ERROR, $Warn, $Die);
         sub version { $GD::Graph::colour::VERSION }
         my $VERS = qr{ $HWS VERSION $HWS \n }xms;
         diag( "Testing $main_module \$${main_module}::VERSION" );
@@ -68,7 +67,7 @@ sub _fail {
         'VERSION' => '1.030' # Variable and Value
         'VERSION' => '2.121_020'
         'VERSION' => '0.050', # Standard variable $VERSION
-        use vars qw( $VERSION $seq @FontDirs );
+        our ( $VERSION, $seq, @FontDirs );
         $VERSION
         # *VERSION = \'1.01';
         # ( $VERSION ) = '$Revision: 1.56 $ ' =~ m/\$Revision:\s+([^\s]+)/;

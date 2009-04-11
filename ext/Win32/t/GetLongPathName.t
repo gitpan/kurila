@@ -1,5 +1,4 @@
-use strict;
-use Test;
+use Test::More;
 use Win32;
 
 my @paths = qw(

@@ -1,6 +1,5 @@
 package File::Spec::Unix;
 
-use strict;
 our ($VERSION);
 
 $VERSION = '3.2701';
@@ -39,8 +38,7 @@ actually traverse the filesystem cleaning up paths like this.
 
 =cut
 
-sub canonpath {
-    my ($self,$path) = < @_;
+sub canonpath($self,?$path) {
     return unless defined $path;
     
     # Handle POSIX-style node names beginning with double slash (qnx, nto)
@@ -48,7 +46,7 @@ sub canonpath {
     # may be interpreted in an implementation-defined manner, although
     # more than two leading slashes shall be treated as a single slash.")
     my $node = '';
-    my $double_slashes_special = $^O eq 'qnx' || $^O eq 'nto';
+    my $double_slashes_special = $^OS_NAME eq 'qnx' || $^OS_NAME eq 'nto';
     if ( $double_slashes_special && $path =~ s{^(//[^/]+)(?:/|\z)}{/}s ) {
       $node = $1;
     }
@@ -141,13 +139,6 @@ sub _tmpdir {
     return $tmpdir if defined $tmpdir;
     my $self = shift;
     my @dirlist = @_;
-    {
-	no strict 'refs';
-	if (${*{Symbol::fetch_glob("\cTAINT")}}) { # Check for taint mode on perl >= 5.8.0
-            require Scalar::Util;
-	    @dirlist = grep { ! Scalar::Util::tainted($_) } @dirlist;
-	}
-    }
     foreach ( @dirlist) {
 	next unless defined && -d && -w _;
 	$tmpdir = $_;
@@ -160,7 +151,7 @@ sub _tmpdir {
 
 sub tmpdir {
     return $tmpdir if defined $tmpdir;
-    $tmpdir = @_[0]->_tmpdir( %ENV{TMPDIR}, "/tmp" );
+    $tmpdir = @_[0]->_tmpdir( env::var('TMPDIR'), "/tmp" );
 }
 
 =item updir
@@ -180,7 +171,7 @@ directory. (Does not strip symlinks, only '.', '..', and equivalents.)
 
 sub no_upwards {
     my $self = shift;
-    return grep(!m/^\.{1,2}\z/s, @_);
+    return grep( {!m/^\.{1,2}\z/s }, @_);
 }
 
 =item case_tolerant
@@ -202,8 +193,7 @@ L<File::Spec::VMS/file_name_is_absolute>).
 
 =cut
 
-sub file_name_is_absolute {
-    my ($self,$file) = < @_;
+sub file_name_is_absolute($self,$file) {
     return scalar($file =~ m:^/:s);
 }
 
@@ -214,8 +204,8 @@ Takes no argument, returns the environment variable PATH as an array.
 =cut
 
 sub path {
-    return () unless exists %ENV{PATH};
-    my @path = split(':', %ENV{PATH});
+    return () unless defined env::var('PATH');
+    my @path = split(':', env::var('PATH'));
     foreach ( @path) { $_ = '.' if $_ eq '' }
     return @path;
 }
@@ -251,10 +241,9 @@ The results can be passed to L</catpath()> to get back a path equivalent to
 
 =cut
 
-sub splitpath {
-    my ($self,$path, $nofile) = < @_;
+sub splitpath($self,$path, ?$nofile) {
 
-    my ($volume,$directory,$file) = ('','','');
+    my @($volume,$directory,$file) = @('','','');
 
     if ( $nofile ) {
         $directory = $path;
@@ -307,8 +296,7 @@ inserted if needed (though if the directory portion doesn't start with
 
 =cut
 
-sub catpath {
-    my ($self,$volume,$directory,$file) = < @_;
+sub catpath($self,$volume,$directory,$file) {
 
     if ( $directory ne ''                && 
          $file ne ''                     && 
@@ -352,22 +340,21 @@ Based on code written by Shigio Yamaguchi.
 
 =cut
 
-sub abs2rel {
-    my($self,$path,$base) = < @_;
+sub abs2rel($self,$path,?$base) {
     $base = $self->_cwd() unless defined $base and length $base;
 
-    ($path, $base) = < map { $self->canonpath($_) } @( $path, $base);
+    @($path, $base) =  map { $self->canonpath($_) }, @( $path, $base);
 
-    if (grep $self->file_name_is_absolute($_), @( $path, $base)) {
-	($path, $base) = < map { $self->rel2abs($_) } @( $path, $base);
+    if (grep { $self->file_name_is_absolute($_) }, @( $path, $base)) {
+	@($path, $base) =  map { $self->rel2abs($_) }, @( $path, $base);
     }
     else {
 	# save a couple of cwd()s if both paths are relative
-	($path, $base) = < map { $self->catdir('/', $_) } @( $path, $base);
+	@($path, $base) =  map { $self->catdir('/', $_) }, @( $path, $base);
     }
 
-    my ($path_volume) = < $self->splitpath($path, 1);
-    my ($base_volume) = < $self->splitpath($base, 1);
+    my @($path_volume, ...) =  $self->splitpath($path, 1);
+    my @($base_volume, ...) =  $self->splitpath($base, 1);
 
     # Can't relativize across volumes
     return $path unless $path_volume eq $base_volume;
@@ -391,15 +378,16 @@ sub abs2rel {
       return $self->canonpath( $self->catpath('', $self->catdir( < @pathchunks ), '') );
     }
 
-    while ((nelems @pathchunks) && nelems @basechunks && $self->_same(@pathchunks[0], @basechunks[0])) {
+    while (@pathchunks && @basechunks
+             && $self->_same(@pathchunks[0], @basechunks[0])) {
         shift @pathchunks ;
         shift @basechunks ;
     }
-    return $self->curdir unless (nelems @pathchunks) || nelems @basechunks;
+    return $self->curdir unless @pathchunks || @basechunks;
 
     # $base now contains the directories the resulting relative path 
     # must ascend out of before it can descend to $path_directory.
-    my $result_dirs = $self->catdir( ( $self->updir) x nelems @basechunks, < @pathchunks );
+    my $result_dirs = $self->catdir( < (@( $self->updir) x nelems @basechunks), < @pathchunks );
     return $self->canonpath( $self->catpath('', $result_dirs, '') );
 }
 
@@ -433,8 +421,7 @@ Based on code written by Shigio Yamaguchi.
 
 =cut
 
-sub rel2abs {
-    my ($self,$path,$base ) = < @_;
+sub rel2abs($self,$path,?$base) {
 
     # Clean up $path
     if ( ! $self->file_name_is_absolute( $path ) ) {
@@ -481,13 +468,12 @@ sub _cwd {
 
 
 # Internal method to reduce xx\..\yy -> yy
-sub _collapse {
-    my($fs, $path) = < @_;
+sub _collapse($fs, $path) {
 
     my $updir  = $fs->updir;
     my $curdir = $fs->curdir;
 
-    my($vol, $dirs, $file) = < $fs->splitpath($path);
+    my@($vol, $dirs, $file) =  $fs->splitpath($path);
     my @dirs = $fs->splitdir($dirs);
     pop @dirs if (nelems @dirs) && @dirs[-1] eq '';
 

@@ -10,10 +10,10 @@ package IO::Socket;
 use IO::Handle;
 use Socket v1.3;
 use Carp;
-use strict;
+
 our(@ISA, $VERSION, @EXPORT_OK);
 use Exporter;
-use Errno;
+use Errno < qw|EINPROGRESS EWOULDBLOCK EISCONN|;
 
 # legacy
 
@@ -33,36 +33,33 @@ sub import {
     }
 }
 
-sub new {
-    my($class,< %arg) = < @_;
+sub new($class,%< %arg) {
     my $sock = $class->SUPER::new();
 
     $sock->autoflush(1);
 
-    %{*$sock}{'io_socket_timeout'} = delete %arg{Timeout};
+    %{*$sock}{+'io_socket_timeout'} = delete %arg{Timeout};
 
-    return scalar(%arg) ? $sock->configure(\%arg)
-			: $sock;
+    return scalar(%arg) ?? $sock->configure(\%arg)
+			!! $sock;
 }
 
 my @domain2pkg;
 
-sub register_domain {
-    my($p,$d) = < @_;
-    @domain2pkg[$d] = $p;
+sub register_domain($p,$d) {
+    @domain2pkg[+$d] = $p;
 }
 
-sub configure {
-    my($sock,$arg) = < @_;
+sub configure($sock,$arg) {
     my $domain = delete $arg->{Domain};
 
-    croak 'IO::Socket: Cannot configure a generic socket'
+    die 'IO::Socket: Cannot configure a generic socket'
 	unless defined $domain;
 
-    croak "IO::Socket: Unsupported socket domain"
+    die "IO::Socket: Unsupported socket domain"
 	unless defined @domain2pkg[$domain];
 
-    croak "IO::Socket: Cannot configure socket in domain '$domain'"
+    die "IO::Socket: Cannot configure socket in domain '$domain'"
 	unless ref($sock) eq "IO::Socket";
 
     bless($sock, @domain2pkg[$domain]);
@@ -71,29 +68,29 @@ sub configure {
 
 sub socket {
     (nelems @_) == 4 or croak 'usage: $sock->socket(DOMAIN, TYPE, PROTOCOL)';
-    my($sock,$domain,$type,$protocol) = < @_;
+    my@($sock,$domain,$type,$protocol) =  @_;
 
     socket($sock,$domain,$type,$protocol) or
     	return undef;
 
-    %{*$sock}{'io_socket_domain'} = $domain;
-    %{*$sock}{'io_socket_type'}   = $type;
-    %{*$sock}{'io_socket_proto'}  = $protocol;
+    %{*$sock}{+'io_socket_domain'} = $domain;
+    %{*$sock}{+'io_socket_type'}   = $type;
+    %{*$sock}{+'io_socket_proto'}  = $protocol;
 
     $sock;
 }
 
 sub socketpair {
     (nelems @_) == 4 || croak 'usage: IO::Socket->socketpair(DOMAIN, TYPE, PROTOCOL)';
-    my($class,$domain,$type,$protocol) = < @_;
+    my@($class,$domain,$type,$protocol) =  @_;
     my $sock1 = $class->new();
     my $sock2 = $class->new();
 
     socketpair($sock1,$sock2,$domain,$type,$protocol) or
     	return ();
 
-    %{*$sock1}{'io_socket_type'}  = %{*$sock2}{'io_socket_type'}  = $type;
-    %{*$sock1}{'io_socket_proto'} = %{*$sock2}{'io_socket_proto'} = $protocol;
+    %{*$sock1}{+'io_socket_type'}  = %{*$sock2}{+'io_socket_type'}  = $type;
+    %{*$sock1}{+'io_socket_proto'} = %{*$sock2}{+'io_socket_proto'} = $protocol;
 
     return @($sock1, $sock2);
 }
@@ -102,43 +99,43 @@ sub connect {
     (nelems @_) == 2 or croak 'usage: $sock->connect(NAME)';
     my $sock = shift;
     my $addr = shift;
-    my $timeout = %{*$sock}{'io_socket_timeout'};
+    my $timeout = %{*$sock}{?'io_socket_timeout'};
     my $err;
     my $blocking;
 
     $blocking = $sock->blocking(0) if $timeout;
     if (!connect($sock, $addr)) {
-	if (defined $timeout && (%!{EINPROGRESS} || %!{EWOULDBLOCK})) {
+	if (defined $timeout && ($^OS_ERROR == EINPROGRESS || $^OS_ERROR == EWOULDBLOCK)) {
 	    require IO::Select;
 
 	    my $sel = IO::Select->new( $sock);
 
-	    undef $!;
+	    undef $^OS_ERROR;
 	    if (!$sel->can_write($timeout)) {
-		$err = $! || (exists &Errno::ETIMEDOUT ? &Errno::ETIMEDOUT : 1);
-		$@ = "connect: timeout";
+		$err = $^OS_ERROR || (exists &Errno::ETIMEDOUT ?? &Errno::ETIMEDOUT( < @_ ) !! 1);
+		$^EVAL_ERROR = "connect: timeout";
 	    }
 	    elsif (!connect($sock,$addr) &&
-                not (%!{EISCONN} || ($! == 10022 && $^O eq 'MSWin32'))
+                not ($^OS_ERROR == EISCONN || ($^OS_ERROR == 10022 && $^OS_NAME eq 'MSWin32'))
             ) {
 		# Some systems refuse to re-connect() to
 		# an already open socket and set errno to EISCONN.
 		# Windows sets errno to WSAEINVAL (10022)
-		$err = $!;
-		$@ = "connect: $!";
+		$err = $^OS_ERROR;
+		$^EVAL_ERROR = "connect: $^OS_ERROR";
 	    }
 	}
-        elsif ($blocking || !(%!{EINPROGRESS} || %!{EWOULDBLOCK}))  {
-	    $err = $!;
-	    $@ = "connect: $!";
+        elsif ($blocking || !($^OS_ERROR == EINPROGRESS || $^OS_ERROR == EWOULDBLOCK))  {
+	    $err = $^OS_ERROR;
+	    $^EVAL_ERROR = "connect: $^OS_ERROR";
 	}
     }
 
     $sock->blocking(1) if $blocking;
 
-    $! = $err if $err;
+    $^OS_ERROR = $err if $err;
 
-    $err ? undef : $sock;
+    $err ?? undef !! $sock;
 }
 
 # Enable/disable blocking IO on sockets.
@@ -151,7 +148,7 @@ sub blocking {
     my $sock = shift;
 
     return $sock->SUPER::blocking(< @_)
-        if $^O ne 'MSWin32';
+        if $^OS_NAME ne 'MSWin32';
 
     # Windows handles blocking differently
     #
@@ -168,15 +165,15 @@ sub blocking {
     # because sockets are blocking by default.
     # Therefore internally we have to reverse the semantics.
 
-    my $orig= !%{*$sock}{io_sock_nonblocking};
+    my $orig= !%{*$sock}{?io_sock_nonblocking};
         
     return $orig unless (nelems @_);
 
     my $block = shift;
     
     if ( !$block != !$orig ) {
-        %{*$sock}{io_sock_nonblocking} = $block ? 0 : 1;
-        ioctl($sock, 0x8004667e, pack("L!",%{*$sock}{io_sock_nonblocking}))
+        %{*$sock}{+io_sock_nonblocking} = $block ?? 0 !! 1;
+        ioctl($sock, 0x8004667e, pack("L!",%{*$sock}{?io_sock_nonblocking}))
             or return undef;
     }
     
@@ -187,7 +184,7 @@ sub blocking {
 sub close {
     (nelems @_) == 1 or croak 'usage: $sock->close()';
     my $sock = shift;
-    %{*$sock}{'io_socket_peername'} = undef;
+    %{*$sock}{+'io_socket_peername'} = undef;
     $sock->SUPER::close();
 }
 
@@ -196,25 +193,23 @@ sub bind {
     my $sock = shift;
     my $addr = shift;
 
-    return bind($sock, $addr) ? $sock
-			      : undef;
+    return bind($sock, $addr) ?? $sock
+			      !! undef;
 }
 
-sub listen {
-    (nelems @_) +>= 1 && (nelems @_) +<= 2 or croak 'usage: $sock->listen([QUEUE])';
-    my($sock,$queue) = < @_;
+sub listen($sock,?$queue) {
     $queue = 5
 	unless $queue && $queue +> 0;
 
-    return listen($sock, $queue) ? $sock
-				 : undef;
+    return listen($sock, $queue) ?? $sock
+				 !! undef;
 }
 
 sub accept {
     (nelems @_) == 1 || (nelems @_) == 2 or croak 'usage $sock->accept([PKG])';
     my $sock = shift;
     my $pkg = shift || $sock;
-    my $timeout = %{*$sock}{'io_socket_timeout'};
+    my $timeout = %{*$sock}{?'io_socket_timeout'};
     my $new = $pkg->new(Timeout => $timeout);
     my $peer = undef;
 
@@ -224,8 +219,8 @@ sub accept {
 	my $sel = IO::Select->new( $sock);
 
 	unless ( @( $sel->can_read($timeout) ) ) {
-	    $@ = 'accept: timeout';
-	    $! = (exists &Errno::ETIMEDOUT ? &Errno::ETIMEDOUT : 1);
+	    $^EVAL_ERROR = 'accept: timeout';
+	    $^OS_ERROR = (exists &Errno::ETIMEDOUT ?? &Errno::ETIMEDOUT( < @_ ) !! 1);
 	    return;
 	}
     }
@@ -243,31 +238,31 @@ sub sockname {
 
 sub peername {
     (nelems @_) == 1 or croak 'usage: $sock->peername()';
-    my($sock) = < @_;
-    %{*$sock}{'io_socket_peername'} ||= getpeername($sock);
+    my@($sock) =  @_;
+    %{*$sock}{+'io_socket_peername'} ||= getpeername($sock);
 }
 
 sub connected {
     (nelems @_) == 1 or croak 'usage: $sock->connected()';
-    my($sock) = < @_;
+    my@($sock) =  @_;
     getpeername($sock);
 }
 
 sub send {
     (nelems @_) +>= 2 && (nelems @_) +<= 4 or croak 'usage: $sock->send(BUF, [FLAGS, [TO]])';
     my $sock  = @_[0];
-    my $flags = @_[2] || 0;
-    my $peer  = @_[3] || $sock->peername;
+    my $flags = @_[?2] || 0;
+    my $peer  = @_[?3] || $sock->peername;
 
     croak 'send: Cannot determine peer address'
 	 unless(defined $peer);
 
     my $r = defined(getpeername($sock))
-	? send($sock, @_[1], $flags)
-	: send($sock, @_[1], $flags, $peer);
+	?? send($sock, @_[1], $flags)
+	!! send($sock, @_[1], $flags, $peer);
 
     # remember who we send to, if it was successful
-    %{*$sock}{'io_socket_peername'} = $peer
+    %{*$sock}{+'io_socket_peername'} = $peer
 	if((nelems @_) == 4 && defined $r);
 
     $r;
@@ -277,16 +272,16 @@ sub recv {
     (nelems @_) == 3 || (nelems @_) == 4 or croak 'usage: $sock->recv(BUF, LEN [, FLAGS])';
     my $sock  = @_[0];
     my $len   = @_[2];
-    my $flags = @_[3] || 0;
+    my $flags = @_[?3] || 0;
 
     # remember who we recv'd from
-    %{*$sock}{'io_socket_peername'} = recv($sock, @_[1]='', $len, $flags);
+    %{*$sock}{+'io_socket_peername'} = recv($sock, (@_[1]=''), $len, $flags);
 }
 
 sub shutdown {
     (nelems @_) == 2 or croak 'usage: $sock->shutdown(HOW)';
-    my($sock, $how) = < @_;
-    %{*$sock}{'io_socket_peername'} = undef;
+    my@($sock, $how) =  @_;
+    %{*$sock}{+'io_socket_peername'} = undef;
     shutdown($sock, $how);
 }
 
@@ -308,22 +303,22 @@ sub getsockopt {
 
 sub sockopt {
     my $sock = shift;
-    (nelems @_) == 1 ? $sock->getsockopt(SOL_SOCKET,< @_)
-	    : $sock->setsockopt(SOL_SOCKET,< @_);
+    (nelems @_) == 1 ?? $sock->getsockopt(SOL_SOCKET,< @_)
+	    !! $sock->setsockopt(SOL_SOCKET,< @_);
 }
 
 sub atmark {
     (nelems @_) == 1 or croak 'usage: $sock->atmark()';
-    my($sock) = < @_;
+    my@($sock) =  @_;
     sockatmark($sock);
 }
 
 sub timeout {
     (nelems @_) == 1 || (nelems @_) == 2 or croak 'usage: $sock->timeout([VALUE])';
-    my($sock,$val) = < @_;
-    my $r = %{*$sock}{'io_socket_timeout'};
+    my@($sock,$val) =  @_;
+    my $r = %{*$sock}{?'io_socket_timeout'};
 
-    %{*$sock}{'io_socket_timeout'} = defined $val ? 0 + $val : $val
+    %{*$sock}{+'io_socket_timeout'} = defined $val ?? 0 + $val !! $val
 	if((nelems @_) == 2);
 
     $r;
@@ -332,19 +327,19 @@ sub timeout {
 sub sockdomain {
     (nelems @_) == 1 or croak 'usage: $sock->sockdomain()';
     my $sock = shift;
-    %{*$sock}{'io_socket_domain'};
+    %{*$sock}{?'io_socket_domain'};
 }
 
 sub socktype {
     (nelems @_) == 1 or croak 'usage: $sock->socktype()';
     my $sock = shift;
-    %{*$sock}{'io_socket_type'}
+    %{*$sock}{?'io_socket_type'}
 }
 
 sub protocol {
     (nelems @_) == 1 or croak 'usage: $sock->protocol()';
-    my($sock) = < @_;
-    %{*$sock}{'io_socket_proto'};
+    my@($sock) =  @_;
+    %{*$sock}{?'io_socket_proto'};
 }
 
 1;

@@ -6,11 +6,11 @@ use File::Basename;
 use File::Copy 'copy';
 use File::Find;
 use File::Spec;
-use strict;
 
-use vars < qw($VERSION @ISA @EXPORT_OK 
-          $Is_MacOS $Is_VMS 
-          $Debug $Verbose $Quiet $MANIFEST $DEFAULT_MSKIP);
+
+our ($VERSION, @ISA, @EXPORT_OK, 
+,          $Is_MacOS, $Is_VMS, 
+,          $Debug, $Verbose, $Quiet, $MANIFEST, $DEFAULT_MSKIP);
 
 $VERSION = '1.51_01';
 @ISA=@('Exporter');
@@ -19,13 +19,13 @@ $VERSION = '1.51_01';
                 manifind   maniread   manicopy   maniadd
                );
 
-$Is_MacOS = $^O eq 'MacOS';
-$Is_VMS   = $^O eq 'VMS';
+$Is_MacOS = $^OS_NAME eq 'MacOS';
+$Is_VMS   = $^OS_NAME eq 'VMS';
 require VMS::Filespec if $Is_VMS;
 
-$Debug   = %ENV{PERL_MM_MANIFEST_DEBUG} || 0;
-$Verbose = defined %ENV{PERL_MM_MANIFEST_VERBOSE} ?
-                   %ENV{PERL_MM_MANIFEST_VERBOSE} : 1;
+$Debug   = env::var('PERL_MM_MANIFEST_DEBUG') || 0;
+$Verbose = defined env::var('PERL_MM_MANIFEST_VERBOSE') ??
+                   env::var('PERL_MM_MANIFEST_VERBOSE') !! 1;
 $Quiet = 0;
 $MANIFEST = 'MANIFEST';
 
@@ -84,25 +84,24 @@ that are found in the existing F<MANIFEST> file in the new one.
 =cut
 
 sub _sort {
-    return sort { lc $a cmp lc $b } @_;
+    return sort { lc $a cmp lc $b }, @_;
 }
 
 sub mkmanifest {
     my $manimiss = 0;
     my $read = (-r 'MANIFEST' && maniread()) or $manimiss++;
     $read = \%() if $manimiss;
-    local *M;
     my $bakbase = $MANIFEST;
     $bakbase =~ s/\./_/g if $Is_VMS; # avoid double dots
     rename $MANIFEST, "$bakbase.bak" unless $manimiss;
-    open M, ">", "$MANIFEST" or die "Could not open $MANIFEST: $!";
+    open my $m, ">", "$MANIFEST" or die "Could not open $MANIFEST: $^OS_ERROR";
     my $skip = _maniskip();
     my $found = manifind();
-    my($key,$val,$file,%all);
-    %all = %(< %$found, < %$read);
-    %all{$MANIFEST} = ($Is_VMS ? "$MANIFEST\t\t" : '') . 'This list of files'
+    my($key,$val,%all);
+    %all = %$found +%+ %$read;
+    %all{+$MANIFEST} = ($Is_VMS ?? "$MANIFEST\t\t" !! '') . 'This list of files'
         if $manimiss; # add new MANIFEST to known file list
-    foreach $file ( _sort < keys %all) {
+    foreach my $file ( _sort < keys %all) {
 	if ($skip->($file)) {
 	    # Policy: only remove files if they're listed in MANIFEST.SKIP.
 	    # Don't remove files just because they don't exist.
@@ -112,14 +111,14 @@ sub mkmanifest {
 	if ($Verbose){
 	    warn "Added to $MANIFEST: $file\n" unless exists $read->{$file};
 	}
-	my $text = %all{$file};
+	my $text = %all{?$file};
 	$file = _unmacify($file);
 	my $tabs = (5 - (length($file)+1)/8);
 	$tabs = 1 if $tabs +< 1;
 	$tabs = 0 unless $text;
-	print M $file, "\t" x $tabs, $text, "\n";
+	print $m ,$file, "\t" x $tabs, $text, "\n";
     }
-    close M;
+    close $m;
 }
 
 # Geez, shouldn't this use File::Spec or File::Basename or something?  
@@ -151,10 +150,10 @@ sub manifind {
 	return if -d $_;
 	
         if( $Is_VMS ) {
-            $name =~ s#(.*)\.$#{ lc($1) }#;
+            $name =~ s#(.*)\.$#$( lc($1) )#;
             $name = uc($name) if $name =~ m/^MANIFEST(\.SKIP)?$/i;
         }
-	$found->{$name} = "";
+	$found->{+$name} = "";
     };
 
     # We have to use "$File::Find::dir/$_" in preprocess, because 
@@ -162,7 +161,7 @@ sub manifind {
     # Also, it's okay to use / here, because MANIFEST files use Unix-style 
     # paths.
     find(\%(wanted => $wanted),
-	 $Is_MacOS ? ":" : ".");
+	 $Is_MacOS ?? ":" !! ".");
 
     return $found;
 }
@@ -227,8 +226,7 @@ file.
 
 =cut
 
-sub skipcheck {
-    my($p) = < @_;
+sub skipcheck(?$p) {
     my $found = manifind();
     my $matches = _maniskip();
 
@@ -251,13 +249,13 @@ sub _check_files {
     my $read = maniread() || \%();
     my $found = manifind($p);
 
-    my(@missfile) = @( () );
+    my@(@missfile) =@( @( () ));
     foreach my $file ( _sort < keys %$read){
         warn "Debug: manicheck checking from $MANIFEST $file\n" if $Debug;
         if ($dosnames){
             $file = lc $file;
-            $file =~ s=(\.(\w|-)+)={substr ($1,0,4)}=g;
-            $file =~ s=((\w|-)+)={substr ($1,0,8)}=g;
+            $file =~ s=(\.(\w|-)+)=$(substr ($1,0,4))=g;
+            $file =~ s=((\w|-)+)=$(substr ($1,0,8))=g;
         }
         unless ( exists $found->{$file} ) {
             warn "No such file: $file\n" unless $Quiet;
@@ -269,8 +267,7 @@ sub _check_files {
 }
 
 
-sub _check_manifest {
-    my($p) = < @_;
+sub _check_manifest(?$p) {
     my $read = maniread() || \%();
     my $found = manifind($p);
     my $skip  = _maniskip();
@@ -280,7 +277,7 @@ sub _check_manifest {
         next if $skip->($file);
         warn "Debug: manicheck checking from disk $file\n" if $Debug;
         unless ( exists $read->{$file} ) {
-            my $canon = $Is_MacOS ? "\t" . _unmacify($file) : '';
+            my $canon = $Is_MacOS ?? "\t" . _unmacify($file) !! '';
             warn "Not in $MANIFEST: $file$canon\n" unless $Quiet;
             push @missentry, $file;
         }
@@ -302,33 +299,32 @@ start with C<#> in the C<MANIFEST> file are discarded.
 
 =cut
 
-sub maniread {
-    my ($mfile) = < @_;
+sub maniread(?$mfile) {
     $mfile ||= $MANIFEST;
     my $read = \%();
     my $m;
     unless (open $m, "<", $mfile){
-        warn "Problem opening $mfile: $!";
+        warn "Problem opening $mfile: $^OS_ERROR";
         return $read;
     }
-    local $_;
+    local $_ = undef;
     while ( ~< $m){
         chomp;
         next if m/^\s*#/;
 
-        my($file, $comment) = m/^(\S+)\s*(.*)/;
+        my @(?$file, ?$comment) = @: m/^(\S+)\s*(.*)/;
         next unless $file;
 
         if ($Is_MacOS) {
             $file = _macify($file);
-            $file =~ s/\\([0-3][0-7][0-7])/{sprintf("\%c", oct($1))}/g;
+            $file =~ s/\\([0-3][0-7][0-7])/$(sprintf("\%c", oct($1)))/g;
         }
         elsif ($Is_VMS) {
             require File::Basename;
-            my($base,$dir) = < File::Basename::fileparse($file);
+            my@($base,$dir) =  File::Basename::fileparse($file);
             # Resolve illegal file specifications in the same way as tar
             $dir =~ s/./_/g;
-            my(@pieces) = split(m/\./,$base);
+            my@(@pieces) = split@(m/\./,$base);
             if ((nelems @pieces) +> 2) { $base = shift(@pieces) . '.' . join('_', @pieces); }
             my $okfile = "$dir$base";
             warn "Debug: Illegal name $file changed to $okfile\n" if $Debug;
@@ -336,7 +332,7 @@ sub maniread {
             $file = lc($file) unless $file =~ m/^MANIFEST(\.SKIP)?$/;
         }
 
-        $read->{$file} = $comment;
+        $read->{+$file} = $comment;
     }
     close $m;
     $read;
@@ -347,23 +343,24 @@ sub _maniskip {
     my @skip ;
     my $mfile = "$MANIFEST.SKIP";
     _check_mskip_directives($mfile) if -f $mfile;
-    local(*M, $_);
-    open M, "<", $mfile or open M, "<", $DEFAULT_MSKIP or return sub {0};
-    while ( ~< *M){
+    local($_);
+    my $m;
+    open $m, "<", $mfile or open $m, "<", $DEFAULT_MSKIP or return sub {0};
+    while ( ~< $m){
 	chomp;
 	s/\r//;
 	next if m/^#/;
 	next if m/^\s*$/;
 	push @skip, _macify($_);
     }
-    close M;
+    close $m;
     return sub {0} unless (scalar nelems @skip +> 0);
 
-    my $opts = $Is_VMS ? '(?i)' : '';
+    my $opts = $Is_VMS ?? '(?i)' !! '';
 
     # Make sure each entry is isolated in its own parentheses, in case
     # any of them contain alternations
-    my $regex = join '|', map "(?:$_)", @skip;
+    my $regex = join '|', map { "(?:$_)" }, @skip;
 
     return sub { @_[0] =~ qr{$opts$regex} };
 }
@@ -376,14 +373,15 @@ sub _maniskip {
 # and an external manifest.skip file
 sub _check_mskip_directives {
     my $mfile = shift;
-    local (*M, $_);
+    local ($_);
     my @lines = @( () );
     my $flag = 0;
-    unless (open M, "<", $mfile) {
-        warn "Problem opening $mfile: $!";
+    my $m;
+    unless (open $m, "<", $mfile) {
+        warn "Problem opening $mfile: $^OS_ERROR";
         return;
     }
-    while ( ~< *M) {
+    while ( ~< $m) {
         if (m/^#!include_default\s*$/) {
 	    if (my @default = _include_mskip_file()) {
 	        push @lines, < @default;
@@ -403,18 +401,18 @@ sub _check_mskip_directives {
         }
         push @lines, $_;
     }
-    close M;
+    close $m;
     return unless $flag;
     my $bakbase = $mfile;
     $bakbase =~ s/\./_/g if $Is_VMS;  # avoid double dots
     rename $mfile, "$bakbase.bak";
     warn "Debug: Saving original $mfile as $bakbase.bak\n" if $Debug;
-    unless (open M, ">", "$mfile") {
-        warn "Problem opening $mfile: $!";
+    unless (open $m, ">", "$mfile") {
+        warn "Problem opening $mfile: $^OS_ERROR";
         return;
     }
-    print M $_ for @( (< @lines));
-    close M;
+    print $m ,$_ for @( (< @lines));
+    close $m;
     return;
 }
 
@@ -426,15 +424,16 @@ sub _include_mskip_file {
         warn qq{Included file "$mskip" not found - skipping};
         return;
     }
-    local (*M, $_);
-    unless (open M, "<", $mskip) {
-        warn "Problem opening $mskip: $!";
+    local ($_);
+    my $m;
+    unless (open $m, "<", $mskip) {
+        warn "Problem opening $mskip: $^OS_ERROR";
         return;
     }
     my @lines = @( () );
     push @lines, "\n#!start included $mskip\n";
-    push @lines, $_ while ~< *M;
-    close M;
+    push @lines, $_ while ~< $m;
+    close $m;
     push @lines, "#!end included $mskip\n\n";
     return @lines;
 }
@@ -460,15 +459,14 @@ default.
 
 =cut
 
-sub manicopy {
-    my($read,$target,$how)=< @_;
+sub manicopy($read,$target,$how) {
     die "manicopy() called without target argument" unless defined $target;
     $how ||= 'cp';
     require File::Path;
     require File::Basename;
 
     $target = VMS::Filespec::unixify($target) if $Is_VMS;
-    File::Path::mkpath(\@( $target ),! $Quiet,$Is_VMS ? undef : 0755);
+    File::Path::mkpath(\@( $target ),! $Quiet,$Is_VMS ?? undef !! 0755);
     foreach my $file (keys %$read){
     	if ($Is_MacOS) {
 	    if ($file =~ m!:!) { 
@@ -482,55 +480,53 @@ sub manicopy {
 	    if ($file =~ m!/!) { # Ilya, that hurts, I fear, or maybe not?
 		my $dir = File::Basename::dirname($file);
 		$dir = VMS::Filespec::unixify($dir) if $Is_VMS;
-		File::Path::mkpath(\@("$target/$dir"),! $Quiet,$Is_VMS ? undef : 0755);
+		File::Path::mkpath(\@("$target/$dir"),! $Quiet,$Is_VMS ?? undef !! 0755);
 	    }
 	    cp_if_diff($file, "$target/$file", $how);
 	}
     }
 }
 
-sub cp_if_diff {
-    my($from, $to, $how)=< @_;
-    -f $from or warn "$0: $from not found";
-    my($diff) = 0;
-    local(*F,*T);
-    open(F, "<","$from\0") or die "Can't read $from: $!\n";
-    if (open(T, "<","$to\0")) {
-        local $_;
-	while ( ~< *F) { $diff++,last if $_ ne ~< *T; }
-	$diff++ unless eof(T);
-	close T;
+sub cp_if_diff($from, $to, $how) {
+    -f $from or warn "$^PROGRAM_NAME: $from not found";
+    my $diff = 0;
+    my ($f, $t);
+    open($f, "<","$from\0") or die "Can't read $from: $^OS_ERROR\n";
+    if (open($t, "<","$to\0")) {
+        local $_ = undef;
+	while ( ~< $f) { $diff++,last if $_ ne ~< $t; }
+	$diff++ unless eof($t);
+	close $t;
     }
     else { $diff++; }
-    close F;
+    close $f;
     if ($diff) {
 	if (-e $to) {
-	    unlink($to) or die "unlink $to: $!";
+	    unlink($to) or die "unlink $to: $^OS_ERROR";
 	}
-        STRICT_SWITCH: {
+        STRICT_SWITCH: do {
 	    best($from,$to), last STRICT_SWITCH if $how eq 'best';
 	    cp($from,$to), last STRICT_SWITCH if $how eq 'cp';
 	    ln($from,$to), last STRICT_SWITCH if $how eq 'ln';
 	    die("ExtUtils::Manifest::cp_if_diff " .
 		  "called with illegal how argument [$how]. " .
 		  "Legal values are 'best', 'cp', and 'ln'.");
-	}
+	};
     }
 }
 
-sub cp {
-    my ($srcFile, $dstFile) = < @_;
-    my ($access,$mod) = < @(stat $srcFile)[[8..9]];
+sub cp($srcFile, $dstFile) {
+    my @($access,$mod) =  @(stat $srcFile)[[8..9]];
 
     copy($srcFile,$dstFile);
-    utime $access, $mod + ($Is_VMS ? 1 : 0), $dstFile;
+    utime $access, $mod + ($Is_VMS ?? 1 !! 0), $dstFile;
     _manicopy_chmod($srcFile, $dstFile);
 }
 
 
 sub ln {
-    my ($srcFile, $dstFile) = < @_;
-    return &cp if $Is_VMS or ($^O eq 'MSWin32' and Win32::IsWin95());
+    my @($srcFile, $dstFile) =  @_;
+    return &cp( < @_ ) if $Is_VMS or ($^OS_NAME eq 'MSWin32' and Win32::IsWin95());
     link($srcFile, $dstFile);
 
     unless( _manicopy_chmod($srcFile, $dstFile) ) {
@@ -543,28 +539,25 @@ sub ln {
 # 1) Strip off all group and world permissions.
 # 2) Let everyone read it.
 # 3) If the owner can execute it, everyone can.
-sub _manicopy_chmod {
-    my($srcFile, $dstFile) = < @_;
+sub _manicopy_chmod($srcFile, $dstFile) {
 
     my $perm = 0444 ^|^ @(stat $srcFile)[2] ^&^ 0700;
-    chmod( $perm ^|^ ( $perm ^&^ 0100 ? 0111 : 0 ), $dstFile );
+    chmod( $perm ^|^ ( $perm ^&^ 0100 ?? 0111 !! 0 ), $dstFile );
 }
 
 # Files that are often modified in the distdir.  Don't hard link them.
 my @Exceptions = qw(MANIFEST META.yml SIGNATURE);
-sub best {
-    my ($srcFile, $dstFile) = < @_;
+sub best($srcFile, $dstFile) {
 
-    my $is_exception = grep $srcFile =~ m/$_/, @Exceptions;
-    if ($is_exception or !%Config{d_link} or -l $srcFile) {
+    my $is_exception = grep { $srcFile =~ m/$_/ }, @Exceptions;
+    if ($is_exception or ! config_value("d_link") or -l $srcFile) {
 	cp($srcFile, $dstFile);
     } else {
 	ln($srcFile, $dstFile) or cp($srcFile, $dstFile);
     }
 }
 
-sub _macify {
-    my($file) = < @_;
+sub _macify($file) {
 
     return $file unless $Is_MacOS;
 
@@ -577,8 +570,7 @@ sub _macify {
     $file;
 }
 
-sub _maccat {
-    my($f1, $f2) = < @_;
+sub _maccat($f1, $f2) {
 
     return "$f1/$f2" unless $Is_MacOS;
 
@@ -587,13 +579,12 @@ sub _maccat {
     return $f1;
 }
 
-sub _unmacify {
-    my($file) = < @_;
+sub _unmacify($file) {
 
     return $file unless $Is_MacOS;
 
     $file =~ s|^:||;
-    $file =~ s|([/ \n])|{sprintf("\\\%03o", unpack("c", $1))}|g;
+    $file =~ s|([/ \n])|$(sprintf("\\\%03o", unpack("c", $1)))|g;
     $file =~ s|:|/|g;
 
     $file;
@@ -611,23 +602,23 @@ $file will be normalized (ie. Unixified).  B<UNIMPLEMENTED>
 =cut
 
 sub maniadd {
-    my($additions) = shift;
+    my@($additions) =@( shift);
 
     _normalize($additions);
     _fix_manifest($MANIFEST);
 
     my $manifest = maniread();
-    my @needed = grep { !exists $manifest->{$_} } keys %$additions;
+    my @needed = grep { !exists $manifest->{$_} }, keys %$additions;
     return 1 unless (nelems @needed);
 
-    open(MANIFEST, ">>", "$MANIFEST") or 
-      die "maniadd() could not open $MANIFEST: $!";
+    open(my $manifest_fh, ">>", "$MANIFEST") or 
+      die "maniadd() could not open $MANIFEST: $^OS_ERROR";
 
     foreach my $file ( _sort < @needed) {
-        my $comment = $additions->{$file} || '';
-        printf MANIFEST "\%-40s \%s\n", $file, $comment;
+        my $comment = $additions->{?$file} || '';
+        printf $manifest_fh ,"\%-40s \%s\n", $file, $comment;
     }
-    close MANIFEST or die "Error closing $MANIFEST: $!";
+    close $manifest_fh or die "Error closing $MANIFEST: $^OS_ERROR";
 
     return 1;
 }
@@ -637,17 +628,17 @@ sub maniadd {
 sub _fix_manifest {
     my $manifest_file = shift;
 
-    open MANIFEST, "<", $MANIFEST or die "Could not open $MANIFEST: $!";
+    open my $manifest_fh, "<", $MANIFEST or die "Could not open $MANIFEST: $^OS_ERROR";
 
     # Yes, we should be using seek(), but I'd like to avoid loading POSIX
     # to get SEEK_*
-    my @manifest = @( ~< *MANIFEST );
-    close MANIFEST;
+    my @manifest = @( ~< $manifest_fh );
+    close $manifest_fh;
 
     unless( @manifest[-1] =~ m/\n\z/ ) {
-        open MANIFEST, ">>", "$MANIFEST" or die "Could not open $MANIFEST: $!";
-        print MANIFEST "\n";
-        close MANIFEST;
+        open $manifest_fh, ">>", "$MANIFEST" or die "Could not open $MANIFEST: $^OS_ERROR";
+        print $manifest_fh, "\n";
+        close $manifest_fh;
     }
 }
 

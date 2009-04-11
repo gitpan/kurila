@@ -2,22 +2,9 @@ package Term::Cap;
 
 # Since the debugger uses Term::ReadLine which uses Term::Cap, we want
 # to load as few modules as possible.  This includes Carp.pm.
-sub carp
-{
-    require Carp;
-    goto &Carp::carp;
-}
 
-sub croak
-{
-    require Carp;
-    goto &Carp::croak;
-}
-
-use strict;
-
-use vars < qw($VERSION $VMS_TERMCAP);
-use vars < qw($termpat $state $first $entry);
+our ($VERSION, $VMS_TERMCAP);
+our ($termpat, $state, $first, $entry);
 
 $VERSION = '1.12';
 
@@ -104,7 +91,7 @@ output the string to $FH if specified.
 # If a different termcap is required then the text of one can be supplied
 # in $Term::Cap::VMS_TERMCAP before Tgetent is called.
 
-if ( $^O eq 'VMS' )
+if ( $^OS_NAME eq 'VMS' )
 {
     chomp( my @entry = @( ~< *DATA ) );
     $VMS_TERMCAP = join '', @entry;
@@ -117,32 +104,32 @@ sub termcap_path
     my @termcap_path;
 
     # $TERMCAP, if it's a filespec
-    push( @termcap_path, %ENV{TERMCAP} )
+    push( @termcap_path, env::var('TERMCAP') )
       if (
-        ( exists %ENV{TERMCAP} )
+        ( defined env::var('TERMCAP') )
         && (
-            ( $^O eq 'os2' || $^O eq 'MSWin32' || $^O eq 'dos' )
-            ? %ENV{TERMCAP} =~ m/^[a-z]:[\\\/]/is
-            : %ENV{TERMCAP} =~ m/^\//s
+            ( $^OS_NAME eq 'os2' || $^OS_NAME eq 'MSWin32' || $^OS_NAME eq 'dos' )
+            ?? env::var('TERMCAP') =~ m/^[a-z]:[\\\/]/is
+            !! env::var('TERMCAP') =~ m/^\//s
         )
       );
-    if ( ( exists %ENV{TERMPATH} ) && ( %ENV{TERMPATH} ) )
+    if ( env::var('TERMPATH') )
     {
 
         # Add the users $TERMPATH
-        push( @termcap_path, < split( m/(:|\s+)/, %ENV{TERMPATH} ) );
+        push( @termcap_path, < split( m/(:|\s+)/, env::var('TERMPATH') ) );
     }
     else
     {
 
         # Defaults
         push( @termcap_path,
-            exists %ENV{'HOME'} ? %ENV{'HOME'} . '/.termcap' : undef,
+            defined env::var('HOME') ?? env::var('HOME') . '/.termcap' !! undef,
             '/etc/termcap', '/usr/share/misc/termcap', );
     }
 
     # return the list of those termcaps that exist
-    return grep { defined $_ && -f $_ } @termcap_path;
+    return grep { defined $_ && -f $_ }, @termcap_path;
 }
 
 =item B<Tgetent>
@@ -191,36 +178,34 @@ an old DSD-style speed ( where 13 equals 9600).
 =item TERM
 
 The terminal type whose termcap entry will be used - if not supplied it will
-default to $ENV{TERM}: if that is not set then B<Tgetent> will croak.
+default to $ENV{TERM}: if that is not set then B<Tgetent> will die.
 
 =back
 
-It calls C<croak> on failure.
+It calls C<die> on failure.
 
 =cut
 
-sub Tgetent
+sub Tgetent($class, $self)
 {    ## public -- static method
-    my $class = shift;
-    my ($self) = < @_;
 
     $self = \%() unless defined $self;
     bless $self, $class;
 
-    my ( $term, $cap, $search, $field, $max, $tmp_term, $TERMCAP );
+    my ( $term, $cap, $search, $max, $tmp_term, $TERMCAP );
     local ( $termpat, $state, $first, $entry );    # used inside eval
-    local $_;
+    local $_ = undef;
 
     # Compute PADDING factor from OSPEED (to be used by Tpad)
-    if ( !$self->{OSPEED} )
+    if ( !$self->{?OSPEED} )
     {
-        if ($^W)
+        if ($^WARNING)
         {
-            carp "OSPEED was not set, defaulting to 9600";
+            warn "OSPEED was not set, defaulting to 9600";
         }
-        $self->{OSPEED} = 9600;
+        $self->{+OSPEED} = 9600;
     }
-    if ( $self->{OSPEED} +< 16 )
+    if ( $self->{?OSPEED} +< 16 )
     {
 
         # delays for old style speeds
@@ -228,42 +213,42 @@ sub Tgetent
             0,    200, 133.3, 90.9, 74.3, 66.7, 50, 33.3,
             16.7, 8.3, 5.5,   4.1,  2,    1,    .5, .2
         );
-        $self->{PADDING} = @pad[ $self->{OSPEED} ];
+        $self->{+PADDING} = @pad[ $self->{?OSPEED} ];
     }
     else
     {
-        $self->{PADDING} = 10000 / $self->{OSPEED};
+        $self->{+PADDING} = 10000 / $self->{?OSPEED};
     }
 
-    unless ( $self->{TERM} )
+    unless ( $self->{?TERM} )
     {
-       if ( %ENV{TERM} )
+       if ( env::var('TERM') )
        {
-         $self->{TERM} =  %ENV{TERM} ;
+         $self->{+TERM} =  env::var('TERM') ;
        }
        else
        {
-          if ( $^O eq 'Win32' )
+          if ( $^OS_NAME eq 'Win32' )
           {
-             $self->{TERM} =  'dumb';
+             $self->{+TERM} =  'dumb';
           }
           else
           {
-             croak "TERM not set";
+             die "TERM not set";
           }
        }
     }
 
-    $term = $self->{TERM};    # $term is the term type we are looking for
+    $term = $self->{?TERM};    # $term is the term type we are looking for
 
     # $tmp_term is always the next term (possibly :tc=...:) we are looking for
-    $tmp_term = $self->{TERM};
+    $tmp_term = $self->{?TERM};
 
     # protect any pattern metacharacters in $tmp_term
     $termpat = $tmp_term;
     $termpat =~ s/(\W)/\\$1/g;
 
-    my $foo = ( exists %ENV{TERMCAP} ? %ENV{TERMCAP} : '' );
+    my $foo = env::var('TERMCAP') // '' ;
 
     # $entry is the extracted termcap entry
     if ( ( $foo !~ m:^/:s ) && ( $foo =~ m/(^|\|)$termpat(?:)[:|]/s ) )
@@ -277,15 +262,15 @@ sub Tgetent
     {
 
         # last resort--fake up a termcap from terminfo
-        local %ENV{TERM} = $term;
+        local env::var('TERM' ) = $term;
 
-        if ( $^O eq 'VMS' )
+        if ( $^OS_NAME eq 'VMS' )
         {
             $entry = $VMS_TERMCAP;
         }
         else
         {
-            if ( grep { -x "$_/infocmp" } split m/:/, %ENV{PATH} )
+            if ( grep { -x "$_/infocmp" }, split m/:/, env::var('PATH') )
             {
                 try {
                     my $tmp = `infocmp -C 2>/dev/null`;
@@ -300,7 +285,7 @@ sub Tgetent
             else
             {
                # this is getting desperate now
-               if ( $self->{TERM} eq 'dumb' )
+               if ( $self->{?TERM} eq 'dumb' )
                {
                   $entry = 'dumb|80-column dumb tty::am::co#80::bl=^G:cr=^M:do=^J:sf=^J:';
                }
@@ -308,7 +293,7 @@ sub Tgetent
         }
     }
 
-    croak "Can't find a valid termcap file" unless (nelems @termcap_path) || $entry;
+    die "Can't find a valid termcap file" unless (nelems @termcap_path) || $entry;
 
     $state = 1;    # 0 == finished
                    # 1 == next file
@@ -364,55 +349,55 @@ sub Tgetent
 
             # get the next TERMCAP
             $TERMCAP = shift @termcap_path
-              || croak "failed termcap lookup on $tmp_term";
+              || die "failed termcap lookup on $tmp_term";
         }
         else
         {
 
             # do the same file again
             # prevent endless recursion
-            $max-- || croak "failed termcap loop at $tmp_term";
+            $max-- || die "failed termcap loop at $tmp_term";
             $state = 1;    # ok, maybe do a new file next time
         }
 
-        open( TERMCAP, "<", "$TERMCAP\0" ) || croak "open $TERMCAP: $!";
+        open( my $termcap_fh, "<", "$TERMCAP\0" ) || die "open $TERMCAP: $^OS_ERROR";
         eval $search;
-        die $@ if $@;
-        close TERMCAP;
+        die $^EVAL_ERROR if $^EVAL_ERROR;
+        close $termcap_fh;
 
         # If :tc=...: found then search this file again
-        $entry =~ s/:tc=([^:]+):/:/ && ( $tmp_term = $1, $state = 2 );
+        $entry =~ s/:tc=([^:]+):/:/ && ( ($tmp_term = $1), ($state = 2) );
 
         # protect any pattern metacharacters in $tmp_term
         $termpat = $tmp_term;
         $termpat =~ s/(\W)/\\$1/g;
     }
 
-    croak "Can't find $term" if $entry eq '';
+    die "Can't find $term" if $entry eq '';
     $entry =~ s/:+\s*:+/:/g;    # cleanup $entry
     $entry =~ s/:+/:/g;         # cleanup $entry
-    $self->{TERMCAP} = $entry;  # save it
+    $self->{+TERMCAP} = $entry;  # save it
                                 # print STDERR "DEBUG: $entry = ", $entry, "\n";
 
     # Precompile $entry into the object
     $entry =~ s/^[^:]*://;
-    foreach $field ( split( m/:[\s:\\]*/, $entry ) )
+    foreach my $field ( split( m/:[\s:\\]*/, $entry ) )
     {
         if ( defined $field && $field =~ m/^(\w\w)$/ )
         {
-            $self->{ '_' . $field } = 1 unless defined $self->{ '_' . $1 };
+            $self->{+'_' . $field } = 1 unless defined $self->{?'_' . $1 };
 
             # print STDERR "DEBUG: flag $1\n";
         }
         elsif ( defined $field && $field =~ m/^(\w\w)\@/ )
         {
-            $self->{ '_' . $1 } = "";
+            $self->{+'_' . $1 } = "";
 
             # print STDERR "DEBUG: unset $1\n";
         }
         elsif ( defined $field && $field =~ m/^(\w\w)#(.*)/ )
         {
-            $self->{ '_' . $1 } = $2 unless defined $self->{ '_' . $1 };
+            $self->{+'_' . $1 } = $2 unless defined $self->{?'_' . $1 };
 
             # print STDERR "DEBUG: numeric $1 = $2\n";
         }
@@ -420,10 +405,10 @@ sub Tgetent
         {
 
             # print STDERR "DEBUG: string $1 = $2\n";
-            next if defined $self->{ '_' . ( $cap = $1 ) };
+            next if defined $self->{?'_' . ( $cap = $1 ) };
             $_ = $2;
             s/\\E/\033/g;
-            s/\\(\d\d\d)/{pack('c',oct($1) ^&^ 0177)}/g;
+            s/\\(\d\d\d)/$(pack('c',oct($1) ^&^ 0177))/g;
             s/\\n/\n/g;
             s/\\r/\r/g;
             s/\\t/\t/g;
@@ -431,16 +416,16 @@ sub Tgetent
             s/\\f/\f/g;
             s/\\\^/\377/g;
             s/\^\?/\177/g;
-            s/\^(.)/{pack('c',ord($1) ^&^ 31)}/g;
+            s/\^(.)/$(pack('c',ord($1) ^&^ 31))/g;
             s/\\(.)/$1/g;
             s/\377/^/g;
-            $self->{ '_' . $cap } = $_;
+            $self->{+'_' . $cap } = $_;
         }
 
-        # else { carp "junk in $term ignored: $field"; }
+        # else { warn "junk in $term ignored: $field"; }
     }
-    $self->{'_pc'} = "\0" unless defined $self->{'_pc'};
-    $self->{'_bc'} = "\b" unless defined $self->{'_bc'};
+    $self->{+'_pc'} = "\0" unless defined $self->{?'_pc'};
+    $self->{+'_bc'} = "\b" unless defined $self->{?'_bc'};
     $self;
 }
 
@@ -475,10 +460,8 @@ The padded $string is returned.
 
 =cut
 
-sub Tpad
+sub Tpad( $self, $string, $cnt, ?$FH)
 {    ## public
-    my $self = shift;
-    my ( $string, $cnt, $FH ) = < @_;
     my ( $decr, $ms );
 
     if ( defined $string && $string =~ m/(^[\d.]+)(\*?)(.*)$/ )
@@ -486,14 +469,14 @@ sub Tpad
         $ms = $1;
         $ms *= $cnt if $2;
         $string = $3;
-        $decr   = $self->{PADDING};
+        $decr   = $self->{?PADDING};
         if ( $decr +> .1 )
         {
             $ms += $decr / 2;
-            $string .= $self->{'_pc'} x ( $ms / $decr );
+            $string .= $self->{?'_pc'} x ( $ms / $decr );
         }
     }
-    print $FH $string if $FH;
+    print $FH, $string if $FH;
     $string;
 }
 
@@ -527,25 +510,23 @@ The appropriate string for the capability will be returned.
 
 =cut
 
-sub Tputs
+sub Tputs( $self, $cap, $cnt, $FH)
 {    ## public
-    my $self = shift;
-    my ( $cap, $cnt, $FH ) = < @_;
     my $string;
 
     $cnt = 0 unless $cnt;
 
     if ($cnt +> 1) {
-	$string = Tpad($self, $self->{'_' . $cap}, $cnt);
+	$string = Tpad($self, $self->{?'_' . $cap}, $cnt);
     } else {
 	# cache result because Tpad can be slow
 	unless (exists $self->{$cap}) {
-	    $self->{$cap} = exists $self->{"_$cap"} ?
-		Tpad($self, $self->{"_$cap"}, 1) : undef;
+	    $self->{+$cap} = exists $self->{"_$cap"} ??
+		Tpad($self, $self->{?"_$cap"}, 1) !! undef;
 	}
-	$string = $self->{$cap};
+	$string = $self->{?$cap};
     }
-    print $FH $string if $FH;
+    print $FH, $string if $FH;
     $string;
 }
 
@@ -602,11 +583,9 @@ The output string will be returned.
 
 =cut
 
-sub Tgoto
+sub Tgoto( $self, $cap, $code, $tmp, $FH)
 {    ## public
-    my $self = shift;
-    my ( $cap, $code, $tmp, $FH ) = < @_;
-    my $string = $self->{ '_' . $cap };
+    my $string = $self->{?'_' . $cap };
     my $result = '';
     my $after  = '';
     my $online = 0;
@@ -624,10 +603,10 @@ sub Tgoto
 	    $tmp = shift(@tmp);
 	    if ($tmp == 0 || $tmp == 4 || $tmp == 10) {
 		if ($online) {
-		    ++$tmp, $after .= $self->{'_up'} if $self->{'_up'};
+		    ++$tmp, ($after .= $self->{?'_up'}) if $self->{?'_up'};
 		}
 		else {
-		    ++$tmp, $after .= $self->{'_bc'};
+		    ++$tmp, ($after .= $self->{?'_bc'});
 		}
 	    }
 	    $result .= sprintf("\%c",$tmp);
@@ -639,12 +618,12 @@ sub Tgoto
 	    $online = !$online;
 	}
 	elsif ($code eq 'r') {
-	    ($code,$tmp) = < @tmp;
+	    @($code,$tmp) =  @tmp;
 	    @tmp = @($tmp,$code);
 	    $online = !$online;
 	}
 	elsif ($code eq '>') {
-	    ($code,$tmp,$string) = unpack("CCa99",$string);
+	    @($code,$tmp,$string) = unpack@("CCa99",$string);
 	    if (@tmp[0] +> $code) {
 		@tmp[0] += $tmp;
 	    }
@@ -658,7 +637,7 @@ sub Tgoto
 	    $online = !$online;
 	}
 	elsif ($code eq 'i') {
-	    ($code,$tmp) = < @tmp;
+	    @($code,$tmp) =  @tmp;
 	    @tmp = @($code+1,$tmp+1);
 	}
 	else {
@@ -666,7 +645,7 @@ sub Tgoto
 	}
     }
     $string = Tpad( $self, $result . $string . $after, $cnt );
-    print $FH $string if $FH;
+    print $FH, $string if $FH;
     $string;
 }
 
@@ -674,7 +653,7 @@ sub Tgoto
 
 =item B<Trequire>
 
-Takes a list of capabilities as an argument and will croak if one is not
+Takes a list of capabilities as an argument and will die if one is not
 found.
 
 =cut
@@ -682,13 +661,13 @@ found.
 sub Trequire
 {    ## public
     my $self = shift;
-    my ( $cap, @undefined );
-    foreach $cap ( @_)
+    my ( @undefined );
+    foreach my $cap ( @_)
     {
         push( @undefined, $cap )
-          unless defined $self->{ '_' . $cap } && $self->{ '_' . $cap };
+          unless defined $self->{?'_' . $cap } && $self->{?'_' . $cap };
     }
-    croak "Terminal does not support: ({join ' ',@undefined})" if (nelems @undefined);
+    die "Terminal does not support: ($(join ' ',@undefined))" if (nelems @undefined);
 }
 
 =back

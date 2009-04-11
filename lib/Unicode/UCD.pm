@@ -1,6 +1,5 @@
 package Unicode::UCD;
 
-use strict;
 use warnings;
 
 our $VERSION = '0.25';
@@ -76,18 +75,17 @@ my $CASEFOLDFH;
 my $CASESPECFH;
 my $NAMEDSEQFH;
 
-sub openunicode {
-    my ($rfh, < @path) = < @_;
+sub openunicode($rfh, @< @path) {
     my $f;
     unless (defined $$rfh) {
-	for my $d ( @INC) {
+	for my $d ( $^INCLUDE_PATH) {
 	    use File::Spec;
 	    $f = File::Spec->catfile($d, "unicore", < @path);
 	    last if open($$rfh, "<", $f);
 	    undef $f;
 	}
 	croak __PACKAGE__, ": failed to find ", <
-              File::Spec->catfile(< @path), " in {join ' ',@INC}"
+              File::Spec->catfile(< @path), " in $(join ' ',$^INCLUDE_PATH)"
 	    unless defined $f;
     }
     return $f;
@@ -153,7 +151,7 @@ sub _getcode {
 # but it will be used if available.
 
 try { require Lingua::KO::Hangul::Util };
-my $hasHangulUtil = ! $@;
+my $hasHangulUtil = ! $^EVAL_ERROR;
 if ($hasHangulUtil) {
     Lingua::KO::Hangul::Util->import();
 }
@@ -183,7 +181,7 @@ my @CharinfoRanges = @(
 # CJK Ideographs
   \@( 0x4E00,   0x9FA5,   \&han_charname,   undef  ),
 # Hangul Syllables
-  \@( 0xAC00,   0xD7A3,   $hasHangulUtil ? \&getHangulName : \&hangul_charname,  \&hangul_decomp ),
+  \@( 0xAC00,   0xD7A3,   $hasHangulUtil ?? \&getHangulName !! \&hangul_charname,  \&hangul_decomp ),
 # Non-Private Use High Surrogates
   \@( 0xD800,   0xDB7F,   undef,   undef  ),
 # Private Use High Surrogates
@@ -212,8 +210,8 @@ sub charinfo {
         $rcode = $hexk;
 	$rcode =~ s/^0+//;
 	$rcode =  sprintf("\%04X", hex($rcode));
-        $rname = $range->[2] ? $range->[2]->($code) : '';
-        $rdec  = $range->[3] ? $range->[3]->($code) : '';
+        $rname = $range->[2] ?? $range->[2]->($code) !! '';
+        $rdec  = $range->[3] ?? $range->[3]->($code) !! '';
         $hexk  = sprintf("\%06X", $range->[0]); # replace by the first
         last;
       }
@@ -226,22 +224,22 @@ sub charinfo {
 	    return unless defined $line;
 	    chomp $line;
 	    my %prop;
- <	    %prop{[qw(
+ 	    %prop{[qw(
 		     code name category
 		     combining bidi decomposition
 		     decimal digit numeric
 		     mirrored unicode10 comment
 		     upper lower title
-		    )]} = < split(m/;/, $line, -1);
+		    )]} =  split(m/;/, $line, -1);
 	    $hexk =~ s/^0+//;
 	    $hexk =  sprintf("\%04X", hex($hexk));
-	    if (%prop{code} eq $hexk) {
-		%prop{block}  = charblock($code);
-		%prop{script} = charscript($code);
+	    if (%prop{?code} eq $hexk) {
+		%prop{+block}  = charblock($code);
+		%prop{+script} = charscript($code);
 		if(defined $rname){
-                    %prop{code} = $rcode;
-                    %prop{name} = $rname;
-                    %prop{decomposition} = $rdec;
+                    %prop{+code} = $rcode;
+                    %prop{+name} = $rname;
+                    %prop{+decomposition} = $rdec;
                 }
 		return \%prop;
 	    }
@@ -250,8 +248,7 @@ sub charinfo {
     return;
 }
 
-sub _search { # Binary search in a [[lo,hi,prop],[...],...] table.
-    my ($table, $lo, $hi, $code) = < @_;
+sub _search($table, $lo, $hi, $code) {
 
     return if $lo +> $hi;
 
@@ -270,8 +267,7 @@ sub _search { # Binary search in a [[lo,hi,prop],[...],...] table.
     }
 }
 
-sub charinrange {
-    my ($range, $arg) = < @_;
+sub charinrange($range, $arg) {
     my $code = _getcode($arg);
     croak __PACKAGE__, "::charinrange: unknown code '$arg'"
 	unless defined $code;
@@ -310,13 +306,13 @@ my %BLOCKS;
 sub _charblocks {
     unless (nelems @BLOCKS) {
 	if (openunicode(\$BLOCKSFH, "Blocks.txt")) {
-	    local $_;
+	    local $_ = undef;
 	    while ( ~< $BLOCKSFH) {
 		if (m/^([0-9A-F]+)\.\.([0-9A-F]+);\s+(.+)/) {
-		    my ($lo, $hi) = (hex($1), hex($2));
+		    my @($lo, $hi) = @(hex($1), hex($2));
 		    my $subrange = \@( $lo, $hi, $3 );
 		    push @BLOCKS, $subrange;
-		    push @{%BLOCKS{$3}}, $subrange;
+		    push @{%BLOCKS{+$3}}, $subrange;
 		}
 	    }
 	    close($BLOCKSFH);
@@ -335,7 +331,7 @@ sub charblock {
 	_search(\@BLOCKS, 0, ((nelems @BLOCKS)-1), $code);
     } else {
 	if (exists %BLOCKS{$arg}) {
-	    return dclone %BLOCKS{$arg};
+	    return dclone %BLOCKS{?$arg};
 	} else {
 	    return;
 	}
@@ -372,19 +368,19 @@ my %SCRIPTS;
 sub _charscripts {
     unless (nelems @SCRIPTS) {
 	if (openunicode(\$SCRIPTSFH, "Scripts.txt")) {
-	    local $_;
+	    local $_ = undef;
 	    while ( ~< $SCRIPTSFH) {
 		if (m/^([0-9A-F]+)(?:\.\.([0-9A-F]+))?\s+;\s+(\w+)/) {
-		    my ($lo, $hi) = (hex($1), $2 ? hex($2) : hex($1));
+		    my @($lo, $hi) = @(hex($1), $2 ?? hex($2) !! hex($1));
 		    my $script = lc($3);
-		    $script =~ s/\b(\w)/{uc($1)}/g;
+		    $script =~ s/\b(\w)/$(uc($1))/g;
 		    my $subrange = \@( $lo, $hi, $script );
 		    push @SCRIPTS, $subrange;
-		    push @{%SCRIPTS{$script}}, $subrange;
+		    push @{%SCRIPTS{+$script}}, $subrange;
 		}
 	    }
 	    close($SCRIPTSFH);
-	    @SCRIPTS = sort { $a->[0] <+> $b->[0] } @SCRIPTS;
+	    @SCRIPTS = sort { $a->[0] <+> $b->[0] }, @SCRIPTS;
 	}
     }
 }
@@ -400,7 +396,7 @@ sub charscript {
 	_search(\@SCRIPTS, 0, ((nelems @SCRIPTS)-1), $code);
     } else {
 	if (exists %SCRIPTS{$arg}) {
-	    return dclone %SCRIPTS{$arg};
+	    return dclone %SCRIPTS{?$arg};
 	} else {
 	    return;
 	}
@@ -620,11 +616,11 @@ my %COMPEXCL;
 sub _compexcl {
     unless (%COMPEXCL) {
 	if (openunicode(\$COMPEXCLFH, "CompositionExclusions.txt")) {
-	    local $_;
+	    local $_ = undef;
 	    while ( ~< $COMPEXCLFH) {
 		if (m/^([0-9A-F]+)\s+\#\s+/) {
 		    my $code = hex($1);
-		    %COMPEXCL{$code} = undef;
+		    %COMPEXCL{+$code} = undef;
 		}
 	    }
 	    close($COMPEXCLFH);
@@ -691,11 +687,11 @@ my %CASEFOLD;
 sub _casefold {
     unless (%CASEFOLD) {
 	if (openunicode(\$CASEFOLDFH, "CaseFolding.txt")) {
-	    local $_;
+	    local $_ = undef;
 	    while ( ~< $CASEFOLDFH) {
 		if (m/^([0-9A-F]+); ([CFSI]); ([0-9A-F]+(?: [0-9A-F]+)*);/) {
 		    my $code = hex($1);
-		    %CASEFOLD{$code} = \%( code    => $1,
+		    %CASEFOLD{+$code} = \%( code    => $1,
                                            status  => $2,
                                            mapping => $3 );
 		}
@@ -713,7 +709,7 @@ sub casefold {
 
     _casefold() unless %CASEFOLD;
 
-    return %CASEFOLD{$code};
+    return %CASEFOLD{?$code};
 }
 
 =head2 casespec
@@ -772,27 +768,27 @@ my %CASESPEC;
 sub _casespec {
     unless (%CASESPEC) {
 	if (openunicode(\$CASESPECFH, "SpecialCasing.txt")) {
-	    local $_;
+	    local $_ = undef;
 	    while ( ~< $CASESPECFH) {
 		if (m/^([0-9A-F]+); ([0-9A-F]+(?: [0-9A-F]+)*)?; ([0-9A-F]+(?: [0-9A-F]+)*)?; ([0-9A-F]+(?: [0-9A-F]+)*)?; (\w+(?: \w+)*)?/) {
-		    my ($hexcode, $lower, $title, $upper, $condition) =
-			($1, $2, $3, $4, $5);
+		    my @($hexcode, $lower, $title, $upper, $condition) =
+			@($1, $2, $3, $4, $5);
 		    my $code = hex($hexcode);
 		    if (exists %CASESPEC{$code}) {
 			if (exists %CASESPEC{$code}->{code}) {
-			    my ($oldlower,
+			    my @($oldlower,
 				$oldtitle,
 				$oldupper,
-				$oldcondition) = <
+				$oldcondition) = 
 				    %{%CASESPEC{$code}}{[qw(lower
 							   title
 							   upper
 							   condition)]};
 			    if (defined $oldcondition) {
-				my ($oldlocale) =
-				($oldcondition =~ m/^([a-z][a-z](?:_\S+)?)/);
+				my @($oldlocale) =
+				@($oldcondition =~ m/^([a-z][a-z](?:_\S+)?)/);
 				delete %CASESPEC{$code};
-				%CASESPEC{$code}->{$oldlocale} =
+				%CASESPEC{+$code}->{+$oldlocale} =
 				\%( code      => $hexcode,
                                     lower     => $oldlower,
                                     title     => $oldtitle,
@@ -800,16 +796,16 @@ sub _casespec {
                                     condition => $oldcondition );
 			    }
 			}
-			my ($locale) =
-			    ($condition =~ m/^([a-z][a-z](?:_\S+)?)/);
-			%CASESPEC{$code}->{$locale} =
+			my @($locale) =
+			    @($condition =~ m/^([a-z][a-z](?:_\S+)?)/);
+			%CASESPEC{$code}->{+$locale} =
 			\%( code      => $hexcode,
                             lower     => $lower,
                             title     => $title,
                             upper     => $upper,
                             condition => $condition );
 		    } else {
-			%CASESPEC{$code} =
+			%CASESPEC{+$code} =
 			\%( code      => $hexcode,
                             lower     => $lower,
                             title     => $title,
@@ -831,7 +827,7 @@ sub casespec {
 
     _casespec() unless %CASESPEC;
 
-    return ref %CASESPEC{$code} ? dclone %CASESPEC{$code} : %CASESPEC{$code};
+    return ref %CASESPEC{?$code} ?? dclone %CASESPEC{?$code} !! %CASESPEC{?$code};
 }
 
 =head2 namedseq()
@@ -860,12 +856,11 @@ my %NAMEDSEQ;
 sub _namedseq {
     unless (%NAMEDSEQ) {
 	if (openunicode(\$NAMEDSEQFH, "NamedSequences.txt")) {
-	    local $_;
-	    while ( ~< $NAMEDSEQFH) {
-		if (m/^(.+)\s*;\s*([0-9A-F]+(?: [0-9A-F]+)*)$/) {
-		    my ($n, $s) = ($1, $2);
-		    my @s = map { chr(hex($_)) } split(' ', $s);
-		    %NAMEDSEQ{$n} = join("", @s);
+	    while ( defined(my $line = ~< $NAMEDSEQFH) ) {
+		if ($line =~ m/^(.+)\s*;\s*([0-9A-F]+(?: [0-9A-F]+)*)$/) {
+		    my @($n, $s) = @($1, $2);
+		    my @s = map { chr(hex($_)) }, split(' ', $s);
+		    %NAMEDSEQ{+$n} = join("", @s);
 		}
 	    }
 	    close($NAMEDSEQFH);
@@ -878,8 +873,8 @@ sub namedseq {
     if ((nelems @_) == 0) {
         return %NAMEDSEQ;
     } elsif ((nelems @_) == 1) {
-        my $s = %NAMEDSEQ{ @_[0] };
-        return map { ord($_) } split('', $s);
+        my $s = %NAMEDSEQ{?@_[0] };
+        return map { ord($_) }, split('', $s);
     }
     return;
 }

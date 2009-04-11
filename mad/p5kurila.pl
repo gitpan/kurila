@@ -15,6 +15,11 @@ sub fst(@) {
     return $_[0];
 }
 
+sub find_ops {
+    my ($xml, $name) = @_;
+    return $xml->findnodes(qq[//op_null[\@was="$name"]]), $xml->findnodes(qq[//op_$name]);
+}
+
 sub entersub_handler {
     my ($twig, $sub) = @_;
 
@@ -212,6 +217,7 @@ sub is_in_string {
     return 1 if $op->tag eq "op_stringify" or
       ($op->tag eq "op_null" and ($op->att('was') || '') eq "stringify");
     return 1 if $op->tag eq "op_concat";
+    return 1 if $op->tag eq "op_substcont";
 
     return $op->parent && is_in_string($op->parent);
 }
@@ -522,8 +528,8 @@ sub use_pkg_version {
 }
 
 sub lvalue_subs {
-    my $xml = shift;
-    for my $op ($xml->findnodes(qq|//op_substr|)) {
+    my ($xml, $opname) = @_;
+    for my $op ($xml->findnodes(qq|//op_$opname|)) {
         next unless ($op->parent->tag eq "op_sassign");
         next unless $op->pos == 3;
         my $assign = $op->parent;
@@ -825,6 +831,7 @@ sub sv_array_hash {
         my (undef, $right, $left) = $op->children;
 
         next if $left->att('flags') =~ m/PARENS/;
+
         my $svt;
         $svt = $1 eq 'av' ? '@' : '%' if $left->child(1)->tag =~ m/op_(?:pad|rv2)(av|hv)/;
         next unless $svt;
@@ -841,6 +848,9 @@ sub sv_array_hash {
     for my $op (map { $xml->findnodes("//op_$_") } qw|padav rv2av anonlist|) {
         my $flags = $op->att('flags') || '';
         my $main_prop = $op->tag eq "op_anonlist" ? 'square_open' : 'ary';
+        if ( $op->tag eq "op_anonlist" and $flags =~ m/\bSPECIAL\b/) {
+            next;
+        }
         if ($flags =~ m/SCALAR/ and $flags !~ m/REF/) {
             set_madprop($op, $main_prop, 'nelems(' . get_madprop($op, $main_prop));
             set_madprop($op, 'round_open', "");
@@ -885,7 +895,7 @@ sub sv_array_hash {
 
     # add '<' in front of subcalls in list context.
     for my $op (map { $xml->findnodes("//op_$_") } qw|entersub|) {
-        next unless $op->att('flags') =~ m/LIST/; # must be list context.
+        next unless ($op->att('flags')||'') =~ m/LIST/; # must be list context.
 
         next if (get_madprop($op->parent, 'comma') || '') eq '=&gt;'; # skip if preceded by '=>'
 
@@ -1052,6 +1062,367 @@ sub simplify_array {
     }
 }
 
+sub ampcall {
+    my $xml = shift;
+
+    for my $esop ($xml->find_nodes("//op_entersub")) {
+        next unless $esop->att('private') =~ m/\bAMPER\b/;
+        next unless $esop->att('flags') !~ m/\bSTACKED\b/;
+        set_madprop($esop, 'round_open', '( &lt; @_ ');
+        set_madprop($esop, 'round_close', ')');
+    }
+}
+
+sub doblock {
+    my $xml = shift;
+
+    for my $lineseq ($xml->find_nodes("//op_lineseq")) {
+        next unless (get_madprop($lineseq, 'curly_open')||'') eq "\{";
+        next if $lineseq->att('flags') =~ m/\bATTACHED\b/;
+        next unless $lineseq->parent->tag eq "op_leaveloop";
+        set_madprop($lineseq, 'curly_open', "do \{");
+        set_madprop($lineseq, 'curly_close', "\};");
+    }
+
+    for my $scope ($xml->find_nodes("//op_scope"),
+                   $xml->find_nodes("//op_leave")) {
+        next unless is_in_string($scope);
+        next unless (get_madprop($scope, 'curly_open')||'') eq "\{";
+        next if $scope->att('flags') =~ m/\bLIST\b/;
+        next if $scope->parent->tag =~ m/^op_rv2/;
+        next if (get_madprop($scope->parent, 'do') || '') eq "do";
+        set_madprop($scope, 'curly_open', "\$(");
+        set_madprop($scope, 'curly_close', ")");
+    }
+}
+
+sub remove_use_strict {
+    my $xml = shift;
+    for my $mad ($xml->findnodes(qq|//mad_op[\@key="use"]|)) {
+        next unless $mad->child(0)->att("PV") eq "strict.pm";
+        set_madprop($mad->child(0), "value", "", wsbefore => '');
+        my ($args) = $mad->parent->findnodes(qq|mad_op[\@key="bigarrow"]|);
+        $args->delete if $args;
+        my $wsbefore = get_madprop($mad->parent->parent, "operator", "wsbefore");
+        $wsbefore =~ s/&#xA;$//;
+        set_madprop($mad->parent->parent, "operator", "", wsbefore => $wsbefore);
+        set_madprop($mad->parent->parent, "semicolon", "");
+    }
+}
+
+sub add_call_parens {
+    my $xml = shift;
+    for my $op ($xml->findnodes("//op_entersub")) {
+        if ( not get_madprop($op, "null_type") ) {
+            my $gvop = $op->child(0)->child(1);
+            if (my $value = get_madprop($gvop, "value") ) {
+                set_madprop($gvop, "value", $value . "()");
+            }
+        }
+        elsif ( get_madprop($op, "null_type") eq "noamp" ) {
+            set_madprop($op, "round_open", "(");
+            set_madprop($op, "round_close", ")");
+        }
+    }
+}
+
+sub rename_ternary_op {
+    my $xml = shift;
+    for my $madprop ($xml->findnodes(qq|//mad_conditional_op[\@val="?"]|)) {
+        my $op = $madprop->parent->parent;
+        set_madprop($op, "conditional_op", "??");
+        set_madprop($op, "attribute", "!!");
+    }
+}
+
+sub hashkey_regulator {
+    my $xml = shift;
+    for my $op ($xml->findnodes(qq|//op_helem|)) {
+        if ($op->att("flags") =~ m/\bMOD\b/
+              and ($op->att("private")||'') !~ m/\bLVAL_DEFER\b/) {
+            if ( $op->att("flags") =~ m/(\bSPECIAL\b|\bREF\b)/ ) {
+                set_madprop($op, "curly_open", "{+");
+            }
+        }
+        else {
+            next if $op->following_elt()->tag eq "op_method_named";
+            set_madprop($op, "curly_open", "{?");
+        }
+    }
+}
+
+sub pattern_assignment {
+    my $xml = shift;
+
+    for my $op ($xml->findnodes("//op_aassign")) {
+        my (undef, $dst, $subj) = $op->children;
+
+        next if ($subj->child(1)->tag eq "op_padsv")
+          && ($dst->child(1)->tag =~ m/op_entersub|op_const|op_padsv/);
+
+        for my $side ($subj, $dst) {
+            if ( $side->tag eq "op_null"
+                   and get_madprop($side, "round_open")) {
+                set_madprop($side, "round_open", "\@(");
+            }
+            elsif ($side->child(1)->att("flags") =~ m/\bPARENS\b/
+                     and get_madprop($side->child(1), "round_open")) {
+                set_madprop($side->child(1), "round_open", "\@(");
+            }
+            elsif ( $side->child(1)->tag eq "op_expand") {
+                set_madprop($side->child(1), "operator", '');
+            }
+            else {
+                set_madprop($side->child(1), "wrap_open", "\@(");
+                set_madprop($side->child(1), "wrap_close", ")");
+            }
+        }
+
+        my ($exp) = $op->child(2)->findnodes(".//op_expand");
+        if ( $exp and get_madprop($exp, "operator") ) {
+            my $var = "\@";
+            if ((get_madprop($exp->child(1), "hsh") || '') =~ m/%/) {
+                $var = "%";
+            }
+            set_madprop($exp, "operator", $var . "&lt;");
+        }
+    }
+}
+
+sub env_using_package {
+    my $xml = shift;
+
+    for my $op ($xml->findnodes("//op_rv2hv")) {
+        next unless get_madprop($op, "hsh") eq "\%ENV";
+        next unless $op->parent->tag eq "op_helem";
+        if (get_madprop($op->parent, "local")) {
+            set_madprop($op, "hsh", "env::temp_set_var");
+            set_madprop($op->parent, "local", '');
+        }
+        elsif ($op->parent->att('flags') =~ m/\bASSIGN\b/) {
+            set_madprop($op, "hsh", "env::set_var");
+        }
+        elsif (is_in_string($op->parent)) {
+            set_madprop($op, "hsh", "\$(env::var");
+        }
+        else {
+            set_madprop($op, "hsh", "env::var");
+        }
+        set_madprop($op->parent, "curly_open", "(");
+        if (is_in_string($op->parent)) {
+            set_madprop($op->parent, "curly_close", "))");
+        } else {
+            set_madprop($op->parent, "curly_close", ")");
+        }
+        if ( $op->next_sibling->tag eq "op_const"
+         and $op->next_sibling->att("private") =~ m/\bBARE\b/ ) {
+            set_madprop($op->next_sibling, "value",
+                        qq['] . get_madprop($op->next_sibling, "value") . qq[']);
+        }
+    }
+}
+
+sub remove_vars {
+    my $xml = shift;
+    for my $madop ($xml->findnodes(qq(//mad_op[\@key="use"]))) {
+        next unless $madop->child(0)->att("PV") eq "vars.pm";
+        my $madprops = $madop->parent;
+        my $arrow_op = $madprops->child(2);
+        my $vars = get_madprop($arrow_op->child(0)->child(1), "assign");
+
+        $vars =~ s/^\s+|\s+$//g;
+        $vars =~ s/([\s\n]+)/,$1/g;
+
+        # replace whole tree
+        my $nullop = $madprops->parent;
+        my $ws = get_madprop($nullop, "operator", "wsbefore" );
+        $madop->delete();
+        $arrow_op->delete();
+        set_madprop($nullop, "value", qq[our ($vars)], wsbefore => $ws );
+        set_madprop($nullop, "null_type", "valuestatement");
+    }
+}
+
+sub rename_magic_vars {
+    my $xml = shift;
+
+    my $mapping = {
+        '$|' => '$^OUTPUT_AUTOFLUSH',
+        '$!' => '$^OS_ERROR',
+        '$?' => '$^CHILD_ERROR',
+        '$&lt;' => '$^UID',
+        '$&gt;' => '$^EUID',
+        '$$' => '$^PID',
+        '$/' => '$^INPUT_RECORD_SEPARATOR',
+        '$\\' => '$^OUTPUT_RECORD_SEPARATOR',
+        '$@' => '$^EVAL_ERROR',
+        '$,' => '$^OUTPUT_FIELD_SEPARATOR',
+        '$0' => '$^PROGRAM_NAME',
+        '$^C' => '$^COMPILING',
+        '$^D' => '$^DEBUGGING',
+        '$^E' => '$^EXTENDED_OS_ERROR',
+        '$^F' => '$^SYSTEM_FD_MAX',
+        '$^H' => '$^HINT_BITS',
+        '$^I' => '$^INPLACE_EDIT',
+        '$^N' => '$^LAST_SUBMATCH_RESULT',
+        '$^M' => '$^EMERGENCY_MEMORY',
+        '$^O' => '$^OS_NAME',
+        '$^P' => '$^PERLDB',
+        '$^R' => '$^LAST_REGEXP_CODE_RESULT',
+        '$^S' => '$^EXCEPTIONS_BEING_CAUGHT',
+        '$^T' => '$^BASETIME',
+        '$^V' => '$^PERL_VERSION',
+        '$^W' => '$^WARNING',
+        '$^X' => '$^EXECUTABLE_NAME',
+    };
+
+    for my $propname (qw[value variable]) {
+        for ( find_ops( $xml, "rv2sv" ) ) {
+            my $var = get_madprop($_, $propname);
+            if ($var and $mapping->{$var}) {
+                set_madprop($_, $propname => $mapping->{$var});
+            }
+        }
+
+        for ( find_ops( $xml, "rv2hv" ) ) {
+            my $var = get_madprop($_, $propname);
+            if ($var and $var eq "%^H") {
+                set_madprop($_, $propname => "\$^HINTS");
+            }
+        }
+    }
+}
+
+sub rename_inc_vars {
+    my $xml = shift;
+    for my $propname (qw[value variable]) {
+        for ( find_ops( $xml, "rv2av" ) ) {
+            my $var = get_madprop($_, $propname);
+            if ($var and $var eq "\@INC") {
+                set_madprop($_, $propname => "\$^INCLUDE_PATH");
+            }
+        }
+        for ( find_ops( $xml, "rv2hv" ) ) {
+            my $var = get_madprop($_, $propname);
+            if ($var and $var eq "\%INC") {
+                set_madprop($_, $propname => "\$^INCLUDED");
+            }
+        }
+    }
+}
+
+sub print_filehandle {
+    my $xml = shift;
+    for my $op ( find_ops( $xml, "print" ), find_ops( $xml, "prtf" ) ) {
+        my $has_fh = $op->att("flags") =~ m/\bSTACKED\b/;
+        my $stdout = XML::Twig::Elt->new("op_null");
+        if ($has_fh) {
+            my $fh = $op->child(2);
+            if ($fh->tag eq "op_rv2gv" and $fh->child(0)->tag eq "op_gv"
+                  and get_madprop($fh->child(0), "value") =~ m/^(STDOUT|STDERR)$/ ) {
+                set_madprop($fh->child(0), value => "\\*" . get_madprop($fh->child(0), "value"));
+            }
+            if ($fh->tag eq "op_rv2gv" and $fh->child(0)->tag eq "op_scope") {
+                set_madprop($fh->child(0), "curly_open", "");
+                set_madprop($fh->child(0), "curly_close", "");
+            }
+        }
+        my $arg = $has_fh ? "," : get_madprop($op, "round_open") ? "\\*STDOUT, " : " \\*STDOUT," ;
+        set_madprop($stdout, value => $arg);
+        set_madprop($stdout, "null_type" => "value");
+        $stdout->cut;
+        $stdout->paste( after => $op->child( $has_fh ? 2 : 1 ) );
+    }
+    return;
+}
+
+sub block_arg {
+    my $xml = shift;
+    for my $op (find_ops($xml, "mapstart"), find_ops($xml, "grepstart")) {
+        my ($scope) = map { $op->findnodes("op_null/op_null/$_") } qw|op_scope op_leave|;
+        if ($scope) {
+            set_madprop($scope, "curly_close", "},");
+        }
+        else {
+            my ($opnull) = $op->findnodes("op_null");
+            set_madprop($opnull, "wrap_open", " {");
+            set_madprop($opnull, "wrap_close", " }");
+        }
+    }
+    for my $op (find_ops($xml, "entersub")) {
+        my ($refgen) = $op->findnodes("op_null/op_srefgen");
+        next unless $refgen;
+        next if get_madprop($refgen, "operator");
+        my ($scope) = $op->findnodes("op_null/op_srefgen/op_anoncode/op_leavesub/op_lineseq");
+        next unless $scope;
+        set_madprop($scope, "curly_close", "},");
+    }
+    for my $op (find_ops($xml, "sort")) {
+        my ($scope) = map { $op->findnodes("op_null/$_") } qw|op_scope op_leave|;
+        next unless $scope;
+        set_madprop($scope, "curly_close", "},");
+    }
+}
+
+sub must_haveargs {
+    my $xml = shift;
+    for my $op (find_ops($xml, "entersub")) {
+        next if $op->att('flags') =~ m/\bSTACKED\b/;
+        set_madprop($op, 'round_open', "( &lt; \@_ ");
+        set_madprop($op, 'round_close', ")");
+    }
+}
+
+sub make_prototype {
+    my $xml = shift;
+    for my $amp ($xml->findnodes(q{//mad_op[@key="ampersand"]})) {
+        my @args = $amp->findnodes(q{.//madprops/mad_value[@val='@_']});
+        next if @args > 1;
+        if (@args) {
+            my $arg_op = $args[0]->parent->parent;
+            if (($arg_op->parent->tag eq "op_sassign")
+                  and $arg_op->pos == 2
+                    and $arg_op->parent->child(2)->tag eq "op_anonarray") {
+                my $new_prototype = $arg_op->parent->child(2);
+                set_madprop($new_prototype, 'square_open', '(', wsbefore => '');
+                set_madprop($new_prototype, 'square_close', ')', wsbefore => '');
+                del_madprop($new_prototype, 'defintion');
+                my $pt = $amp->parent->insert_new_elt("mad_op",
+                                                      { key => 'prototype' });
+                $new_prototype->move($pt);
+                if ($arg_op->parent->next_sibling->tag eq "op_nextstate") {
+                    set_madprop($arg_op->parent->next_sibling,
+                                'semicolon', '');
+                }
+                $arg_op->parent->delete();
+            }
+        }
+    }
+}
+
+sub mg_stdin {
+    my $xml = shift;
+    for my $op (find_ops($xml, "rv2gv")) {
+        for my $name (qw[STDIN STDOUT STDERR]) {
+            if ((get_madprop($op, "star") || '') eq "*" . $name) {
+                set_madprop($op, "star", '$^' . $name);
+                if ($op->parent->tag eq "op_srefgen") {
+                    set_madprop($op->parent, "operator", '');
+                }
+            }
+        }
+    }
+}
+
+sub local_undef {
+    my $xml = shift;
+    for my $op (find_ops($xml, "null"), find_ops($xml, "magicsv")) {
+        next unless ($op->att('flags') || '') !~ m/\bASSIGN\b/;
+        next unless get_madprop($op, 'local');
+        set_madprop($op, 'wrap_close', ' = undef');
+    }
+}
+
 my $from; # floating point number with starting version of kurila.
 GetOptions("from=s" => \$from);
 $from =~ m/(\w+)[-]([\d.]+)$/ or die "invalid from: '$from'";
@@ -1099,7 +1470,7 @@ if ($from->{branch} ne "kurila" or $from->{v} < v1.5) {
 if ($from->{branch} ne "kurila" or $from->{v} < v1.6) {
     remove_vstring( $twig );
     use_pkg_version($twig);
-    lvalue_subs( $twig );
+    lvalue_subs( $twig, "substr" );
 }
 
 #pointy_anon_hash( $twig );
@@ -1135,8 +1506,43 @@ if ($from->{branch} ne "kurila" or $from->{v} < qv '1.13') {
     sv_array_hash($twig);
 }
 
-map_array($twig);
+if ($from->{branch} ne "kurila" or $from->{v} < qv '1.14') {
+    map_array($twig);
+}
 #simplify_array($twig);
+
+if ($from->{branch} ne "kurila" or $from->{v} < qv '1.15') {
+    ampcall($twig);
+    doblock($twig);
+    lvalue_subs( $twig, "vec" );
+    remove_use_strict($twig);
+}
+
+if ($from->{branch} ne "kurila" or $from->{v} < qv '1.16') {
+    rename_ternary_op($twig);
+    hashkey_regulator($twig);
+    pattern_assignment($twig);
+}
+
+if ($from->{branch} ne "kurila" or $from->{v} < qv '1.17') {
+    env_using_package($twig);
+    remove_vars($twig);
+    rename_magic_vars($twig);
+}
+
+if ($from->{branch} ne "kurila" or $from->{v} < qv '1.17') {
+    rename_inc_vars($twig);
+    print_filehandle($twig);
+    block_arg($twig);
+}
+
+#must_haveargs($twig);
+
+#make_prototype($twig);
+mg_stdin($twig);
+local_undef($twig);
+
+#add_call_parens($twig);
 
 # print
 $twig->print( pretty_print => 'indented' );

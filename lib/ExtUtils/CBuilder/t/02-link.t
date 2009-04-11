@@ -1,22 +1,21 @@
 #! perl -w
 
 BEGIN {
-  if (%ENV{PERL_CORE}) {
+  if (env::var('PERL_CORE')) {
     chdir 't' if -d 't';
     chdir '../lib/ExtUtils/CBuilder'
-      or die "Can't chdir to lib/ExtUtils/CBuilder: $!";
-    @INC = qw(../..);
+      or die "Can't chdir to lib/ExtUtils/CBuilder: $^OS_ERROR";
+    $^INCLUDE_PATH = qw(../..);
   }
 }
 
-use strict;
-use Test;
+use Test::More;
 BEGIN { 
-  if ($^O eq 'MSWin32') {
-    print "1..0 # Skipped: link_executable() is not implemented yet on Win32\n";
+  if ($^OS_NAME eq 'MSWin32') {
+    print $^STDOUT, "1..0 # Skipped: link_executable() is not implemented yet on Win32\n";
     exit;
   }
-  if ($^O eq 'VMS') {
+  if ($^OS_NAME eq 'VMS') {
     # So we can get the return value of system()
     require vmsish;
     vmsish->import();
@@ -28,30 +27,29 @@ use ExtUtils::CBuilder;
 use File::Spec;
 
 # TEST doesn't like extraneous output
-my $quiet = %ENV{PERL_CORE} && !%ENV{HARNESS_ACTIVE};
+my $quiet = env::var('PERL_CORE') && !env::var('HARNESS_ACTIVE');
 
 my $b = ExtUtils::CBuilder->new(quiet => $quiet);
 ok $b;
 
 my $source_file = File::Spec->catfile('t', 'compilet.c');
-{
-  local *FH;
-  open FH, ">", "$source_file" or die "Can't create $source_file: $!";
-  print FH "int main(void) \{ return 11; \}\n";
-  close FH;
-}
+do {
+  open my $fh, ">", "$source_file" or die "Can't create $source_file: $^OS_ERROR";
+  print $fh, "int main(void) \{ return 11; \}\n";
+  close $fh;
+};
 ok -e $source_file;
 
 # Compile
 my $object_file;
-ok $object_file = $b->compile(source => $source_file);
+ok($object_file = $b->compile(source => $source_file));
 
 # Link
 my ($exe_file, @temps);
-($exe_file, < @temps) = < $b->link_executable(objects => $object_file);
+@($exe_file, @< @temps) =  $b->link_executable(objects => $object_file);
 ok $exe_file;
 
-if ($^O eq 'os2') {		# Analogue of LDLOADPATH...
+if ($^OS_NAME eq 'os2') {		# Analogue of LDLOADPATH...
 	# Actually, not needed now, since we do not link with the generated DLL
   my $old = OS2::extLibpath();	# [builtin function]
   $old = ";$old" if defined $old and length $old;
@@ -60,7 +58,7 @@ if ($^O eq 'os2') {		# Analogue of LDLOADPATH...
 }
 
 # Try the executable
-ok my_system($exe_file), 11;
+is my_system($exe_file), 11;
 
 # Clean up
 for (@($source_file, $object_file, $exe_file)) {
@@ -70,7 +68,7 @@ for (@($source_file, $object_file, $exe_file)) {
 
 sub my_system {
   my $cmd = shift;
-  if ($^O eq 'VMS') {
+  if ($^OS_NAME eq 'VMS') {
     return system("mcr $cmd");
   }
   return system($cmd) >> 8;

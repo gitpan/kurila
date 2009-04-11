@@ -2,8 +2,8 @@
 # Time-stamp: "2004-12-29 20:01:02 AST" -*-Perl-*-
 
 package Class::ISA;
-use strict;
-use vars < qw($Debug $VERSION);
+
+our ($Debug, $VERSION);
 $VERSION = '0.33';
 $Debug = 0 unless defined $Debug;
 
@@ -140,13 +140,12 @@ Sean M. Burke C<sburke@cpan.org>
 
 ###########################################################################
 
-sub self_and_super_versions { map {
-        $_ => (defined(${*{Symbol::fetch_glob("$_\::VERSION")}}) ? ${*{Symbol::fetch_glob("$_\::VERSION")}} : undef)
-      } self_and_super_path(@_[0])
+sub self_and_super_versions { @+: map {
+        @: $_ => (defined(${*{Symbol::fetch_glob("$_\::VERSION")}}) ?? ${*{Symbol::fetch_glob("$_\::VERSION")}} !! undef)
+      }, self_and_super_path(@_[0])
 }
 
 # Also consider magic like:
-#   no strict 'refs';
 #   my %class2SomeHashr =
 #     map { defined(%{"$_\::SomeHash"}) ? ($_ => \%{"$_\::SomeHash"}) : () }
 #         Class::ISA::self_and_super_path($class);
@@ -155,7 +154,6 @@ sub self_and_super_versions { map {
 #
 # Or even consider this incantation for doing something like hash-data
 # inheritance:
-#   no strict 'refs';
 #   %union_hash = 
 #     map { defined(%{"$_\::SomeHash"}) ? %{"$_\::SomeHash"}) : () }
 #         reverse(Class::ISA::self_and_super_path($class));
@@ -185,17 +183,16 @@ sub self_and_super_path {
   my $current;
   while((nelems @in_stack)) {
     next unless defined($current = shift @in_stack) && length($current);
-    print "At $current\n" if $Debug;
+    print $^STDOUT, "At $current\n" if $Debug;
     push @out, $current;
-    no strict 'refs';
     unshift @in_stack,
       < map
         { my $c = $_; # copy, to avoid being destructive
           substr($c,0,2, "main::") if substr($c,0,2) eq '::';
            # Canonize the :: -> main::, ::foo -> main::foo thing.
            # Should I ever canonize the Foo'Bar = Foo::Bar thing? 
-          %seen{$c}++ ? () : $c;
-        }
+          %seen{+$c}++ ?? () !! $c;
+        },
  @{*{Symbol::fetch_glob("$current\::ISA")}}
     ;
     # I.e., if this class has any parents (at least, ones I've never seen

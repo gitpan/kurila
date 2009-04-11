@@ -5,7 +5,7 @@
 #
 
 package Locale::Script;
-use strict;
+
 
 require Exporter;
 use Carp;
@@ -15,7 +15,7 @@ use Locale::Constants;
 #-----------------------------------------------------------------------
 #	Public Global Variables
 #-----------------------------------------------------------------------
-use vars < qw($VERSION @ISA @EXPORT @EXPORT_OK);
+our ($VERSION, @ISA, @EXPORT, @EXPORT_OK);
 $VERSION   = sprintf("\%d.\%02d", q$Revision: 2.7 $ =~ m/(\d+)\.(\d+)/);
 @ISA       = qw(Exporter);
 @EXPORT    = qw(code2script script2code
@@ -38,7 +38,7 @@ my $COUNTRIES = \@();
 sub code2script
 {
     my $code = shift;
-    my $codeset = (nelems @_) +> 0 ? shift : LOCALE_CODE_DEFAULT;
+    my $codeset = (nelems @_) +> 0 ?? shift !! LOCALE_CODE_DEFAULT;
 
 
     return undef unless defined $code;
@@ -61,7 +61,7 @@ sub code2script
 
     if (exists $CODES->[$codeset]->{$code})
     {
-        return $CODES->[$codeset]->{$code};
+        return $CODES->[$codeset]->{?$code};
     }
     else
     {
@@ -81,14 +81,14 @@ sub code2script
 sub script2code
 {
     my $script = shift;
-    my $codeset = (nelems @_) +> 0 ? shift : LOCALE_CODE_DEFAULT;
+    my $codeset = (nelems @_) +> 0 ?? shift !! LOCALE_CODE_DEFAULT;
 
 
     return undef unless defined $script;
     $script = lc($script);
     if (exists $COUNTRIES->[$codeset]->{$script})
     {
-        return $COUNTRIES->[$codeset]->{$script};
+        return $COUNTRIES->[$codeset]->{?$script};
     }
     else
     {
@@ -131,7 +131,7 @@ sub script_code2code
 #=======================================================================
 sub all_script_codes
 {
-    my $codeset = (nelems @_) +> 0 ? shift : LOCALE_CODE_DEFAULT;
+    my $codeset = (nelems @_) +> 0 ?? shift !! LOCALE_CODE_DEFAULT;
 
     return keys %{ $CODES->[$codeset] };
 }
@@ -144,7 +144,7 @@ sub all_script_codes
 #=======================================================================
 sub all_script_names
 {
-    my $codeset = (nelems @_) +> 0 ? shift : LOCALE_CODE_DEFAULT;
+    my $codeset = (nelems @_) +> 0 ?? shift !! LOCALE_CODE_DEFAULT;
 
     return values %{ $CODES->[$codeset] };
 }
@@ -155,37 +155,37 @@ sub all_script_names
 # initialisation code - stuff the DATA into the ALPHA2 hash
 #
 #=======================================================================
-{
+do {
     my   ($alpha2, $alpha3, $numeric);
     my    $script;
-    local $_;
+    local $_ = undef;
 
 
     while ( ~< *DATA)
     {
         next unless m/\S/;
         chop;
-        ($alpha2, $alpha3, $numeric, $script) = < split(m/:/, $_, 4);
+        @($alpha2, $alpha3, $numeric, $script) =  split(m/:/, $_, 4);
 
-        $CODES->[LOCALE_CODE_ALPHA_2]->{$alpha2} = $script;
-        $COUNTRIES->[LOCALE_CODE_ALPHA_2]->{lc "$script"} = $alpha2;
+        $CODES->[+LOCALE_CODE_ALPHA_2]->{+$alpha2} = $script;
+        $COUNTRIES->[+LOCALE_CODE_ALPHA_2]->{+lc "$script"} = $alpha2;
 
 	if ($alpha3)
 	{
-            $CODES->[LOCALE_CODE_ALPHA_3]->{$alpha3} = $script;
-            $COUNTRIES->[LOCALE_CODE_ALPHA_3]->{lc "$script"} = $alpha3;
+            $CODES->[+LOCALE_CODE_ALPHA_3]->{+$alpha3} = $script;
+            $COUNTRIES->[+LOCALE_CODE_ALPHA_3]->{+lc "$script"} = $alpha3;
 	}
 
 	if ($numeric)
 	{
-            $CODES->[LOCALE_CODE_NUMERIC]->{$numeric} = $script;
-            $COUNTRIES->[LOCALE_CODE_NUMERIC]->{lc "$script"} = $numeric;
+            $CODES->[+LOCALE_CODE_NUMERIC]->{+$numeric} = $script;
+            $COUNTRIES->[+LOCALE_CODE_NUMERIC]->{+lc "$script"} = $numeric;
 	}
 
     }
 
-    close(DATA);
-}
+    close(\*DATA);
+};
 
 1;
 

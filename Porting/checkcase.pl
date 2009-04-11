@@ -3,7 +3,7 @@
 # in the current directory and its subdirectories
 
 use warnings;
-use strict;
+
 use File::Find;
 
 my %files;
@@ -18,9 +18,9 @@ my $failed;
 
 foreach (values %files) {
     if ((nelems @$_) +> 1) {
-	print join(", ", @$_), "\n";
+	print $^STDOUT, join(", ", @$_), "\n";
 	$failed++;
     }
 }
 
-print "no similarly named files found\n" unless $failed;
+print $^STDOUT, "no similarly named files found\n" unless $failed;

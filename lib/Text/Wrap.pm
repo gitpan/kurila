@@ -9,9 +9,9 @@ our @EXPORT_OK = qw($columns $break $huge);
 
 our $VERSION = 2006.1117;
 
-use vars < qw($VERSION $columns $debug $break $huge $unexpand $tabstop
-	$separator $separator2);
-use strict;
+our ($columns, $debug, $break, $huge, $unexpand, $tabstop,
+     $separator, $separator2);
+
 
 BEGIN	{
 	$columns = 76;  # <= screen width
@@ -26,14 +26,13 @@ BEGIN	{
 
 use Text::Tabs < qw(expand unexpand);
 
-sub wrap
+sub wrap($ip, $xp, @< @t)
 {
-	my ($ip, $xp, < @t) = < @_;
 
 	local($Text::Tabs::tabstop) = $tabstop;
 	my $r = "";
 	my $tail = pop(@t);
-	my $t = expand(join("", @( (< map { m/\s+\z/ ? ( $_ ) : ($_, ' ') } @t), $tail)));
+	my $t = expand(join("", @: < (@+: map { m/\s+\z/ ?? @( $_ ) !! @($_, ' ') }, @t), $tail));
 	my $lead = $ip;
 	my $ll = $columns - length(expand($ip)) - 1;
 	$ll = 0 if $ll +< 0;
@@ -41,24 +40,21 @@ sub wrap
 	my $nl = "";
 	my $remainder = "";
 
-	use re 'taint';
-
-	pos($t) = 0;
 	while ($t !~ m/\G(?:$break)*\Z/gc) {
 		if ($t =~ m/\G([^\n]{0,$ll})($break|\n+|\z)/xmgc) {
 			$r .= $unexpand 
-				? unexpand($nl . $lead . $1)
-				: $nl . $lead . $1;
+				?? unexpand($nl . $lead . $1)
+				!! $nl . $lead . $1;
 			$remainder = $2;
 		} elsif ($huge eq 'wrap' && $t =~ m/\G([^\n]{$ll})/gc) {
 			$r .= $unexpand 
-				? unexpand($nl . $lead . $1)
-				: $nl . $lead . $1;
-			$remainder = defined($separator2) ? $separator2 : $separator;
+				?? unexpand($nl . $lead . $1)
+				!! $nl . $lead . $1;
+			$remainder = defined($separator2) ?? $separator2 !! $separator;
 		} elsif ($huge eq 'overflow' && $t =~ m/\G([^\n]*?)($break|\n+|\z)/xmgc) {
 			$r .= $unexpand 
-				? unexpand($nl . $lead . $1)
-				: $nl . $lead . $1;
+				?? unexpand($nl . $lead . $1)
+				!! $nl . $lead . $1;
 			$remainder = $2;
 		} elsif ($huge eq 'die') {
 			die "couldn't wrap '$t'";
@@ -69,36 +65,34 @@ sub wrap
 		} else {
 			die "This shouldn't happen";
 		}
-			
+
 		$lead = $xp;
 		$ll = $nll;
 		$nl = defined($separator2)
-			? ($remainder eq "\n"
-				? "\n"
-				: $separator2)
-			: $separator;
+			?? ($remainder eq "\n"
+				?? "\n"
+				!! $separator2)
+			!! $separator;
 	}
 	$r .= $remainder;
 
-	print "-----------$r---------\n" if $debug;
+	print $^STDOUT, "-----------$r---------\n" if $debug;
 
-	print "Finish up with '$lead'\n" if $debug;
+	print $^STDOUT, "Finish up with '$lead'\n" if $debug;
 
 	$r .= $lead . substr($t, pos($t), length($t)-pos($t))
 		if pos($t) ne length($t);
 
-	print "-----------$r---------\n" if $debug;;
+	print $^STDOUT, "-----------$r---------\n" if $debug;;
 
 	return $r;
 }
 
-sub fill 
+sub fill($ip, $xp, @< @raw) 
 {
-	my ($ip, $xp, < @raw) = < @_;
 	my @para;
-	my $pp;
 
-	for $pp (split(m/\n\s+/, join("\n", @raw))) {
+	for my $pp (split(m/\n\s+/, join("\n", @raw))) {
 		$pp =~ s/\s+/ /g;
 		my $x = wrap($ip, $xp, $pp);
 		push(@para, $x);
@@ -107,7 +101,7 @@ sub fill
 	# if paragraph_indent is the same as line_indent, 
 	# separate paragraphs with blank lines
 
-	my $ps = ($ip eq $xp) ? "\n\n" : "\n";
+	my $ps = ($ip eq $xp) ?? "\n\n" !! "\n";
 	return join ($ps, @para);
 }
 

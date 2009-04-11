@@ -1,8 +1,7 @@
 
 package IO::Compress::Gzip ;
 
-
-use strict ;
+ 
 use warnings;
 use bytes;
 
@@ -87,7 +86,7 @@ sub ckParams
     my $strict = $got->value('Strict') ;
 
 
-    {
+    do {
         if (! $got->parsed('Time') ) {
             # Modification time defaults to now.
             $got->value('Time' => time) ;
@@ -145,7 +144,7 @@ sub ckParams
 
             $got->value('ExtraField', $data) ;
         }
-    }
+    };
 
     return 1;
 }

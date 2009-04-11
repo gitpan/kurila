@@ -8,15 +8,14 @@ use Config;
 use File::Path;
 use File::Spec::Functions;
 
-use strict;
 use warnings;
 our $pragma_name;
 
 our $got_files = 0; # set to 1 to generate output files.
 
-$| = 1;
+$^OUTPUT_AUTOFLUSH = 1;
 
-my $Is_MacOS = $^O eq 'MacOS';
+my $Is_MacOS = $^OS_NAME eq 'MacOS';
 my $tmpfile = "tmp0000";
 1 while -e ++$tmpfile;
 END { 1 while unlink $tmpfile }
@@ -25,11 +24,11 @@ my @prgs = @( () ) ;
 my @w_files = @( () ) ;
 
 if ((nelems @ARGV))
-  { print "ARGV = [{join ' ',@ARGV}]\n" ;
+  { print $^STDOUT, "ARGV = [$(join ' ',@ARGV)]\n" ;
     if ($Is_MacOS) {
-      @w_files = map { s#^#:lib:$pragma_name:#; $_ } @ARGV
+      @w_files = map { s#^#:lib:$pragma_name:#; $_ }, @ARGV
     } else {
-      @w_files = map { s#^#./lib/$pragma_name/#; $_ } @ARGV
+      @w_files = map { s#^#./lib/$pragma_name/#; $_ }, @ARGV
     }
   }
 else
@@ -42,25 +41,25 @@ foreach my $file ( @w_files) {
     next if $file =~ m/perlio$/ && !('PerlIO::Layer'->find( 'perlio'));
     next if -d $file;
 
-    open F, "<", "$file" or die "Cannot open $file: $!\n" ;
+    open my $f, "<", "$file" or die "Cannot open $file: $^OS_ERROR\n" ;
     my $line = 0;
     open my $got_file, ">", "$file.got" or die if $got_files;
-    while ( ~< *F) {
-        print $got_file $_ if $got_files;
+    while ( ~< $f) {
+        print $got_file, $_ if $got_files;
         $line++;
 	last if m/^__END__/ ;
     }
     close $got_file if $got_files;
 
-    {
-        local $/ = undef;
+    do {
+        local $^INPUT_RECORD_SEPARATOR = undef;
         $files++;
-        @prgs = @(< @prgs, $file, < split "\n########\n", ~< *F) ;
-    }
-    close F ;
+        @prgs = @(< @prgs, $file, < split "\n########\n", ~< $f) ;
+    };
+    close $f ;
 }
 
-undef $/;
+undef $^INPUT_RECORD_SEPARATOR;
 
 plan tests => (scalar(nelems @prgs)-$files);
 
@@ -69,7 +68,7 @@ my $file;
 for ( @prgs){
     unless (m/\n/)
      {
-      print "# From $_\n";
+      print $^STDOUT, "# From $_\n";
       $file = $_;
 
       if ($got_files) {
@@ -85,7 +84,7 @@ for ( @prgs){
     if (s/^(\s*-\w+)//){
         $switch = $1;
     }
-    my($prog,$expected) = < split(m/\nEXPECT(?:\n|$)/, $_, 2);
+    my@($prog,$expected) =  split(m/\nEXPECT(?:\n|$)/, $_, 2);
 
     my ($todo, $todo_reason);
     $todo = $prog =~ s/^#\s*TODO\s*(.*)\n//m and $todo_reason = $1;
@@ -93,8 +92,8 @@ for ( @prgs){
     # This provides the flexibility to have conditional TODOs
     if ($todo_reason && $todo_reason =~ s/^\?//) {
 	my $temp = eval $todo_reason;
-	if ($@) {
-	    die "# In TODO code reason:\n# $todo_reason\n{$@->message}";
+	if ($^EVAL_ERROR) {
+	    die "# In TODO code reason:\n# $todo_reason\n$($^EVAL_ERROR->message)";
 	}
 	$todo_reason = $temp;
     }
@@ -112,9 +111,9 @@ for ( @prgs){
                 mkpath($1);
                 push(@temp_path, $1);
     	    }
-	    open F, ">", "$filename" or die "Cannot open $filename: $!\n" ;
-	    print F $code ;
-	    close F or die "Cannot close $filename: $!\n";
+	    open my $f, ">", "$filename" or die "Cannot open $filename: $^OS_ERROR\n" ;
+	    print $f ,$code ;
+	    close $f or die "Cannot close $filename: $^OS_ERROR\n";
 	}
 	shift @files ;
 	$prog = shift @files ;
@@ -126,23 +125,23 @@ for ( @prgs){
 	$prog =~ s|"\."|":"|g;
     }
 
-    open TEST, ">", "$tmpfile" or die "Cannot open >$tmpfile: $!";
-    print TEST q{
+    open my $test, ">", "$tmpfile" or die "Cannot open >$tmpfile: $^OS_ERROR";
+    print $test, q{
         BEGIN {
-            open(STDERR, ">&", "STDOUT")
-              or die "Can't dup STDOUT->STDERR: $!;";
+            open($^STDERR, ">&", $^STDOUT)
+              or die "Can't dup STDOUT->STDERR: $^OS_ERROR;";
         }
     };
-    print TEST "\n#line 1\n";  # So the line numbers don't get messed up.
-    print TEST $prog,"\n";
-    close TEST or die "Cannot close $tmpfile: $!";
+    print $test, "\n#line 1\n";  # So the line numbers don't get messed up.
+    print $test, $prog,"\n";
+    close $test or die "Cannot close $tmpfile: $^OS_ERROR";
     my $results = runperl( switches => \@($switch), stderr => 1, progfile => $tmpfile );
-    my $status = $?;
+    my $status = $^CHILD_ERROR;
     $results =~ s/\n+$//;
     # allow expected output to be written as if $prog is on STDIN
     $results =~ s/tmp\d+/-/g;
     $results =~ s|at \.\./lib/warnings\.pm line \d+ character \d+\.|at .../warnings.pm line xxx.|g;
-    if ($^O eq 'VMS') {
+    if ($^OS_NAME eq 'VMS') {
         # some tests will trigger VMS messages that won't be expected
         $results =~ s/\n?%[A-Z]+-[SIWEF]-[A-Z]+,.*//;
 
@@ -175,15 +174,15 @@ for ( @prgs){
 		$option_random = 1;
 	    }
 	    else {
-		die "$0: Unknown OPTION '$option'\n";
+		die "$^PROGRAM_NAME: Unknown OPTION '$option'\n";
 	    }
 	}
     }
-    die "$0: can't have OPTION regex and random\n"
+    die "$^PROGRAM_NAME: can't have OPTION regex and random\n"
         if $option_regex + $option_random +> 1;
     my $ok = 0;
     if ($results =~ s/^SKIPPED\n//) {
-	print "$results\n" ;
+	print $^STDOUT, "$results\n" ;
 	$ok = 1;
     }
     elsif ($option_random) {
@@ -200,11 +199,12 @@ for ( @prgs){
 
         $src =~ s/\nEXPECT(?:\n|$)(.|\n)*/\nEXPECT\n$results/;
     }
-    print $out_file $src, "\n########\n" if $got_files;
+    print $out_file, $src, "\n########\n" if $got_files;
  
-    print_err_line( $switch, $prog, $expected, $results, $todo, $file ) unless $ok;
+    our $TODO = $todo ?? $todo_reason !! 0;
 
-    our $TODO = $todo ? $todo_reason : 0;
+    print_err_line( $switch, $prog, $expected, $results, $todo, $file ) unless $ok or $TODO;
+
     ok($ok);
 
     foreach ( @temps)
@@ -221,22 +221,22 @@ sub randomMatch
     my @got = sort split "\n", $got ;
     my @expected = sort split "\n", $expected ;
 
-   return "{join ' ',@got}" eq "{join ' ',@expected}";
+   return "$(join ' ',@got)" eq "$(join ' ',@expected)";
 
 }
 
 sub print_err_line {
-    my($switch, $prog, $expected, $results, $todo) = < @_;
+    my @($switch, $prog, $expected, $results, $todo, $file) =  @_;
     my $err_line = "FILE: $file\n" .
                    "PROG: $switch\n$prog\n" .
 		   "EXPECTED:\n$expected\n" .
 		   "GOT:\n$results\n";
     if ($todo) {
 	$err_line =~ s/^/# /mg;
-	print $err_line;  # Harness can't filter it out from STDERR.
+	print $^STDOUT, $err_line;  # Harness can't filter it out from STDERR.
     }
     else {
-	print STDERR $err_line;
+	print $^STDERR, $err_line;
     }
 
     return 1;

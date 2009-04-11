@@ -4,7 +4,6 @@ our @ISA = qw(Exporter);
 require Exporter;
 our @EXPORT = qw(setup_recurs teardown_recurs);
 
-use strict;
 use File::Path;
 use File::Basename;
 
@@ -18,7 +17,7 @@ WriteMakefile(
 END
 
              'Problem-Module/subdir/Makefile.PL'    => <<'END',
-printf "\@INC \%s .\n", (grep { $_ eq '.' } @INC) ? "has" : "doesn't have";
+printf $^STDOUT, "\$^INCLUDE_PATH \%s .\n", (grep { $_ eq '.' }, $^INCLUDE_PATH) ?? "has" !! "doesn't have";
 
 warn "I think I'm going to be sick\n";
 die "YYYAaaaakkk\n";
@@ -28,15 +27,15 @@ END
 
 
 sub setup_recurs {
-    while(my($file, $text) = each %Files) {
+    while(my@(?$file, ?$text) =@( each %Files)) {
         # Convert to a relative, native file path.
         $file = 'File::Spec'->catfile('File::Spec'->curdir, < split m{\/}, $file);
 
         my $dir = dirname($file);
         mkpath $dir;
-        open(FILE, ">", "$file") || die "Can't create $file: $!";
-        print FILE $text;
-        close FILE;
+        open(my $fh, ">", "$file") || die "Can't create $file: $^OS_ERROR";
+        print $fh, $text;
+        close $fh;
     }
 
     return 1;

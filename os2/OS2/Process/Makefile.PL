@@ -23,11 +23,11 @@ sub create_constants {
   for ( @try) {
     $src_dir = $_, last if -d "$_/utils" and -r "$_/utils/h2xs";
   }
-  warn("Can't find \$PERL_SRC/utils/h2xs in {join ' ',@try}, falling back to no constants"),
+  warn("Can't find \$PERL_SRC/utils/h2xs in $(join ' ',@try), falling back to no constants"),
     return unless defined $src_dir;
   # Can't name it *::Constants, otherwise constants.xs would overwrite it...
   # This produces warnings from PSZ-conversion on WS_* constants.
-  system $^X, "-I$src_dir/lib", "$src_dir/utils/h2xs", '-fn', 'OS2::Process::Const',
+  system $^EXECUTABLE_NAME, "-I$src_dir/lib", "$src_dir/utils/h2xs", '-fn', 'OS2::Process::Const',
     '--skip-exporter', '--skip-autoloader', # too large memory overhead
       '--skip-strict', '--skip-warnings', # likewise
 	'--skip-ppport',	# will not work without dynaloading.
@@ -38,7 +38,7 @@ sub create_constants {
     and warn("Can't build module with contants, falling back to no constants"),
       return;
   rename 'OS2/Process/Const', 'Process_constants'
-    or warn("Error renaming module, falling back to no constants: $!"),
+    or warn("Error renaming module, falling back to no constants: $^OS_ERROR"),
       return;
   return 1;
 }

@@ -1,25 +1,23 @@
 package ExtUtils::CBuilder::Platform::aix;
 
-use strict;
 use ExtUtils::CBuilder::Platform::Unix;
 use File::Spec;
 
-use vars < qw($VERSION @ISA);
+our ($VERSION, @ISA);
 $VERSION = '0.22';
 @ISA = qw(ExtUtils::CBuilder::Platform::Unix);
 
 sub need_prelink { 1 }
 
-sub link {
-  my ($self, < %args) = < @_;
-  my $cf = $self->{config};
+sub link($self, %< %args) {
+  my $cf = $self->{?config};
 
-  (my $baseext = %args{module_name}) =~ s/.*:://;
+  (my $baseext = %args{?module_name}) =~ s/.*:://;
   my $perl_inc = $self->perl_inc();
 
   # Massage some very naughty bits in %Config
-  local $cf->{lddlflags} = $cf->{lddlflags};
-  for (@($cf->{lddlflags})) {
+  local $cf->{+lddlflags} = $cf->{?lddlflags};
+  for (@($cf->{?lddlflags})) {
     s/\$ [(] BASEEXT [)] /$baseext/x;
     s/\$ [(] PERL_INC [)] /$perl_inc/x;
   }

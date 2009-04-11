@@ -3,7 +3,7 @@
 ## This module is to be use()'d only by Pod::Simple::Transcode
 
 package Pod::Simple::TranscodeSmart;
-use strict;
+
 use Pod::Simple;
 require Encode;
 
@@ -23,11 +23,10 @@ sub encmodver {
 }
 
 sub make_transcoder {
-  my($e) = @_[1];
+  my $e = @_[1];
   die "WHAT ENCODING!?!?" unless $e;
-  my $x;
   return sub {
-    foreach $x ( @_) {
+    foreach my $x ( @_) {
       $x = Encode::decode($e, $x);
     }
     return;

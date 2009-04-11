@@ -36,10 +36,11 @@ Perl_runops_standard(pTHX)
 {
     dVAR;
     while ((PL_op = CALL_FPTR(PL_op->op_ppaddr)(aTHX))) {
+	if (PL_destroyav)
+	    call_destructors();
 	PERL_ASYNC_CHECK();
     }
 
-    TAINT_NOT;
     return 0;
 }
 

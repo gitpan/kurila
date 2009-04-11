@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w -I.
 
-use strict;
+
 our @tests =split(m/\nEND\n/s, <<DONE);
 TEST1
 Cyberdog Information
@@ -48,16 +48,15 @@ END
 DONE
 
 
-$| = 1;
+$^OUTPUT_AUTOFLUSH = 1;
 
 my $numtests = scalar(nelems @tests) / 2;
-print "1..$numtests\n";
+print $^STDOUT, "1..$numtests\n";
 
 use Text::Wrap;
 
-use strict;
 
-my $rerun = %ENV{'PERL_DL_NONLAZY'} ? 0 : 1;
+my $rerun = env::var('PERL_DL_NONLAZY') ?? 0 !! 1;
 
 my $tn = 1;
 while ((nelems @tests)) {
@@ -69,7 +68,7 @@ while ((nelems @tests)) {
 	my $back = fill('    ', ' ', $in);
 
 	if ($back eq $out) {
-		print "ok $tn\n";
+		print $^STDOUT, "ok $tn\n";
 	} elsif ($rerun) {
 		my $oi = $in;
 		write_file("#o", $back);
@@ -78,30 +77,27 @@ while ((nelems @tests)) {
 			s/\t/^I\t/gs;
 			s/\n/\$\n/gs;
 		}
-		print "------------ input ------------\n";
-		print $in;
-		print "\n------------ output -----------\n";
-		print $back;
-		print "\n------------ expected ---------\n";
-		print $out;
-		print "\n-------------------------------\n";
+		print $^STDOUT, "------------ input ------------\n";
+		print $^STDOUT, $in;
+		print $^STDOUT, "\n------------ output -----------\n";
+		print $^STDOUT, $back;
+		print $^STDOUT, "\n------------ expected ---------\n";
+		print $^STDOUT, $out;
+		print $^STDOUT, "\n-------------------------------\n";
 		$Text::Wrap::debug = 1;
 		fill('    ', ' ', $oi);
 		exit(1);
 	} else {
-		print "not ok $tn\n";
+		print $^STDOUT, "not ok $tn\n";
 	}
 	$tn++;
 }
 
-sub write_file
+sub write_file($f, @< @data)
 {
-	my ($f, < @data) = < @_;
 
-	local(*F);
-
-	open(F, ">", "$f") || die "open >$f: $!";
-	(print F < @data) || die "write $f: $!";
-	close(F) || die "close $f: $!";
+	open(my $fh, ">", "$f") || die "open >$f: $^OS_ERROR";
+	(print $fh, < @data) || die "write $f: $^OS_ERROR";
+	close($fh) || die "close $f: $^OS_ERROR";
 	return 1;
 }

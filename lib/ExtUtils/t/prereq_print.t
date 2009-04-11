@@ -1,16 +1,15 @@
 #!/usr/bin/perl -w
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't' if -d 't';
-        @INC = @('../lib', 'lib');
+        $^INCLUDE_PATH = @('../lib', 'lib');
     }
     else {
-        unshift @INC, 't/lib';
+        unshift $^INCLUDE_PATH, 't/lib';
     }
 }
 
-use strict;
 use Config;
 
 use Test::More;
@@ -27,16 +26,16 @@ use MakeMaker::Test::Setup::BFD;
 
 # 'make disttest' sets a bunch of environment variables which interfere
 # with our testing.
-delete %ENV{[qw(PREFIX LIB MAKEFLAGS)]};
+env::var($_) = undef for qw(PREFIX LIB MAKEFLAGS);
 
 my $Perl = which_perl();
 my $Makefile = makefile_name();
-my $Is_VMS = $^O eq 'VMS';
+my $Is_VMS = $^OS_NAME eq 'VMS';
 
 chdir 't';
 perl_lib;
 
-$| = 1;
+$^OUTPUT_AUTOFLUSH = 1;
 
 ok( setup_recurs(), 'setup' );
 END {
@@ -45,26 +44,25 @@ END {
 }
 
 ok( chdir('Big-Dummy'), "chdir'd to Big-Dummy" ) ||
-  diag("chdir failed: $!");
+  diag("chdir failed: $^OS_ERROR");
 
 unlink $Makefile;
 my $prereq_out = run(qq{$Perl Makefile.PL "PREREQ_PRINT=1"});
 ok( !-r $Makefile, "PREREQ_PRINT produces no $Makefile" );
-is( $?, 0,         '  exited normally' );
-{
+is( $^CHILD_ERROR, 0,         '  exited normally' );
+do {
     package _Prereq::Print;
-    no strict;
     my $PREREQ_PM = undef;  # shut up "used only once" warning.
     eval $prereq_out;
-    die if $@;
+    die if $^EVAL_ERROR;
     main::is_deeply( $PREREQ_PM, \%( strict => 0 ), 'prereqs dumped' );
-    main::is( $@, '',                             '  without error' );
-}
+    main::is( $^EVAL_ERROR, '',                             '  without error' );
+};
 
 
 $prereq_out = run(qq{$Perl Makefile.PL "PRINT_PREREQ=1"});
 ok( !-r $Makefile, "PRINT_PREREQ produces no $Makefile" );
-is( $?, 0,         '  exited normally' );
+is( $^CHILD_ERROR, 0,         '  exited normally' );
 main::like( $prereq_out, qr/^perl\(strict\) \s* >= \s* 0 \s*$/x, 
                                                       'prereqs dumped' );
 

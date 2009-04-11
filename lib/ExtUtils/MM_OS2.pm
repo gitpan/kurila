@@ -1,6 +1,5 @@
 package ExtUtils::MM_OS2;
 
-use strict;
 
 use ExtUtils::MakeMaker < qw(neatvalue);
 use File::Spec;
@@ -37,29 +36,27 @@ Define TO_UNIX to convert OS2 linefeeds to Unix style.
 
 =cut
 
-sub init_dist {
-    my($self) = < @_;
+sub init_dist($self) {
 
-    $self->{TO_UNIX} ||= <<'MAKE_TEXT';
+    $self->{+TO_UNIX} ||= <<'MAKE_TEXT';
 $(NOECHO) $(TEST_F) tmp.zip && $(RM_F) tmp.zip; $(ZIP) -ll -mr tmp.zip $(DISTVNAME) && unzip -o tmp.zip && $(RM_F) tmp.zip
 MAKE_TEXT
 
     $self->SUPER::init_dist;
 }
 
-sub dlsyms {
-    my($self,< %attribs) = < @_;
+sub dlsyms($self,%< %attribs) {
 
-    my($funcs) = %attribs{DL_FUNCS} || $self->{DL_FUNCS} || \%();
-    my($vars)  = %attribs{DL_VARS} || $self->{DL_VARS} || \@();
-    my($funclist) = %attribs{FUNCLIST} || $self->{FUNCLIST} || \@();
-    my($imports)  = %attribs{IMPORTS} || $self->{IMPORTS} || \%();
+    my@($funcs) = %attribs{?DL_FUNCS} || $self->{?DL_FUNCS} || \%();
+    my@($vars)  = %attribs{?DL_VARS} || $self->{?DL_VARS} || \@();
+    my@($funclist) = %attribs{?FUNCLIST} || $self->{?FUNCLIST} || \@();
+    my@($imports)  = %attribs{?IMPORTS} || $self->{?IMPORTS} || \%();
     my(@m);
-    (my $boot = $self->{NAME}) =~ s/:/_/g;
+    (my $boot = $self->{?NAME}) =~ s/:/_/g;
 
-    if (not $self->{SKIPHASH}->{'dynamic'}) {
+    if (not $self->{SKIPHASH}->{?'dynamic'}) {
 	push(@m,"
-$self->{BASEEXT}.def: Makefile.PL
+$self->{?BASEEXT}.def: Makefile.PL
 ",
      q|	$(PERL) "-I$(PERL_ARCHLIB)" "-I$(PERL_LIB)" -e 'use ExtUtils::Mksymlists; \
      Mksymlists("NAME" => "$(NAME)", "DLBASE" => "$(DLBASE)", |,
@@ -71,29 +68,28 @@ $self->{BASEEXT}.def: Makefile.PL
      ', "DL_VARS" => ', < neatvalue($vars), q|);'
 |);
     }
-    if ($self->{IMPORTS} && %{$self->{IMPORTS}}) {
+    if ($self->{?IMPORTS} && %{$self->{?IMPORTS}}) {
 	# Make import files (needed for static build)
 	-d 'tmp_imp' or mkdir 'tmp_imp', 0777 or die "Can't mkdir tmp_imp";
 	open my $imp, '>', 'tmpimp.imp' or die "Can't open tmpimp.imp";
-	while (my($name, $exp) = each %{$self->{IMPORTS}}) {
-	    my ($lib, $id) = ($exp =~ m/(.*)\.(.*)/) or die "Malformed IMPORT `$exp'";
-	    print $imp "$name $lib $id ?\n";
+	while (my@($name, $exp) =@( each %{$self->{IMPORTS}})) {
+	    my @($lib, $id) = @($exp =~ m/(.*)\.(.*)/) or die "Malformed IMPORT `$exp'";
+	    print $imp, "$name $lib $id ?\n";
 	}
 	close $imp or die "Can't close tmpimp.imp";
 	# print "emximp -o tmpimp$Config::Config{lib_ext} tmpimp.imp\n";
-	system "emximp -o tmpimp%Config::Config{lib_ext} tmpimp.imp" 
-	    and die "Cannot make import library: $!, \$?=$?";
+	system "emximp -o tmpimp%Config::Config{?lib_ext} tmpimp.imp" 
+	    and die "Cannot make import library: $^OS_ERROR, \$?=$^CHILD_ERROR";
 	unlink glob( <"tmp_imp/*");
-	system "cd tmp_imp; %Config::Config{ar} x ../tmpimp%Config::Config{lib_ext}" 
-	    and die "Cannot extract import objects: $!, \$?=$?";      
+	system "cd tmp_imp; %Config::Config{?ar} x ../tmpimp%Config::Config{?lib_ext}" 
+	    and die "Cannot extract import objects: $^OS_ERROR, \$?=$^CHILD_ERROR";      
     }
     join('', @m);
 }
 
-sub static_lib {
-    my($self) = < @_;
+sub static_lib($self) {
     my $old = $self->ExtUtils::MM_Unix::static_lib();
-    return $old unless $self->{IMPORTS} && %{$self->{IMPORTS}};
+    return $old unless $self->{?IMPORTS} && %{$self->{?IMPORTS}};
     
     my @chunks = split m/\n{2,}/, $old;
     shift @chunks unless length @chunks[0]; # Empty lines at the start
@@ -104,14 +100,12 @@ EOC
     return join "\n\n". '', @chunks;
 }
 
-sub replace_manpage_separator {
-    my($self,$man) = < @_;
+sub replace_manpage_separator($self,$man) {
     $man =~ s,/+,.,g;
     $man;
 }
 
-sub maybe_command {
-    my($self,$file) = < @_;
+sub maybe_command($self,$file) {
     $file =~ s,[/\\]+,/,g;
     return $file if -x $file && ! -d _;
     return "$file.exe" if -x "$file.exe" && ! -d _;
@@ -126,12 +120,12 @@ sub maybe_command {
 sub init_linker {
     my $self = shift;
 
-    $self->{PERL_ARCHIVE} = "\$(PERL_INC)/libperl\$(LIB_EXT)";
+    $self->{+PERL_ARCHIVE} = "\$(PERL_INC)/libperl\$(LIB_EXT)";
 
-    $self->{PERL_ARCHIVE_AFTER} = $OS2::is_aout
-      ? ''
-      : '$(PERL_INC)/libperl_override$(LIB_EXT)';
-    $self->{EXPORT_LIST} = '$(BASEEXT).def';
+    $self->{+PERL_ARCHIVE_AFTER} = $OS2::is_aout
+      ?? ''
+      !! '$(PERL_INC)/libperl_override$(LIB_EXT)';
+    $self->{+EXPORT_LIST} = '$(BASEEXT).def';
 }
 
 =item os_flavor

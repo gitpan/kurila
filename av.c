@@ -39,7 +39,7 @@ Perl_av_reify(pTHX_ AV *av)
 	SV * const sv = AvARRAY(av)[--key];
 	assert(sv);
 	if (sv != &PL_sv_undef)
-	    SvREFCNT_inc_simple_void_NN(sv);
+	    SvREFCNT_inc_void_NN(sv);
     }
     key = AvARRAY(av) - AvALLOC(av);
     while (key)
@@ -203,11 +203,9 @@ Perl_av_fetch(pTHX_ register AV *av, I32 key, I32 lval)
 	    return NULL;
 	return av_store(av,key,newSV(0));
     }
-    if (AvARRAY(av)[key] == &PL_sv_undef) {
+    if (lval && AvARRAY(av)[key] == &PL_sv_undef) {
     emptyness:
-	if (lval)
-	    return av_store(av,key,newSV(0));
-	return NULL;
+	return av_store(av,key,newSV(0));
     }
     else if (AvREIFY(av)
 	     && (!AvARRAY(av)[key]	/* eg. @_ could have freed elts */
@@ -281,7 +279,10 @@ Perl_av_store(pTHX_ register AV *av, I32 key, SV *val)
     if (SvSMAGICAL(av)) {
 	const MAGIC* const mg = SvMAGIC(av);
 	if (val != &PL_sv_undef) {
-	    sv_magic(val, (SV*)av, toLOWER(mg->mg_type), 0, key);
+	    SV* ref = newRV_inc(mg->mg_obj);
+	    sv_rvweaken(ref);
+	    sv_magic(val, ref, toLOWER(mg->mg_type), 0, key);
+	    SvREFCNT_dec(ref);
 	}
 	if (PL_delaymagic && mg->mg_type == PERL_MAGIC_isa)
 	    PL_delaymagic |= DM_ARRAY;
@@ -416,6 +417,8 @@ Perl_av_undef(pTHX_ register AV *av)
 void
 Perl_av_tmprefcnt(pTHX_ AV *av)
 {
+    PERL_ARGS_ASSERT_AV_TMPREFCNT;
+
     if (AvREAL(av)) {
 	register I32 key = AvFILLp(av) + 1;
 	while (key)

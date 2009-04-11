@@ -1,8 +1,8 @@
 
 package Pod::Simple::HTMLLegacy;
-use strict;
 
-use vars < qw($VERSION);
+
+our ($VERSION);
 use Getopt::Long;
 
 $VERSION = "5.01";
@@ -19,7 +19,7 @@ sub pod2html {
   my( $verbose, $infile, $outfile, $title );
   my $index = 1;
  
-  {
+  do {
     my($help);
 
     my($netscape); # dummy
@@ -36,16 +36,16 @@ sub pod2html {
     ) or return bad_opts(< @args);
     bad_opts(< @args) if (nelems @ARGV); # it should be all switches!
     return help_message() if $help;
-  }
+  };
 
   for(@($infile, $outfile)) { $_ = undef unless defined and length }
   
   if($verbose) {
     warn sprintf "\%s version \%s\n", __PACKAGE__, $VERSION;
-    warn "OK, processed args [{join ' ',@args}] ...\n";
+    warn "OK, processed args [$(join ' ',@args)] ...\n";
     warn sprintf
       " Verbose: \%s\n Index: \%s\n Infile: \%s\n Outfile: \%s\n Title: \%s\n",
-      < map defined($_) ? $_ : "(nil)", @(
+      < map { defined($_) ?? $_ !! "(nil)" }, @(
        $verbose,     $index,     $infile,     $outfile,     $title,)
     ;
     *Pod::Simple::HTML::DEBUG = sub(){1};
@@ -66,7 +66,7 @@ sub pod2html {
 #--------------------------------------------------------------------------
 
 sub bad_opts     { die < _help_message();         }
-sub help_message { print STDOUT < _help_message() }
+sub help_message { print $^STDOUT, < _help_message() }
 
 #--------------------------------------------------------------------------
 

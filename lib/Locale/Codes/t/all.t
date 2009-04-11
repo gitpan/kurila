@@ -17,24 +17,19 @@ use Locale::Language;
 use Locale::Currency;
 use Locale::Script;
 
-print "1..20\n";
+print $^STDOUT, "1..20\n";
 
-my $code;
-my $language;
-my $country;
 my $ok;
 my $reverse;
-my $currency;
-my $script;
 
 
 #-----------------------------------------------------------------------
 # Old API - without codeset specified, default to ALPHA_2
 #-----------------------------------------------------------------------
 $ok = 1;
-foreach $code (  all_country_codes())
+foreach my $code (  all_country_codes())
 {
-    $country = code2country($code);
+    my $country = code2country($code);
     if (!defined $country)
     {
         $ok = 0;
@@ -52,15 +47,15 @@ foreach $code (  all_country_codes())
         last;
     }
 }
-print ($ok ? "ok 1\n" : "not ok 1\n");
+print ($^STDOUT, $ok ?? "ok 1\n" !! "not ok 1\n");
 
 #-----------------------------------------------------------------------
 # code to country, back to code, for ALPHA2
 #-----------------------------------------------------------------------
 $ok = 1;
-foreach $code ( all_country_codes(LOCALE_CODE_ALPHA_2))
+foreach my $code ( all_country_codes(LOCALE_CODE_ALPHA_2))
 {
-    $country = code2country($code, LOCALE_CODE_ALPHA_2);
+    my $country = code2country($code, LOCALE_CODE_ALPHA_2);
     if (!defined $country)
     {
         $ok = 0;
@@ -78,15 +73,15 @@ foreach $code ( all_country_codes(LOCALE_CODE_ALPHA_2))
         last;
     }
 }
-print ($ok ? "ok 2\n" : "not ok 2\n");
+print ($^STDOUT, $ok ?? "ok 2\n" !! "not ok 2\n");
 
 #-----------------------------------------------------------------------
 # code to country, back to code, for ALPHA3
 #-----------------------------------------------------------------------
 $ok = 1;
-foreach $code ( all_country_codes(LOCALE_CODE_ALPHA_3))
+foreach my $code ( all_country_codes(LOCALE_CODE_ALPHA_3))
 {
-    $country = code2country($code, LOCALE_CODE_ALPHA_3);
+    my $country = code2country($code, LOCALE_CODE_ALPHA_3);
     if (!defined $country)
     {
         $ok = 0;
@@ -104,15 +99,15 @@ foreach $code ( all_country_codes(LOCALE_CODE_ALPHA_3))
         last;
     }
 }
-print ($ok ? "ok 3\n" : "not ok 3\n");
+print ($^STDOUT, $ok ?? "ok 3\n" !! "not ok 3\n");
 
 #-----------------------------------------------------------------------
 # code to country, back to code, for NUMERIC
 #-----------------------------------------------------------------------
 $ok = 1;
-foreach $code ( all_country_codes(LOCALE_CODE_NUMERIC))
+foreach my $code ( all_country_codes(LOCALE_CODE_NUMERIC))
 {
-    $country = code2country($code, LOCALE_CODE_NUMERIC);
+    my $country = code2country($code, LOCALE_CODE_NUMERIC);
     if (!defined $country)
     {
         $ok = 0;
@@ -130,16 +125,16 @@ foreach $code ( all_country_codes(LOCALE_CODE_NUMERIC))
         last;
     }
 }
-print ($ok ? "ok 4\n" : "not ok 4\n");
+print ($^STDOUT, $ok ?? "ok 4\n" !! "not ok 4\n");
 
 
 #-----------------------------------------------------------------------
 # Old API - country to code, back to country, using default of ALPHA_2
 #-----------------------------------------------------------------------
 $ok = 1;
-foreach $country ( all_country_names())
+foreach my $country ( all_country_names())
 {
-    $code = country2code($country);
+    my $code = country2code($country);
     if (!defined $code)
     {
         $ok = 0;
@@ -157,15 +152,15 @@ foreach $country ( all_country_names())
         last;
     }
 }
-print ($ok ? "ok 5\n" : "not ok 5\n");
+print ($^STDOUT, $ok ?? "ok 5\n" !! "not ok 5\n");
 
 #-----------------------------------------------------------------------
 # country to code, back to country, using LOCALE_CODE_ALPHA_2
 #-----------------------------------------------------------------------
 $ok = 1;
-foreach $country ( all_country_names())
+foreach my $country ( all_country_names())
 {
-    $code = country2code($country, LOCALE_CODE_ALPHA_2);
+    my $code = country2code($country, LOCALE_CODE_ALPHA_2);
     if (!defined $code)
     {
         $ok = 0;
@@ -183,15 +178,15 @@ foreach $country ( all_country_names())
         last;
     }
 }
-print ($ok ? "ok 6\n" : "not ok 6\n");
+print ($^STDOUT, $ok ?? "ok 6\n" !! "not ok 6\n");
 
 #-----------------------------------------------------------------------
 # country to code, back to country, using LOCALE_CODE_ALPHA_3
 #-----------------------------------------------------------------------
 $ok = 1;
-foreach $country ( all_country_names())
+foreach my $country ( all_country_names())
 {
-    $code = country2code($country, LOCALE_CODE_ALPHA_3);
+    my $code = country2code($country, LOCALE_CODE_ALPHA_3);
     if (!defined $code)
     {
 	next if ($country eq 'Antarctica'
@@ -221,15 +216,15 @@ foreach $country ( all_country_names())
         last;
     }
 }
-print ($ok ? "ok 7\n" : "not ok 7\n");
+print ($^STDOUT, $ok ?? "ok 7\n" !! "not ok 7\n");
 
 #-----------------------------------------------------------------------
 # country to code, back to country, using LOCALE_CODE_NUMERIC
 #-----------------------------------------------------------------------
 $ok = 1;
-foreach $country ( all_country_names())
+foreach my $country ( all_country_names())
 {
-    $code = country2code($country, LOCALE_CODE_NUMERIC);
+    my $code = country2code($country, LOCALE_CODE_NUMERIC);
     if (!defined $code)
     {
 	next if ($country eq 'Antarctica'
@@ -259,13 +254,13 @@ foreach $country ( all_country_names())
         last;
     }
 }
-print ($ok ? "ok 8\n" : "not ok 8\n");
+print ($^STDOUT, $ok ?? "ok 8\n" !! "not ok 8\n");
 
 
 $ok = 1;
-foreach $code ( all_language_codes())
+foreach my $code ( all_language_codes())
 {
-    $language = code2language($code);
+    my $language = code2language($code);
     if (!defined $language)
     {
         $ok = 0;
@@ -283,13 +278,13 @@ foreach $code ( all_language_codes())
         last;
     }
 }
-print ($ok ? "ok 9\n" : "not ok 9\n");
+print ($^STDOUT, $ok ?? "ok 9\n" !! "not ok 9\n");
 
 
 $ok = 1;
-foreach $language ( all_language_names())
+foreach my $language ( all_language_names())
 {
-    $code = language2code($language);
+    my $code = language2code($language);
     if (!defined $code)
     {
         $ok = 0;
@@ -307,12 +302,12 @@ foreach $language ( all_language_names())
         last;
     }
 }
-print ($ok ? "ok 10\n" : "not ok 10\n");
+print ($^STDOUT, $ok ?? "ok 10\n" !! "not ok 10\n");
 
 $ok = 1;
-foreach $code ( all_currency_codes())
+foreach my $code ( all_currency_codes())
 {
-    $currency = code2currency($code);
+    my $currency = code2currency($code);
     if (!defined $currency)
     {
         $ok = 0;
@@ -338,12 +333,12 @@ foreach $code ( all_currency_codes())
         last;
     }
 }
-print ($ok ? "ok 11\n" : "not ok 11\n");
+print ($^STDOUT, $ok ?? "ok 11\n" !! "not ok 11\n");
 
 $ok = 1;
-foreach $currency ( all_currency_names())
+foreach my $currency ( all_currency_names())
 {
-    $code = currency2code($currency);
+    my $code = currency2code($currency);
     if (!defined $code)
     {
         $ok = 0;
@@ -361,7 +356,7 @@ foreach $currency ( all_currency_names())
         last;
     }
 }
-print ($ok ? "ok 12\n" : "not ok 12\n");
+print ($^STDOUT, $ok ?? "ok 12\n" !! "not ok 12\n");
 
 #=======================================================================
 #
@@ -373,9 +368,9 @@ print ($ok ? "ok 12\n" : "not ok 12\n");
 # Old API - without codeset specified, default to ALPHA_2
 #-----------------------------------------------------------------------
 $ok = 1;
-foreach $code ( all_script_codes())
+foreach my $code ( all_script_codes())
 {
-    $script = code2script($code);
+    my $script = code2script($code);
     if (!defined $script)
     {
         $ok = 0;
@@ -393,15 +388,15 @@ foreach $code ( all_script_codes())
         last;
     }
 }
-print ($ok ? "ok 13\n" : "not ok 13\n");
+print ($^STDOUT, $ok ?? "ok 13\n" !! "not ok 13\n");
 
 #-----------------------------------------------------------------------
 # code to script, back to code, for ALPHA2
 #-----------------------------------------------------------------------
 $ok = 1;
-foreach $code ( all_script_codes(LOCALE_CODE_ALPHA_2))
+foreach my $code ( all_script_codes(LOCALE_CODE_ALPHA_2))
 {
-    $script = code2script($code, LOCALE_CODE_ALPHA_2);
+    my $script = code2script($code, LOCALE_CODE_ALPHA_2);
     if (!defined $script)
     {
         $ok = 0;
@@ -419,15 +414,15 @@ foreach $code ( all_script_codes(LOCALE_CODE_ALPHA_2))
         last;
     }
 }
-print ($ok ? "ok 14\n" : "not ok 14\n");
+print ($^STDOUT, $ok ?? "ok 14\n" !! "not ok 14\n");
 
 #-----------------------------------------------------------------------
 # code to script, back to code, for ALPHA3
 #-----------------------------------------------------------------------
 $ok = 1;
-foreach $code ( all_script_codes(LOCALE_CODE_ALPHA_3))
+foreach my $code ( all_script_codes(LOCALE_CODE_ALPHA_3))
 {
-    $script = code2script($code, LOCALE_CODE_ALPHA_3);
+    my $script = code2script($code, LOCALE_CODE_ALPHA_3);
     if (!defined $script)
     {
         $ok = 0;
@@ -445,15 +440,15 @@ foreach $code ( all_script_codes(LOCALE_CODE_ALPHA_3))
         last;
     }
 }
-print ($ok ? "ok 15\n" : "not ok 15\n");
+print ($^STDOUT, $ok ?? "ok 15\n" !! "not ok 15\n");
 
 #-----------------------------------------------------------------------
 # code to script, back to code, for NUMERIC
 #-----------------------------------------------------------------------
 $ok = 1;
-foreach $code ( all_script_codes(LOCALE_CODE_NUMERIC))
+foreach my $code ( all_script_codes(LOCALE_CODE_NUMERIC))
 {
-    $script = code2script($code, LOCALE_CODE_NUMERIC);
+    my $script = code2script($code, LOCALE_CODE_NUMERIC);
     if (!defined $script)
     {
         $ok = 0;
@@ -471,16 +466,16 @@ foreach $code ( all_script_codes(LOCALE_CODE_NUMERIC))
         last;
     }
 }
-print ($ok ? "ok 16\n" : "not ok 16\n");
+print ($^STDOUT, $ok ?? "ok 16\n" !! "not ok 16\n");
 
 
 #-----------------------------------------------------------------------
 # Old API - script to code, back to script, using default of ALPHA_2
 #-----------------------------------------------------------------------
 $ok = 1;
-foreach $script ( all_script_names())
+foreach my $script ( all_script_names())
 {
-    $code = script2code($script);
+    my $code = script2code($script);
     if (!defined $code)
     {
         $ok = 0;
@@ -498,15 +493,15 @@ foreach $script ( all_script_names())
         last;
     }
 }
-print ($ok ? "ok 17\n" : "not ok 17\n");
+print ($^STDOUT, $ok ?? "ok 17\n" !! "not ok 17\n");
 
 #-----------------------------------------------------------------------
 # script to code, back to script, using LOCALE_CODE_ALPHA_2
 #-----------------------------------------------------------------------
 $ok = 1;
-foreach $script ( all_script_names())
+foreach my $script ( all_script_names())
 {
-    $code = script2code($script, LOCALE_CODE_ALPHA_2);
+    my $code = script2code($script, LOCALE_CODE_ALPHA_2);
     if (!defined $code)
     {
         $ok = 0;
@@ -524,15 +519,15 @@ foreach $script ( all_script_names())
         last;
     }
 }
-print ($ok ? "ok 18\n" : "not ok 18\n");
+print ($^STDOUT, $ok ?? "ok 18\n" !! "not ok 18\n");
 
 #-----------------------------------------------------------------------
 # script to code, back to script, using LOCALE_CODE_ALPHA_3
 #-----------------------------------------------------------------------
 $ok = 1;
-foreach $script ( all_script_names())
+foreach my $script ( all_script_names())
 {
-    $code = script2code($script, LOCALE_CODE_ALPHA_3);
+    my $code = script2code($script, LOCALE_CODE_ALPHA_3);
     if (!defined $code)
     {
         $ok = 0;
@@ -550,15 +545,15 @@ foreach $script ( all_script_names())
         last;
     }
 }
-print ($ok ? "ok 19\n" : "not ok 19\n");
+print ($^STDOUT, $ok ?? "ok 19\n" !! "not ok 19\n");
 
 #-----------------------------------------------------------------------
 # script to code, back to script, using LOCALE_CODE_NUMERIC
 #-----------------------------------------------------------------------
 $ok = 1;
-foreach $script ( all_script_names())
+foreach my $script ( all_script_names())
 {
-    $code = script2code($script, LOCALE_CODE_NUMERIC);
+    my $code = script2code($script, LOCALE_CODE_NUMERIC);
     if (!defined $code)
     {
         $ok = 0;
@@ -576,5 +571,5 @@ foreach $script ( all_script_names())
         last;
     }
 }
-print ($ok ? "ok 20\n" : "not ok 20\n");
+print ($^STDOUT, $ok ?? "ok 20\n" !! "not ok 20\n");
 

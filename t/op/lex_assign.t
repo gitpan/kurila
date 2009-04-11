@@ -9,29 +9,29 @@ our ($xref, $runme, @a, %h, $aref, $chopit, @chopar, $posstr,
 
 our ($undefed, @z, @x, @aaa, $toself, $direct);
 
-$| = 1;
+$^OUTPUT_AUTOFLUSH = 1;
 umask 0;
 $xref = \ "";
-$runme = $^X;
+$runme = $^EXECUTABLE_NAME;
 @a =1..5;
 %h = %( <1..6);
 $aref = \@a;
 $href = \%h;
-open OP, '-|', qq{$runme -le "print 'aaa Ok ok' for 1..100"};
+open my $op_fh, '-|', qq{$runme -le "print \\\$^STDOUT, 'aaa Ok ok' for 1..100"};
 $chopit = 'aaaaaa';
 @chopar =113 .. 119;
 $posstr = '123456';
 $cstr = 'aBcD.eF';
-pos $posstr = 3;
+pos($posstr = 3);
 $nn = $n = 2;
 sub subb {"in s"}
 
 @INPUT = @( ~< *DATA );
-@simple_input = grep m/^\s*\w+\s*\$\w+\s*[#\n]/, @INPUT;
+@simple_input = grep { m/^\s*\w+\s*\$\w+\s*[#\n]/ }, @INPUT;
 
 plan 6 + (nelems @INPUT) + nelems @simple_input;
 
-sub wrn {"{join ' ',@_}"}
+sub wrn {"$(join ' ',@_)"}
 
 # Check correct optimization of ucfirst etc
 my $a = "AB";
@@ -43,7 +43,7 @@ my $dc = 0;
 sub A::DESTROY {$dc += 1}
 $a=8;
 my $b;
-{ my $c = 6; $b = bless \$c, "A"}
+do { my $c = 6; $b = bless \$c, "A"};
 
 ok $dc == 0;
 
@@ -65,17 +65,17 @@ ok( ($zzz1 == 13 and $zzz2 == 13 and $l1 == 13),
     "$zzz1 = $l1 = $l2 = $zzz2 = $l3 = $l4 = 13" );
 
 for ( @INPUT) {
- SKIP: {
-    ($op, undef, $comment) = m/^([^\#]+)(\#\s+(.*))?/;
+ SKIP: do {
+    @($op, _, $comment) = @: m/^([^\#]+)(\#\s+(.*))?/;
     $comment = $op unless defined $comment;
     chomp;
     $op = "$op==$op" unless $op =~ m/==/;
-    ($op, $expectop) = $op =~ m/(.*)==(.*)/;
+    @($op, $expectop) = @: $op =~ m/(.*)==(.*)/;
   
-    if ($op =~ m/^'\?\?\?'/ or $comment =~ m/skip\(.*\Q$^O\E.*\)/i) {
+    if ($op =~ m/^'\?\?\?'/ or $comment =~ m/skip\(.*\Q$^OS_NAME\E.*\)/i) {
       skip("$comment", 1);
     }
-    $integer = ($comment =~ m/^i_/) ? "use integer" : '' ;
+    $integer = ($comment =~ m/^i_/) ?? "use integer" !! '' ;
   
     eval <<EOE . <<'EOE';
     local \$^WARN_HOOK = \\&wrn;
@@ -86,23 +86,23 @@ for ( @INPUT) {
 EOE
     is($a, $b, $comment);
 EOE
-    if ($@) {
-      if ($@->{description} =~ m/is unimplemented/) {
+    if ($^EVAL_ERROR) {
+      if ($^EVAL_ERROR->{?description} =~ m/is unimplemented/) {
         skip("$comment: unimplemented", 1);
       } else {
-        fail("error: {$@->message}");
+        fail("error: $($^EVAL_ERROR->message)");
       }
     }
-  }
+  };
 }
 
 for ( @simple_input) {
  SKIP:
- {
-  ($op, undef, $comment) = m/^([^\#]+)(\#\s+(.*))?/;
+ do {
+  @($op, _, $comment) = @: m/^([^\#]+)(\#\s+(.*))?/;
   $comment = $op unless defined $comment;
   chomp;
-  ($operator, $variable) = m/^\s*(\w+)\s*\$(\w+)/ or warn "misprocessed '$_'\n";
+  @($operator, $variable) = @: m/^\s*(\w+)\s*\$(\w+)/ or warn "misprocessed '$_'\n";
   eval <<EOE;
   local \$^WARN_HOOK = \\&wrn;
   my \$$variable = "Ac# Ca\\nxxx";
@@ -112,16 +112,16 @@ for ( @simple_input) {
   ok( \$toself eq \$direct,
      "\\\$$variable = $operator \\\$$variable");
 EOE
-  if ($@) {
-    if ($@->{description} =~ m/is unimplemented/) {
+  if ($^EVAL_ERROR) {
+    if ($^EVAL_ERROR->{?description} =~ m/is unimplemented/) {
       skip("skipping $comment: unimplemented", 1);
-    } elsif ($@->{description} =~ m/Can't (modify|take log of 0)/) {
+    } elsif ($^EVAL_ERROR->{?description} =~ m/Can't (modify|take log of 0)/) {
       skip("skipping $comment: syntax not good for selfassign", 1);
     } else {
-      fail("error: {$@->message}");
+      fail("error: $($^EVAL_ERROR->message)");
     }
   }
- }
+ };
 }
 
 try {
@@ -135,17 +135,16 @@ try {
 
     1;
 };
-die if $@;
+die if $^EVAL_ERROR;
 ok 1;
 
 __END__
 ref $xref			# ref
 ref $cstr			# ref nonref
-`$runme -e "print qq[1\\n]"`				# backtick skip(MSWin32)
+`$runme -e "print \\\$^STDOUT, qq[1\\n]"`				# backtick skip(MSWin32)
 `$undefed`			# backtick undef skip(MSWin32)
-~< *OP				# readline
+~< $op_fh				# readline
 'faked'				# rcatline
-(<@z) = (1 .. 3)			# aassign
 chop $chopit			# chop
 (chop (@x=@chopar))		# schop
 chomp $chopit			# chomp
@@ -220,12 +219,11 @@ subb()				# entersub
 caller				# caller
 '???'                           # warn
 'faked'				# die
-open BLAH, "<", "non-existent"	# open
-fileno STDERR			# fileno
+open my $blah, "<", "non-existent"	# open
+fileno $^STDERR			# fileno
 umask 0				# umask
-select STDOUT			# sselect
 select undef,undef,undef,0	# select
-getc OP				# getc
+getc($op_fh)				# getc
 '???'				# read
 '???'				# sysread
 '???'				# syswrite
@@ -250,7 +248,7 @@ utime 'non-existent'		# utime
 rename 'non-existent', 'non-existent1'	# rename
 link 'non-existent', 'non-existent1' # link
 '???'				# symlink
-readlink 'non-existent', 'non-existent1' # readlink
+readlink 'non-existent' # readlink
 '???'				# mkdir
 '???'				# rmdir
 '???'				# telldir
@@ -263,11 +261,11 @@ system "$runme -e 0"		# system skip(VMS)
 getppid				# getppid
 getpgrp				# getpgrp
 '???'				# setpgrp
-getpriority $$, $$		# getpriority
+getpriority $^PID, $^PID		# getpriority
 '???'				# setpriority
 time				# time
-localtime $^T			# localtime
-gmtime $^T			# gmtime
+localtime $^BASETIME			# localtime
+gmtime $^BASETIME			# gmtime
 '???'				# sleep: can randomly fail
 '???'				# alarm
 '???'				# shmget

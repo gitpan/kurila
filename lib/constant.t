@@ -1,15 +1,14 @@
-#!./perl -T
+#!./perl
 
 use warnings;
-use vars < qw{ @warnings $fagwoosh $putt $kloong};
+our (@warnings, $fagwoosh, $putt, $kloong);
 BEGIN {				# ...and save 'em for later
-    $^WARN_HOOK = sub { push @warnings, @_[0]->{description} }
+    $^WARN_HOOK = sub { push @warnings, @_[0]->{?description} }
 }
-END { print STDERR < @warnings }
+END { print $^STDERR, < @warnings }
 
 
-use strict;
-use Test::More tests => 89;
+use Test::More tests => 88;
 my $TB = Test::More->builder;
 
 BEGIN { use_ok('constant'); }
@@ -58,10 +57,10 @@ is COUNTLAST, 1;
 is((COUNTLIST)[1], 4);
 
 use constant ABC	=> 'ABC';
-is "abc${\( ABC )}abc", "abcABCabc";
+is "abc$( ABC )abc", "abcABCabc";
 
 use constant DEF	=> 'D', 'E', chr ord 'F';
-is "d e f {join ' ',@{\ DEF}} d e f", "d e f D E F d e f";
+is "d e f $(join ' ', DEF) d e f", "d e f D E F d e f";
 
 use constant SINGLE	=> "'";
 use constant DOUBLE	=> '"';
@@ -74,10 +73,10 @@ is MESS, q('"'\"'"\);
 is length(MESS), 8;
 
 use constant TRAILING	=> '12 cats';
-{
-    local $^W;
+do {
+    local $^WARNING = 0;
     cmp_ok TRAILING, '==', 12;
-}
+};
 is TRAILING, '12 cats';
 
 use constant LEADING	=> " \t1234";
@@ -91,28 +90,25 @@ is ZERO1, '0';
 is ZERO2, '0';
 is ZERO3, '0.0';
 
-{
+do {
     package Other;
     use constant PI	=> 3.141;
-}
+};
 
 cmp_ok(abs(PI - 3.1416), '+<', 0.0001);
 is Other::PI, 3.141;
 
-use constant E2BIG => $! = 7;
+use constant E2BIG => ($^OS_ERROR = 7);
 cmp_ok E2BIG, '==', 7;
 # This is something like "Arg list too long", but the actual message
 # text may vary, so we can't test much better than this.
 cmp_ok length(E2BIG), '+>', 6;
 
 is nelems(@warnings), 0 or diag join "\n", @( "unexpected warning", < @warnings);
-@warnings = @( () );		# just in case
-undef &PI;
-ok nelems(@warnings) && (@warnings[0] =~ m/Constant sub.* undefined/) or
-  diag join "\n", @( "unexpected warning", < @warnings);
-shift @warnings;
 
 is nelems(@warnings), 0, "unexpected warning";
+
+ok 1;
 
 my $curr_test = $TB->current_test;
 use constant CSCALAR	=> \"ok 37\n";
@@ -121,15 +117,15 @@ use constant CARRAY	=> \@( undef, "ok 39\n" );
 use constant CCODE	=> sub { "ok @_[0]\n" };
 
 my $output = $TB->output ;
-print $output ${+CSCALAR};
-print $output CHASH->{foo};
-print $output CARRAY->[1];
-print $output CCODE->($curr_test+4);
+print $output, ${$: CSCALAR};
+print $output, CHASH->{?foo};
+print $output, CARRAY->[1];
+print $output, CCODE->($curr_test+4);
 
-$TB->current_test($curr_test+4);
+$TB->current_test += 4;
 
 eval q{ CCODE->{foo} };
-ok scalar($@->{description} =~ m/^Constant is not a HASH/);
+like($^EVAL_ERROR->{?description}, qr/^Expected a HASH ref but got a CODE ref|Constant is not a HASH reference/);
 
 
 # Allow leading underscore
@@ -140,36 +136,35 @@ is _PRIVATE, 47;
 eval q{
     use constant __DISALLOWED => "Oops";
 };
-like $@->{description}, qr/begins with '__'/;
+like $^EVAL_ERROR->{?description}, qr/begins with '__'/;
 
 # Check on declared() and %declared. This sub should be EXACTLY the
 # same as the one quoted in the docs!
-sub declared ($) {
+sub declared($name) {
     use constant v1.01;              # don't omit this!
-    my $name = shift;
     $name =~ s/^::/main::/;
     my $pkg = caller;
-    my $full_name = $name =~ m/::/ ? $name : "{$pkg}::$name";
-    %constant::declared{$full_name};
+    my $full_name = $name =~ m/::/ ?? $name !! "$($pkg)::$name";
+    %constant::declared{?$full_name};
 }
 
 ok declared 'PI';
-ok %constant::declared{'main::PI'};
+ok %constant::declared{?'main::PI'};
 
 ok !declared 'PIE';
-ok !%constant::declared{'main::PIE'};
+ok !%constant::declared{?'main::PIE'};
 
-{
+do {
     package Other;
     use constant IN_OTHER_PACK => 42;
     main::ok main::declared 'IN_OTHER_PACK';
-    main::ok %constant::declared{'Other::IN_OTHER_PACK'};
+    main::ok %constant::declared{?'Other::IN_OTHER_PACK'};
     main::ok main::declared 'main::PI';
-    main::ok %constant::declared{'main::PI'};
-}
+    main::ok %constant::declared{?'main::PI'};
+};
 
 ok declared 'Other::IN_OTHER_PACK';
-ok %constant::declared{'Other::IN_OTHER_PACK'};
+ok %constant::declared{?'Other::IN_OTHER_PACK'};
 
 @warnings = @( () );
 eval q{
@@ -195,7 +190,6 @@ eval q{
 my @Expected_Warnings = 
   @(
    qr/^Constant name 'BEGIN' is a Perl keyword/,
-   qr/^Constant subroutine BEGIN redefined/,
    qr/^Constant name 'INIT' is a Perl keyword/,
    qr/^Constant name 'CHECK' is a Perl keyword/,
    qr/^Constant name 'UNITCHECK' is a Perl keyword/,
@@ -224,8 +218,8 @@ elsif ((nelems @warnings) == (nelems @Expected_Warnings) + 1) {
 else {
     my $rule = " -" x 20;
     diag "/!\\ unexpected case: ", scalar nelems @warnings, " warnings\n$rule\n";
-    diag < map { "  $_" } @warnings;
-    diag $rule, $/;
+    diag < map { "  $_" }, @warnings;
+    diag $rule, $^INPUT_RECORD_SEPARATOR;
 }
 
 is nelems(@warnings), 0+nelems @Expected_Warnings;
@@ -245,57 +239,58 @@ use constant \%(
 	SPIT   => sub { shift },
 );
 
-is nelems(@{+FAMILY}), THREE;
-is nelems(@{+FAMILY}), nelems @{RFAM->[0]};
+is nelems(@{$:FAMILY}), THREE;
+is nelems(@{$:FAMILY}), nelems @{RFAM->[0]};
 is FAMILY->[2], RFAM->[0]->[2];
-is AGES->{FAMILY->[1]}, 28;
-is THREE**3, SPIT->((nelems @{+FAMILY})**3);
+is AGES->{?FAMILY->[1]}, 28;
+is THREE**3, SPIT->((nelems @{$:FAMILY})**3);
 
 # Allow name of digits/underscores only if it begins with underscore
-{
+do {
     use warnings FATAL => 'constant';
     eval q{
-        use constant _1_2_3 => 'allowed';
+        use constant '_1_2_3' => 'allowed';
     };
-    ok( $@ eq '' );
-}
+    die if $^EVAL_ERROR;
+    ok( $^EVAL_ERROR eq '' );
+};
 
 $fagwoosh = 'geronimo';
 $putt = 'leutwein';
 $kloong = 'schlozhauer';
 
-{
+do {
     my @warnings;
     local $^WARN_HOOK = sub { push @warnings, < @_ };
-    eval 'use constant fagwoosh => 5; 1' or die $@;
+    eval 'use constant fagwoosh => 5; 1' or die $^EVAL_ERROR;
 
-    is ("{join ' ',@warnings}", "", "No warnings if the typeglob exists already");
+    is ("$(join ' ',@warnings)", "", "No warnings if the typeglob exists already");
 
     my $value = eval 'fagwoosh';
-    is ($@, '');
+    is ($^EVAL_ERROR, '');
     is ($value, 5);
 
     my @value = @( eval 'fagwoosh' );
-    is ($@, '');
+    is ($^EVAL_ERROR, '');
     is_deeply (\@value, \@(5));
 
-    eval 'use constant putt => 6, 7; 1' or die $@;
+    eval 'use constant putt => 6, 7; 1' or die $^EVAL_ERROR;
 
-    is ("{join ' ',@warnings}", "", "No warnings if the typeglob exists already");
+    is ("$(join ' ',@warnings)", "", "No warnings if the typeglob exists already");
 
     @value = eval 'putt';
-    is ($@, '');
+    is ($^EVAL_ERROR, '');
     is_deeply (\@value, \@(6, 7));
 
-    eval 'use constant "klong"; 1' or die $@;
+    eval 'use constant "klong"; 1' or die $^EVAL_ERROR;
 
-    is ("{join ' ',@warnings}", "", "No warnings if the typeglob exists already");
+    is ("$(join ' ',@warnings)", "", "No warnings if the typeglob exists already");
 
     $value = eval 'klong';
-    is ($@, '');
+    is ($^EVAL_ERROR, '');
     is ($value, undef);
 
     @value = eval 'klong';
-    is ($@, '');
+    is ($^EVAL_ERROR, '');
     is_deeply (\@value, \undef);
-}
+};

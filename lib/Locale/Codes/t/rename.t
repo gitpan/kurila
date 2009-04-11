@@ -5,8 +5,6 @@
 
 use Locale::Country;
 
-local $^WARN_HOOK = sub { };		# muffle warnings from carp
-
 Locale::Country::rename_country('gb' => 'Great Britain');
 
 #-----------------------------------------------------------------------
@@ -73,7 +71,7 @@ plan tests => (nelems @TESTS);
 foreach my $test ( @TESTS)
 {
     my $ok = eval "$test";
-    die if $@;
+    die if $^EVAL_ERROR;
     ok $ok;
 }
 

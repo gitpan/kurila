@@ -1,7 +1,6 @@
 package Getopt::Std;
 require Exporter;
 
-use strict;
 
 =head1 NAME
 
@@ -89,15 +88,14 @@ our ($OUTPUT_HELP_VERSION, $STANDARD_HELP_VERSION);
 # Usage:
 #	getopt('oDI');  # -o, -D & -I take arg.  Sets opt_* as a side effect.
 
-sub getopt (;$$) {
-    my ($argumentative, $hash) = < @_;
+sub getopt($argumentative, ?$hash) {
     $argumentative = '' if !defined $argumentative;
     my ($first,$rest);
-    local $_;
+    local $_ = undef;
     local @EXPORT;
 
     while ((nelems @ARGV) && ($_ = @ARGV[0]) =~ m/^-(.)(.*)/) {
-	($first,$rest) = ($1,$2);
+	@($first,$rest) = @($1,$2);
 	if (m/^--$/) {	# early exit if --
 	    shift @ARGV;
 	    last;
@@ -111,20 +109,18 @@ sub getopt (;$$) {
 		$rest = shift(@ARGV);
 	    }
 	    if (ref $hash) {
-	        %$hash{$first} = $rest;
+	        %$hash{+$first} = $rest;
 	    }
 	    else {
-                no strict 'refs';
 	        ${*{Symbol::fetch_glob("opt_$first")}} = $rest;
 	        push( @EXPORT, "\$opt_$first" );
 	    }
 	}
 	else {
 	    if (ref $hash) {
-	        %$hash{$first} = 1;
+	        %$hash{+$first} = 1;
 	    }
 	    else {
-                no strict 'refs';
 	        ${*{Symbol::fetch_glob("opt_$first")}} = 1;
 	        push( @EXPORT, "\$opt_$first" );
 	    }
@@ -144,46 +140,45 @@ sub getopt (;$$) {
 
 sub output_h () {
   return $OUTPUT_HELP_VERSION if defined $OUTPUT_HELP_VERSION;
-  return \*STDOUT if $STANDARD_HELP_VERSION;
-  return \*STDERR;
+  return $^STDOUT if $STANDARD_HELP_VERSION;
+  return $^STDERR;
 }
 
 sub try_exit () {
     exit 0 if $STANDARD_HELP_VERSION;
     my $p = __PACKAGE__;
-    print {output_h()} <<EOM;
+    print output_h() ,<<EOM;
   [Now continuing due to backward compatibility and excessive paranoia.
    See ``perldoc $p'' about \$$p\::STANDARD_HELP_VERSION.]
 EOM
 }
 
-sub version_mess ($;$) {
-    my $args = shift;
+sub version_mess ($args, ?$mess) {
     my $h = output_h;
-    if ((nelems @_) and defined &main::VERSION_MESSAGE) {
+    if ($mess and defined &main::VERSION_MESSAGE) {
 	main::VERSION_MESSAGE($h, __PACKAGE__, $VERSION, $args);
     } else {
 	my $v = $main::VERSION;
 	$v = '[unknown]' unless defined $v;
 	my $myv = $VERSION;
 	$myv .= ' [paranoid]' unless $STANDARD_HELP_VERSION;
-	my $perlv = $^V;
-	print $h <<EOH;
-$0 version $v calling Getopt::Std::getopts (version $myv),
+	my $perlv = $^PERL_VERSION;
+	print $h, <<EOH;
+$^PROGRAM_NAME version $v calling Getopt::Std::getopts (version $myv),
 running under Perl version $perlv.
 EOH
     }
 }
 
-sub help_mess ($;$) {
+sub help_mess {
     my $args = shift;
     my $h = output_h;
     if ((nelems @_) and defined &main::HELP_MESSAGE) {
 	main::HELP_MESSAGE($h, __PACKAGE__, $VERSION, $args);
     } else {
-	my (@witharg) = @($args =~ m/(\S)\s*:/g);
-	my (@rest) = @($args =~ m/([^\s:])(?!\s*:)/g);
-	my ($help, $arg) = ('', '');
+	my @witharg = @($args =~ m/(\S)\s*:/g);
+	my @rest = @($args =~ m/([^\s:])(?!\s*:)/g);
+	my @($help, $arg) = @('', '');
 	if ((nelems @witharg)) {
 	    $help .= "\n\tWith arguments: -" . join " -", @witharg;
 	    $arg = "\nSpace is not required between options and their arguments.";
@@ -191,28 +186,28 @@ sub help_mess ($;$) {
 	if ((nelems @rest)) {
 	    $help .= "\n\tBoolean (without arguments): -" . join " -", @rest;
 	}
-	my ($scr) = ($0 =~ m,([^/\\]+)$,);
-	print $h <<EOH if (nelems @_);			# Let the script override this
+	my @($scr) = @($^PROGRAM_NAME =~ m,([^/\\]+)$,);
+	print $h, <<EOH if (nelems @_);			# Let the script override this
 
 Usage: $scr [-OPTIONS [-MORE_OPTIONS]] [--] [PROGRAM_ARG1 ...]
 EOH
-	print $h <<EOH;
+	print $h, <<EOH;
 
 The following single-character options are accepted:$help
 
 Options may be merged together.  -- stops processing of options.$arg
 EOH
 	my $has_pod;
-	if ( defined $0 and $0 ne '-e' and -f $0 and -r $0
-	     and open my $script, '<', $0 ) {
+	if ( defined $^PROGRAM_NAME and $^PROGRAM_NAME ne '-e' and -f $^PROGRAM_NAME and -r $^PROGRAM_NAME
+	     and open my $script, '<', $^PROGRAM_NAME ) {
 	    while ( ~< $script) {
-		$has_pod = 1, last if m/^=(pod|head1)/;
+		($has_pod = 1), last if m/^=(pod|head1)/;
 	    }
 	}
-	print $h <<EOH if $has_pod;
+	print $h, <<EOH if $has_pod;
 
 For more details run
-	perldoc -F $0
+	perldoc -F $^PROGRAM_NAME
 EOH
     }
 }
@@ -221,40 +216,38 @@ EOH
 #   getopts('a:bc');	# -a takes arg. -b & -c not. Sets opt_* as a
 #			#  side effect.
 
-sub getopts ($;$) {
-    my ($argumentative, $hash) = < @_;
+sub getopts($argumentative, ?$hash) {
     my (@args,$first,$rest,$exit);
     my $errs = 0;
-    local $_;
+    local $_ = undef;
     local @EXPORT;
 
     @args = split( m/ */, $argumentative );
     while((nelems @ARGV) && ($_ = @ARGV[0]) =~ m/^-(.)(.*)/s) {
-	($first,$rest) = ($1,$2);
+	@($first,$rest) = @($1,$2);
 	if (m/^--$/) {	# early exit if --
 	    shift @ARGV;
 	    last;
 	}
 	my $pos = index($argumentative,$first);
 	if ($pos +>= 0) {
-	    if (defined(@args[$pos+1]) and (@args[$pos+1] eq ':')) {
+	    if (defined(@args[?$pos+1]) and (@args[$pos+1] eq ':')) {
 		shift(@ARGV);
 		if ($rest eq '') {
 		    ++$errs unless (nelems @ARGV);
 		    $rest = shift(@ARGV);
 		}
 		if (ref $hash) {
-		    %$hash{$first} = $rest;
+		    %$hash{+$first} = $rest;
 		}
 		else {
-                    no strict 'refs';
 		    ${*{Symbol::fetch_glob("opt_$first")}} = $rest;
 		    push( @EXPORT, "\$opt_$first" );
 		}
 	    }
 	    else {
 		if (ref $hash) {
-		    %$hash{$first} = 1;
+		    %$hash{+$first} = 1;
 		}
 		else {
 		    ${*{Symbol::fetch_glob("opt_$first")}} = 1;

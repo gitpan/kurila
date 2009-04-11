@@ -2,20 +2,10 @@
 
 use Config;
 
-BEGIN {
-    unless (-d 'blib') {
-	keys %Config; # Silence warning
-	if (%Config{extensions} !~ m/\bList\/Util\b/) {
-	    print "1..0 # Skip: List::Util was not built\n";
-	    exit 0;
-	}
-    }
-}
-
 use Scalar::Util ();
-use Test::More  (grep { m/weaken/ } < @Scalar::Util::EXPORT_FAIL)
-			? (skip_all => 'weaken requires XS version')
-			: (tests => 22);
+use Test::More  (grep { m/weaken/ }, @Scalar::Util::EXPORT_FAIL)
+			?? (skip_all => 'weaken requires XS version')
+			!! (tests => 22);
 
 if (0) {
   require Devel::Peek;
@@ -25,7 +15,7 @@ else {
   *Dump = sub {};
 }
 
-Scalar::Util->import(qw(weaken isweak));
+Scalar::Util->import( < qw(weaken isweak));
 
 if(1) {
 
@@ -35,35 +25,35 @@ my ($y,$z);
 # Case 1: two references, one is weakened, the other is then undef'ed.
 #
 
-{
+do {
 	my $x = "foo";
 	$y = \$x;
 	$z = \$x;
-}
-print "# START\n";
+};
+print $^STDOUT, "# START\n";
 Dump($y); Dump($z);
 
 ok( ref($y) and ref($z));
 
-print "# WEAK:\n";
+print $^STDOUT, "# WEAK:\n";
 weaken($y);
 Dump($y); Dump($z);
 
 ok( ref($y) and ref($z));
 
-print "# UNDZ:\n";
+print $^STDOUT, "# UNDZ:\n";
 undef($z);
 Dump($y); Dump($z);
 
 ok( not (defined($y) and defined($z)) );
 
-print "# UNDY:\n";
+print $^STDOUT, "# UNDY:\n";
 undef($y);
 Dump($y); Dump($z);
 
 ok( not (defined($y) and defined($z)) );
 
-print "# FIN:\n";
+print $^STDOUT, "# FIN:\n";
 Dump($y); Dump($z);
 
 
@@ -71,22 +61,22 @@ Dump($y); Dump($z);
 # Case 2: one reference, which is weakened
 #
 
-print "# CASE 2:\n";
+print $^STDOUT, "# CASE 2:\n";
 
-{
+do {
 	my $x = "foo";
 	$y = \$x;
-}
+};
 
 ok( ref($y) );
-print "# BW: \n";
+print $^STDOUT, "# BW: \n";
 Dump($y);
 weaken($y);
-print "# AW: \n";
+print $^STDOUT, "# AW: \n";
 Dump($y);
 ok( not defined $y  );
 
-print "# EXITBLOCK\n";
+print $^STDOUT, "# EXITBLOCK\n";
 }
 
 # 
@@ -94,45 +84,42 @@ print "# EXITBLOCK\n";
 #
 
 my $flag = 0;
-{
+do {
 	my $y = bless \%(), 'Dest';
 	Dump($y);
-	print "# 1: {dump::view($y)}\n";
-	$y->{Self} = $y;
+	$y->{+Self} = $y;
 	Dump($y);
-	print "# 2: {dump::view($y)}\n";
-	$y->{Flag} = \$flag;
-	print "# 3: {dump::view($y)}\n";
-	weaken($y->{Self});
-	print "# WKED\n";
+	$y->{+Flag} = \$flag;
+	weaken($y->{?Self});
+	print $^STDOUT, "# WKED\n";
 	ok( ref($y) );
-	print "# VALS: HASH ", dump::view($y),"   SELF ", dump::view(\$y->{Self}),"  Y ", dump::view(\$y), 
-		"    FLAG: ", dump::view(\$y->{Flag}),"\n";
-	print "# VPRINT\n";
-}
-print "# OUT $flag\n";
+	print $^STDOUT, "# VALS: HASH ", dump::view($y),"   SELF ", dump::view(\$y->{+Self}),"  Y ", dump::view(\$y), 
+		"    FLAG: ", dump::view(\$y->{+Flag}),"\n";
+	print $^STDOUT, "# VPRINT\n";
+};
+print $^STDOUT, "# OUT $flag\n";
 ok( $flag == 1 );
 
-print "# AFTER\n";
+print $^STDOUT, "# AFTER\n";
 
 undef $flag;
 
-print "# FLAGU\n";
+print $^STDOUT, "# FLAGU\n";
 
 #
 # Case 4: a more complicated circular structure
 #
 
 $flag = 0;
-{
+do {
 	my $y = bless \%(), 'Dest';
 	my $x = bless \%(), 'Dest';
-	$x->{Ref} = $y;
-	$y->{Ref} = $x;
-	$x->{Flag} = \$flag;
-	$y->{Flag} = \$flag;
-	weaken($x->{Ref});
-}
+	$x->{+Ref} = $y;
+	$y->{+Ref} = $x;
+	$x->{+Flag} = \$flag;
+	$y->{+Flag} = \$flag;
+	weaken($x->{?Ref});
+};
 ok( $flag == 2 );
 
 #
@@ -140,13 +127,13 @@ ok( $flag == 2 );
 #
 
 our ($y, $z);
-{
+do {
 	my $x = "foo";
 	$y = \$x;
 	$z = \$x;
-}
+};
 
-print "# CASE5\n";
+print $^STDOUT, "# CASE5\n";
 Dump($y);
 
 weaken($y);
@@ -171,33 +158,33 @@ $b = \$a;
 ok(!isweak($b));
 
 our $x = \%();
-weaken($x->{Y} = \$a);
-ok(isweak($x->{Y}));
-ok(!isweak($x->{Z}));
+weaken($x->{+Y} = \$a);
+ok(isweak($x->{?Y}));
+ok(!isweak($x->{?Z}));
 
 #
 # Case 7: test weaken on a read only ref
 #
 
-SKIP: {
+SKIP: do {
     # in a MAD build, constants have refcnt 2, not 1
-    skip("Test does not work with MAD", 5) if exists %Config{mad};
+    skip("Test does not work with MAD", 5) if config_value("mad");
 
     $a = eval '\"hello"';
-    ok(ref($a)) or print "# didn't get a ref from eval\n";
+    ok(ref($a)) or print $^STDOUT, "# didn't get a ref from eval\n";
     $b = $a;
     try{weaken($b)};
     # we didn't die
-    ok($@ eq "") or print "# died with $@\n";
+    ok($^EVAL_ERROR eq "") or print $^STDOUT, "# died with $^EVAL_ERROR\n";
     ok(isweak($b));
-    ok($$b eq "hello") or print "# b is '$$b'\n";
+    ok($$b eq "hello") or print $^STDOUT, "# b is '$$b'\n";
     $a="";
-    ok(not $b) or print "# b didn't go away\n";
-}
+    ok(not $b) or print $^STDOUT, "# b didn't go away\n";
+};
 
 package Dest;
 
 sub DESTROY {
-	print "# INCFLAG\n";
+	print $^STDOUT, "# INCFLAG\n";
 	${@_[0]->{Flag}} ++;
 }

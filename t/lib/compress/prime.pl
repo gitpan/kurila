@@ -1,6 +1,6 @@
 
 use lib 't';
-use strict;
+
 use warnings;
 use bytes;
 
@@ -34,9 +34,9 @@ some more stuff on this line
 ad finally...
 EOM
 
-    print "#\n# Testing $UncompressClass\n#\n";
+    print $^STDOUT, "#\n# Testing $UncompressClass\n#\n";
 
-    my ($info, $compressed) = < mkComplete($CompressClass, $hello);
+    my @($info, $compressed) =  mkComplete($CompressClass, $hello);
     my $cc = $compressed ;
 
     plan tests => (length($compressed) * 6 * 7) + 1 + $extra ;
@@ -49,7 +49,7 @@ EOM
         {
             for my $useBuf (0 .. 1)
             {
-                print "#\n# BlockSize $blocksize, Length $i, Buffer $useBuf\n#\n" ;
+                print $^STDOUT, "#\n# BlockSize $blocksize, Length $i, Buffer $useBuf\n#\n" ;
                 my $lex = LexFile->new( my $name) ;
         
                 my $prime = substr($compressed, 0, $i);
@@ -78,7 +78,7 @@ EOM
                 $status = $gz->read($un) while $status +> 0 ;
                 is $status, 0 ;
                 ok ! $gz->error() 
-                    or print "Error is '" . $gz->error() . "'\n";
+                    or print $^STDOUT, "Error is '" . $gz->error() . "'\n";
                 is $un, $hello ;
                 ok $gz->eof() ;
                 ok $gz->close() ;

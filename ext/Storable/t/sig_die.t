@@ -9,25 +9,20 @@
 use Config;
 
 sub BEGIN {
-    if (%ENV{PERL_CORE}){
+    if (env::var('PERL_CORE')){
        chdir('t') if -d 't';
-       @INC = @('.', '../lib');
+       $^INCLUDE_PATH = @('.', '../lib');
     } else {
-       unshift @INC, 't';
-    }
-    if (%ENV{PERL_CORE} and %Config{'extensions'} !~ m/\bStorable\b/) {
-        print "1..0 # Skip: Storable was not built\n";
-        exit 0;
+       unshift $^INCLUDE_PATH, 't';
     }
 }
 
-use strict;
 BEGIN {
     if (!eval q{
        use Test::More;
        1;
     }) {
-       print "1..0 # skip: tests only work with Test::More\n";
+       print $^STDOUT, "1..0 # skip: tests only work with Test::More\n";
        exit;
     }
 }

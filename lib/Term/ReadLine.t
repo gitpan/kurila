@@ -1,10 +1,10 @@
 #!./perl -w
-use strict;
+
 
 BEGIN {
-    if ( %ENV{PERL_CORE} ) {
+    if ( env::var('PERL_CORE') ) {
         chdir 't' if -d 't';
-        @INC = @( '../lib' );
+        $^INCLUDE_PATH = @( '../lib' );
     }
 }
 
@@ -16,12 +16,12 @@ sub new      { bless \%() }
 
 package main;
 
-use Test::More tests => 15;
+use Test::More tests => 14;
 
 BEGIN {
-    %ENV{PERL_RL} = 'Mock'; # test against our instrumented class
-    use_ok('Term::ReadLine');
+    env::var('PERL_RL' ) = 'Mock'; # test against our instrumented class
 }
+use Term::ReadLine;
 
 my $t = Term::ReadLine->new( 'test term::readline');
 

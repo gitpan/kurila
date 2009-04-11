@@ -1,26 +1,26 @@
 #!./perl -w
 
-print "1..145\n";
+print $^STDOUT, "1..145\n";
 
-sub tryok ($$) {
-   print +(@_[1] ? "ok" : "not ok"), " @_[0]\n";
+sub tryok($nr, $ok) {
+   print($^STDOUT,  ($ok ?? "ok" !! "not ok"), " $nr\n" );
 }
-sub tryeq ($$$) {
-  if (@_[1] == @_[2]) {
-    print "ok @_[0]\n";
+sub tryeq ($nr, $got, $expected) {
+  if ($got == $expected) {
+    print $^STDOUT, "ok $nr\n";
   } else {
-    print "not ok @_[0] # @_[1] != @_[2]\n";
+    print $^STDOUT, "not ok $nr # $got != $expected\n";
   }
 }
-sub tryeq_sloppy ($$$) {
-  if (@_[1] == @_[2]) {
-    print "ok @_[0]\n";
+sub tryeq_sloppy ($nr, $got, $expected) {
+  if ($got == $expected) {
+    print $^STDOUT, "ok $nr\n";
   } else {
-    my $error = abs (@_[1] - @_[2]) / @_[1];
+    my $error = abs ($got - $expected) / $expected;
     if ($error +< 1e-9) {
-      print "ok @_[0] # @_[1] is close to @_[2], \$^O eq $^O\n";
+      print $^STDOUT, "ok $nr # $got is close to $expected, \$^O eq $^OS_NAME\n";
     } else {
-      print "not ok @_[0] # @_[1] != @_[2]\n";
+      print $^STDOUT, "not ok $nr # $got != $expected\n";
     }
   }
 }
@@ -48,7 +48,7 @@ my $limit = 1e6;
 
 # Division (and modulo) of floating point numbers
 # seem to be rather sloppy in Cray.
-$limit = 1e8 if $^O eq 'unicos';
+$limit = 1e8 if $^OS_NAME eq 'unicos';
 
 tryok $T++, abs( 13e21 %  4e21 -  1e21) +< $limit;
 tryok $T++, abs(-13e21 %  4e21 -  3e21) +< $limit;
@@ -92,12 +92,12 @@ tryeq $T++, 1 + 1, 2;
 tryeq $T++, 4 + -2, 2;
 tryeq $T++, -10 + 100, 90;
 tryeq $T++, -7 + -9, -16;
-tryeq $T++, -63 + +2, -61;
+tryeq $T++, -63 + 2, -61;
 tryeq $T++, 4 + -1, 3;
 tryeq $T++, -1 + 1, 0;
-tryeq $T++, +29 + -29, 0;
+tryeq $T++, 29 + -29, 0;
 tryeq $T++, -1 + 4, 3;
-tryeq $T++, +4 + -17, -13;
+tryeq $T++, 4 + -17, -13;
 
 # subtraction
 tryeq $T++, 3 - 1, 2;
@@ -126,7 +126,7 @@ tryeq $T++, 2147483647 - -2147483648, 4294967295;
 # UV - IV promote to NV
 tryeq $T++, 4294967294 - -3, 4294967297;
 # IV - IV promote to NV
-tryeq $T++, -2147483648 - +1, -2147483649;
+tryeq $T++, -2147483648 - 1, -2147483649;
 # UV - UV promote to IV
 tryeq $T++, 2147483648 - 2147483650, -2;
 # IV - UV promote to IV
@@ -157,10 +157,10 @@ $s -= 1;
 tryeq $T++, $s, -1;
 undef $s;
 $s -= -1;
-tryeq $T++, $s, +1;
+tryeq $T++, $s, 1;
 undef $s;
 $s -= -4294967290;
-tryeq $T++, $s, +4294967290;
+tryeq $T++, $s, 4294967290;
 undef $s;
 $s -= 4294967290;
 tryeq $T++, $s, -4294967290;
@@ -169,7 +169,7 @@ $s -= 4294967297;
 tryeq $T++, $s, -4294967297;
 undef $s;
 $s -= -4294967297;
-tryeq $T++, $s, +4294967297;
+tryeq $T++, $s, 4294967297;
 
 # Multiplication
 
@@ -265,7 +265,7 @@ tryeq_sloppy $T++, 18446744073709551616/2, 9223372036854775808;
 tryeq_sloppy $T++, 18446744073709551616/4294967296, 4294967296;
 tryeq_sloppy $T++, 18446744073709551616/9223372036854775808, 2;
 
-{
+do {
   # The peephole optimiser is wrong to think that it can substitute intops
   # in place of regular ops, because i_multiply can overflow.
   # Bug reported by "Sisyphus" <kalinabears@hdc.com.au>
@@ -282,23 +282,22 @@ tryeq_sloppy $T++, 18446744073709551616/9223372036854775808, 2;
   my $t = time;
   my $t1000 = time() * 1000;
   tryok $T++, abs($t1000 -1000 * $t) +<= 2000;
-}
+};
 
 my $vms_no_ieee;
-if ($^O eq 'VMS') {
-  use vars '%Config';
+if ($^OS_NAME eq 'VMS') {
   try {require Config; Config->import() };
-  $vms_no_ieee = 1 unless defined(%Config{useieee});
+  $vms_no_ieee = 1 unless defined(config_value('useieee'));
 }
 
-if ($^O eq 'vos') {
-  print "not ok ", $T++, " # TODO VOS raises SIGFPE instead of producing infinity.\n";
+if ($^OS_NAME eq 'vos') {
+  print $^STDOUT, "not ok ", $T++, " # TODO VOS raises SIGFPE instead of producing infinity.\n";
 }
 elsif ($vms_no_ieee) {
- print $T++, " # SKIP -- the IEEE infinity model is unavailable in this configuration.\n"
+ print $^STDOUT, $T++, " # SKIP -- the IEEE infinity model is unavailable in this configuration.\n"
 }
-elsif ($^O eq 'ultrix') {
-  print "not ok ", $T++, " # TODO Ultrix enters deep nirvana instead of producing infinity.\n";
+elsif ($^OS_NAME eq 'ultrix') {
+  print $^STDOUT, "not ok ", $T++, " # TODO Ultrix enters deep nirvana instead of producing infinity.\n";
 }
 else {
   # The computation of $v should overflow and produce "infinity"
@@ -317,5 +316,5 @@ else {
   {
     $v *= 2;
   }
-  print "ok ", $T++, "\n";
+  print $^STDOUT, "ok ", $T++, "\n";
 }

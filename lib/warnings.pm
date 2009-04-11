@@ -12,8 +12,8 @@ our $VERSION = '1.06';
 # see also strict.pm.
 my $pkg = __PACKAGE__;
 unless ( __FILE__ =~ m/(^|[\/\\])\Q$pkg\E\.pmc?$/ ) {
-    my (undef, $f, $l) = caller;
-    die("Incorrect use of pragma '{__PACKAGE__}' at $f line $l.\n");
+    my @(_, $f, $l) = @: caller;
+    die("Incorrect use of pragma '$(__PACKAGE__)' at $f line $l.\n");
 }
 
 =head1 NAME
@@ -299,7 +299,7 @@ our $NONE     = "\0\0\0\0\0\0\0\0\0\0\0\0";
 our $LAST_BIT = 94 ;
 our $BYTES    = 12 ;
 
-our $All = "" ; vec($All, %Offsets{'all'}, 2) = 3 ;
+our $All = "" ; vec($All, %Offsets{'all'}, 2 => 3);
 
 sub bits
 {
@@ -312,7 +312,7 @@ sub bits
     my $fatal = 0 ;
     my $no_fatal = 0 ;
 
-    foreach my $word (  @_ ) {
+    foreach my $word ( @_ ) {
 	if ($word eq 'FATAL') {
 	    $fatal = 1;
 	    $no_fatal = 0;
@@ -321,7 +321,7 @@ sub bits
 	    $fatal = 0;
 	    $no_fatal = 1;
 	}
-	elsif ($catmask = %Bits{$word}) {
+	elsif ($catmask = %Bits{?$word}) {
 	    $mask ^|^= $catmask ;
 	    $mask ^|^= %DeadBits{$word} if $fatal ;
 	    $mask ^&^= ^~^(%DeadBits{$word}^|^$All) if $no_fatal ;
@@ -350,7 +350,7 @@ sub import
     
     push @_, 'all' unless @_;
 
-    foreach my $word (  @_ ) {
+    foreach my $word ( @_ ) {
 	if ($word eq 'FATAL') {
 	    $fatal = 1;
 	    $no_fatal = 0;
@@ -359,7 +359,7 @@ sub import
 	    $fatal = 0;
 	    $no_fatal = 1;
 	}
-	elsif ($catmask = %Bits{$word}) {
+	elsif ($catmask = %Bits{?$word}) {
 	    $mask ^|^= $catmask ;
 	    $mask ^|^= %DeadBits{$word} if $fatal ;
 	    $mask ^&^= ^~^(%DeadBits{$word}^|^$All) if $no_fatal ;
@@ -385,11 +385,11 @@ sub unimport
 
     push @_, 'all' unless @_;
 
-    foreach my $word (  @_ ) {
+    foreach my $word ( @_ ) {
 	if ($word eq 'FATAL') {
 	    next; 
 	}
-	elsif ($catmask = %Bits{$word}) {
+	elsif ($catmask = %Bits{?$word}) {
 	    $mask ^&^= ^~^($catmask ^|^ %DeadBits{$word} ^|^ $All);
 	}
 	else
@@ -399,7 +399,7 @@ sub unimport
     $^WARNING_BITS = $mask ;
 }
 
-my %builtin_type; < %builtin_type{[qw(SCALAR ARRAY HASH CODE REF GLOB LVALUE Regexp)]} = ();
+my %builtin_type; %builtin_type{[qw(SCALAR ARRAY HASH CODE REF GLOB LVALUE Regexp)]} = @();
 
 sub __chk
 {
@@ -416,13 +416,13 @@ sub __chk
 	    $category = $type;
             $isobj = 1 ;
         }
-        $offset = %Offsets{$category};
+        $offset = %Offsets{?$category};
         die("Unknown warnings category '$category'")
 	    unless defined $offset;
     }
     else {
         $category = @(caller(1))[0] ;
-        $offset = %Offsets{$category};
+        $offset = %Offsets{?$category};
         die("package '$category' not registered for warnings")
 	    unless defined $offset ;
     }
@@ -432,7 +432,7 @@ sub __chk
     my $pkg ;
 
     if ($isobj) {
-        while (do { { package DB; $pkg = @(caller($i++))[0] } } ) {
+        while (do { package DB; $pkg = @(caller($i++))[0] } ) {
             last unless @DB::args && @DB::args[0] =~ m/^$category=/ ;
         }
 	$i -= 2 ;
@@ -450,7 +450,7 @@ sub enabled
     die("Usage: warnings::enabled([category])")
 	unless nelems(@_) == 1 || nelems(@_) == 0 ;
 
-    my ($callers_bitmask, $offset, $i) = < __chk(< @_) ;
+    my @($callers_bitmask, $offset, $i) = __chk(< @_) ;
 
     return 0 unless defined $callers_bitmask ;
     return vec($callers_bitmask, $offset, 1) ||
@@ -464,7 +464,7 @@ sub warn
 	unless nelems(@_) == 2 || nelems(@_) == 1 ;
 
     my $message = pop ;
-    my ($callers_bitmask, $offset, $i) = < __chk(<@_) ;
+    my @($callers_bitmask, $offset, $i) = __chk(<@_) ;
     die($message)
 	if vec($callers_bitmask, $offset+1, 1) ||
 	   vec($callers_bitmask, %Offsets{'all'}+1, 1) ;
@@ -477,7 +477,7 @@ sub warnif
 	unless nelems(@_) == 2 || nelems(@_) == 1 ;
 
     my $message = pop ;
-    my ($callers_bitmask, $offset, $i) = <__chk(<@_) ;
+    my @($callers_bitmask, $offset, $i) = __chk(<@_) ;
 
     return
         unless defined $callers_bitmask &&

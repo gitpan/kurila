@@ -5,16 +5,14 @@ BEGIN {
 }
 
 BEGIN {
-    if ($^O eq 'riscos') {
+    if ($^OS_NAME eq 'riscos') {
 	skip_all("kill() not implemented on this platform");
     }
 }
 
-use strict;
-
 plan tests => 2;
 
-ok( kill(0, $$), 'kill(0, $pid) returns true if $pid exists' );
+ok( kill(0, $^PID), 'kill(0, $pid) returns true if $pid exists' );
 
 # It's not easy to come up with an individual PID that is known not to exist,
 # so just check that at least some PIDs in a large range are reported not to

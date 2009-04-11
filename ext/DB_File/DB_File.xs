@@ -364,19 +364,19 @@ typedef union INFO {
 #define db_get(db, key, value, flags)   ((db->dbp)->get)(db->dbp, TXN &key, &value, flags)
 
 #ifdef DB_VERSION_MAJOR
-#define db_DESTROY(db)                  (!db->aborted && ( db->cursor->c_close(db->cursor),\
-					  (db->dbp->close)(db->dbp, 0) ))
-#define db_close(db)			((db->dbp)->close)(db->dbp, 0)
-#define db_del(db, key, flags)          (flagSet(flags, R_CURSOR) 					\
+#    define db_DESTROY(db)                  (!db->aborted && ( db->cursor->c_close(db->cursor),\
+					      (db->dbp->close)(db->dbp, 0) ))
+#    define db_close(db)			((db->dbp)->close)(db->dbp, 0)
+#    define db_del(db, key, flags)          (flagSet(flags, R_CURSOR) 					\
 						? ((db->cursor)->c_del)(db->cursor, 0)		\
 						: ((db->dbp)->del)(db->dbp, NULL, &key, flags) )
 
 #else /* ! DB_VERSION_MAJOR */
 
-#define db_DESTROY(db)                  (!db->aborted && ((db->dbp)->close)(db->dbp))
-#define db_close(db)			((db->dbp)->close)(db->dbp)
-#define db_del(db, key, flags)          ((db->dbp)->del)(db->dbp, &key, flags)
-#define db_put(db, key, value, flags)   ((db->dbp)->put)(db->dbp, &key, &value, flags)
+#    define db_DESTROY(db)                  (!db->aborted && ((db->dbp)->close)(db->dbp))
+#    define db_close(db)			((db->dbp)->close)(db->dbp)
+#    define db_del(db, key, flags)          ((db->dbp)->del)(db->dbp, &key, flags)
+#    define db_put(db, key, value, flags)   ((db->dbp)->put)(db->dbp, &key, &value, flags)
 
 #endif /* ! DB_VERSION_MAJOR */
 
@@ -400,10 +400,6 @@ typedef struct {
 #ifdef DB_VERSION_MAJOR
 	DBC *	cursor ;
 #endif
-	SV *    filter_fetch_key ;
-	SV *    filter_store_key ;
-	SV *    filter_fetch_value ;
-	SV *    filter_store_value ;
 	int     filtering ;
 
 	} DB_File_type;
@@ -415,26 +411,18 @@ typedef DBT DBTKEY ;
 
 #define OutputValue(arg, name)  					\
 	{ if (RETVAL == 0) {						\
-	      SvGETMAGIC(arg) ;          				\
 	      my_sv_setpvn(arg, (const char *)name.data, name.size) ;			\
-	      TAINT;                                       		\
-	      SvTAINTED_on(arg);                                       	\
-	      DBM_ckFilter(arg, filter_fetch_value,"filter_fetch_value") ; 	\
 	  }								\
 	}
 
 #define OutputKey(arg, name)	 					\
 	{ if (RETVAL == 0) 						\
 	  { 								\
-		SvGETMAGIC(arg) ;          				\
 		if (db->type != DB_RECNO) {				\
 		    my_sv_setpvn(arg, (const char *)name.data, name.size); 		\
 		}							\
 		else 							\
 		    sv_setiv(arg, (I32)*(I32*)name.data - 1); 		\
-	      TAINT;                                       		\
-	      SvTAINTED_on(arg);                                       	\
-	      DBM_ckFilter(arg, filter_fetch_key,"filter_fetch_key") ; 	\
 	  } 								\
 	}
 
@@ -600,16 +588,9 @@ const DBT * key2 ;
     PUSHs(sv_2mortal(newSVpvn((const char*)data2,key2->size)));
     PUTBACK ;
 
-    count = perl_call_sv(CurrentDB->compare, G_SCALAR); 
+    retval = SvIV( perl_call_sv(CurrentDB->compare, G_SCALAR) ); 
 
     SPAGAIN ;
-
-    if (count != 1){
-        tidyUp(CurrentDB);
-        croak ("DB_File btree_compare: expected 1 return value from compare sub, got %d\n", count) ;
-    }
-
-    retval = POPi ;
 
     PUTBACK ;
     FREETMPS ;
@@ -684,16 +665,9 @@ const DBT * key2 ;
     PUSHs(sv_2mortal(newSVpvn(data2,key2->size)));
     PUTBACK ;
 
-    count = perl_call_sv(CurrentDB->prefix, G_SCALAR); 
+    retval = SvIV( perl_call_sv(CurrentDB->prefix, G_SCALAR) ); 
 
     SPAGAIN ;
-
-    if (count != 1){
-        tidyUp(CurrentDB);
-        croak ("DB_File btree_prefix: expected 1 return value from prefix sub, got %d\n", count) ;
-    }
- 
-    retval = POPi ;
  
     PUTBACK ;
     FREETMPS ;
@@ -765,16 +739,9 @@ HASH_CB_SIZE_TYPE size ;
     XPUSHs(sv_2mortal(newSVpvn((char*)data,size)));
     PUTBACK ;
 
-    count = perl_call_sv(CurrentDB->hash, G_SCALAR); 
+    retval = SvIV( perl_call_sv(CurrentDB->hash, G_SCALAR) );
 
     SPAGAIN ;
-
-    if (count != 1){
-        tidyUp(CurrentDB);
-        croak ("DB_File hash_cb: expected 1 return value from hash sub, got %d\n", count) ;
-    }
-
-    retval = POPi ;
 
     PUTBACK ;
     FREETMPS ;
@@ -958,8 +925,6 @@ SV *   sv ;
 
     /* Default to HASH */
     RETVAL->filtering = 0 ;
-    RETVAL->filter_fetch_key = RETVAL->filter_store_key = 
-    RETVAL->filter_fetch_value = RETVAL->filter_store_value =
     RETVAL->hash = RETVAL->compare = RETVAL->prefix = NULL ;
     RETVAL->type = DB_HASH ;
 
@@ -982,9 +947,6 @@ SV *   sv ;
 
         if (sv_isa(sv, "DB_File::HASHINFO"))
         {
-
-	    if (!isHASH)
-	        croak("DB_File can only tie an associative array to a DB_HASH database") ;
 
             RETVAL->type = DB_HASH ;
             openinfo = (void*)info ;
@@ -1018,9 +980,6 @@ SV *   sv ;
         }
         else if (sv_isa(sv, "DB_File::BTREEINFO"))
         {
-	    if (!isHASH)
-	        croak("DB_File can only tie an associative array to a DB_BTREE database");
-
             RETVAL->type = DB_BTREE ;
             openinfo = (void*)info ;
    
@@ -1230,8 +1189,6 @@ SV *   sv ;
 
     /* Default to HASH */
     RETVAL->filtering = 0 ;
-    RETVAL->filter_fetch_key = RETVAL->filter_store_key = 
-    RETVAL->filter_fetch_value = RETVAL->filter_store_value =
     RETVAL->hash = RETVAL->compare = RETVAL->prefix = NULL ;
     RETVAL->type = DB_HASH ;
 
@@ -1265,9 +1222,6 @@ SV *   sv ;
 
         if (sv_isa(sv, "DB_File::HASHINFO"))
         {
-
-	    if (!isHASH)
-	        croak("DB_File can only tie an associative array to a DB_HASH database") ;
 
             RETVAL->type = DB_HASH ;
   
@@ -1303,9 +1257,6 @@ SV *   sv ;
         }
         else if (sv_isa(sv, "DB_File::BTREEINFO"))
         {
-	    if (!isHASH)
-	        croak("DB_File can only tie an associative array to a DB_BTREE database");
-
             RETVAL->type = DB_BTREE ;
    
             svp = hv_fetch(action, "compare", 7, FALSE);
@@ -1547,14 +1498,6 @@ db_DESTROY(db)
 	    SvREFCNT_dec(db->compare) ;
 	  if (db->prefix)
 	    SvREFCNT_dec(db->prefix) ;
-	  if (db->filter_fetch_key)
-	    SvREFCNT_dec(db->filter_fetch_key) ;
-	  if (db->filter_store_key)
-	    SvREFCNT_dec(db->filter_store_key) ;
-	  if (db->filter_fetch_value)
-	    SvREFCNT_dec(db->filter_fetch_value) ;
-	  if (db->filter_store_value)
-	    SvREFCNT_dec(db->filter_store_value) ;
 	  safefree(db) ;
 #ifdef DB_VERSION_MAJOR
 	  if (RETVAL > 0)
@@ -1689,7 +1632,6 @@ unshift(db, ...)
 #endif
 	    for (i = items-1 ; i > 0 ; --i)
 	    {
-		DBM_ckFilter(ST(i), filter_store_value, "filter_store_value");
 	        value.data = SvPV(ST(i), n_a) ;
 	        value.size = n_a ;
 	        One = 1 ;
@@ -1799,7 +1741,6 @@ push(db, ...)
 		    keyval = 0 ;
 	        for (i = 1 ; i < items ; ++i)
 	        {
-		    DBM_ckFilter(ST(i), filter_store_value, "filter_store_value");
 	            value.data = SvPV(ST(i), n_a) ;
 	            value.size = n_a ;
 		    ++ keyval ;
@@ -1958,36 +1899,4 @@ db_seq(db, key, value, flags)
 	  RETVAL
 	  key
 	  value
-
-SV *
-filter_fetch_key(db, code)
-	DB_File		db
-	SV *		code
-	SV *		RETVAL = &PL_sv_undef ;
-	CODE:
-	    DBM_setFilter(db->filter_fetch_key, code) ;
-
-SV *
-filter_store_key(db, code)
-	DB_File		db
-	SV *		code
-	SV *		RETVAL = &PL_sv_undef ;
-	CODE:
-	    DBM_setFilter(db->filter_store_key, code) ;
-
-SV *
-filter_fetch_value(db, code)
-	DB_File		db
-	SV *		code
-	SV *		RETVAL = &PL_sv_undef ;
-	CODE:
-	    DBM_setFilter(db->filter_fetch_value, code) ;
-
-SV *
-filter_store_value(db, code)
-	DB_File		db
-	SV *		code
-	SV *		RETVAL = &PL_sv_undef ;
-	CODE:
-	    DBM_setFilter(db->filter_store_value, code) ;
 

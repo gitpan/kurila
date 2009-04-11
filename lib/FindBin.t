@@ -2,24 +2,24 @@
 
 BEGIN {
     # Can't chdir in BEGIN before FindBin runs, as it then can't find us.
-    @INC = @( -d 't' ? 'lib' : '../lib' );
+    $^INCLUDE_PATH = @( -d 't' ?? 'lib' !! '../lib' );
 }
 
-print "1..2\n";
+print $^STDOUT, "1..2\n";
 
 use FindBin < qw($Bin);
 
-print "# $Bin\n";
+print $^STDOUT, "# $Bin\n";
 
-if ($^O eq 'MacOS') {
-    print "not " unless $Bin =~ m,:lib:$,;
+if ($^OS_NAME eq 'MacOS') {
+    print $^STDOUT, "not " unless $Bin =~ m,:lib:$,;
 } else {
-    print "not " unless $Bin =~ m,[/.]lib\]?$,;
+    print $^STDOUT, "not " unless $Bin =~ m,[/.]lib\]?$,;
 }
-print "ok 1\n";
+print $^STDOUT, "ok 1\n";
 
-$0 = "-";
+$^PROGRAM_NAME = "-";
 FindBin::again();
 
-print "not " if $FindBin::Script ne "-";
-print "ok 2\n";
+print $^STDOUT, "not " if $FindBin::Script ne "-";
+print $^STDOUT, "ok 2\n";

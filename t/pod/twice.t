@@ -1,28 +1,29 @@
-use strict;
-use Test;
+
+use Test::More;
 use File::Spec;
 
 BEGIN { plan tests => 1 }
 
 use Pod::Parser;
 
-try {require IO::String;};
-skip($@ ? 'no IO::String' : '', sub {
-  {
-    my $pod_string = 'some I<silly> text';
-    my $handle = 'IO::String'->new( \$pod_string );
-    my $parser = 'Pod::Parser'->new();
-    $parser->parse_from_file( $0, $handle );
-  }
+SKIP:
+do {
+    if (not try {require IO::String; 1}) {
+        skip 'no IO::String', 1;
+    }
+    do {
+        my $pod_string = 'some I<silly> text';
+        my $handle = 'IO::String'->new( \$pod_string );
+        my $parser = 'Pod::Parser'->new();
+        $parser->parse_from_file( $^PROGRAM_NAME, $handle );
+    };
   # free the reference
-  {
+  do {
     my $parser = 'Pod::Parser'->new();
-    $parser->parse_from_file( $0, < 'File::Spec'->devnull );
-  }
+    $parser->parse_from_file( $^PROGRAM_NAME, < 'File::Spec'->devnull );
+  };
   1;
-});
-
-exit 0;
+};
 
 __END__
 

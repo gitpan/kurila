@@ -15,25 +15,20 @@
 
 use Config;
 
-sub BEGIN {
-    if (%ENV{PERL_CORE}){
+BEGIN {
+    if (env::var('PERL_CORE')){
 	chdir('t') if -d 't';
-	@INC = @('.', '../lib', '../ext/Storable/t');
+	$^INCLUDE_PATH = @('.', '../lib', '../ext/Storable/t');
     } else {
 	# This lets us distribute Test::More in t/
-	unshift @INC, 't';
-    }
-    if (%ENV{PERL_CORE} and %Config{'extensions'} !~ m/\bStorable\b/) {
-        print "1..0 # Skip: Storable was not built\n";
-        exit 0;
+	unshift $^INCLUDE_PATH, 't';
     }
 }
 
-use strict;
-use vars < qw($file_magic_str $other_magic $network_magic $byteorder
-            $major $minor $minor_write $fancy);
+our ($file_magic_str, $other_magic, $network_magic, $byteorder,
+     $major, $minor, $minor_write, $fancy);
 
-$byteorder = %Config{byteorder};
+$byteorder = config_value('byteorder');
 
 $file_magic_str = 'pst0';
 $other_magic = 7 + length $byteorder;
@@ -55,7 +50,7 @@ plan tests => 372 + length ($byteorder) * 4 + $fancy * 8;
 
 use Storable < qw (store retrieve freeze thaw nstore nfreeze);
 require 'testlib.pl';
-use vars '$file';
+our $file;
 
 # There is no UTF8 flag anymore
 use bytes;
@@ -70,29 +65,29 @@ sub test_hash {
 }
 
 sub test_header {
-  my ($header, $isfile, $isnetorder) = < @_;
-  is (!!$header->{file}, !!$isfile, "is file");
+  my @($header, $isfile, $isnetorder) = @_;
+  is ( ! ! $header->{?file}, ! ! $isfile, "is file");
   is ($header->{major}, $major, "major number");
   is ($header->{minor}, $minor_write, "minor number");
-  is (!!$header->{netorder}, !!$isnetorder, "is network order");
+  is ( ! ! $header->{netorder}, ! ! $isnetorder, "is network order");
   if ($isnetorder) {
     # Network order header has no sizes
   } else {
     is ($header->{byteorder}, $byteorder, "byte order");
-    is ($header->{intsize}, %Config{intsize}, "int size");
-    is ($header->{longsize}, %Config{longsize}, "long size");
- SKIP: {
-	skip ("No \$Config\{prtsize\} on this perl version ($^V)", 1)
-	    unless defined %Config{ptrsize};
-	is ($header->{ptrsize}, %Config{ptrsize}, "long size");
-    }
-    is ($header->{nvsize}, %Config{nvsize} || %Config{doublesize} || 8,
+    is ($header->{intsize}, config_value('intsize'), "int size");
+    is ($header->{longsize}, config_value('longsize'), "long size");
+ SKIP: do {
+	skip ("No \$Config\{prtsize\} on this perl version ($^PERL_VERSION)", 1)
+	    unless defined config_value('ptrsize');
+	is ($header->{ptrsize}, config_value('ptrsize'), "long size");
+    };
+    is ($header->{nvsize}, config_value('nvsize') || config_value('doublesize') || 8,
         "nv size"); # 5.00405 doesn't even have doublesize in config.
   }
 }
 
 sub test_truncated {
-  my ($data, $sub, $magic_len, $what) = < @_;
+  my @($data, $sub, $magic_len, $what) = @_;
   for my $i (0 .. length ($data) - 1) {
     my $short = substr $data, 0, $i;
 
@@ -100,26 +95,26 @@ sub test_truncated {
     my $clone = &$sub($short);
     is (defined ($clone), '', "truncated $what to $i should fail");
     if ($i +< $magic_len) {
-      like ($@ && $@->{description}, "/^Magic number checking on storable $what failed/",
+      like ($^EVAL_ERROR && $^EVAL_ERROR->{description}, "/^Magic number checking on storable $what failed/",
           "Should croak with magic number warning");
     } else {
-      is ($@, "", "Should not set \$\@");
+      is ($^EVAL_ERROR, "", "Should not set \$\@");
     }
   }
 }
 
 sub test_corrupt {
-  my ($data, $sub, $what, $name) = < @_;
+  my @($data, $sub, $what, $name) = @_;
 
   my $clone = &$sub($data);
   is (defined ($clone), '', "$name $what should fail");
-  like ($@->{description}, $what, $name);
+  like ($^EVAL_ERROR->{description}, $what, $name);
 }
 
 sub test_things {
-  my ($contents, $sub, $what, $isnetwork) = < @_;
+  my @($contents, $sub, $what, ?$isnetwork) = @_;
   my $isfile = $what eq 'file';
-  my $file_magic = $isfile ? length $file_magic_str : 0;
+  my $file_magic = $isfile ?? length $file_magic_str !! 0;
 
   my $header = Storable::read_magic ($contents);
   test_header ($header, $isfile, $isnetwork);
@@ -127,13 +122,13 @@ sub test_things {
   # Test that if we re-write it, everything still works:
   my $clone = &$sub ($contents);
 
-  is ($@, "", "There should be no error");
+  is ($^EVAL_ERROR, "", "There should be no error");
 
   test_hash ($clone);
 
   # Now lets check the short version:
   test_truncated ($contents, $sub, $file_magic
-                  + ($isnetwork ? $network_magic : $other_magic), $what);
+                  + ($isnetwork ?? $network_magic !! $other_magic), $what);
 
   my $copy;
   if ($isfile) {
@@ -156,17 +151,17 @@ sub test_things {
   # )
   my $minor4 = $header->{minor} + 4;
   substr ($copy, $file_magic + 1, 1, chr $minor4);
-  {
+  do {
     # Now by default newer minor version numbers are not a pain.
     $clone = &$sub($copy);
-    is ($@, "", "by default no error on higher minor");
+    is ($^EVAL_ERROR, "", "by default no error on higher minor");
     test_hash ($clone);
 
     local $Storable::accept_future_minor = 0;
     test_corrupt ($copy, $sub,
                   "/^Storable binary image v$header->{major}\.$minor4 more recent than I am \\(v$header->{major}\.$minor\\)/",
                   "higher minor");
-  }
+  };
 
   $copy = $contents;
   my $major1 = $header->{major} + 1;
@@ -196,7 +191,7 @@ sub test_things {
              \@('longsize', "Long integer"),
              \@('ptrsize', "Pointer"),
              \@('nvsize', "Double"))) {
-      my ($key, $name) = < @$_;
+      my @($key, $name) = @$_;
       $copy = $contents;
       substr ($copy, $where++, 1, chr 0);
       test_corrupt ($copy, $sub, "/^$name size is not compatible/",
@@ -229,13 +224,13 @@ sub test_things {
                 "/^Storable binary image v$header->{major}.$minor4 contains data of type 255. This Storable is v$header->{major}.$minor and can only handle data types up to 28/",
                 "bogus tag, minor plus 4");
   # And check again that this croak is not delayed:
-  {
+  do {
     # local $Storable::DEBUGME = 1;
     local $Storable::accept_future_minor = 0;
     test_corrupt ($copy, $sub,
                   "/^Storable binary image v$header->{major}\.$minor4 more recent than I am \\(v$header->{major}\.$minor\\)/",
                   "higher minor");
-  }
+  };
 }
 
 ok (defined store(\%hash, $file));
@@ -243,10 +238,10 @@ ok (defined store(\%hash, $file));
 my $expected = 20 + bytes::length ($file_magic_str) + $other_magic + $fancy;
 my $length = -s $file;
 
-die "Don't seem to have written file '$file' as I can't get its length: $!"
+die "Don't seem to have written file '$file' as I can't get its length: $^OS_ERROR"
   unless defined $file;
 
-die "Expected file to be $expected bytes (sizeof long is %Config{longsize}) but it is $length"
+die "Expected file to be $expected bytes (sizeof long is $(config_value('longsize'))) but it is $length"
   unless $length == $expected;
 
 # Read the contents into memory:
@@ -264,17 +259,17 @@ my $stored = freeze \%hash;
 test_things($stored, \&freeze_and_thaw, 'string');
 
 # Network order.
-unlink $file or die "Can't unlink '$file': $!";
+unlink $file or die "Can't unlink '$file': $^OS_ERROR";
 
 ok (defined nstore(\%hash, $file));
 
 $expected = 20 + length ($file_magic_str) + $network_magic + $fancy;
 $length = -s $file;
 
-die "Don't seem to have written file '$file' as I can't get its length: $!"
+die "Don't seem to have written file '$file' as I can't get its length: $^OS_ERROR"
   unless defined $file;
 
-die "Expected file to be $expected bytes (sizeof long is %Config{longsize}) but it is $length"
+die "Expected file to be $expected bytes (sizeof long is $(config_value('longsize'))) but it is $length"
   unless $length == $expected;
 
 # Read the contents into memory:
@@ -293,7 +288,7 @@ test_things($stored, \&freeze_and_thaw, 'string', 1);
 
 # Test that the bug fixed by #20587 doesn't affect us under some older
 # Perl. AMS 20030901
-{
+do {
     chop(my $a = chr(0xDF).chr(256));
     my %a = %(chr(0xDF) => 1);
     %a{$a}++;
@@ -301,10 +296,10 @@ test_things($stored, \&freeze_and_thaw, 'string', 1);
     # If we were built with -DDEBUGGING, the assert() should have killed
     # us, which will probably alert the user that something went wrong.
     ok(1);
-}
+};
 
 # Unusual in that the empty string is stored with an SX_LSCALAR marker
 my $hash = store_and_retrieve("pst0\5\6\3\0\0\0\1\1\0\0\0\0\0\0\0\5empty");
-ok(!$@, "no exception");
+ok(!$^EVAL_ERROR, "no exception");
 is(ref($hash), "HASH", "got a hash");
 is($hash->{empty}, "", "got empty element");

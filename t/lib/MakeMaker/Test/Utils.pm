@@ -1,10 +1,10 @@
 package MakeMaker::Test::Utils;
 
 use File::Spec;
-use strict;
+
 use Config;
 
-use vars < qw($VERSION @ISA @EXPORT);
+our ($VERSION, @ISA, @EXPORT);
 
 require Exporter;
 @ISA = qw(Exporter);
@@ -17,8 +17,8 @@ $VERSION = 0.03;
 	     have_compiler
             );
 
-my $Is_VMS   = $^O eq 'VMS';
-my $Is_MacOS = $^O eq 'MacOS';
+my $Is_VMS   = $^OS_NAME eq 'VMS';
+my $Is_MacOS = $^OS_NAME eq 'MacOS';
 
 
 =head1 NAME
@@ -67,13 +67,13 @@ matter where you chdir to.
 =cut
 
 sub which_perl {
-    my $perl = $^X;
+    my $perl = $^EXECUTABLE_NAME;
     $perl ||= 'perl';
 
     # VMS should have 'perl' aliased properly
     return $perl if $Is_VMS;
 
-    $perl .= %Config{exe_ext} unless $perl =~ m/%Config{exe_ext}$/i;
+    $perl .= config_value("exe_ext") unless $perl =~ m/$(config_value("exe_ext"))$/i;
 
     my $perlpath = 'File::Spec'->rel2abs( $perl );
     unless( $Is_MacOS || -x $perlpath ) {
@@ -81,8 +81,8 @@ sub which_perl {
 
         # When building in the core, *don't* go off and find
         # another perl
-        die "Can't find a perl to use (\$^X=$^X), (\$perlpath=$perlpath)" 
-          if %ENV{PERL_CORE};
+        die "Can't find a perl to use (\$^X=$^EXECUTABLE_NAME), (\$perlpath=$perlpath)" 
+          if env::var('PERL_CORE');
 
         foreach my $path ( 'File::Spec'->path) {
             $perlpath = 'File::Spec'->catfile($path, $perl);
@@ -101,27 +101,22 @@ Sets up environment variables so perl can find its libraries.
 
 =cut
 
-my $old5lib = %ENV{PERL5LIB};
-my $had5lib = exists %ENV{PERL5LIB};
+my $old5lib = env::var('PERL5LIB');
+my $had5lib = defined $old5lib;
 sub perl_lib {
                                # perl-src/t/
-    my $lib =  %ENV{PERL_CORE} ? qq{../lib}
+    my $lib =  env::var('PERL_CORE') ?? qq{../lib}
                                # ExtUtils-MakeMaker/t/
-                               : qq{../blib/lib};
+                               !! qq{../blib/lib};
     $lib = 'File::Spec'->rel2abs($lib);
     my @libs = @($lib);
-    push @libs, %ENV{PERL5LIB} if exists %ENV{PERL5LIB};
-    %ENV{PERL5LIB} = join(%Config{path_sep}, @libs);
-    unshift @INC, $lib;
+    push @libs, env::var('PERL5LIB') if defined env::var('PERL5LIB');
+    env::var('PERL5LIB' ) = join(config_value("path_sep"), @libs);
+    unshift $^INCLUDE_PATH, $lib;
 }
 
-END { 
-    if( $had5lib ) {
-        %ENV{PERL5LIB} = $old5lib;
-    }
-    else {
-        delete %ENV{PERL5LIB};
-    }
+END {
+    env::var('PERL5LIB' ) = $old5lib;
 }
 
 
@@ -135,7 +130,7 @@ should generate.
 =cut
 
 sub makefile_name {
-    return $Is_VMS ? 'Descrip.MMS' : 'Makefile';
+    return $Is_VMS ?? 'Descrip.MMS' !! 'Makefile';
 }   
 
 =item B<makefile_backup>
@@ -149,7 +144,7 @@ Makefile.
 
 sub makefile_backup {
     my $makefile = makefile_name;
-    return $Is_VMS ? "$makefile".'_old' : "$makefile.old";
+    return $Is_VMS ?? "$makefile".'_old' !! "$makefile.old";
 }
 
 =item B<make>
@@ -161,8 +156,7 @@ Returns a good guess at the make to run.
 =cut
 
 sub make {
-    my $make = %Config{make};
-    $make = %ENV{MAKE} if exists %ENV{MAKE};
+    my $make = env::var('MAKE') // config_value("make");
 
     return $make;
 }
@@ -200,13 +194,13 @@ different calling convention than Unix or Windows.
 =cut
 
 sub make_macro {
-    my($make, $target) = (shift, shift);
+    my@($make, $target) = @(shift, shift);
 
     my $is_mms = $make =~ m/^MM(K|S)/i;
 
     my $cmd = $make;
     my $macros = '';
-    while( my($key,$val) = splice(@_, 0, 2) ) {
+    while( my@(?$key,?$val) = @: splice(@_, 0, 2) ) {
         if( $is_mms ) {
             $macros .= qq{/macro="$key=$val"};
         }
@@ -215,7 +209,7 @@ sub make_macro {
         }
     }
 
-    return $is_mms ? "$make$macros $target" : "$make $target $macros";
+    return $is_mms ?? "$make$macros $target" !! "$make $target $macros";
 }
 
 =item B<calibrate_mtime>
@@ -229,10 +223,10 @@ touched.
 =cut
 
 sub calibrate_mtime {
-    open(FILE, ">", "calibrate_mtime.tmp") || die $!;
-    print FILE "foo";
-    close FILE;
-    my($mtime) = @(stat('calibrate_mtime.tmp'))[9];
+    open(my $file, ">", "calibrate_mtime.tmp") || die $^OS_ERROR;
+    print $file, "foo";
+    close $file;
+    my $mtime = @(stat('calibrate_mtime.tmp'))[9];
     unlink 'calibrate_mtime.tmp';
     return $mtime;
 }
@@ -278,13 +272,13 @@ sub setup_mm_test_root {
         # imposed by RMS.  We get around this with a rooted logical, but we
         # can't create logical names with attributes in Perl, so we do it
         # in a DCL subprocess and put it in the job table so the parent sees it.
-        open( MMTMP, ">", 'mmtesttmp.com' ) || 
-          die "Error creating command file; $!";
-        print MMTMP <<'COMMAND';
+        open( my $mmtmp, ">", 'mmtesttmp.com' ) || 
+          die "Error creating command file; $^OS_ERROR";
+        print $mmtmp, <<'COMMAND';
 $ MM_TEST_ROOT = F$PARSE("SYS$DISK:[-]",,,,"NO_CONCEAL")-".][000000"-"]["-"].;"+".]"
 $ DEFINE/JOB/NOLOG/TRANSLATION=CONCEALED MM_TEST_ROOT 'MM_TEST_ROOT'
 COMMAND
-        close MMTMP;
+        close $mmtmp;
 
         system '@mmtesttmp.com';
         1 while unlink 'mmtesttmp.com';
@@ -304,13 +298,13 @@ sub have_compiler {
 
     # ExtUtils::CBuilder prints its compilation lines to the screen.
     # Shut it up.
-    local *STDOUT = *STDOUT;
-    local *STDERR = *STDERR;
+    local $^STDOUT = $^STDOUT;
+    local $^STDERR = $^STDERR;
 
     my $buffer;
     open my $fh, '>', \$buffer;
-    *STDOUT = *{$fh}{IO};
-    *STDERR = *{$fh}{IO};
+    $^STDOUT = *{$fh}{IO};
+    $^STDERR = *{$fh}{IO};
 
     try {
 	require ExtUtils::CBuilder;

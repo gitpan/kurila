@@ -1,5 +1,5 @@
 package Pod::Functions;
-use strict;
+
 
 =head1 NAME
 
@@ -128,23 +128,23 @@ while ( ~< *DATA) {
     chomp;
     s/#.*//;
     next unless $_;
-    my($name, $type, $text) = < split " ", $_, 3;
-    %Type{$name} = $type;
-    %Flavor{$name} = $text;
+    my@($name, $type, $text) =  split " ", $_, 3;
+    %Type{+$name} = $type;
+    %Flavor{+$name} = $text;
     for my $t ( split m/[,\s]+/, $type ) {
-        push @{%Kinds{$t}}, $name;
+        push @{%Kinds{+$t}}, $name;
     }
 }
 
-close DATA;
+close \*DATA;
 
 my( $typedesc, $list );
 unless (caller) {
     foreach my $type (  @Type_Order ) {
-	$list = join(", ", sort @{%Kinds{$type}});
-	$typedesc = %Type_Description{$type} . ":";
+	$list = join(", ", sort @{%Kinds{?$type}});
+	$typedesc = %Type_Description{?$type} . ":";
 
-        print < form("",
+        print $^STDOUT, < form("",
                    "\{[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[\}",
                    $typedesc,
                    "     \{[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[\}",

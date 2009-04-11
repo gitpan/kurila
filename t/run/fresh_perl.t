@@ -12,11 +12,10 @@ BEGIN {
     require './test.pl';	# for which_perl() etc
 }
 
-use strict;
 
 my $Perl = which_perl();
 
-$|=1;
+$^OUTPUT_AUTOFLUSH=1;
 
 my @prgs = @( () );
 while( ~< *DATA) { 
@@ -30,14 +29,14 @@ while( ~< *DATA) {
 plan tests => scalar nelems @prgs;
 
 foreach my $prog ( @prgs) {
-    my($raw_prog, $name) = < @$prog;
+    my@($raw_prog, $name) =  @$prog;
 
     my $switch;
     if ($raw_prog =~ s/^\s*(-\w.*)\n//){
 	$switch = $1;
     }
 
-    my($prog,$expected) = < split(m/\nEXPECT\n/, $raw_prog);
+    my@($prog,?$expected) =  split(m/\nEXPECT\n/, $raw_prog);
     $prog .= "\n";
     $expected = '' unless defined $expected;
 
@@ -57,8 +56,8 @@ __END__
 ########
 our $cusp = ^~^0 ^^^ (^~^0 >> 1);
 use integer;
-$, = " ";
-print +($cusp - 1) % 8, $cusp % 8, -$cusp % 8, 8 ^|^ (($cusp + 1) % 8 + 7), "!\n";
+$^OUTPUT_FIELD_SEPARATOR = " ";
+print($^STDOUT, ($cusp - 1) % 8, $cusp % 8, -$cusp % 8, 8 ^|^ (($cusp + 1) % 8 + 7), "!\n");
 EXPECT
 7 0 0 8 !
 ########
@@ -72,37 +71,37 @@ BEGIN
         }
 ########
 our @array;
-@array[128]=1
+@array[+128]=1
 ########
-our $x=0x0eabcd; print $x->ref;
+our $x=0x0eabcd; print $^STDOUT, $x->ref;
 EXPECT
-Can't locate object method "ref" via package "961485" (perhaps you forgot to load "961485"?) at - line 1 character 26.
+Can't locate object method "ref" via package "961485" (perhaps you forgot to load "961485"?) at - line 1 character 36.
 ########
 our $str;
 chop ($str .= ~< *DATA);
 ########
 our ($x, $y);
-$x=2;$y=3;$x+<$y ? $x : $y += 23;print $x;
+$x=2;$y=3;$x+<$y ?? $x !! $y += 23;print $^STDOUT, $x;
 EXPECT
 25
 ########
-eval 'sub bar {print "In bar"}';
+eval 'sub bar {print $^STDOUT, "In bar"}';
 ########
-system './perl -ne "print if eof" /dev/null' unless $^O eq 'MacOS'
+system q[./perl -ne 'print \$^STDOUT, $_ if eof' /dev/null] unless $^OS_NAME eq 'MacOS'
 ########
 our $file;
 chop($file = ~< *DATA);
 ########
 package N;
-sub new {my ($obj,$n)=@_; bless \$n}  
+sub new {my @($obj,$n)=@_; bless \$n}  
 our $aa=N->new(1);
 $aa=12345;
-print $aa;
+print $^STDOUT, $aa;
 EXPECT
 12345
 ########
 $_="foo";
-printf(STDOUT "\%s\n", $_);
+printf($^STDOUT, "\%s\n", $_);
 EXPECT
 foo
 ########
@@ -111,97 +110,65 @@ push(@a, 1, 2, 3,)
 ########
 quotemeta ""
 ########
-package FOO;sub new {bless \%(FOO => 'BAR')};
-package main;
-use strict 'vars';   
-my $self = FOO->new();
-print %$self{FOO};
-EXPECT
-BAR
-########
 $_="foo";
 s/.{1}//s;
-print;
+print $^STDOUT, $_;
 EXPECT
 oo
-########
-sub by_number { $a <+> $b; };# inline function for sort below
-our %as_ary;
-%as_ary{0}="a0";
-our @ordered_array=sort by_number keys(%as_ary);
 ########
 BEGIN { die "phooey" }
 EXPECT
 phooey at - line 1 character 9.
-BEGIN failed--compilation aborted
+    BEGIN called at - line 1 character 1.
 ########
 BEGIN { 1/0 }
 EXPECT
 Illegal division by zero at - line 1 character 10.
-BEGIN failed--compilation aborted
+    BEGIN called at - line 1 character 1.
 ########
 BEGIN { undef = 0 }
 EXPECT
-Modification of a read-only value attempted at - line 1 character 14.
-BEGIN failed--compilation aborted
+Can't assign to undef operator at - line 1 character 9.
 ########
-my @a; @a[2] = 1; for (@a) { $_ = 2 } print "{join ' ', @a}\n"
+my @a; @a[+2] = 1; for (@a) { $_ = 2 } print $^STDOUT, join(' ', @a) . "\n"
 EXPECT
 2 2 2
 ########
 # used to attach defelem magic to all immortal values,
 # which made restore of local $_ fail.
 foo(2+>1);
-sub foo { bar() for @_;  }
+sub foo { bar() for $: @_;  }
 sub bar { local $_; }
-print "ok\n";
+print $^STDOUT, "ok\n";
 EXPECT
 ok
 ########
-print "ok\n" if ("\0" cmp "\x[FF]") +< 0;
+print $^STDOUT, "ok\n" if ("\0" cmp "\x[FF]") +< 0;
 EXPECT
 ok
 ########
-open(H,"<",$^O eq 'MacOS' ? ':run:fresh_perl.t' : 'run/fresh_perl.t'); # must be in the 't' directory
-stat(H);
-print "ok\n" if (-e _ and -f _ and -r _);
+open(my $h,"<",$^OS_NAME eq 'MacOS' ?? ':run:fresh_perl.t' !! 'run/fresh_perl.t'); # must be in the 't' directory
+stat($h);
+print $^STDOUT, "ok\n" if (-e _ and -f _ and -r _);
 EXPECT
 ok
 ########
 my $a = 'outer';
-eval q[ my $a = 'inner'; eval q[ print "$a " ] ];
-try { my $x = 'peace'; eval q[ print "$x\n" ] }
+eval q[ my $a = 'inner'; eval q[ print $^STDOUT, "$a " ] ];
+try { my $x = 'peace'; eval q[ print $^STDOUT, "$x\n" ] }
 EXPECT
 inner peace
 ########
-# TODO fix location
--w
-$| = 1;
-sub foo {
-    print "In foo1\n";
-    eval 'sub foo { print "In foo2\n" }';
-    print "Exiting foo1\n";
-}
-foo;
-foo;
-EXPECT
-In foo1
-Subroutine foo redefined at (eval 1) line 1.
-    (eval) called at - line 4.
-    main::foo called at - line 7.
-Exiting foo1
-In foo2
-########
 our $s = 0;
 map {#this newline here tickles the bug
-$s += $_} @(1,2,4);
-print "eat flaming death\n" unless ($s == 7);
+$s += $_}, @(1,2,4);
+print $^STDOUT, "eat flaming death\n" unless ($s == 7);
 ########
 BEGIN { @ARGV = qw(a b c d e) }
-BEGIN { print "argv <{join ' ', @ARGV}>\nbegin <",shift,">\n" }
-END { print "end <",shift,">\nargv <{join ' ', @ARGV}>\n" }
-INIT { print "init <",shift,">\n" }
-CHECK { print "check <",shift,">\n" }
+BEGIN { print $^STDOUT, "argv <$(join ' ', @ARGV)>\nbegin <",shift(@ARGV),">\n" }
+END { print $^STDOUT, "end <",shift(@ARGV),">\nargv <$(join ' ', @ARGV)>\n" }
+INIT { print $^STDOUT, "init <",shift(@ARGV),">\n" }
+CHECK { print $^STDOUT, "check <",shift(@ARGV),">\n" }
 EXPECT
 argv <a b c d e>
 begin <a>
@@ -213,23 +180,17 @@ argv <e>
 -l
 # fdopen from a system descriptor to a system descriptor used to close
 # the former.
-open STDERR, '>&=', \*STDOUT or die $!;
-select STDOUT; $| = 1; print fileno STDOUT or die $!;
-select STDERR; $| = 1; print fileno STDERR or die $!;
+open $^STDERR, '>&=', $^STDOUT or die $^OS_ERROR;
+print $^STDOUT, fileno $^STDOUT or die $^OS_ERROR;
+print $^STDOUT, fileno $^STDERR or die $^OS_ERROR;
 EXPECT
 1
 2
 ########
-# TODO fix location
--w
-sub testme { my $a = "test"; { local $a = "new test"; print $a }}
-EXPECT
-Can't localize lexical variable $a at - line 1.
-########
 # TODO
 package X;
 sub ascalar { my $r; bless \$r }
-sub DESTROY { print "destroyed\n" };
+sub DESTROY { print $^STDOUT, "destroyed\n" };
 package main;
 *s = X->ascalar();
 EXPECT
@@ -238,7 +199,7 @@ destroyed
 # TODO
 package X;
 sub anarray { bless \@() }
-sub DESTROY { print "destroyed\n" };
+sub DESTROY { print $^STDOUT, "destroyed\n" };
 package main;
 *a = X->anarray();
 EXPECT
@@ -247,7 +208,7 @@ destroyed
 # TODO
 package X;
 sub ahash { bless \%() }
-sub DESTROY { print "destroyed\n" };
+sub DESTROY { print $^STDOUT, "destroyed\n" };
 package main;
 *h = X->ahash();
 EXPECT
@@ -256,34 +217,17 @@ destroyed
 # TODO
 package X;
 sub aclosure { my $x; bless sub { ++$x } }
-sub DESTROY { print "destroyed\n" };
+sub DESTROY { print $^STDOUT, "destroyed\n" };
 package main;
 *c = X->aclosure;
 EXPECT
 destroyed
 ########
-# TODO
-no strict "refs";
-package X;
-sub any { bless \%() }
-my $f = "FH000"; # just to thwart any future optimisations
-sub afh { select select *{Symbol::fetch_glob(++$f)};
-          my $r = *{Symbol::fetch_glob($f)}{IO}; delete Symbol::stash('X')->{$f}; bless $r }
-sub DESTROY { print "destroyed\n" }
-package main;
-print "start\n";
-our $x = X->any(); # to bump sv_objcount. IO objs aren't counted??
-*f = X->afh();
-EXPECT
-start
-destroyed
-destroyed
-########
 # TODO fix trace back of "call_sv"
 BEGIN {
-  $| = 1;
+  $^OUTPUT_AUTOFLUSH = 1;
   $^WARN_HOOK = sub {
-    try { print @_[0]->{description} };
+    try { print $^STDOUT, @_[0]->{description} };
     die "bar";
   };
   warn "foo\n";
@@ -301,25 +245,23 @@ sub re {
 }
 EXPECT
 ########
-use strict;
 my $foo = "ZZZ\n";
-END { print $foo }
+END { print $^STDOUT, $foo }
 EXPECT
 ZZZ
 ########
 eval '
-use strict;
 my $foo = "ZZZ\n";
-END { print $foo }
+END { print $^STDOUT, $foo }
 ';
 EXPECT
 ZZZ
 ########
 -w
-if (@ARGV) { print "" }
+if (@ARGV) { print $^STDOUT, "" }
 else {
   our $x;
-  if ($x == 0) { print "" } else { print $x }
+  if ($x == 0) { print $^STDOUT, "" } else { print $^STDOUT, $x }
 }
 EXPECT
 Use of uninitialized value $main::x in numeric eq (==) at - line 4 character 10.
@@ -327,25 +269,19 @@ Use of uninitialized value $main::x in numeric eq (==) at - line 4 character 10.
 our $x = sub {};
 foo();
 sub foo { try { return }; }
-print "ok\n";
+print $^STDOUT, "ok\n";
 EXPECT
 ok
-########
-sub f { my $a = 1; my $b = 2; my $c = 3; my $d = 4; next }
-my $x = "foo";
-{ f } continue { print $x, "\n" }
-EXPECT
-foo
 ########
 sub C () { 1 }
 sub M { @_[0] = 2; }
 eval "C";
 M(C);
 EXPECT
-Modification of a read-only value attempted at - line 2 character 14.
+Modification of a read-only value attempted at - line 2 character 11.
     main::M called at - line 4 character 1.
 ########
-print < qw(ab a\b a\\b);
+print $^STDOUT, < qw(ab a\b a\\b);
 EXPECT
 aba\ba\\b
 ########
@@ -354,22 +290,22 @@ aba\ba\\b
 our $foo;
 sub myeval { eval @_[0] }
 $foo = "ok 2\n";
-myeval('sub foo { local $foo = "ok 1\n"; print $foo; }');
-die $@ if $@;
+myeval('sub foo { local $foo = "ok 1\n"; print $^STDOUT, $foo; }');
+die $^EVAL_ERROR if $^EVAL_ERROR;
 foo();
-print $foo;
+print $^STDOUT, $foo;
 EXPECT
 ok 1
 ok 2
 ########
 # lexicals outside an eval"" should be visible inside subroutine definitions
 # within it
-eval <<'EOT'; die $@ if $@;
-{
+eval <<'EOT'; die $^EVAL_ERROR if $^EVAL_ERROR;
+do {
     my $X = "ok\n";
-    eval 'sub Y { print $X }'; die $@ if $@;
+    eval 'sub Y { print $^STDOUT, $X }'; die $^EVAL_ERROR if $^EVAL_ERROR;
     Y();
-}
+};
 EOT
 EXPECT
 ok
@@ -378,11 +314,11 @@ ok
 # reversed again as a result of [perl #17763]
 die qr(x)
 EXPECT
-(?-uxism:x) at - line 3 character 1.
+(error description isn't a string) at - line 3 character 1.
 ########
 # David Dyck
 # coredump in 5.7.1
-close STDERR; die;
+close $^STDERR; die;
 EXPECT
 ########
 # core dump in 20000716.007
@@ -394,36 +330,36 @@ my @h = 1 .. 10;
 bad(<@h);
 sub bad {
    undef @h;
-   print "O";
-   print for @_;
-   print "K";
+   print $^STDOUT, "O";
+   print $^STDOUT, $_ for @_;
+   print $^STDOUT, "K";
 }
 EXPECT
-OK
+O12345678910K
 ########
 # Bug 20010506.041
 use utf8;
-"abcd\x{1234}" =~ m/(a)(b[c])(d+)?/i and print "ok\n";
+"abcd\x{1234}" =~ m/(a)(b[c])(d+)?/i and print $^STDOUT, "ok\n";
 EXPECT
 ok
 ######## (?{...}) compilation bounces on PL_rs
 -0
 our $x;
-{
+do {
   m/(?{ $x })/;
   # {
-}
-BEGIN { print "ok\n" }
+};
+BEGIN { print $^STDOUT, "ok\n" }
 EXPECT
 ok
 ######## scalar ref to file test operator segfaults on 5.6.1 [ID 20011127.155]
 # This only happens if the filename is 11 characters or less.
 my $foo = \-f "blah";
-print "ok" if ref $foo && !$$foo;
+print $^STDOUT, "ok" if ref $foo && !$$foo;
 EXPECT
 ok
 ######## [ID 20011128.159] 'X' =~ m/\X/ segfault in 5.6.1
-print "ok" if 'X' =~ m/\X/;
+print $^STDOUT, "ok" if 'X' =~ m/\X/;
 EXPECT
 ok
 ######## example from Camel 5, ch. 15, pp.406 (with my)
@@ -431,7 +367,7 @@ ok
 use utf8;
 my $人 = 2; # 0xe4 0xba 0xba: U+4eba, "human" in CJK ideograph
 $人++; # a child is born
-print $人, "\n";
+print $^STDOUT, $人, "\n";
 EXPECT
 3
 ######## example from Camel 5, ch. 15, pp.406 (with our)
@@ -439,7 +375,7 @@ EXPECT
 use utf8;
 our $人 = 2; # 0xe4 0xba 0xba: U+4eba, "human" in CJK ideograph
 $人++; # a child is born
-print $人, "\n";
+print $^STDOUT, $人, "\n";
 EXPECT
 3
 ######## example from Camel 5, ch. 15, pp.406 (with package vars)
@@ -447,7 +383,7 @@ EXPECT
 use utf8;
 our $人 = 2; # 0xe4 0xba 0xba: U+4eba, "human" in CJK ideograph
 $人++; # a child is born
-print $人, "\n";
+print $^STDOUT, $人, "\n";
 EXPECT
 3
 ########
@@ -458,29 +394,9 @@ our $code = eval q[
   sub { eval '$x = "ok 1\n"'; }
 ];
 &{$code}();
-print $x;
+print $^STDOUT, $x;
 EXPECT
 ok 1
 ######## [ID 20020623.009] nested eval/sub segfaults
 our $eval = eval 'sub { eval q|sub { %S }| }';
 $eval->(\%());
-######## "Segfault using HTML::Entities", Richard Jolly <richardjolly@mac.com>, <A3C7D27E-C9F4-11D8-B294-003065AE00B6@mac.com> in perl-unicode@perl.org
--lw
-# SKIP: use Config; %ENV{PERL_CORE_MINITEST} or " %Config::Config{'extensions'} " !~ m[ Encode ] # Perl configured without Encode module
-BEGIN {
-  eval 'require Encode';
-  if ($@) { exit 0 } # running minitest?
-}
-# Test case cut down by jhi
-use Carp;
-$^WARN_HOOK = sub { $@ = shift };
-use Encode;
-use utf8;
-my $t = "\x[E9]";
-$t =~ s/([^a])/{''}/g;
-$@ =~ s/ at .*/ at/;
-print $@;
-print "Good" if $t eq "\x[E9]";
-EXPECT
-
-Good

@@ -43,12 +43,12 @@ typedef struct
 CV *
 PerlIOVia_fetchmethod(pTHX_ PerlIOVia * s, const char *method, CV ** save)
 {
-    GV *gv = gv_fetchmeth(s->stash, method, strlen(method), 0);
+    CV *cv = gv_fetchmeth(s->stash, method, strlen(method), 0);
 #if 0
     Perl_warn(aTHX_ "Lookup %s::%s => %p", HvNAME_get(s->stash), method, gv);
 #endif
-    if (gv) {
-	return *save = GvCV(gv);
+    if (cv) {
+	return *save = cv;
     }
     else {
 	return *save = (CV *) - 1;
@@ -89,8 +89,12 @@ PerlIOVia_method(pTHX_ PerlIO * f, const char *method, CV ** save, int flags,
 	    if (!s->fh) {
 		GV *gv = newGVgen(HvNAME_get(s->stash));
 		GvIOp(gv) = newIO();
-		s->fh = newRV_noinc((SV *) gv);
+		s->fh = newRV((SV *) gv);
 		s->io = GvIOp(gv);
+		if (gv) {
+		    /* shamelessly stolen from IO::File's new_tmpfile() */
+		    hv_delete(GvSTASH(gv), GvNAME(gv), GvNAMELEN(gv), G_DISCARD);
+		}
 	    }
 	    IoIFP(s->io) = PerlIONext(f);
 	    IoOFP(s->io) = PerlIONext(f);
@@ -101,15 +105,8 @@ PerlIOVia_method(pTHX_ PerlIO * f, const char *method, CV ** save, int flags,
 	    /* FIXME: How should this work for OPEN etc? */
 	}
 	PUTBACK;
-	count = call_sv((SV *) cv, flags);
-	if (count) {
-	    SPAGAIN;
-	    result = POPs;
-	    PUTBACK;
-	}
-	else {
-	    result = &PL_sv_undef;
-	}
+	result = call_sv((SV *) cv, flags);
+        SPAGAIN;
 	LEAVE;
 	POPSTACK;
     }
@@ -134,14 +131,14 @@ PerlIOVia_pushed(pTHX_ PerlIO * f, const char *mode, SV * arg,
 	else {
 	    STRLEN pkglen = 0;
 	    const char *pkg = SvPV(arg, pkglen);
-	    s->obj = SvREFCNT_inc(arg);
-	    s->stash = gv_stashpvn(pkg, pkglen, 0);
+	    s->obj =
+		newSVpvn(Perl_form(aTHX_ "PerlIO::via::%s", pkg),
+			 pkglen + 13);
+	    s->stash = gv_stashpvn(SvPVX_const(s->obj), pkglen + 13, 0);
 	    if (!s->stash) {
 		SvREFCNT_dec(s->obj);
-		s->obj =
-		    newSVpvn(Perl_form(aTHX_ "PerlIO::via::%s", pkg),
-			     pkglen + 13);
-		s->stash = gv_stashpvn(SvPVX_const(s->obj), pkglen + 13, 0);
+		s->obj = SvREFCNT_inc(arg);
+		s->stash = gv_stashpvn(pkg, pkglen, 0);
 	    }
 	    if (s->stash) {
 		char lmode[8];
@@ -203,7 +200,7 @@ push_failed:
 PerlIO *
 PerlIOVia_open(pTHX_ PerlIO_funcs * self, PerlIO_list_t * layers,
 	       IV n, const char *mode, int fd, int imode, int perm,
-	       PerlIO * f, int narg, SV ** args)
+	       PerlIO * f, int narg, SV *const* args)
 {
     if (!f) {
 	f = PerlIO_push(aTHX_ PerlIO_allocate(aTHX), self, mode,
@@ -418,7 +415,7 @@ PerlIOVia_read(pTHX_ PerlIO * f, void *vbuf, Size_t count)
 				 Nullsv);
 	    if (result) {
 		rd = (SSize_t) SvIV(result);
-		Move(SvPVX(buf), vbuf, rd, char);
+		Move(SvPVX_const(buf), vbuf, rd, char);
 		return rd;
 	    }
 	}
@@ -486,7 +483,7 @@ PerlIOVia_get_base(pTHX_ PerlIO * f)
     if (PerlIOBase(f)->flags & PERLIO_F_CANREAD) {
 	PerlIOVia *s = PerlIOSelf(f, PerlIOVia);
 	if (s->var) {
-	    return (STDCHAR *) SvPVX(s->var);
+	    return (STDCHAR *) SvPVX_mutable(s->var);
 	}
     }
     return (STDCHAR *) NULL;

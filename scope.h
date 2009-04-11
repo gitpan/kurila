@@ -17,8 +17,6 @@
 #define SAVEt_I32		6
 #define SAVEt_IV		7
 #define SAVEt_SPTR		8
-#define SAVEt_APTR		9
-#define SAVEt_HPTR		10
 #define SAVEt_PPTR		11
 #define SAVEt_NSTAB		12
 #define SAVEt_SVREF		13
@@ -53,6 +51,8 @@
 #define SAVEt_COMPILE_WARNINGS	42
 #define SAVEt_STACK_CXPOS	43
 #define SAVEt_PARSER		44
+#define SAVEt_SET_MAGICSV		45
+#define SAVEt_CALLSV		46
 
 #ifndef SCOPE_SAVES_SIGNAL_MASK
 #define SCOPE_SAVES_SIGNAL_MASK 0
@@ -153,18 +153,7 @@ Closing bracket on a callback.  See C<ENTER> and L<perlcall>.
 
 #define SAVEOP()	save_op()
 
-#define SAVEHINTS() \
-    STMT_START {					\
-	SSCHECK(4);					\
-	if (PL_hints & HINT_LOCALIZE_HH) {		\
-	    SSPUSHPTR(GvHV(PL_hintgv));			\
-	    GvHV(PL_hintgv) = Perl_hv_copy_hints_hv(aTHX_ GvHV(PL_hintgv)); \
-	}						\
-        SvREFCNT_inc(PL_compiling.cop_hints_hash);      \
-	SSPUSHPTR(PL_compiling.cop_hints_hash);		\
-	SSPUSHINT(PL_hints);				\
-	SSPUSHINT(SAVEt_HINTS);				\
-    } STMT_END
+#define SAVEHINTS() save_hints();
 
 #define SAVECOMPPAD() \
     STMT_START {						\
@@ -210,19 +199,11 @@ Closing bracket on a callback.  See C<ENTER> and L<perlcall>.
         SSPUSHINT(SAVEt_PARSER); 	          \
     } STMT_END
 
-#ifdef USE_ITHREADS
-#  define SAVECOPSTASH(c)	SAVEPPTR(CopSTASHPV(c))
-#  define SAVECOPFILE(c)	SAVEPPTR(CopFILE(c))
-#  define SAVECOPFILE_FREE(c)	SAVESHAREDPV(CopFILE(c))
-#  define SAVECOPLABEL(c)	SAVEPPTR(CopLABEL(c))
-#  define SAVECOPLABEL_FREE(c)	SAVESHAREDPV(CopLABEL(c))
-#else
 #  define SAVECOPSTASH(c)	SAVESPTR(CopSTASH(c))
 #  define SAVECOPFILE(c)	SAVESPTR(CopFILEGV(c))
 #  define SAVECOPFILE_FREE(c)	SAVEGENERICSV(CopFILEGV(c))
 #  define SAVECOPLABEL(c)	SAVEPPTR(CopLABEL(c))
 #  define SAVECOPLABEL_FREE(c)	SAVEPPTR(CopLABEL(c))
-#endif
 
 #define SAVECOPLINE(c)		SAVEI32(CopLINE(c))
 

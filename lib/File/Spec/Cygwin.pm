@@ -1,7 +1,6 @@
 package File::Spec::Cygwin;
 
-use strict;
-use vars < qw(@ISA $VERSION);
+our (@ISA, $VERSION);
 require File::Spec::Unix;
 
 $VERSION = '3.2701';
@@ -37,8 +36,7 @@ and then File::Spec::Unix canonpath() is called on the result.
 
 =cut
 
-sub canonpath {
-    my($self,$path) = < @_;
+sub canonpath($self,?$path) {
     return unless defined $path;
 
     $path =~ s|\\|/|g;
@@ -74,8 +72,7 @@ and if not, File::Spec::Unix file_name_is_absolute() is called.
 =cut
 
 
-sub file_name_is_absolute {
-    my ($self,$file) = < @_;
+sub file_name_is_absolute($self,$file) {
     return 1 if $file =~ m{^([a-z]:)?[\\/]}is; # C:/test
     return $self->SUPER::file_name_is_absolute($file);
 }
@@ -99,7 +96,7 @@ variables are tainted, they are not used.
 my $tmpdir;
 sub tmpdir {
     return $tmpdir if defined $tmpdir;
-    $tmpdir = @_[0]->_tmpdir( %ENV{TMPDIR}, "/tmp", %ENV{'TMP'}, %ENV{'TEMP'}, 'C:/temp' );
+    $tmpdir = @_[0]->_tmpdir( env::var('TMPDIR'), "/tmp", env::var('TMP'), env::var('TEMP'), 'C:/temp' );
 }
 
 =item case_tolerant
@@ -111,11 +108,10 @@ Default: 1
 
 =cut
 
-sub case_tolerant () {
-  return 1 unless $^O eq 'cygwin'
+sub case_tolerant(?$drive) {
+  return 1 unless $^OS_NAME eq 'cygwin'
     and defined &Cygwin::mount_flags;
 
-  my $drive = shift;
   if (! $drive) {
       my @flags = split(m/,/, Cygwin::mount_flags('/cygwin'));
       my $prefix = pop(@flags);

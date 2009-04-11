@@ -3,20 +3,20 @@
 #P = start of string  Q = start of substr  R = end of substr  S = end of string
 
 use warnings ;
-use strict;
+
 
 our ($w, $FATAL_MSG, $x);
 
 $a = 'abcdefxyz';
 $^WARN_HOOK = sub {
-     if (@_[0]->{description} =~ m/^substr outside of string/) {
+     if (@_[0]->{?description} =~ m/^substr outside of string/) {
           $w++;
-     } elsif (@_[0]->{description} =~ m/^Attempt to use reference as lvalue in substr/) {
+     } elsif (@_[0]->{?description} =~ m/^Attempt to use reference as lvalue in substr/) {
           $w += 2;
-     } elsif (@_[0]->{description} =~ m/^Use of uninitialized value/) {
+     } elsif (@_[0]->{?description} =~ m/^Use of uninitialized value/) {
           $w += 3;
      } else {
-          warn @_[0]->{description};
+          warn @_[0]->{?description};
      }
 };
 
@@ -228,10 +228,10 @@ for (@(0,1)) {
 
 $w = 0 ;
 # coercion of references
-{
+do {
   my $s = \@();
   dies_like( sub { substr($s, 0, 1, 'Foo'); }, qr/reference as string/ );
-}
+};
 
 # check no spurious warnings
 is($w, 0);
@@ -265,21 +265,21 @@ is ($w, 0);
 
 # using 4 arg substr as lvalue is a compile time error
 eval_dies_like( 'substr($a,0,0,"") = "abc"',
-                qr/Can't modify substr/);
+                qr/Can't assign to substr/);
 is ($a, "foo");
 
 $a = "abcdefgh";
 is(sub { shift }->(substr($a, 0, 4, "xxxx")), 'abcd');
 is($a, 'xxxxefgh');
 
-{
+do {
     my $y = 10;
     $y = "2" . $y;
     is ($y, 210);
-}
+};
 
 # utf8 sanity
-{
+do {
     use utf8;
     my $x = substr("a\x{263a}b",0);
     $x = substr($x,1,1);
@@ -290,8 +290,8 @@ is($a, 'xxxxefgh');
     is($x, "abcd\x{263a}");
     $x = join '', reverse split m//, $x;
     is($x, "\x{263a}dcba");
-}
-{
+};
+do {
     # using bytes.
     no utf8;
     my $x = substr("a" . utf8::chr(0x263a) . "b",0); # \x{263a} == \xE2\x98\xBA
@@ -302,7 +302,7 @@ is($a, 'xxxxefgh');
     is($x, "abcd\x[E2]");
     $x = join '', reverse split m//, $x;
     is($x, "\x[E2]dcba");
-}
+};
 
 # And tests for already-UTF8 one
 
@@ -427,41 +427,41 @@ is(substr($x, 2, 1), "\x{100}");
 is(substr($x, 3, 1), "\x{FF}");
 is(substr($x, 4, 1), "\x{F3}");
 
-substr($x = "ab", 0, 0, "\x{100}\x{200}");
+substr(($x = "ab"), 0, 0, "\x{100}\x{200}");
 is($x, "\x{100}\x{200}ab");
 
-substr($x = "\x{100}\x{200}", 0, 0, "ab");
+substr(($x = "\x{100}\x{200}"), 0, 0, "ab");
 is($x, "ab\x{100}\x{200}");
 
-substr($x = "ab", 1, 0, "\x{100}\x{200}");
+substr(($x = "ab"), 1, 0, "\x{100}\x{200}");
 is($x, "a\x{100}\x{200}b");
 
-substr($x = "\x{100}\x{200}", 1, 0, "ab");
+substr(($x = "\x{100}\x{200}"), 1, 0, "ab");
 is($x, "\x{100}ab\x{200}");
 
-substr($x = "ab", 2, 0, "\x{100}\x{200}");
+substr(($x = "ab"), 2, 0, "\x{100}\x{200}");
 is($x, "ab\x{100}\x{200}");
 
-substr($x = "\x{100}\x{200}", 2, 0, "ab");
+substr(($x = "\x{100}\x{200}"), 2, 0, "ab");
 is($x, "\x{100}\x{200}ab");
 
 # [perl #20933]
-{ 
+do { 
     my $s = "ab";
     my @r; 
-    @r[$_] = \ substr $s, $_, 1 for @( (0, 1));
-    is(join("", map { $$_ } @r), "ab");
-}
+    @r[+$_] = \ substr $s, $_, 1 for @( (0, 1));
+    is(join("", map { $$_ }, @r), "ab");
+};
 
 # [perl #24605]
-{
+do {
     my $x = "0123456789\x{500}";
     my $y = substr $x, 4;
     is(substr($x, 7, 1), "7");
-}
+};
 
 # multiple assignments to lvalue [perl #24346]   
-{
+do {
     is(ref \substr($x,1,3), "SCALAR", "not an lvalue");
     my $x = "abcdef";
     for (@(substr($x,1,3))) {
@@ -470,31 +470,31 @@ is($x, "\x{100}\x{200}ab");
 	is($_, 'XX');
 	is($x, 'abcdef'); 
     }
-}
+};
 
 # [perl #29149]
-{
+do {
     my $text  = "0123456789\x{ED} ";
     my $pos = 5;
-    pos($text) = $pos;
+    pos($text, $pos);
     my $a = substr($text, $pos, $pos);
     is(substr($text,$pos,1), $pos);
 
-}
+};
 
 # [perl #34976] incorrect caching of utf8 substr length
-{
+do {
     my  $a = "abcd\x{100}";
     is(substr($a,1,2), 'bc');
     is(substr($a,1,1), 'b');
-}
+};
 
-{
+do {
     # lvalue ref count
     my $foo = "bar";
     is(Internals::SvREFCNT(\$foo), 2);
     substr($foo, -2, 2, "la");
     is(Internals::SvREFCNT(\$foo), 2);
-}
+};
 
 }

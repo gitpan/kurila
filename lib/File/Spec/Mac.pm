@@ -1,7 +1,6 @@
 package File::Spec::Mac;
 
-use strict;
-use vars < qw(@ISA $VERSION);
+our (@ISA, $VERSION);
 require File::Spec::Unix;
 
 $VERSION = '3.2701';
@@ -9,7 +8,7 @@ $VERSION = '3.2701';
 @ISA = qw(File::Spec::Unix);
 
 my $macfiles;
-if ($^O eq 'MacOS') {
+if ($^OS_NAME eq 'MacOS') {
 	$macfiles = try { require Mac::Files };
 }
 
@@ -38,8 +37,7 @@ On Mac OS, there's nothing to be done. Returns what it's given.
 
 =cut
 
-sub canonpath {
-    my ($self,$path) = < @_;
+sub canonpath($self,?$path) {
     return $path;
 }
 
@@ -355,8 +353,8 @@ sub rootdir {
 #  volume is returned, since that's the closest in concept.
 #
     return '' unless $macfiles;
-    my $system = Mac::Files::FindFolder( <&Mac::Files::kOnSystemDisk, <
-	&Mac::Files::kSystemFolderType);
+    my $system = Mac::Files::FindFolder( <&Mac::Files::kOnSystemDisk( < @_ ), <
+	&Mac::Files::kSystemFolderType( < @_ ));
     $system =~ s/:.*\Z(?!\n)/:/s;
     return $system;
 }
@@ -373,7 +371,7 @@ directory on your startup volume.
 my $tmpdir;
 sub tmpdir {
     return $tmpdir if defined $tmpdir;
-    $tmpdir = @_[0]->_tmpdir( %ENV{TMPDIR} );
+    $tmpdir = @_[0]->_tmpdir( env::var('TMPDIR') );
 }
 
 =item updir
@@ -407,8 +405,7 @@ E.g.
 
 =cut
 
-sub file_name_is_absolute {
-    my ($self,$file) = < @_;
+sub file_name_is_absolute($self,$file) {
     if ($file =~ m/:/) {
 	return ! ($file =~ m/^:/s);
     } elsif ( $file eq '' ) {
@@ -432,8 +429,8 @@ sub path {
 #  The concept is meaningless under the MacPerl application.
 #  Under MPW, it has a meaning.
 #
-    return unless exists %ENV{Commands};
-    returnsplit(m/,/, %ENV{Commands});
+    return unless defined env::var('Commands');
+    returnsplit(m/,/, env::var('Commands'));
 }
 
 =item splitpath
@@ -457,12 +454,11 @@ The results can be passed to C<catpath()> to get back a path equivalent to
 
 =cut
 
-sub splitpath {
-    my ($self,$path, $nofile) = < @_;
+sub splitpath($self,$path, ?$nofile) {
     my ($volume,$directory,$file);
 
     if ( $nofile ) {
-        ( $volume, $directory ) = $path =~ m|^((?:[^:]+:)?)(.*)|s;
+        @( $volume, $directory ) = @: $path =~ m|^((?:[^:]+:)?)(.*)|s;
     }
     else {
         $path =~
@@ -525,15 +521,14 @@ yields:
 
 =cut
 
-sub splitdir {
-	my ($self, $path) = < @_;
+sub splitdir($self, ?$path) {
 	my @result = @( () );
 	my ($head, $sep, $tail, $volume, $directories);
 
 	return @result if ( (!defined($path)) || ($path eq '') );
 	return  @(':') if ($path eq ':');
 
-	( $volume, $sep, $directories ) = $path =~ m|^((?:[^:]+:)?)(:*)(.*)|s;
+	@( $volume, $sep, $directories ) = @: $path =~ m|^((?:[^:]+:)?)(:*)(.*)|s;
 
 	# deprecated, but handle it correctly
 	if ($volume) {
@@ -544,7 +539,7 @@ sub splitdir {
 	while ($sep || $directories) {
 		if (length($sep) +> 1) {
 			my $updir_count = length($sep) - 1;
-			for (my $i=0; $i+<$updir_count; $i++) {
+			for my $i (0 .. $updir_count -1) {
 				# push '::' updir_count times;
 				# simulate Unix '..' updirs
 				push (@result, '::');
@@ -552,7 +547,8 @@ sub splitdir {
 		}
 		$sep = '';
 		if ($directories) {
-			( $head, $sep, $tail ) = $directories =~ m|^((?:[^:]+)?)(:*)(.*)|s;
+			@( $head, $sep, $tail ) =
+                          @: $directories =~ m|^((?:[^:]+)?)(:*)(.*)|s;
 			push (@result, $head);
 			$directories = $tail;
 		}
@@ -576,8 +572,7 @@ resulting path will have a trailing ':'.
 
 =cut
 
-sub catpath {
-    my ($self,$volume,$directory,$file) = < @_;
+sub catpath($self,$volume,$directory,$file) {
 
     if ( (! $volume) && (! $directory) ) {
 	$file =~ s/^:// if $file;
@@ -586,7 +581,7 @@ sub catpath {
 
     # We look for a volume in $volume, then in $directory, but not both
 
-    my ($dir_volume, $dir_dirs) = < $self->splitpath($directory, 1);
+    my @($dir_volume, $dir_dirs, _) =  $self->splitpath($directory, 1);
 
     $volume = $dir_volume unless length $volume;
     my $path = $volume; # may be ''
@@ -645,7 +640,7 @@ sub _resolve_updirs {
 	my $proceed;
 
 	# resolve any updirs, e.g. "HD:tmp::file" -> "HD:file"
-	do {
+	{
 		$proceed = ($path =~ s/^(.*):[^:]+::(.*?)\z/$1:$2/);
 	} while ($proceed);
 
@@ -653,8 +648,7 @@ sub _resolve_updirs {
 }
 
 
-sub abs2rel {
-    my($self,$path,$base) = < @_;
+sub abs2rel($self,$path,$base) {
 
     # Clean up $path
     if ( ! $self->file_name_is_absolute( $path ) ) {
@@ -674,8 +668,8 @@ sub abs2rel {
     }
 
     # Split up paths - ignore $base's file
-    my ( $path_vol, $path_dirs, $path_file ) = <  $self->splitpath( $path );
-    my ( $base_vol, $base_dirs )             = <  $self->splitpath( $base );
+    my @( $path_vol, $path_dirs, $path_file ) =   $self->splitpath( $path );
+    my @( $base_vol, $base_dirs, _ )             =   $self->splitpath( $base );
 
     return $path unless lc( $path_vol ) eq lc( $base_vol );
 
@@ -725,8 +719,7 @@ Based on code written by Shigio Yamaguchi.
 
 =cut
 
-sub rel2abs {
-    my ($self,$path,$base) = < @_;
+sub rel2abs($self,$path,?$base) {
 
     if ( ! $self->file_name_is_absolute($path) ) {
         # Figure out the effective $base and clean it up.
@@ -740,10 +733,10 @@ sub rel2abs {
 	# Split up paths
 
 	# igonore $path's volume
-        my ( $path_dirs, $path_file ) = < ($self->splitpath($path))[[1..2]] ;
+        my @( $path_dirs, $path_file ) =  ($self->splitpath($path))[[1..2]] ;
 
         # ignore $base's file part
-	my ( $base_vol, $base_dirs ) = < $self->splitpath($base) ;
+	my @( $base_vol, $base_dirs, _ ) =  $self->splitpath($base) ;
 
 	# Glom them together
 	$path_dirs = ':' if ($path_dirs eq '');

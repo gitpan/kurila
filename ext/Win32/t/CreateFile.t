@@ -1,5 +1,4 @@
-use strict;
-use Test;
+use Test::More;
 use Win32;
 
 my $path = "testing-$$";
@@ -22,7 +21,7 @@ ok(!-d $path);
 
 ok(Win32::CreateFile($path));
 ok(-f $path);
-ok(-s $path, 0);
+is(-s $path, 0);
 
 ok(!Win32::CreateDirectory($path));
 ok(!Win32::CreateFile($path));

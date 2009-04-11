@@ -1,21 +1,9 @@
 #!/usr/bin/perl
 
-BEGIN {
-    if( %ENV{PERL_CORE} ) {
-        chdir 't' if -d 't';
-        unshift @INC, '../lib';
-    }
-    else {
-        unshift @INC, 't/lib';
-    }
-}
-chdir 't';
-
-
 use Test::More;
 
 BEGIN {
-	if ($^O =~ m/NetWare/i) {
+	if ($^OS_NAME =~ m/NetWare/i) {
 		plan tests => 39;
 	} else {
 		plan skip_all => 'This is not NW5';

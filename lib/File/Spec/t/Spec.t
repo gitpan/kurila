@@ -15,7 +15,7 @@ try {
 
 my $skip_exception = "Install VMS::Filespec (from vms/ext)" ;
 
-if ( $@ ) {
+if ( $^EVAL_ERROR ) {
    # Not pretty, but it allows testing of things not implemented soley
    # on VMS.  It might be better to change File::Spec::VMS to do this,
    # making it more usable when running on (say) Unix but working with
@@ -25,7 +25,7 @@ if ( $@ ) {
       sub File::Spec::VMS::unixify \{ die "$skip_exception" \}
       sub File::Spec::VMS::vmspath \{ die "$skip_exception" \}
    - ;
-   %INC{"VMS/Filespec.pm"} = 1 ;
+   $^INCLUDED{+"VMS/Filespec.pm"} = 1 ;
 }
 require File::Spec::VMS ;
 
@@ -37,7 +37,7 @@ require File::Spec::Cygwin ;
 # $root is only needed by Mac OS tests; these particular
 # tests are skipped on other OSs
 my $root = '';
-if ($^O eq 'MacOS') {
+if ($^OS_NAME eq 'MacOS') {
 	$root = File::Spec::Mac->rootdir();
 }
 
@@ -703,9 +703,9 @@ my @tests = @(
 
 plan tests => scalar (nelems @tests) + 1;
 
-{
+do {
     package File::Spec::FakeWin32;
-    use vars < qw(@ISA);
+    our (@ISA);
     @ISA = qw(File::Spec::Win32);
 
     sub _cwd { 'C:\one\two' }
@@ -713,10 +713,10 @@ plan tests => scalar (nelems @tests) + 1;
     # Some funky stuff to override Cwd::getdcwd() for testing purposes,
     # in the limited scope of the rel2abs() method.
     if ($Cwd::VERSION) {  # Avoid a 'used only once' warning
-	local $^W;
+	local $^WARNING = undef;
 	*rel2abs = sub {
 	    my $self = shift;
-	    local $^W;
+	    local $^WARNING = undef;
 	    local *Cwd::getdcwd = sub {
 	      return 'D:\alpha\beta' if @_[0] eq 'D:';
 	      return 'C:\one\two'    if @_[0] eq 'C:';
@@ -727,7 +727,7 @@ plan tests => scalar (nelems @tests) + 1;
 	};
 	*rel2abs = *rel2abs; # Avoid a 'used only once' warning
     }
-}
+};
 
 
 is("Win32->can('_cwd')", "Win32->can('_cwd')");
@@ -743,12 +743,12 @@ for (  @tests ) {
 # an expected result. Works with functions that return scalars or arrays.
 #
 sub tryfunc {
-  SKIP: {
+  SKIP: do {
     my $function = shift ;
     my $expected = shift ;
     my $platform = shift ;
 
-    if ($platform && $^O ne $platform) {
+    if ($platform && $^OS_NAME ne $platform) {
 	skip("skip $function", 1);
 	return;
     }
@@ -757,17 +757,17 @@ sub tryfunc {
     my $got = eval $function;
     $got = join ',',$got if (ref \$got) eq "ARRAY";
 
-    if ( $@ ) {
-      if ( $@->{description} =~ m/^\Q$skip_exception/ ) {
+    if ( $^EVAL_ERROR ) {
+      if ( $^EVAL_ERROR->{?description} =~ m/^\Q$skip_exception/ ) {
 	skip "skip $function: $skip_exception", 1;
       }
       else {
-        die if $@;
-	is $@, '', $function;
+        die if $^EVAL_ERROR;
+	is $^EVAL_ERROR, '', $function;
       }
       return;
     }
 
     is $got, $expected, $function;
-}
+};
 }

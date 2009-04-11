@@ -2,19 +2,18 @@
 package Pod::Simple::LinkSection;
   # Based somewhat dimly on Array::Autojoin
 
-use strict;
 use Pod::Simple::BlackBox;
 
 sub tack_on {
   @_[0] = \@('', \%(), "@_[0]" );
-  return @_[0]->[2] .= @_[1];
+  return (@_[0]->[2] .= @_[1]);
 }
 
 sub as_string {
-  goto &Pod::Simple::BlackBox::stringify_lol;
+    return Pod::Simple::BlackBox::stringify_lol(<@_);
 }
 sub stringify {
-  goto &Pod::Simple::BlackBox::stringify_lol;
+    return Pod::Simple::BlackBox::stringify_lol(<@_);
 }
 
 sub new {

@@ -241,10 +241,6 @@ int Perl_getcwd_sv(pTHX_ register SV *sv)
 {
 #ifndef PERL_MICRO
 
-#ifndef INCOMPLETE_TAINTS
-    SvTAINTED_on(sv);
-#endif
-
 #ifdef HAS_GETCWD
     {
 	char buf[MAXPATHLEN];
@@ -337,12 +333,12 @@ int Perl_getcwd_sv(pTHX_ register SV *sv)
 
 	if (pathlen) {
 	    /* shift down */
-	    Move(SvPVX(sv), SvPVX(sv) + namelen + 1, pathlen, char);
+	    Move(SvPVX_const(sv), SvPVX_mutable(sv) + namelen + 1, pathlen, char);
 	}
 
 	/* prepend current directory to the front */
-	*SvPVX(sv) = '/';
-	Move(dp->d_name, SvPVX(sv)+1, namelen, char);
+	*SvPVX_mutable(sv) = '/';
+	Move(dp->d_name, SvPVX_mutable(sv)+1, namelen, char);
 	pathlen += (namelen + 1);
 
 #ifdef VOID_CLOSEDIR
@@ -359,7 +355,7 @@ int Perl_getcwd_sv(pTHX_ register SV *sv)
 	*SvEND(sv) = '\0';
 	SvPOK_only(sv);
 
-	if (PerlDir_chdir(SvPVX(sv)) < 0) {
+	if (PerlDir_chdir(SvPVX_mutable(sv)) < 0) {
 	    SV_CWD_RETURN_UNDEF;
 	}
     }
@@ -399,9 +395,6 @@ PPCODE:
     dXSTARG;
     getcwd_sv(TARG);
     XSprePUSH; PUSHTARG;
-#ifndef INCOMPLETE_TAINTS
-    SvTAINTED_on(TARG);
-#endif
 }
 
 void
@@ -412,9 +405,6 @@ PPCODE:
     dXSTARG;
     getcwd_sv(TARG);
     XSprePUSH; PUSHTARG;
-#ifndef INCOMPLETE_TAINTS
-    SvTAINTED_on(TARG);
-#endif
 }
 
 void
@@ -432,15 +422,11 @@ PPCODE:
     if (bsd_realpath(path, buf)) {
         sv_setpvn(TARG, buf, strlen(buf));
         SvPOK_only(TARG);
-	SvTAINTED_on(TARG);
     }
     else
         sv_setsv(TARG, &PL_sv_undef);
 
     XSprePUSH; PUSHTARG;
-#ifndef INCOMPLETE_TAINTS
-    SvTAINTED_on(TARG);
-#endif
 }
 
 #if defined(WIN32) && !defined(UNDER_CE)
@@ -458,8 +444,8 @@ PPCODE:
         (items == 1 && (!SvOK(ST(0)) || (SvPOK(ST(0)) && !SvCUR(ST(0))))))
         drive = 0;
     else if (items == 1 && SvPOK(ST(0)) && SvCUR(ST(0)) &&
-             isALPHA(SvPVX(ST(0))[0]))
-        drive = toUPPER(SvPVX(ST(0))[0]) - 'A' + 1;
+             isALPHA(SvPVX_mutable(ST(0))[0]))
+        drive = toUPPER(SvPVX_mutable(ST(0))[0]) - 'A' + 1;
     else
         croak("Usage: getdcwd(DRIVE)");
 
@@ -474,9 +460,6 @@ PPCODE:
     Safefree(dir);
 
     XSprePUSH; PUSHTARG;
-#ifndef INCOMPLETE_TAINTS
-    SvTAINTED_on(TARG);
-#endif
 }
 
 #endif

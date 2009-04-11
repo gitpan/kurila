@@ -1,11 +1,11 @@
 BEGIN {
-    if (%ENV{PERL_CORE}) {
-	push @INC, "lib/compress";
+    if (env::var('PERL_CORE')) {
+	push $^INCLUDE_PATH, "lib/compress";
     }
 }
 
 use lib < qw(t t/compress);
-use strict;
+
 use warnings;
 use bytes;
 
@@ -55,12 +55,12 @@ my $fil;
 # =========================
 
 try { compress(\@(1)); };
-ok $@->{description} =~ m#not a scalar reference#
-    or print "# $@\n" ;;
+ok $^EVAL_ERROR->{?description} =~ m#not a scalar reference#
+    or print $^STDOUT, "# $^EVAL_ERROR\n" ;;
 
 try { uncompress(\@(1)); };
-ok $@->{description} =~ m#not a scalar reference#
-    or print "# $@\n" ;
+ok $^EVAL_ERROR->{?description} =~ m#not a scalar reference#
+    or print $^STDOUT, "# $^EVAL_ERROR\n" ;
 
 $hello = "hello mum" ;
 my $keep_hello = $hello ;
@@ -132,16 +132,16 @@ ok !defined uncompress (\$compr) ;
 # ==============================
 
 $hello = "I am a HAL 9000 computer" ;
-my @hello = @( split('', $hello) );
+my @hello = split('', $hello);
 my ($err, $X, $status);
  
-ok($x = deflateInit( \%(-Bufsize => 1) ) );
+ok($x = deflateInit( \%(Bufsize => 1) ) );
 ok $x ;
  
 my $Answer = '';
-foreach (<@hello)
+foreach (@hello)
 {
-    ($X, $status) = < $x->deflate($_) ;
+    @($X, $status) =  $x->deflate($_) ;
     last unless $status == Z_OK ;
 
     $Answer .= $X ;
@@ -149,21 +149,21 @@ foreach (<@hello)
  
 ok $status == Z_OK ;
 
-ok    (@(($X, $status) = < $x->flush())[1] == Z_OK ) ;
+ok    (@(@($X, $status) =  $x->flush())[?1] == Z_OK ) ;
 $Answer .= $X ;
  
  
-my @Answer = @( split('', $Answer) );
+my @Answer = split('', $Answer);
  
 my $k;
-ok ($k = inflateInit( \%(-Bufsize => 1)) ) ;
+ok ($k = inflateInit( \%(Bufsize => 1)) ) ;
 ok $k ;
  
 my $GOT = '';
 my $Z;
-foreach (< @Answer)
+foreach (@Answer)
 {
-    ($Z, $status) = < $k->inflate($_) ;
+    @($Z, $status) =  $k->inflate($_) ;
     $GOT .= $Z ;
     last if $status == Z_STREAM_END or $status != Z_OK ;
  
@@ -178,22 +178,22 @@ title 'deflate/inflate - small buffer with a number';
 
 $hello = 6529 ;
  
-ok ($x = deflateInit( \%(-Bufsize => 1) ) ) ;
+ok ($x = deflateInit( \%(Bufsize => 1) ) ) ;
 ok $x ;
  
 ok !defined $x->msg() ;
 ok $x->total_in() == 0 ;
 ok $x->total_out() == 0 ;
 $Answer = '';
-{
-    ($X, $status) = < $x->deflate($hello) ;
+do {
+    @($X, $status) =  $x->deflate($hello) ;
 
     $Answer .= $X ;
-}
+};
  
 ok $status == Z_OK ;
 
-ok   (@(($X, $status) = < $x->flush())[1] == Z_OK ) ;
+ok   (@(@($X, $status) =  $x->flush())[?1] == Z_OK ) ;
 $Answer .= $X ;
  
 ok !defined $x->msg() ;
@@ -201,9 +201,9 @@ ok $x->total_in() == length $hello ;
 ok $x->total_out() == length $Answer ;
 
  
-@Answer = @( split('', $Answer) );
+@Answer = split('', $Answer);
  
-ok ($k = inflateInit( \%(-Bufsize => 1)) ) ;
+ok ($k = inflateInit( \%(Bufsize => 1)) ) ;
 ok $k ;
 
 ok !defined $k->msg() ;
@@ -211,9 +211,9 @@ ok $k->total_in() == 0 ;
 ok $k->total_out() == 0 ;
  
 $GOT = '';
-foreach ( < @Answer)
+foreach (@Answer)
 {
-    ($Z, $status) = < $k->inflate($_) ;
+    @($Z, $status) =  $k->inflate($_) ;
     $GOT .= $Z ;
     last if $status == Z_STREAM_END or $status != Z_OK ;
  
@@ -232,21 +232,21 @@ title 'deflate/inflate - larger buffer';
 # ==============================
 
 
-ok $x = deflateInit() ;
+ok($x = deflateInit());
  
-ok (@(($X, $status) = < $x->deflate($contents))[1] == Z_OK) ;
+ok (@(@($X, $status) =  $x->deflate($contents))[?1] == Z_OK) ;
 
 my $Y = $X ;
  
  
-ok (@(($X, $status) = < $x->flush() )[1] == Z_OK ) ;
+ok (@(@($X, $status) =  $x->flush() )[?1] == Z_OK ) ;
 $Y .= $X ;
  
  
  
-ok $k = inflateInit() ;
+ok($k = inflateInit());
  
-($Z, $status) = < $k->inflate($Y) ;
+@($Z, $status) =  $k->inflate($Y) ;
  
 ok $status == Z_STREAM_END ;
 ok $contents eq $Z ;
@@ -255,21 +255,21 @@ title 'deflate/inflate - preset dictionary';
 # ===================================
 
 my $dictionary = "hello" ;
-ok $x = deflateInit(\%(-Level => Z_BEST_COMPRESSION,
-			 -Dictionary => $dictionary)) ;
+ok($x = deflateInit(\%(Level => Z_BEST_COMPRESSION,
+			 Dictionary => $dictionary)));
  
 my $dictID = $x->dict_adler() ;
 
-($X, $status) = < $x->deflate($hello) ;
+@($X, $status) =  $x->deflate($hello) ;
 ok $status == Z_OK ;
-($Y, $status) = < $x->flush() ;
+@($Y, $status) =  $x->flush() ;
 ok $status == Z_OK ;
 $X .= $Y ;
 $x = 0 ;
  
-ok $k = inflateInit(-Dictionary => $dictionary) ;
+ok($k = inflateInit(Dictionary => $dictionary));
  
-($Z, $status) = < $k->inflate($X);
+@($Z, $status) =  $k->inflate($X);
 ok $status == Z_STREAM_END ;
 ok $k->dict_adler() == $dictID;
 ok $hello eq $Z ;
@@ -292,35 +292,35 @@ ok $hello eq $Z ;
 title 'inflate - check remaining buffer after Z_STREAM_END';
 # ===================================================
  
-{
-    ok $x = deflateInit(-Level => Z_BEST_COMPRESSION ) ;
+do {
+    ok($x = deflateInit(Level => Z_BEST_COMPRESSION ));
  
-    ($X, $status) = < $x->deflate($hello) ;
+    @($X, $status) =  $x->deflate($hello) ;
     ok $status == Z_OK ;
-    ($Y, $status) = < $x->flush() ;
+    @($Y, $status) =  $x->flush() ;
     ok $status == Z_OK ;
     $X .= $Y ;
     $x = 0 ;
  
-    ok $k = inflateInit()  ;
+    ok($k = inflateInit());
  
     my $first = substr($X, 0, 2) ;
     my $last  = substr($X, 2) ;
-    ($Z, $status) = < $k->inflate($first);
+    @($Z, $status) =  $k->inflate($first);
     ok $status == Z_OK ;
     ok $first eq "" ;
 
     $last .= "appendage" ;
     my $T;
-    ($T, $status) = < $k->inflate($last);
+    @($T, $status) =  $k->inflate($last);
     ok $status == Z_STREAM_END ;
     ok $hello eq $Z . $T ;
     ok $last eq "appendage" ;
 
-}
+};
 
 title 'memGzip & memGunzip';
-{
+do {
     my $name = "test.gz" ;
     my $buffer = <<EOM;
 some sample 
@@ -337,13 +337,13 @@ EOM
     ok length $dest ;
 
     # write it to disk
-    ok open(FH, ">", "$name") ;
-    binmode(FH);
-    print FH $dest ;
-    close FH ;
+    ok open(my $fh, ">", "$name") ;
+    binmode($fh);
+    print $fh, $dest ;
+    close $fh ;
 
     # uncompress with gzopen
-    ok my $fil = gzopen($name, "rb") ;
+    ok(my $fil = gzopen($name, "rb"));
  
     is $fil->gzread($uncomp, 0), 0 ;
     ok (($x = $fil->gzread($uncomp)) == $len) ;
@@ -365,13 +365,13 @@ EOM
     ok length $dest ;
 
     # write it to disk
-    ok open(FH, ">", "$name") ;
-    binmode(FH);
-    print FH $dest ;
-    close FH ;
+    ok open($fh, ">", "$name") ;
+    binmode($fh);
+    print $fh, $dest ;
+    close $fh ;
 
     # uncompress with gzopen
-    ok $fil = gzopen($name, "rb") ;
+    ok($fil = gzopen($name, "rb"));
  
     ok (($x = $fil->gzread($uncomp)) == $len) ;
  
@@ -478,37 +478,37 @@ EOM
     substr($bad, -4, 4, "\x[FF]" x 4) ;
     $ungzip = Compress::Zlib::memGunzip(\$bad) ;
     ok ! defined $ungzip ;
-}
+};
 
-{
+do {
     title "Check all bytes can be handled";
 
     my $lex = LexFile->new( my $name) ;
-    my $data = join '', map { chr } 0x00 .. 0xFF;
+    my $data = join '', map { chr }, 0x00 .. 0xFF;
     $data .= "\r\nabd\r\n";
 
     my $fil;
-    ok $fil = gzopen($name, "wb") ;
+    ok($fil = gzopen($name, "wb"));
     is $fil->gzwrite($data), length $data ;
     ok ! $fil->gzclose();
 
     my $input;
-    ok $fil = gzopen($name, "rb") ;
+    ok($fil = gzopen($name, "rb"));
     is $fil->gzread($input), length $data ;
     ok ! $fil->gzclose();
     ok $input eq $data;
 
     title "Check all bytes can be handled - transparent mode";
     writeFile($name, $data);
-    ok $fil = gzopen($name, "rb") ;
+    ok($fil = gzopen($name, "rb"));
     is $fil->gzread($input), length $data ;
     ok ! $fil->gzclose();
     ok $input eq $data;
 
-}
+};
 
 title 'memGunzip with a gzopen created file';
-{
+do {
     my $name = "test.gz" ;
     my $buffer = <<EOM;
 some sample 
@@ -516,7 +516,7 @@ text
 
 EOM
 
-    ok $fil = gzopen($name, "wb") ;
+    ok($fil = gzopen($name, "wb"));
 
     ok $fil->gzwrite($buffer) == length $buffer ;
 
@@ -528,23 +528,23 @@ EOM
     ok defined $unc ;
     ok $buffer eq $unc ;
     1 while unlink $name ;
-}
+};
 
-{
+do {
 
     # Check - MAX_WBITS
     # =================
     
     $hello = "Test test test test test";
-    @hello = @( split('', $hello) );
+    @hello = split('', $hello);
      
-    ok ($x = deflateInit( -Bufsize => 1, -WindowBits => -MAX_WBITS() ) ) ;
+    ok ($x = deflateInit( Bufsize => 1, WindowBits => -MAX_WBITS() ) ) ;
     ok $x ;
      
     $Answer = '';
-    foreach ( < @hello)
+    foreach (@hello)
     {
-        ($X, $status) = < $x->deflate($_) ;
+        @($X, $status) =  $x->deflate($_) ;
         last unless $status == Z_OK ;
     
         $Answer .= $X ;
@@ -552,7 +552,7 @@ EOM
      
     ok $status == Z_OK ;
     
-    ok   (@(($X, $status) = < $x->flush())[1] == Z_OK ) ;
+    ok   (@(@($X, $status) =  $x->flush())[?1] == Z_OK ) ;
     $Answer .= $X ;
      
      
@@ -561,13 +561,13 @@ EOM
     # Z_STREAM_END when done.  
     push @Answer, " " ; 
      
-    ok ($k = inflateInit(-Bufsize => 1, -WindowBits => -MAX_WBITS()) ) ;
+    ok ($k = inflateInit(Bufsize => 1, WindowBits => -MAX_WBITS()) ) ;
     ok $k ;
      
     $GOT = '';
     foreach ( @Answer)
     {
-        ($Z, $status) = < $k->inflate($_) ;
+        @($Z, $status) =  $k->inflate($_) ;
         $GOT .= $Z ;
         last if $status == Z_STREAM_END or $status != Z_OK ;
      
@@ -576,54 +576,54 @@ EOM
     ok $status == Z_STREAM_END ;
     ok $GOT eq $hello ;
     
-}
+};
 
-{
+do {
     # error cases
 
-    try { deflateInit(-Level) };
-    like $@->{description}, '/^Compress::Zlib::deflateInit: Expected even number of parameters, got 1/';
+    try { deflateInit("Level") };
+    like $^EVAL_ERROR->{?description}, '/^Compress::Zlib::deflateInit: Expected even number of parameters, got 1/';
 
-    try { inflateInit(-Level) };
-    like $@->{description}, '/^Compress::Zlib::inflateInit: Expected even number of parameters, got 1/';
+    try { inflateInit("Level") };
+    like $^EVAL_ERROR->{?description}, '/^Compress::Zlib::inflateInit: Expected even number of parameters, got 1/';
 
-    try { deflateInit(-Joe => 1) };
-    ok $@->{description} =~ m/^Compress::Zlib::deflateInit: unknown key value\(s\) Joe at/;
+    try { deflateInit(Joe => 1) };
+    ok $^EVAL_ERROR->{?description} =~ m/^Compress::Zlib::deflateInit: unknown key value\(s\) Joe at/;
 
-    try { inflateInit(-Joe => 1) };
-    ok $@->{description} =~ m/^Compress::Zlib::inflateInit: unknown key value\(s\) Joe at/;
+    try { inflateInit(Joe => 1) };
+    ok $^EVAL_ERROR->{?description} =~ m/^Compress::Zlib::inflateInit: unknown key value\(s\) Joe at/;
 
-    try { deflateInit(-Bufsize => 0) };
-    ok $@->{description} =~ m/^.*?: Bufsize must be >= 1, you specified 0 at/;
+    try { deflateInit(Bufsize => 0) };
+    ok $^EVAL_ERROR->{?description} =~ m/^.*?: Bufsize must be >= 1, you specified 0 at/;
 
-    try { inflateInit(-Bufsize => 0) };
-    ok $@->{description} =~ m/^.*?: Bufsize must be >= 1, you specified 0 at/;
+    try { inflateInit(Bufsize => 0) };
+    ok $^EVAL_ERROR->{?description} =~ m/^.*?: Bufsize must be >= 1, you specified 0 at/;
 
-    try { deflateInit(-Bufsize => -1) };
+    try { deflateInit(Bufsize => -1) };
     #ok $@ =~ /^.*?: Bufsize must be >= 1, you specified -1 at/;
-    ok $@->{description} =~ m/^Compress::Zlib::deflateInit: Parameter 'Bufsize' must be an unsigned int, got '-1'/;
+    ok $^EVAL_ERROR->{?description} =~ m/^Compress::Zlib::deflateInit: Parameter 'Bufsize' must be an unsigned int, got '-1'/;
 
-    try { inflateInit(-Bufsize => -1) };
-    ok $@->{description} =~ m/^Compress::Zlib::inflateInit: Parameter 'Bufsize' must be an unsigned int, got '-1'/;
+    try { inflateInit(Bufsize => -1) };
+    ok $^EVAL_ERROR->{?description} =~ m/^Compress::Zlib::inflateInit: Parameter 'Bufsize' must be an unsigned int, got '-1'/;
 
-    try { deflateInit(-Bufsize => "xxx") };
-    ok $@->{description} =~ m/^Compress::Zlib::deflateInit: Parameter 'Bufsize' must be an unsigned int, got 'xxx'/;
+    try { deflateInit(Bufsize => "xxx") };
+    ok $^EVAL_ERROR->{?description} =~ m/^Compress::Zlib::deflateInit: Parameter 'Bufsize' must be an unsigned int, got 'xxx'/;
 
-    try { inflateInit(-Bufsize => "xxx") };
-    ok $@->{description} =~ m/^Compress::Zlib::inflateInit: Parameter 'Bufsize' must be an unsigned int, got 'xxx'/;
+    try { inflateInit(Bufsize => "xxx") };
+    ok $^EVAL_ERROR->{?description} =~ m/^Compress::Zlib::inflateInit: Parameter 'Bufsize' must be an unsigned int, got 'xxx'/;
 
     try { gzopen(\@(), 0) ; }  ;
-    ok $@->{description} =~ m/^gzopen: file parameter is not a filehandle or filename at/
-	or print "# $@\n" ;
+    ok $^EVAL_ERROR->{?description} =~ m/^gzopen: file parameter is not a filehandle or filename at/
+	or print $^STDOUT, "# $^EVAL_ERROR\n" ;
 
 #    my $x = Symbol::gensym() ;
 #    try { gzopen($x, 0) ; }  ;
 #    ok $@ =~ /^gzopen: file parameter is not a filehandle or filename at/
 #	or print "# $@\n" ;
 
-}
+};
 
-{
+do {
     title 'CRC32' ;
 
     # CRC32 of this data should have the high bit set
@@ -633,9 +633,9 @@ EOM
 
     my $crc = crc32($data) ;
     is $crc, $expected_crc;
-}
+};
 
-{
+do {
     title 'Adler32' ;
 
     # adler of this data should have the high bit set
@@ -646,28 +646,28 @@ EOM
     my $expected_crc = 0xAAD60AC7 ; # 2866154183 
     my $crc = adler32($data) ;
     is $crc, $expected_crc;
-}
+};
 
-{
+do {
     # memGunzip - input > 4K
 
     my $contents = '' ;
     foreach (1 .. 20000)
       { $contents .= chr int rand 256 }
 
-    ok my $compressed = Compress::Zlib::memGzip(\$contents) ;
+    ok(my $compressed = Compress::Zlib::memGzip(\$contents));
 
     ok length $compressed +> 4096 ;
-    ok my $out = Compress::Zlib::memGunzip(\$compressed) ;
+    ok(my $out = Compress::Zlib::memGunzip(\$compressed));
      
     ok $contents eq $out ;
     is length $out, length $contents ;
 
     
-}
+};
 
 
-{
+do {
     # memGunzip Header Corruption Tests
 
     my $string = <<EOM;
@@ -675,43 +675,43 @@ some text
 EOM
 
     my $good ;
-    ok my $x = IO::Compress::Gzip->new( \$good, Append => 1, -HeaderCRC => 1) ;
+    ok(my $x = IO::Compress::Gzip->new( \$good, Append => 1, HeaderCRC => 1));
     ok $x->write($string) ;
     ok  $x->close ;
 
-    {
+    do {
         title "Header Corruption - Fingerprint wrong 1st byte" ;
         my $buffer = $good ;
         substr($buffer, 0, 1, 'x') ;
 
         ok ! Compress::Zlib::memGunzip(\$buffer) ;
-    }
+    };
 
-    {
+    do {
         title "Header Corruption - Fingerprint wrong 2nd byte" ;
         my $buffer = $good ;
         substr($buffer, 1, 1, "\x[FF]") ;
 
         ok ! Compress::Zlib::memGunzip(\$buffer) ;
-    }
+    };
 
-    {
+    do {
         title "Header Corruption - CM not 8";
         my $buffer = $good ;
         substr($buffer, 2, 1, 'x') ;
 
         ok ! Compress::Zlib::memGunzip(\$buffer) ;
-    }
+    };
 
-    {
+    do {
         title "Header Corruption - Use of Reserved Flags";
         my $buffer = $good ;
         substr($buffer, 3, 1, "\x[ff]");
 
         ok ! Compress::Zlib::memGunzip(\$buffer) ;
-    }
+    };
 
-}
+};
 
 for my $index ( GZIP_MIN_HEADER_SIZE + 1 ..  GZIP_MIN_HEADER_SIZE + GZIP_FEXTRA_HEADER_SIZE + 1)
 {
@@ -721,8 +721,8 @@ some text
 EOM
 
     my $truncated ;
-    ok  my $x = IO::Compress::Gzip->new( \$truncated, Append => 1, -HeaderCRC => 1, Strict => 0,
-				-ExtraField => "hello" x 10)  ;
+    ok(my $x = IO::Compress::Gzip->new( \$truncated, Append => 1, HeaderCRC => 1, Strict => 0,
+				ExtraField => "hello" x 10));
     ok  $x->write($string) ;
     ok  $x->close ;
 
@@ -742,7 +742,7 @@ some text
 EOM
 
     my $truncated ;
-    ok  my $x = IO::Compress::Gzip->new( \$truncated, Append => 1, -Name => $Name);
+    ok( my $x = IO::Compress::Gzip->new( \$truncated, Append => 1, Name => $Name));
     ok  $x->write($string) ;
     ok  $x->close ;
 
@@ -760,7 +760,7 @@ some text
 EOM
 
     my $truncated ;
-    ok  my $x = IO::Compress::Gzip->new( \$truncated, -Comment => $Comment);
+    ok( my $x = IO::Compress::Gzip->new( \$truncated, Comment => $Comment));
     ok  $x->write($string) ;
     ok  $x->close ;
 
@@ -776,7 +776,7 @@ some text
 EOM
 
     my $truncated ;
-    ok  my $x = IO::Compress::Gzip->new( \$truncated, -HeaderCRC => 1);
+    ok( my $x = IO::Compress::Gzip->new( \$truncated, HeaderCRC => 1));
     ok  $x->write($string) ;
     ok  $x->close ;
 
@@ -785,32 +785,32 @@ EOM
     ok ! Compress::Zlib::memGunzip(\$truncated) ;
 }
 
-{
+do {
     title "memGunzip can cope with a gzip header with all possible fields";
     my $string = <<EOM;
 some text
 EOM
 
     my $buffer ;
-    ok  my $x = IO::Compress::Gzip->new( \$buffer, 
-                             -Append     => 1,
-                             -Strict     => 0,
-                             -HeaderCRC  => 1,
-                             -Name       => "Fred",
-                             -ExtraField => "Extra",
-                             -Comment    => 'Comment');
+    ok( my $x = IO::Compress::Gzip->new( \$buffer, 
+                             Append     => 1,
+                             Strict     => 0,
+                             HeaderCRC  => 1,
+                             Name       => "Fred",
+                             ExtraField => "Extra",
+                             Comment    => 'Comment'));
     ok  $x->write($string) ;
     ok  $x->close ;
 
     ok defined $buffer ;
 
-    ok my $got = Compress::Zlib::memGunzip($buffer) 
+    ok(my $got = Compress::Zlib::memGunzip($buffer)) 
         or diag "gzerrno is $gzerrno" ;
     is $got, $string ;
-}
+};
 
 
-{
+do {
     # Trailer Corruption tests
 
     my $string = <<EOM;
@@ -818,7 +818,7 @@ some text
 EOM
 
     my $good ;
-    ok  my $x = IO::Compress::Gzip->new( \$good, Append => 1) ;
+    ok( my $x = IO::Compress::Gzip->new( \$good, Append => 1));
     ok  $x->write($string) ;
     ok  $x->close ;
 
@@ -830,20 +830,20 @@ EOM
 
         substr($buffer, $trim, undef, '');
 
-        ok my $u = Compress::Zlib::memGunzip(\$buffer) ;
+        ok(my $u = Compress::Zlib::memGunzip(\$buffer));
         ok $u eq $string;
 
     }
 
-    {
+    do {
         title "Trailer Corruption - Length Wrong, CRC Correct" ;
         my $buffer = $good ;
         substr($buffer, -4, 4, pack('V', 1234));
 
         ok ! Compress::Zlib::memGunzip(\$buffer) ;
-    }
+    };
 
-    {
+    do {
         title "Trailer Corruption - Length Wrong, CRC Wrong" ;
         my $buffer = $good ;
         substr($buffer, -4, 4, pack('V', 1234));
@@ -851,8 +851,8 @@ EOM
 
         ok ! Compress::Zlib::memGunzip(\$buffer) ;
 
-    }
-}
+    };
+};
 
 
 sub slurp
@@ -888,7 +888,7 @@ sub trickle
     return $input;
 }
 
-{
+do {
 
     title "Append & MultiStream Tests";
     # rt.24041
@@ -919,15 +919,15 @@ sub trickle
     is trickle($name), $data1 . $data2, "got expected data from trickle";
 
     title "Trailing Data";
-    open F, ">>", "$name";
-    print F $trailing;
-    close F;
+    open my $f, ">>", "$name";
+    print $f, $trailing;
+    close $f;
 
     is slurp($name), $data1 . $data2 . $trailing, "got expected data from slurp" ;
     is trickle($name), $data1 . $data2 . $trailing, "got expected data from trickle" ;
-}
+};
 
-{
+do {
     title "gzclose & gzflush return codes";
     # rt.29215
 
@@ -943,4 +943,4 @@ sub trickle
     is $status, Z_STREAM_ERROR;
     ok ! $fil->gzflush(), "flush ok" ;
     ok ! $fil->gzclose(), "Closed";
-}
+};

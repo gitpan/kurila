@@ -42,11 +42,12 @@ EOF
 }
 
 sub MY::c_o {
-    my($self) = < @_;
+    my@($self) =  @_;
     package MY; # so that "SUPER" works right
     my $inh = $self->SUPER::c_o(< @_);
     use Config;
-    if (%Config{osname} eq 'aix' && %Config{ccversion} eq '5.0.1.0') {
+    if (config_value("osname") eq 'aix' 
+          && config_value("ccversion") eq '5.0.1.0') {
 	# Known buggy optimizer.
 	my $cccmd = $self->const_cccmd;
 	$cccmd =~ s/^CCCMD\s*=\s*//;

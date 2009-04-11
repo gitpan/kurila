@@ -1,19 +1,18 @@
 #!/usr/bin/perl -w
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't';
-        @INC = @('../lib', 'lib');
+        $^INCLUDE_PATH = @('../lib', 'lib');
     }
     else {
-        unshift @INC, 't/lib';
+        unshift $^INCLUDE_PATH, 't/lib';
     }
 }
 
-use strict;
 use Test::More tests => 18;
 
-BEGIN { $^W = 1; }
+BEGIN { $^WARNING = 1; }
 
 my $warnings = '';
 local $^WARN_HOOK = sub { $warnings .= @_[0]->message };
@@ -35,7 +34,7 @@ sub warnings_like {
 }
 
 
-my $Filename = quotemeta $0;
+my $Filename = quotemeta $^PROGRAM_NAME;
    
 
 is( undef, undef,           'undef is undef');
@@ -49,7 +48,7 @@ isnt( undef, 0,             'undef isnt zero' );
 
 #line 45
 like( undef, '/.*/',        'undef is like anything' );
-warnings_like(qr/Use of uninitialized value.* at $Filename line 45 character 57\.\n/);
+warnings_like(qr/Use of uninitialized value.*/);
 
 eq_array( \@(undef, undef), \@(undef, 23) );
 no_warnings;
@@ -69,7 +68,7 @@ no_warnings;
 
 #line 64
 cmp_ok( undef, '+<=', 2, '  undef +<= 2' );
-warnings_like(qr/Use of uninitialized value.* at $Filename line 64 character 45\.\n/);
+warnings_like(qr/Use of uninitialized value.*/);
 
 
 

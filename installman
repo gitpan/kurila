@@ -1,10 +1,9 @@
 #!./perl -w
-BEGIN { @INC = @('lib') }
-use strict;
+BEGIN { $^INCLUDE_PATH = @('lib') }
 
 BEGIN {
     use Config;
-    if (%Config{userelocatableinc}) {
+    if (config_value("userelocatableinc")) {
 	# This might be a considered a hack. Need to get information about the
 	# configuration from Config.pm *before* Config.pm expands any .../
 	# prefixes.
@@ -12,17 +11,17 @@ BEGIN {
 	# So we set $^X to pretend that we're the already installed perl, so
 	# Config.pm doesits ... expansion off that location.
 
-	my $location = %Config{initialinstalllocation};
+	my $location = config_value("initialinstalllocation");
 	die <<'OS' unless defined $location;
-%Config{initialinstalllocation} is not defined - can't install a relocatable
+config_value("initialinstalllocation") is not defined - can't install a relocatable
 perl without this.
 OS
-	$^X = "$location/perl";
+	$^EXECUTABLE_NAME = "$location/perl";
 	# And then remove all trace of ever having loaded Config.pm, so that
 	# it will reload with the revised $^X
 	undef %Config::;
-	delete %INC{"Config.pm"};
-	delete %INC{"Config_heavy.pl"};
+	delete $^INCLUDED{"Config.pm"};
+	delete $^INCLUDED{"Config_heavy.pl"};
 	# You never saw us. We weren't here.
     }
 }
@@ -34,20 +33,20 @@ use File::Copy;
 use File::Path < qw(mkpath);
 use ExtUtils::Packlist;
 use Pod::Man;
-use vars < qw($packlist);
+our ($packlist);
 
-if (%Config{d_umask}) {
+if (config_value("d_umask")) {
     umask(022); # umasks like 077 aren't that useful for installations
 }
 
-%ENV{SHELL} = 'sh' if $^O eq 'os2';
+env::var("SHELL") = 'sh' if $^OS_NAME eq 'os2';
 
-my $ver = %Config{version};     # Not used presently.
-$^V =~ m/kurila-(\d+).(\d+)/ or die "Invalid \$^V";
-my ($release, $patchlevel) = ($1, $2);
+my $ver = config_value("version");     # Not used presently.
+$^PERL_VERSION =~ m/kurila-(\d+).(\d+)/ or die "Invalid \$^PERL_VERSION";
+my @($release, $patchlevel) = @($1, $2);
 warn "Patchlevel of perl ($patchlevel)" .
-    "and patchlevel of config.sh (%Config{'KURILA_VERSION'}) don't match\n"
-	if $patchlevel != %Config{'KURILA_VERSION'};
+    "and patchlevel of config.sh ($(config_value('KURILA_VERSION'))) don't match\n"
+	if $patchlevel != config_value('KURILA_VERSION');
 
 my $usage =
 "Usage:  installman --man1dir=/usr/wherever --man1ext=1
@@ -55,10 +54,10 @@ my $usage =
 		   --batchlimit=40
 	           --notify --verbose --silent --help
 	Defaults are:
-	man1dir = %Config{'installman1dir'};
-	man1ext = %Config{'man1ext'};
-	man3dir = %Config{'installman3dir'};
-	man3ext = %Config{'man3ext'};
+	man1dir = config_value('installman1dir');
+	man1ext = config_value('man1ext');
+	man3dir = config_value('installman3dir');
+	man3ext = config_value('man3ext');
 	--notify  (or -n) just lists commands that would be executed.
         --verbose (or -V) report all progress.
         --silent  (or -S) be silent. Only report errors.\n";
@@ -68,32 +67,33 @@ GetOptions( \%opts,
             < qw( man1dir=s man1ext=s man3dir=s man3ext=s batchlimit=i
                 destdir:s notify n help silent S verbose V)) 
 	|| die $usage;
-die $usage if %opts{help};
+die $usage if %opts{?help};
 %opts{destdir} //= '';
 
-%opts{man1dir} = "%opts{destdir}%Config{'installman1dir'}"
-    unless defined(%opts{man1dir}); 
-%opts{man1ext} = %Config{'man1ext'}
-    unless defined(%opts{man1ext}); 
-%opts{man3dir} = "%opts{destdir}%Config{'installman3dir'}"
-    unless defined(%opts{man3dir}); 
-%opts{man3ext} = %Config{'man3ext'}
-    unless defined(%opts{man3ext}); 
-%opts{silent} ||= %opts{S};
-%opts{notify} ||= %opts{n};
-%opts{verbose} ||= %opts{V} || %opts{notify};
+%opts{+man1dir} = "%opts{destdir}" . config_value('installman1dir')
+    unless defined(%opts{?man1dir}); 
+%opts{+man1ext} = config_value('man1ext')
+    unless defined(%opts{?man1ext}); 
+%opts{+man3dir} = "%opts{destdir}" . config_value('installman3dir')
+    unless defined(%opts{?man3dir}); 
+%opts{+man3ext} = config_value('man3ext')
+    unless defined(%opts{?man3ext}); 
+%opts{+silent} ||= %opts{?S};
+%opts{+notify} ||= %opts{?n};
+%opts{+verbose} ||= %opts{?V} || %opts{notify};
 
 #Sanity checks
 
--x  "./perl%Config{exe_ext}" 
-  or warn "./perl%Config{exe_ext} not found!  Have you run make?\n";
--d  "%opts{destdir}%Config{'installprivlib'}"
-	|| warn "Perl library directory %Config{'installprivlib'} not found.
+-x  "./perl" . config_value("exe_ext")
+  or warn "./perl$(config_value('exe_ext')) not found!  Have you run make?\n";
+-d  "%opts{destdir}$(config_value('installprivlib'))"
+	|| warn "Perl library directory $(config_value('installprivlib')) not found.
 		Have you run make install?.  (Installing anyway.)\n";
--x "t/perl%Config{exe_ext}"		|| warn "WARNING: You've never run 'make test'!!!" .
+-x "t/perl$(config_value('exe_ext'))"		|| warn "WARNING: You've never run 'make test'!!!" .
 	"  (Installing anyway.)\n";
 
-$packlist = ExtUtils::Packlist->new("%opts{destdir}%Config{installarchlib}/.packlist");
+$packlist = ExtUtils::Packlist->new(
+    "%opts{destdir}$(config_value('installarchlib'))/.packlist");
 
 
 # Install the main pod pages.
@@ -104,15 +104,15 @@ pod2man('lib', %opts{man3dir}, %opts{man3ext});
 
 # Install the pods embedded in the installed scripts
 my $has_man1dir = %opts{man1dir} ne '' && -d %opts{man1dir};
-open UTILS, "<", "utils.lst" or die "Can't open 'utils.lst': $!";
-while (~< *UTILS) {
+open my $utilsfh, "<", "utils.lst" or die "Can't open 'utils.lst': $^OS_ERROR";
+while (~< *$utilsfh) {
     next if m/^#/;
     chomp;
     $_ = $1 if m/#.*pod\s*=\s*(\S+)/;
-    my ($where, $what) = m|^(\S*)/(\S+)|;
+    my @($where, $what) = @: m|^(\S*)/(\S+)|;
     pod2man($where, %opts{man1dir}, %opts{man1ext}, $what);
     if ($has_man1dir) {
-	if (my ($where2, $what2) = m|#.*link\s*=\s*(\S+)/(\S+)|) {
+	if (my @(?$where2, ?$what2) = @: m|#.*link\s*=\s*(\S+)/(\S+)|) {
 	    my $old = "%opts{man1dir}/$what.%opts{man1ext}";
 	    my $new = "%opts{man1dir}/$what2.%opts{man1ext}";
 	    unlink($new);
@@ -121,7 +121,7 @@ while (~< *UTILS) {
 	    $xold =~ s/^\Q%opts{'destdir'}\E// if %opts{'destdir'};
 	    my $xnew = $new;
 	    $xnew =~ s/^\Q%opts{'destdir'}\E// if %opts{'destdir'};
-	    $packlist->{$xnew} = \%( from => $xold, type => 'link' );
+	    $packlist->{data}{+$xnew} = \%( from => $xold, type => 'link' );
 	}
     }
 }
@@ -129,7 +129,7 @@ while (~< *UTILS) {
 sub pod2man {
     # @script is scripts names if we are installing manpages embedded 
     # in scripts, () otherwise
-    my($poddir, $mandir, $manext, <@script) = <@_;
+    my @($poddir, $mandir, $manext, @<@script) = @_;
     if ($mandir eq ' ' or $mandir eq '') {
 	if (@script) {
 	    warn "Skipping installation of $poddir/$_ man page.\n"
@@ -140,17 +140,17 @@ sub pod2man {
 	return;
     }
 
-    print "installing from $poddir\n" if %opts{verbose};
+    print $^STDOUT, "installing from $poddir\n" if %opts{verbose};
 
     mkpath($mandir, %opts{verbose}, 0777) unless %opts{notify};  # In File::Path
     # Make a list of all the .pm and .pod files in the directory.  We avoid
-    # chdir because we are running with @INC = '../lib', and modules may wish
+    # chdir because we are running with $^INCLUDE_PATH = '../lib', and modules may wish
     # to dynamically require Carp::Heavy or other diagnostics warnings.
     # Hash the names of files we find, keys are names relative to perl build
     # dir ('.'), values are names relative to $poddir.
     my %modpods;
     if (@script) {
-	%modpods = %( < map {+"$poddir/$_", $_} @script);
+	%modpods = %( < @+: map { @: "$poddir/$_", $_ }, @script);
     }
     else {
 	File::Find::find(\%(no_chdir=>1,
@@ -159,7 +159,7 @@ sub pod2man {
                                 if (-f $_ and m/\.p(?:m|od)$/) {
                                     my $fullname = $_;
                                     s!^\Q$poddir\E/!!;
-                                    %modpods{$fullname} = $_;
+                                    %modpods{+$fullname} = $_;
                                 }
                             }),
                          $poddir);
@@ -175,15 +175,15 @@ sub pod2man {
 
 	# Skip files without pod docs
 	my $has_pod;
-	if (open T, "<", $mod)
+	if (open my $t, "<", $mod)
 	{
 	    local $_;
-	    while (~< *T)
+	    while (~< *$t)
 	    {
 		++$has_pod and last if m/^=(?:head\d+|item|pod)\b/;
 	    }
 
-	    close T;
+	    close $t;
 	}
 
 	unless ($has_pod)
@@ -195,19 +195,19 @@ sub pod2man {
 	# Convert name from  File/Basename.pm to File::Basename.3 format,
 	# if necessary.
 	$manpage =~ s#\.p(m|od)$##;
-	if ($^O eq 'os2' || $^O eq 'amigaos' || $^O eq 'uwin' || $^O eq 'cygwin') {
+	if ($^OS_NAME eq 'os2' || $^OS_NAME eq 'amigaos' || $^OS_NAME eq 'uwin' || $^OS_NAME eq 'cygwin') {
 	  $manpage =~ s#/#.#g;
 	}
 	else {
 	  $manpage =~ s#/#::#g;
 	}
-	$tmp = "{$mandir}/{$manpage}.tmp";
-	$manpage = "{$mandir}/{$manpage}.{$manext}";
+	$tmp = "$($mandir)/$($manpage).tmp";
+	$manpage = "$($mandir)/$($manpage).$($manext)";
 	push @to_process, \@($mod, $tmp, $manpage);
     }
 
     foreach my $page (@to_process) {
-	my($pod, $tmp, $manpage) = <@$page;
+	my @($pod, $tmp, $manpage) = @$page;
 
         my $parser = Pod::Man->new( section => $manext,
                                     official=> 1,
@@ -215,11 +215,11 @@ sub pod2man {
                                   );
 	my $xmanpage = $manpage;
 	$xmanpage =~ s/^\Q%opts{'destdir'}\E// if %opts{'destdir'};
-        print "  $xmanpage\n";
+        print $^STDOUT, "  $xmanpage\n";
 	if (!%opts{notify} && $parser->parse_from_file($pod, $tmp)) {
             if (-s $tmp) {
                 if (rename($tmp, $manpage)) {
-                    $packlist->{$xmanpage} = \%( type => 'file' );
+                    $packlist->{data}{+$xmanpage} = \%( type => 'file' );
                     next;
                 }
             }
@@ -229,7 +229,7 @@ sub pod2man {
 }
 
 $packlist->write() unless %opts{notify};
-print "  Installation complete\n" if %opts{verbose};
+print $^STDOUT, "  Installation complete\n" if %opts{verbose};
 
 exit 0;
 
@@ -242,44 +242,45 @@ sub unlink {
 
     foreach my $name (@names) {
 	next unless -e $name;
-	chmod 0777, $name if $^O eq 'os2';
-	print "  unlink $name\n" if %opts{verbose};
+	chmod 0777, $name if $^OS_NAME eq 'os2';
+	print $^STDOUT, "  unlink $name\n" if %opts{verbose};
 	( CORE::unlink($name) and ++$cnt 
-	    or warn "Couldn't unlink $name: $!\n" ) unless %opts{notify};
+	    or warn "Couldn't unlink $name: $^OS_ERROR\n" ) unless %opts{notify};
     }
     return $cnt;
 }
 
 sub link {
-    my($from,$to) = <@_;
+    my @($from,$to) = @_;
     my($success) = 0;
 
-    print "  ln $from $to\n" if %opts{verbose};
+    print $^STDOUT, "  ln $from $to\n" if %opts{verbose};
     try {
         CORE::link($from, $to)
-            ? $success++
-            : ($from =~ m#^/afs/# || $to =~ m#^/afs/#)
-              ? die "AFS"  # okay inside try {}
-              : warn "Couldn't link $from to $to: $!\n"
+            ?? $success++
+            !! ($from =~ m#^/afs/# || $to =~ m#^/afs/#)
+              ?? die "AFS"  # okay inside try {}
+              !! warn "Couldn't link $from to $to: $^OS_ERROR\n"
           unless %opts{notify};
     };
-    if ($@) {
+    if ($^EVAL_ERROR) {
         File::Copy::copy($from, $to)
-            ? $success++
-            : warn "Couldn't copy $from to $to: $!\n"
+            ?? $success++
+            !! warn "Couldn't copy $from to $to: $^OS_ERROR\n"
           unless %opts{notify};
     }
     $success;
 }
 
 sub rename {
-    my($from,$to) = <@_;
+    my @($from,$to) = @_;
     if (-f $to and not &unlink($to)) {
-	my($i);
-	for ($i = 1; $i +< 50; $i++) {
+	my $i = 1;
+	while ($i +< 50) {
 	    last if CORE::rename($to, "$to.$i");
+            $i++;
 	}
-	warn("Cannot rename to `$to.$i': $!"), return 0 
+	warn("Cannot rename to `$to.$i': $^OS_ERROR"), return 0 
 	    if $i +>= 50;	# Give up!
     }
     &link($from,$to) || return 0;
@@ -287,20 +288,20 @@ sub rename {
 }
 
 sub chmod {
-    my($mode,$name) = <@_;
+    my @($mode,$name) = @_;
 
-    printf "  chmod \%o \%s\n", $mode, $name if %opts{verbose};
-    CORE::chmod($mode,$name) || warn sprintf("Couldn't chmod \%o \%s: $!\n",$mode,$name)
+    printf $^STDOUT, "  chmod \%o \%s\n", $mode, $name if %opts{verbose};
+    CORE::chmod($mode,$name) || warn sprintf("Couldn't chmod \%o \%s: $^OS_ERROR\n",$mode,$name)
 	unless %opts{notify};
 }
 
 sub samepath {
-    my($p1, $p2) = <@_;
+    my @($p1, $p2) = @_;
     my($dev1, $ino1, $dev2, $ino2);
 
     if ($p1 ne $p2) {
-	($dev1, $ino1) = stat($p1);
-	($dev2, $ino2) = stat($p2);
+	@($dev1, $ino1, ...) = @: stat($p1);
+	@($dev2, $ino2, ...) = @: stat($p2);
 	($dev1 == $dev2 && $ino1 == $ino2);
     }
     else {

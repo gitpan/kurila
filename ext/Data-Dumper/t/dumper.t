@@ -11,8 +11,6 @@ local $Data::Dumper::Sortkeys = 1;
 use Data::Dumper;
 use Config;
 use utf8;
-use strict;
-my $Is_ebcdic = defined(%Config{'ebcdic'}) && %Config{'ebcdic'} eq 'define';
 
 $Data::Dumper::Pad = "#";
 my $TMAX;
@@ -26,46 +24,29 @@ our (@a, @c, $c, $d, $foo, %foo, @foo, @dogs, %kennel, $mutts, $e, $f, $i,
     @strings_nis, @numbers_is, @numbers_n, $ping, %ping);
 
 
-sub TEST {
-  my ($string, $name) = < @_;
-  no strict;
+sub TEST($string, ?$name) {
   my $t = eval $string;
   $t =~ s/([A-Z]+)\(0x[0-9a-f]+\)/$1(0xdeadbeef)/g
       if ($WANT =~ m/deadbeef/);
-  if ($Is_ebcdic) {
-      # these data need massaging with non ascii character sets
-      # because of hashing order differences
-      $WANT = join("\n",sort(split(m/\n/,$WANT)));
-      $WANT =~ s/\,$//mg;
-      $t    = join("\n",sort(split(m/\n/,$t)));
-      $t    =~ s/\,$//mg;
-  }
 
-  ok(($t eq $WANT and not $@), $name);
-  if ($@) {
-      diag("error: {$@->message}");
+  ok(($t eq $WANT and not $^EVAL_ERROR), $name);
+  if ($^EVAL_ERROR) {
+      diag("error: $($^EVAL_ERROR->message)");
   }
   elsif ($t ne $WANT) {
       diag("--Expected--\n$WANT\n--Got--\n$t\n");
   }
 
   eval "$t";
-  ok(!$@);
-  diag $@ if $@;
+  ok(!$^EVAL_ERROR);
+  diag $^EVAL_ERROR if $^EVAL_ERROR;
 
   $t = eval $string;
   $t =~ s/([A-Z]+)\(0x[0-9a-f]+\)/$1(0xdeadbeef)/g
       if ($WANT =~ m/deadbeef/);
-  if ($Is_ebcdic) {
-      # here too there are hashing order differences
-      $WANT = join("\n",sort(split(m/\n/,$WANT)));
-      $WANT =~ s/\,$//mg;
-      $t    = join("\n",sort(split(m/\n/,$t)));
-      $t    =~ s/\,$//mg;
-  }
-  ok($t eq $WANT and not $@);
-  if ($@) {
-      diag("error: {$@->message}");
+  ok($t eq $WANT and not $^EVAL_ERROR);
+  if ($^EVAL_ERROR) {
+      diag("error: $($^EVAL_ERROR->message)");
   }
   elsif ($t ne $WANT) {
       diag("--Expected--\n$WANT\n--Got--\n$t\n");
@@ -74,9 +55,9 @@ sub TEST {
 
 sub SKIP_TEST {
     my $reason = shift;
-  SKIP: {
+  SKIP: do {
         skip $reason, 3;
-    }
+    };
 }
 
 $TMAX = 8; $XS = 0;
@@ -113,9 +94,9 @@ is Data::Dumper->Dump(\@(%( aap => 'noot' )), \@('*mies')), <<'====';
 $c = \@c;
 $b = \%();
 $a = \@(1, $b, $c);
-$b->{a} = $a;
-$b->{b} = $a->[1];
-$b->{c} = $a->[2];
+$b->{+a} = $a;
+$b->{+b} = $a->[1];
+$b->{+c} = $a->[2];
 
 ############# 1
 ##

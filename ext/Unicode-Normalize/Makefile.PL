@@ -3,9 +3,9 @@ use ExtUtils::MakeMaker;
 my $clean = \%();
 
 if (-f "Normalize.xs") {
-    print STDERR "Making header files for XS...\n";
+    print $^STDERR, "Making header files for XS...\n";
 
-    do 'mkheader' or die $@ || "mkheader: $!";
+    do 'mkheader' or die $^EVAL_ERROR || "mkheader: $^OS_ERROR";
 
     $clean = \%( FILES => 'unfcan.h unfcmb.h unfcmp.h unfcpt.h unfexc.h' );
 }
@@ -22,7 +22,6 @@ WriteMakefile(
 	Exporter	=> 0,
 	'File::Copy'	=> 0,
 	'File::Spec'	=> 0,
-	strict		=> 0,
 	Test		=> 0,
 	warnings	=> 0,
     ),

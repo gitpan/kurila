@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-use strict;
+
 
 use Config;
 use Storable < qw(freeze thaw);
@@ -34,7 +34,7 @@ EOM
   exit; # Grr '
 }
 
-my ($i, $l, $p, $n) = unpack "xxxx{$storesize}CCCC", $frozen;
+my ($i, $l, $p, $n) = unpack "xxxx$($storesize)CCCC", $frozen;
 
 print <<"EOM";
 # byteorder	 '$storebyteorder'

@@ -1,42 +1,41 @@
 #!/usr/bin/perl -w
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't';
-        @INC = @('../lib', 'lib');
+        $^INCLUDE_PATH = @('../lib', 'lib');
     }
     else {
-        unshift @INC, 't/lib';
+        unshift $^INCLUDE_PATH, 't/lib';
     }
 }
 
-use strict;
 
 require Test::Simple::Catch;
-my($out, $err) = < Test::Simple::Catch::caught();
-local %ENV{HARNESS_ACTIVE} = 0;
+use env;
+my@($out, $err) =  Test::Simple::Catch::caught();
+local env::var('HARNESS_ACTIVE' ) = 0;
 
 require Test::Builder;
 my $TB = Test::Builder->create;
 $TB->level(0);
 
-sub try_cmp_ok {
-    my($left, $cmp, $right) = < @_;
+sub try_cmp_ok($left, $cmp, $right) {
     
     my %expect;
-    %expect{ok}    = eval "\$left $cmp \$right";
-    %expect{error} = $@;
-    %expect{error} =~ s/ at .*\n?//;
+    %expect{+ok}    = eval "\$left $cmp \$right";
+    %expect{+error} = $^EVAL_ERROR;
+    %expect{+error} =~ s/ at .*\n?//;
 
     local $Test::Builder::Level = $Test::Builder::Level + 1;
     my $ok = cmp_ok($left, $cmp, $right);
-    $TB->is_num(!!$ok, !!%expect{ok});
+    $TB->is_num( ! ! $ok, ! ! %expect{ok});
     
     my $diag = $$err;
     $$err = "";
-    if( !$ok and %expect{error} ) {
+    if( !$ok and %expect{?error} ) {
         $diag =~ s/^# //mg;
-        $TB->like( $diag, "/\Q%expect{error}\E/" );
+        $TB->like( $diag, "/\Q%expect{?error}\E/" );
     }
     elsif( $ok ) {
         $TB->is_eq( $diag, '' );

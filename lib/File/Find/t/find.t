@@ -7,14 +7,14 @@ my %Expect_Dir  = %( () ); # what we expect for $File::Find::dir
 my $symlink_exists = try { symlink("",""); 1 };
 my $warn_msg;
 
-use Carp::Heavy (); # make sure Carp::Heavy is already loaded, because @INC is relative
+use Carp::Heavy (); # make sure Carp::Heavy is already loaded, because $^INCLUDE_PATH is relative
 
 BEGIN {
     $^WARN_HOOK = sub { $warn_msg = @_[0]; warn "# @_[0]"; }
 }
 
-if ( $symlink_exists ) { print "1..193\n"; }
-else                   { print "1..85\n";  }
+if ( $symlink_exists ) { print $^STDOUT, "1..193\n"; }
+else                   { print $^STDOUT, "1..85\n";  }
 
 # Uncomment this to see where File::Find is chdir'ing to.  Helpful for
 # debugging its little jaunts around the filesystem.
@@ -35,7 +35,7 @@ else                   { print "1..85\n";  }
 
 BEGIN {
     use File::Spec;
-    if ($^O eq 'MSWin32' || $^O eq 'cygwin' || $^O eq 'VMS')
+    if ($^OS_NAME eq 'MSWin32' || $^OS_NAME eq 'cygwin' || $^OS_NAME eq 'VMS')
      {
       # This is a hack - at present File::Find does not produce native names on 
       # Win32 or VMS, so force File::Spec to use Unix names.
@@ -53,18 +53,18 @@ $::count_commonsense = 0;
 find(\%(wanted => sub { ++$::count_commonsense if $_ eq 'commonsense.t'; } ),
    File::Spec->curdir);
 if ($::count_commonsense == 1) {
-  print "ok 1\n";
+  print $^STDOUT, "ok 1\n";
 } else {
-  print "not ok 1 # found $::count_commonsense files named 'commonsense.t'\n";
+  print $^STDOUT, "not ok 1 # found $::count_commonsense files named 'commonsense.t'\n";
 }
 
 $::count_commonsense = 0;
 finddepth(\%(wanted => sub { ++$::count_commonsense if $_ eq 'commonsense.t'; } ),
 	File::Spec->curdir);
 if ($::count_commonsense == 1) {
-  print "ok 2\n";
+  print $^STDOUT, "ok 2\n";
 } else {
-  print "not ok 2 # found $::count_commonsense files named 'commonsense.t'\n";
+  print $^STDOUT, "not ok 2 # found $::count_commonsense files named 'commonsense.t'\n";
 }
 
 my $case = 2;
@@ -91,7 +91,7 @@ sub cleanup {
     }
     chdir(File::Spec->updir);
     if (-d dir_path('for_find')) {
-	rmdir dir_path('for_find') or print "# Can't rmdir for_find: $!\n";
+	rmdir dir_path('for_find') or print $^STDOUT, "# Can't rmdir for_find: $^OS_ERROR\n";
     }
 }
 
@@ -99,52 +99,52 @@ END {
     cleanup();
 }
 
-sub Check($) {
+sub Check($ok) {
     $case++;
-    if (@_[0]) { print "ok $case\n"; }
-    else       { print "not ok $case\n"; }
+    if ($ok) { print $^STDOUT, "ok $case\n"; }
+    else       { print $^STDOUT, "not ok $case\n"; }
 }
 
-sub CheckDie($) {
+sub CheckDie($ok) {
     $case++;
-    if (@_[0]) { print "ok $case\n"; }
-    else { print "not ok $case\n $!\n"; exit 0; }
+    if ($ok) { print $^STDOUT, "ok $case\n"; }
+    else { print $^STDOUT, "not ok $case\n $^OS_ERROR\n"; exit 0; }
 }
 
 sub touch {
     CheckDie( open(my $T,'>',@_[0]) );
 }
 
-sub MkDir($$) {
-    CheckDie( mkdir(@_[0],@_[1]) );
+sub MkDir($dir, $mode) {
+    CheckDie( mkdir($dir, $mode) );
 }
 
 sub wanted_File_Dir {
-    printf "# \$File::Find::dir => '$File::Find::dir'\t\$_ => '$_'\n";
-    s#\.$## if ($^O eq 'VMS' && $_ ne '.');
-    s/(.dir)?$//i if ($^O eq 'VMS' && -d _);
-    Check( %Expect_File{$_} );
+    printf $^STDOUT, "# \$File::Find::dir => '$File::Find::dir'\t\$_ => '$_'\n";
+    s#\.$## if ($^OS_NAME eq 'VMS' && $_ ne '.');
+    s/(.dir)?$//i if ($^OS_NAME eq 'VMS' && -d _);
+    Check( %Expect_File{?$_} );
     if ( $FastFileTests_OK ) {
         delete %Expect_File{ $_} 
-          unless ( %Expect_Dir{$_} && ! -d _ );
+          unless ( %Expect_Dir{?$_} && ! -d _ );
     } else {
         delete %Expect_File{$_} 
-          unless ( %Expect_Dir{$_} && ! -d $_ );
+          unless ( %Expect_Dir{?$_} && ! -d $_ );
     }
 }
 
 sub wanted_File_Dir_prune {
-    &wanted_File_Dir;
+    &wanted_File_Dir( < @_ );
     $File::Find::prune=1 if  $_ eq 'faba';
 }
 
 sub wanted_Name {
     my $n = $File::Find::name;
-    $n =~ s#\.$## if ($^O eq 'VMS' && $n ne '.');
-    print "# \$File::Find::name => '$n'\n";
+    $n =~ s#\.$## if ($^OS_NAME eq 'VMS' && $n ne '.');
+    print $^STDOUT, "# \$File::Find::name => '$n'\n";
     my $i = rindex($n,'/');
     my $OK = exists(%Expect_Name{$n});
-    unless ($^O eq 'MacOS') {
+    unless ($^OS_NAME eq 'MacOS') {
         if ( $OK ) {
             $OK= exists(%Expect_Name{substr($n,0,$i)})  if $i +>= 0;    
         }
@@ -154,11 +154,11 @@ sub wanted_Name {
 }
 
 sub wanted_File {
-    print "# \$_ => '$_'\n";
-    s#\.$## if ($^O eq 'VMS' && $_ ne '.');
+    print $^STDOUT, "# \$_ => '$_'\n";
+    s#\.$## if ($^OS_NAME eq 'VMS' && $_ ne '.');
     my $i = rindex($_,'/');
     my $OK = exists(%Expect_File{ $_});
-    unless ($^O eq 'MacOS') {
+    unless ($^OS_NAME eq 'MacOS') {
         if ( $OK ) {
             $OK= exists(%Expect_File{ substr($_,0,$i)})  if $i +>= 0;
         }
@@ -168,31 +168,31 @@ sub wanted_File {
 }
 
 sub simple_wanted {
-    print "# \$File::Find::dir => '$File::Find::dir'\n";
-    print "# \$_ => '$_'\n";
+    print $^STDOUT, "# \$File::Find::dir => '$File::Find::dir'\n";
+    print $^STDOUT, "# \$_ => '$_'\n";
 }
 
 sub noop_wanted {}
 
 sub my_preprocess {
     my @files = @_;
-    print "# --preprocess--\n";
-    print "#   \$File::Find::dir => '$File::Find::dir' \n";
+    print $^STDOUT, "# --preprocess--\n";
+    print $^STDOUT, "#   \$File::Find::dir => '$File::Find::dir' \n";
     foreach my $file ( @files) {
-        $file =~ s/\.(dir)?$// if $^O eq 'VMS';
-        print "#   $file \n";
+        $file =~ s/\.(dir)?$// if $^OS_NAME eq 'VMS';
+        print $^STDOUT, "#   $file \n";
         delete %Expect_Dir{ $File::Find::dir }->{$file};
     }
-    print "# --end preprocess--\n";
-    Check((nkeys %{%Expect_Dir{ $File::Find::dir }}) == 0);
-    if ((nkeys %{%Expect_Dir{ $File::Find::dir }}) == 0) {
+    print $^STDOUT, "# --end preprocess--\n";
+    Check((nkeys %{%Expect_Dir{?$File::Find::dir }}) == 0);
+    if ((nkeys %{%Expect_Dir{?$File::Find::dir }}) == 0) {
         delete %Expect_Dir{ $File::Find::dir }
     }
     return @files;
 }
 
 sub my_postprocess {
-    print "# postprocess: \$File::Find::dir => '$File::Find::dir' \n";
+    print $^STDOUT, "# postprocess: \$File::Find::dir => '$File::Find::dir' \n";
     delete %Expect_Dir{ $File::Find::dir};
 }
 
@@ -216,7 +216,7 @@ sub dir_path {
     my $first_arg = shift @_;
 
     if ($first_arg eq '.') {
-        if ($^O eq 'MacOS') {
+        if ($^OS_NAME eq 'MacOS') {
             return '' unless (nelems @_);
             # ignore first argument; return a relative path
             # with leading ":" and with trailing ":"
@@ -242,7 +242,7 @@ sub dir_path {
 
 sub topdir {
     my $path = dir_path(< @_);
-    $path =~ s/:$// if ($^O eq 'MacOS');
+    $path =~ s/:$// if ($^OS_NAME eq 'MacOS');
     return $path;
 }
 
@@ -264,7 +264,7 @@ sub file_path {
     my $first_arg = shift @_;
 
     if ($first_arg eq '.') {
-        if ($^O eq 'MacOS') {
+        if ($^OS_NAME eq 'MacOS') {
             return '' unless (nelems @_);
             # ignore first argument; return a relative path  
             # with leading ":", but without trailing ":"
@@ -296,10 +296,9 @@ sub file_path {
 
 sub file_path_name {
     my $path = file_path(< @_);
-    $path = ":$path" if (($^O eq 'MacOS') && ($path !~ m/:/));
+    $path = ":$path" if (($^OS_NAME eq 'MacOS') && ($path !~ m/:/));
     return $path;
 }
-
 
 
 MkDir( dir_path('for_find'), 0770 );
@@ -309,7 +308,7 @@ MkDir( dir_path('fb'), 0770  );
 touch( file_path('fb', 'fb_ord') );
 MkDir( dir_path('fb', 'fba'), 0770  );
 touch( file_path('fb', 'fba', 'fba_ord') );
-if ($^O eq 'MacOS') {
+if ($^OS_NAME eq 'MacOS') {
       CheckDie( symlink(':fb',':fa:fsl') ) if $symlink_exists;
 } else {
       CheckDie( symlink('../fb','fa/fsl') ) if $symlink_exists;
@@ -341,7 +340,7 @@ File::Find::find( \%(wanted => \&wanted_File_Dir_prune), topdir('fa') );
 Check( (nkeys %Expect_File) == 0 );
 
 
-print "# check re-entrancy\n";
+print $^STDOUT, "# check re-entrancy\n";
 
 %Expect_File = %(File::Spec->curdir => 1, file_path('fsl') => 1,
                 file_path('fa_ord') => 1, file_path('fab') => 1,
@@ -445,7 +444,7 @@ File::Find::finddepth( \%(wanted => \&wanted_File, no_chdir => 1),
 Check( (nkeys %Expect_File) == 0 );
 
 
-print "# check preprocess\n";
+print $^STDOUT, "# check preprocess\n";
 %Expect_File = %( () );
 %Expect_Name = %( () );
 %Expect_Dir = %(
@@ -464,7 +463,7 @@ File::Find::find( \%(wanted => \&noop_wanted,
 Check( (nkeys %Expect_Dir) == 0 );
 
 
-print "# check postprocess\n";
+print $^STDOUT, "# check postprocess\n";
 %Expect_File = %( () );
 %Expect_Name = %( () );
 %Expect_Dir = %(
@@ -482,21 +481,21 @@ File::Find::find( \%(wanted => \&noop_wanted,
 
 Check( (nkeys %Expect_Dir) == 0 );
 
-{
-    print "# checking argument localization\n";
+do {
+    print $^STDOUT, "# checking argument localization\n";
 
     ### this checks the fix of perlbug [19977] ###
     my @foo = qw( a b c d e f );
-    my %pre = %( < map { $_ => } @foo );
+    my %pre = %( < map { $_ => }, @foo );
 
     File::Find::find( sub {  } , 'fa' ) for  @foo;
     delete %pre{$_} for  @foo;
 
     Check( ( nkeys %pre ) == 0 );
-}
+};
 
 if ( $symlink_exists ) {
-    print "# --- symbolic link tests --- \n";
+    print $^STDOUT, "# --- symbolic link tests --- \n";
     $FastFileTests_OK= 1;
 
 
@@ -607,20 +606,20 @@ if ( $symlink_exists ) {
     Check( (nkeys %Expect_File) == 0 );     
 
  
-    print "# check dangling symbolic links\n";
+    print $^STDOUT, "# check dangling symbolic links\n";
     MkDir( dir_path('dangling_dir'), 0770 );
     CheckDie( symlink( dir_path('dangling_dir'),
 		       file_path('dangling_dir_sl') ) );
     rmdir dir_path('dangling_dir');
     touch(file_path('dangling_file'));  
-    if ($^O eq 'MacOS') {
+    if ($^OS_NAME eq 'MacOS') {
         CheckDie( symlink('dangling_file', ':fa:dangling_file_sl') );
     } else {
         CheckDie( symlink('../dangling_file','fa/dangling_file_sl') );
     }      
     unlink file_path('dangling_file');
 
-    { 
+    do { 
         # these tests should also emit a warning
 	use warnings;
 
@@ -653,36 +652,36 @@ if ( $symlink_exists ) {
         unlink file_path('fa', 'dangling_file_sl'),
                          file_path('dangling_dir_sl');
 
-    }
+    };
 
 
-    print "# check recursion\n";
-    if ($^O eq 'MacOS') {
+    print $^STDOUT, "# check recursion\n";
+    if ($^OS_NAME eq 'MacOS') {
         CheckDie( symlink(':fa:faa',':fa:faa:faa_sl') );
     } else {
         CheckDie( symlink('../faa','fa/faa/faa_sl') );
     }
-    undef $@;
+    undef $^EVAL_ERROR;
     try {File::Find::find( \%(wanted => \&simple_wanted, follow => 1,
                              no_chdir => 1), topdir('fa') ); };
-    Check( $@->{description} =~ m|for_find[:/]fa[:/]faa[:/]faa_sl is a recursive symbolic link|i );  
+    Check( $^EVAL_ERROR->{?description} =~ m|for_find[:/]fa[:/]faa[:/]faa_sl is a recursive symbolic link|i );  
     unlink file_path('fa', 'faa', 'faa_sl'); 
 
 
-    print "# check follow_skip (file)\n";
-    if ($^O eq 'MacOS') {
+    print $^STDOUT, "# check follow_skip (file)\n";
+    if ($^OS_NAME eq 'MacOS') {
         CheckDie( symlink(':fa:fa_ord',':fa:fa_ord_sl') ); # symlink to a file
     } else {
         CheckDie( symlink('./fa_ord','fa/fa_ord_sl') ); # symlink to a file
     }
-    undef $@;
+    undef $^EVAL_ERROR;
 
     try {File::Find::finddepth( \%(wanted => \&simple_wanted,
                                   follow => 1,
                                   follow_skip => 0, no_chdir => 1),
                                   topdir('fa') );};
 
-    Check( $@->{description} =~ m|for_find[:/]fa[:/]fa_ord encountered a second time|i );
+    Check( $^EVAL_ERROR->{?description} =~ m|for_find[:/]fa[:/]fa_ord encountered a second time|i );
 
 
     # no_chdir is in effect, hence we use file_path_name to specify
@@ -719,28 +718,28 @@ if ( $symlink_exists ) {
     unlink file_path('fa', 'fa_ord_sl');
 
 
-    print "# check follow_skip (directory)\n";
-    if ($^O eq 'MacOS') {
+    print $^STDOUT, "# check follow_skip (directory)\n";
+    if ($^OS_NAME eq 'MacOS') {
         CheckDie( symlink(':fa:faa',':fa:faa_sl') ); # symlink to a directory
     } else {
         CheckDie( symlink('./faa','fa/faa_sl') ); # symlink to a directory
     }
-    undef $@;
+    undef $^EVAL_ERROR;
 
     try {File::Find::find( \%(wanted => \&simple_wanted, follow => 1,
                             follow_skip => 0, no_chdir => 1),
                             topdir('fa') );};
 
-    Check( $@->{description} =~ m|for_find[:/]fa[:/]faa[:/]? encountered a second time|i );
+    Check( $^EVAL_ERROR->{?description} =~ m|for_find[:/]fa[:/]faa[:/]? encountered a second time|i );
 
   
-    undef $@;
+    undef $^EVAL_ERROR;
 
     try {File::Find::find( \%(wanted => \&simple_wanted, follow => 1,
                             follow_skip => 1, no_chdir => 1),
                             topdir('fa') );};
 
-    Check( $@->{description} =~ m|for_find[:/]fa[:/]faa[:/]? encountered a second time|i );  
+    Check( $^EVAL_ERROR->{?description} =~ m|for_find[:/]fa[:/]faa[:/]? encountered a second time|i );  
 
     # no_chdir is in effect, hence we use file_path_name to specify
     # the expected paths for %Expect_File

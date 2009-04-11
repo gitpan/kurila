@@ -40,49 +40,35 @@
 
 my $file;
 
-use strict;
 use warnings FATAL=>"all";
-use vars < qw($iters $numtests $bang $ffff $nulnul $OP $utf8);
-use vars < qw($qr $skip_amp $qr_embed $qr_embed_thr); # set by our callers
+our ($iters, $numtests, $bang, $ffff, $nulnul, $OP, $utf8);
+our ($qr, $skip_amp, $qr_embed); # set by our callers
 
+my $tests_fh;
 
 BEGIN {
-    $iters = shift || 1;	# Poor man performance suite, 10000 is OK.
+    $iters = shift(@ARGV) || 1;	# Poor man performance suite, 10000 is OK.
 
     # Do this open before any chdir
-    $file = shift;
+    $file = shift(@ARGV);
     if (defined $file) {
-	open TESTS, "<", $file or die "Can't open $file";
-    }
-
-    if ($qr_embed_thr) {
-	require Config;
-	if (!%Config::Config{useithreads}) {
-	    print "1..0 # Skip: no ithreads\n";
-		exit 0;
-	}
-	if (%ENV{PERL_CORE_MINITEST}) {
-	    print "1..0 # Skip: no dynamic loading on miniperl, no threads\n";
-		exit 0;
-	}
-	require threads;
+	open $tests_fh, "<", $file or die "Can't open $file";
     }
 }
 
-use strict;
 use warnings FATAL=>"all";
-use vars < qw($iters $numtests $bang $ffff $nulnul $OP);
-use vars < qw($qr $skip_amp $qr_embed $qr_embed_thr); # set by our callers
+our ($iters, $numtests, $bang, $ffff, $nulnul, $OP);
+our ($qr, $skip_amp, $qr_embed, $qr_embed_thr); # set by our callers
 
 
 if (!defined $file) {
-    open(TESTS, "<",'op/re_tests') || open(TESTS, "<",'t/op/re_tests')
-	|| open(TESTS, "<",':op:re_tests') || die "Can't open re_tests";
+    open($tests_fh, "<",'op/re_tests') || open($tests_fh, "<",'t/op/re_tests')
+	|| open($tests_fh, "<",':op:re_tests') || die "Can't open re_tests";
 }
 
-my @tests = @( ~< *TESTS );
+my @tests = @( ~< $tests_fh );
 
-close TESTS;
+close $tests_fh;
 
 BEGIN {
     require utf8;
@@ -95,37 +81,37 @@ BEGIN {
 $bang = sprintf "\\\%03o", ord "!"; # \41 would not be portable.
 $ffff  = "\x[FF]\x[FF]";
 $nulnul = "\0" x 2;
-$OP = $qr ? 'qr' : 'm';
+$OP = $qr ?? 'qr' !! 'm';
 
-$| = 1;
-printf "1..\%d\n# $iters iterations\n", scalar nelems @tests;
+$^OUTPUT_AUTOFLUSH = 1;
+printf $^STDOUT, "1..\%d\n# $iters iterations\n", scalar nelems @tests;
 
 my $test;
 TEST:
 foreach ( @tests) {
     $test++;
     if (!m/\S/ || m/^\s*#/ || m/^__END__$/) {
-        print "ok $test # (Blank line or comment)\n";
-        if (m/#/) { print $_ };
+        print $^STDOUT, "ok $test # (Blank line or comment)\n";
+        if (m/#/) { print $^STDOUT, $_ };
         next;
     }
     chomp;
     s/\\n/\n/g;
-    my ($pat, $subject, $result, $repl, $expect, $reason) = < split(m/\t/,$_,6);
-    if ($result =~ m/c/ and %ENV{PERL_VALGRIND}) {
-        print "ok $test # TODO fix memory leak with compilation error\n";
+    my @($pat, $subject, $result, $repl, $expect, ?$reason) =  split(m/\t/,$_,6);
+    if ($result =~ m/c/ and env::var('PERL_VALGRIND')) {
+        print $^STDOUT, "ok $test # TODO fix memory leak with compilation error\n";
         next;
     }
     $reason = '' unless defined $reason;
     my $input = join(':', @($pat,$subject,$result,$repl,$expect));
     $pat = "'$pat'" unless $pat =~ m/^[:'\/]/;
-    $pat =~ s/\$\{(\w+)\}/{eval '$'.$1}/g;
+    $pat =~ s/\$\{(\w+)\}/$(eval '$'.$1)/g;
     $pat =~ s/\\n/\n/g;
-    my $keep = ($repl =~ m/\$\^MATCH/) ? 'p' : '';
-    $subject = eval qq("$subject"); die "error in '$subject': $@" if $@;
-    $expect  = eval qq("$expect"); die "error in '$expect': $@" if $@;
+    my $keep = ($repl =~ m/\$\^MATCH/) ?? 'p' !! '';
+    $subject = eval qq("$subject"); die "error in '$subject': $($^EVAL_ERROR->message)" if $^EVAL_ERROR;
+    $expect  = eval qq("$expect"); die "error in '$expect': $($^EVAL_ERROR->message)" if $^EVAL_ERROR;
     my $todo = $qr_embed_thr && ($result =~ s/t//);
-    my $skip = ($skip_amp ? ($result =~ s/B//i) : ($result =~ s/B//));
+    my $skip = ($skip_amp ?? ($result =~ s/B//i) !! ($result =~ s/B//));
     $reason = 'skipping $&' if $reason eq  '' && $skip_amp;
     $result =~ s/B//i unless $skip;
 
@@ -139,8 +125,8 @@ foreach ( @tests) {
             $code= <<EOFCODE;
                 $utf8;
                 $study;
-                pos(\$subject)=0;
-                \$match = ( \$subject =~ m{$pat}{$keep}g );
+                pos(\$subject, 0);
+                \$match = ( \$subject =~ m$($pat)$($keep)g );
                 \$got = pos(\$subject);
 EOFCODE
         }
@@ -149,7 +135,7 @@ EOFCODE
                 $utf8;
                 my \$RE = qr$pat;
                 $study;
-                \$match = (\$subject =~ m/(?:)\$RE(?:)/{$keep}) while \$c--;
+                \$match = (\$subject =~ m/(?:)\$RE(?:)/$($keep)) while \$c--;
                 \$got = "$repl";
 EOFCODE
         }
@@ -159,7 +145,7 @@ EOFCODE
 	 	# clone the pattern the other way.
                 my \$RE = threads->new(sub \{qr$pat\})->join();
                 $study;
-                \$match = (\$subject =~ m/(?:)\$RE(?:)/{$keep}) while \$c--;
+                \$match = (\$subject =~ m/(?:)\$RE(?:)/$($keep)) while \$c--;
                 \$got = "$repl";
 EOFCODE
         }
@@ -174,48 +160,48 @@ EOFCODE
         #$code.=qq[\n\$expect="$expect";\n];
         #use Devel::Peek;
         #die Dump($code) if $pat=~/\\h/ and $subject=~/\x{A0}/;
-	{
+	do {
 	    # Probably we should annotate specific tests with which warnings
 	    # categories they're known to trigger, and hence should be
 	    # disabled just for that test
 	    no warnings < qw(uninitialized regexp);
 	    eval $code;
-	}
-	my $err = $@;
+	};
+	my $err = $^EVAL_ERROR;
 	if ($result eq 'c') {
-	    if ($err->{description} !~ m!^\Q$expect!) { print "not ok $test (compile) $input => `$err'\n"; next TEST }
+	    if ($err->{?description} !~ m!^\Q$expect!) { print $^STDOUT, "not ok $test (compile) $input => `$err'\n"; next TEST }
 	    last;  # no need to study a syntax error
 	}
 	elsif ( $skip ) {
-	    print "ok $test # skipped", length($reason) ? " $reason" : '', "\n";
+	    print $^STDOUT, "ok $test # skipped", length($reason) ?? " $reason" !! '', "\n";
 	    next TEST;
 	}
 	elsif ( $todo ) {
-	    print "not ok $test # todo", length($reason) ? " - $reason" : '', "\n";
+	    print $^STDOUT, "not ok $test # todo", length($reason) ?? " - $reason" !! '', "\n";
 	    next TEST;
 	}
 	elsif ($err) {
-	    print "not ok $test $input => error: '{$@->message}'\n{dump::view($code)}\n"; next TEST;
+	    print $^STDOUT, "not ok $test $input => error: '$($^EVAL_ERROR->message)'\n$(dump::view($code))\n"; next TEST;
 	}
 	elsif ($result =~ m/^n/) {
-	    if ($match) { print "not ok $test ($study) $input => false positive\n"; next TEST }
+	    if ($match) { print $^STDOUT, "not ok $test ($study) $input => false positive\n"; next TEST }
 	}
 	else {
 	    if (!$match || $got ne $expect) {
 	        try { require Data::Dumper };
-		if ($@) {
-		    print "not ok $test ($study) $input => `$got', match=$match\n$code\n";
+		if ($^EVAL_ERROR) {
+		    print $^STDOUT, "not ok $test ($study) $input => `$got', match=$match\n$code\n";
 		}
 		else { # better diagnostics
 		    my $s = 'Data::Dumper'->new(\@($subject),\@('subject'))->Useqq(1)->Dump;
 		    my $g = 'Data::Dumper'->new(\@($got),\@('got'))->Useqq(1)->Dump;
-		    print "not ok $test ($study) $input => `$got', match=$match\n$s\n$g\n$code\n";
+		    print $^STDOUT, "not ok $test ($study) $input => `$got', match=$match\n$s\n$g\n$code\n";
 		}
 		next TEST;
 	    }
 	}
     }
-    print "ok $test\n";
+    print $^STDOUT, "ok $test\n";
 }
 
 1;

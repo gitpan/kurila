@@ -1,21 +1,11 @@
 #!./perl
 
-BEGIN {
-    require Config;
-    if ((%Config::Config{'extensions'} !~ m/\bre\b/) ){
-	print "1..0 # Skip -- Perl configured without re module\n";
-	exit 0;
-    }
-}
-
-use strict;
-
 # must use a BEGIN or the prototypes wont be respected meaning 
     # tests could pass that shouldn't
 BEGIN { require "./test.pl"; }
 my $out = runperl(progfile => "../ext/re/t/lexical_debug.pl", stderr => 1 );
 
-print "1..10\n";
+print $^STDOUT, "1..10\n";
 
 # Each pattern will produce an EXACT node with a specific string in 
 # it, so we will look for that. We can't just look for the string

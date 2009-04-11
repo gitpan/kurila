@@ -2,33 +2,32 @@
 
 BEGIN {
    chdir 't' if -d 't';
-   @INC = @( '../lib' );
-   print "1..8\n";
+   $^INCLUDE_PATH = @( '../lib' );
+   print $^STDOUT, "1..8\n";
 }
 
-use strict;
 use Fatal < qw(open close);
 
 my $i = 1;
-try { open *FOO, '<', 'lkjqweriuapofukndajsdlfjnvcvn' };
-print "not " unless $@->{description} =~ m/^Can't open/;
-print "ok $i\n"; ++$i;
+try { open \*FOO, '<', 'lkjqweriuapofukndajsdlfjnvcvn' };
+print $^STDOUT, "not " unless $^EVAL_ERROR->{?description} =~ m/^Can't open/;
+print $^STDOUT, "ok $i\n"; ++$i;
 
 my $foo = 'FOO';
 for (@("*$foo", "\\*$foo")) {
-    eval qq{ open $_, '<', '$0' }; die if $@;
-    print "not " if $@;
-    print "ok $i\n"; ++$i;
+    eval qq{ open $_, '<', '$^PROGRAM_NAME' }; die if $^EVAL_ERROR;
+    print $^STDOUT, "not " if $^EVAL_ERROR;
+    print $^STDOUT, "ok $i\n"; ++$i;
 
-    print "not " if $@ or scalar( ~< *FOO ) !~ m|^#!./perl|;
-    print "ok $i\n"; ++$i;
+    print $^STDOUT, "not " if $^EVAL_ERROR or scalar( ~< *FOO ) !~ m|^#!./perl|;
+    print $^STDOUT, "ok $i\n"; ++$i;
     eval qq{ close *FOO };
-    print "not " if $@;
-    print "ok $i\n"; ++$i;
+    print $^STDOUT, "not " if $^EVAL_ERROR;
+    print $^STDOUT, "ok $i\n"; ++$i;
 }
 
 try { Fatal->import( <qw(print)) };
-if ($@->message !~ m{Cannot make the non-overridable builtin print fatal}) {
-    print "not ";
+if ($^EVAL_ERROR->message !~ m{Cannot make the non-overridable builtin print fatal}) {
+    print $^STDOUT, "not ";
 }
-print "ok $i\n"; ++$i;
+print $^STDOUT, "ok $i\n"; ++$i;

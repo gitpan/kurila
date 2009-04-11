@@ -2,7 +2,6 @@ package User::pwent;
 
 our $VERSION = '1.00';
 
-use strict;
 use warnings;
 
 use Config;
@@ -23,12 +22,14 @@ BEGIN {
 
                    );
     %EXPORT_TAGS = %(
-        FIELDS => \@( < grep(m/^\$pw_/, @EXPORT_OK), < @EXPORT ),
+        FIELDS => \@( < grep( {m/^\$pw_/ }, @EXPORT_OK), < @EXPORT ),
         ALL    => \@( < @EXPORT, < @EXPORT_OK ),
     );
 }
-use vars < grep m/^\$pw_/, @EXPORT_OK;
 
+our ($pw_name, $pw_passwd, $pw_uid, $pw_gid, $pw_change, $pw_age,
+     $pw_class, $pw_comment, $pw_gecos, $pw_dir, $pw_shell, $pw_expire,
+     $pw_quota);
 #
 # XXX: these mean somebody hacked this module's source
 #      without understanding the underlying assumptions.
@@ -36,7 +37,10 @@ use vars < grep m/^\$pw_/, @EXPORT_OK;
 my $IE = "[INTERNAL ERROR]";
 
 # Class::Struct forbids use of @ISA
-sub import { goto &Exporter::import }
+sub import {
+    local $Exporter::ExportLevel = $Exporter::ExportLevel + 1;
+    return Exporter::import(< @_);
+}
 
 use Class::Struct < qw(struct);
 struct 'User::pwent' => \@(
@@ -78,22 +82,20 @@ sub _feature_init {
                  )
     {
         my $short = $feep =~ m/^pw(.*)/
-                  ? $1
-                  : do {
+                  ?? $1
+                  !! do {
                         # not cluck, as we know we called ourselves,
                         # and a confession is probably imminent anyway
                         warn("$IE $feep is a funny struct pwd field");
                         $feep;
                     };
 
-        exists %Config{ "d_" . $feep }
-            || die("$IE Configure doesn't d_$feep");
-        %Groks{$short} = defined %Config{ "d_" . $feep };
+        %Groks{+$short} = defined config_value("d_" . $feep);
     }
     # assume that any that are left are always there
-    for my $feep ( grep m/^\$pw_/s, @EXPORT_OK) {
+    for my $feep ( grep { m/^\$pw_/s }, @EXPORT_OK) {
         $feep =~ m/^\$pw_(.*)/;
-        %Groks{$1} = 1 unless defined %Groks{$1};
+        %Groks{+$1} = 1 unless defined %Groks{?$1};
     }
 }
 
@@ -112,21 +114,21 @@ sub pw_has {
     our %Groks;         # whether build system knew how to do this feature
     my $cando = 1;
     my $sploder = caller() ne __PACKAGE__
-                    ? \&die
-                    : sub { die("$IE {join ' ',@_}") };
+                    ?? \&die
+                    !! sub { die("$IE $(join ' ',@_)") };
     if ((nelems @_) == 0) {
-        my @valid = sort grep { %Groks{$_} } keys %Groks;
+        my @valid = sort grep { %Groks{?$_} }, keys %Groks;
         return @valid;
     }
-    for my $feep ( map { < split } @_) {
-        defined %Groks{$feep}
+    for my $feep ( @+: map { split }, @_) {
+        defined %Groks{?$feep}
             || $sploder->("$feep is never a valid struct pwd field");
-        $cando &&= %Groks{$feep};
+        $cando &&= %Groks{?$feep};
     }
     return $cando;
 }
 
-sub _populate (@) {
+sub _populate {
     return unless (nelems @_);
     my $pwob = new();
 
@@ -167,10 +169,10 @@ sub _populate (@) {
     return $pwob;
 }
 
-sub getpwent ( ) { _populate(CORE::getpwent()) }
-sub getpwnam ($) { _populate(CORE::getpwnam(shift)) }
-sub getpwuid ($) { _populate(CORE::getpwuid(shift)) }
-sub getpw    ($) { (@_[0] =~ m/^\d+\z/s) ? &getpwuid : &getpwnam }
+sub getpwent () { _populate(CORE::getpwent()) }
+sub getpwnam ($v) { _populate(CORE::getpwnam($v)) }
+sub getpwuid ($v) { _populate(CORE::getpwuid($v)) }
+sub getpw    ($v) { ($v =~ m/^\d+\z/s) ?? &getpwuid($v) !! &getpwnam($v) }
 
 _feature_init();
 

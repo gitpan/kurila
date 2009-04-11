@@ -8,17 +8,13 @@
 # spaces.
 
 BEGIN {
-    if (%ENV{PERL_CORE}){
-	push @INC, '../ext/B/t';
+    if (env::var('PERL_CORE')){
+	push $^INCLUDE_PATH, '../ext/B/t';
     } else {
-	unshift @INC, 't';
-	push @INC, "../../t";
+	unshift $^INCLUDE_PATH, 't';
+	push $^INCLUDE_PATH, "../../t";
     }
     require Config;
-    if ((%Config::Config{'extensions'} !~ m/\bB\b/) ){
-        print "1..0 # Skip -- Perl configured without B module\n";
-        exit 0;
-    }
     # require 'test.pl'; # now done by OptreeCheck
 }
 
@@ -382,7 +378,7 @@ EOT_EOT
 EONT_EONT
 
 
-# perl "-I../lib" -MO=Concise,BEGIN,CHECK,INIT,END,-exec -e '$a=$b && print q/foo/'
+# perl "-I../lib" -MO=Concise,BEGIN,CHECK,INIT,END,-exec -e '($a=$b) && print q/foo/'
 
 
 

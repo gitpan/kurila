@@ -1,12 +1,11 @@
 
  # Time-stamp: "2004-03-30 17:52:14 AST"
-use strict;
-use Test;
+use Test::More;
 BEGIN { plan tests => 64 };
 BEGIN { ok 1 }
 use I18N::LangTags (':ALL');
 
-print "# Perl $^V, I18N::LangTags v$I18N::LangTags::VERSION\n";
+print $^STDOUT, "# Perl $^PERL_VERSION, I18N::LangTags v$I18N::LangTags::VERSION\n";
 
 ok !is_language_tag('');
 ok  is_language_tag('fr');
@@ -32,14 +31,14 @@ ok 1 == similarity_language_tag('en-ca', 'en-us');
 ok 2 == similarity_language_tag('en-us-southern', 'en-us-western');
 ok 2 == similarity_language_tag('en-us-southern', 'en-us');
 
-ok grep $_ eq 'hi', panic_languages('kok');
-ok grep $_ eq 'en', panic_languages('x-woozle-wuzzle');
-ok ! grep $_ eq 'mr', panic_languages('it');
-ok grep $_ eq 'es', panic_languages('it');
-ok grep $_ eq 'it', panic_languages('es');
+ok grep { $_ eq 'hi' }, panic_languages('kok');
+ok grep { $_ eq 'en' }, panic_languages('x-woozle-wuzzle');
+ok ! grep { $_ eq 'mr' }, panic_languages('it');
+ok grep { $_ eq 'es' }, panic_languages('it');
+ok grep { $_ eq 'it' }, panic_languages('es');
 
 
-print "# Now the ::List tests...\n";
+print $^STDOUT, "# Now the ::List tests...\n";
 
 use I18N::LangTags::List;
 foreach my $lt (qw(
@@ -83,14 +82,14 @@ foreach my $lt (qw(
   my $name = I18N::LangTags::List::name($lt);
   if($name) {
     ok(1);
-    print "#        $lt -> $name\n";
+    print $^STDOUT, "#        $lt -> $name\n";
   } else {
     ok(0);
-    print "#        Failed lookup on $lt\n";
+    print $^STDOUT, "#        Failed lookup on $lt\n";
   }
 }
 
 
 
-print "# So there!\n";
+print $^STDOUT, "# So there!\n";
 

@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-use strict;
+
 use Test::More tests => 15;
 
 BEGIN { use_ok('fields'); }
@@ -21,10 +21,9 @@ is_deeply( \(sort keys %Foo::FIELDS),
 );
 
 sub show_fields {
-    my($base, $mask) = < @_;
-    no strict 'refs';
+    my@($base, $mask) =  @_;
     my $fields = \%{*{Symbol::fetch_glob($base.'::FIELDS')}};
-    return grep { (%fields::attr{$base}->[$fields->{$_}] ^&^ $mask) == $mask} 
+    return grep { (%fields::attr{$base}->[$fields->{?$_}] ^&^ $mask) == $mask},
                 keys %$fields;
 }
 
@@ -39,38 +38,38 @@ foreach (@(Foo->new)) {
                  what  => 'Ahh',      who => 'Moo',
                  _up_yours => 'Yip' );
 
-    $obj->{Pants} = 'Whatever';
-    $obj->{_no}   = 'Yeah';
- <    %{$obj}{[qw(what who _up_yours)]} = ('Ahh', 'Moo', 'Yip');
+    $obj->{+Pants} = 'Whatever';
+    $obj->{+_no}   = 'Yeah';
+     %{$obj}{[qw(what who _up_yours)]} = @('Ahh', 'Moo', 'Yip');
 
-    while(my($k,$v) = each %test) {
-        is($obj->{$k}, $v);
+    while(my@(?$k,?$v) =@( each %test)) {
+        is($obj->{?$k}, $v);
     }
 }
 
-{
+do {
     local $^WARN_HOOK = sub {
         return if @_[0] =~ m/^Pseudo-hashes are deprecated/ 
     };
     my $phash;
     try { $phash = fields::phash(name => "Joe", rank => "Captain") };
-    like $@->{description}, qr/^Pseudo-hashes have been removed from Perl/;
-}
+    like $^EVAL_ERROR->{?description}, qr/^Pseudo-hashes have been removed from Perl/;
+};
 
 
 # check if fields autovivify
-{
+do {
     package Foo::Autoviv;
     use fields < qw(foo bar);
     sub new { fields::new(@_[0]) }
 
     package main;
     my $a = Foo::Autoviv->new();
-    $a->{foo} = \@('a', 'ok', 'c');
-    $a->{bar} = \%( A => 'ok' );
+    $a->{+foo} = \@('a', 'ok', 'c');
+    $a->{+bar} = \%( A => 'ok' );
     is( $a->{foo}->[1],    'ok' );
-    is( $a->{bar}->{A},, 'ok' );
-}
+    is( $a->{bar}->{?A},, 'ok' );
+};
 
 package Test::FooBar;
 
@@ -78,16 +77,17 @@ use fields < qw(a b c);
 
 sub new {
     my $self = fields::new(shift);
-    (<%$self) = < @_ if (nelems @_);
+    my @(%<%h) =  @_ if (nelems @_);
+    $self->{+$_} = %h{$_} for keys %h;
     $self;
 }
 
 package main;
 
-{
+do {
     my $x = Test::FooBar->new( a => 1, b => 2);
 
     is(ref $x, 'Test::FooBar', 'x is a Test::FooBar');
     ok(exists $x->{a}, 'x has a');
     ok(exists $x->{b}, 'x has b');
-}
+};

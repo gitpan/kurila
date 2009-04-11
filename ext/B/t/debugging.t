@@ -2,22 +2,22 @@
 # Test -DEBUGGING things (in dump.c)
 
 BEGIN {
-    if (%ENV{PERL_CORE}){
-        push @INC, '../ext/B/t';
+    if (env::var('PERL_CORE')){
+        push $^INCLUDE_PATH, '../ext/B/t';
     } else {
-        unshift @INC, 't';
-        push @INC, "../../t";
+        unshift $^INCLUDE_PATH, 't';
+        push $^INCLUDE_PATH, "../../t";
     }
     # skip all tests unless perl was compiled with -DDEBUGGING
     require Config;
-    if (%Config::Config{'ccflags'} !~ m/-DDEBUGGING /) {
-        print "1..0 # Skip -- Perl built w/o -DEBUGGING\n";
+    if (Config::config_value('ccflags') !~ m/-DDEBUGGING /) {
+        print $^STDOUT, "1..0 # Skip -- Perl built w/o -DEBUGGING\n";
         exit 0;
     }
     # require 'test.pl'; # now done by OptreeCheck
 }
 
-print "1..0 # Skip -- TODO for kurila\n";
+print $^STDOUT, "1..0 # Skip -- TODO for kurila\n";
 exit 0;
 
 use OptreeCheck;

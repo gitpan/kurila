@@ -4,34 +4,28 @@ use Config;
 
 BEGIN {
     my $reason;
-    if (%ENV{PERL_CORE} and %Config{'extensions'} !~ m/\bSocket\b/) {
-	$reason = 'Socket extension unavailable';
-    }
-    elsif (%ENV{PERL_CORE} and %Config{'extensions'} !~ m/\bIO\b/) {
-	$reason = 'IO extension unavailable';
-    }
-    elsif ($^O eq 'os2') {
+    if ($^OS_NAME eq 'os2') {
 	require IO::Socket;
 
 	try {IO::Socket::pack_sockaddr_un('/foo/bar') || 1}
-	  or $@->{description} !~ m/not implemented/ or
+	  or $^EVAL_ERROR->{?description} !~ m/not implemented/ or
 	    $reason = 'compiled without TCP/IP stack v4';
     }
-    elsif ($^O =~ m/^(?:qnx|nto|vos|MSWin32)$/ ) {
-	$reason = "UNIX domain sockets not implemented on $^O";
+    elsif ($^OS_NAME =~ m/^(?:qnx|nto|vos|MSWin32)$/ ) {
+	$reason = "UNIX domain sockets not implemented on $^OS_NAME";
     }
-    elsif (! %Config{'d_fork'}) {
+    elsif (! config_value('d_fork')) {
 	$reason = 'no fork';
     }
     if ($reason) {
-	print "1..0 # Skip: $reason\n";
+	print $^STDOUT, "1..0 # Skip: $reason\n";
 	exit 0;
     }
 }
 
-my $PATH = "sock-$$";
+my $PATH = "sock-$^PID";
 
-if ($^O eq 'os2') {	# Can't create sockets with relative path...
+if ($^OS_NAME eq 'os2') {	# Can't create sockets with relative path...
   require Cwd;
   my $d = Cwd::cwd();
   $d =~ s/^[a-z]://i;
@@ -39,16 +33,15 @@ if ($^O eq 'os2') {	# Can't create sockets with relative path...
 }
 
 # Test if we can create the file within the tmp directory
-if (-e $PATH or not open(TEST, ">", "$PATH") and $^O ne 'os2') {
-    print "1..0 # Skip: cannot open '$PATH' for write\n";
+if (-e $PATH or not open(my $testfh, ">", "$PATH") and $^OS_NAME ne 'os2') {
+    print $^STDOUT, "1..0 # Skip: cannot open '$PATH' for write\n";
     exit 0;
 }
-close(TEST);
-unlink($PATH) or $^O eq 'os2' or die "Can't unlink $PATH: $!";
+unlink($PATH) or $^OS_NAME eq 'os2' or die "Can't unlink $PATH: $^OS_ERROR";
 
 # Start testing
-$| = 1;
-print "1..5\n";
+$^OUTPUT_AUTOFLUSH = 1;
+print $^STDOUT, "1..5\n";
 
 use IO::Socket::UNIX;
 
@@ -60,9 +53,9 @@ my $listen = IO::Socket::UNIX->new(Local => $PATH, Listen => 0);
 # generated filename from a temp directory.
 unless (defined $listen) {
     try { require File::Temp };
-    unless ($@) {
+    unless ($^EVAL_ERROR) {
 	File::Temp->import( 'mktemp');
-	for my $TMPDIR (%ENV{TMPDIR}, "/tmp") {
+	for my $TMPDIR (@: env::var('TMPDIR'), "/tmp") {
 	    if (defined $TMPDIR && -d $TMPDIR && -w $TMPDIR) {
 		$PATH = mktemp("$TMPDIR/sXXXXXXXX");
 		last if $listen = IO::Socket::UNIX->new(Local => $PATH,
@@ -70,44 +63,44 @@ unless (defined $listen) {
 	    }
 	}
     }
-    defined $listen or die "$PATH: $!";
+    defined $listen or die "$PATH: $^OS_ERROR";
 }
-print "ok 1\n";
+print $^STDOUT, "ok 1\n";
 
 if(my $pid = fork()) {
 
     my $sock = $listen->accept();
 
     if (defined $sock) {
-	print "ok 2\n";
+	print $^STDOUT, "ok 2\n";
 
-	print $sock->getline();
+	print $^STDOUT, $sock->getline();
 
-	print $sock "ok 4\n";
+	print $sock, "ok 4\n";
 
 	$sock->close;
 
 	waitpid($pid,0);
-	unlink($PATH) || $^O eq 'os2' || warn "Can't unlink $PATH: $!";
+	unlink($PATH) || $^OS_NAME eq 'os2' || warn "Can't unlink $PATH: $^OS_ERROR";
 
-	print "ok 5\n";
+	print $^STDOUT, "ok 5\n";
     } else {
-	print "# accept() failed: $!\n";
+	print $^STDOUT, "# accept() failed: $^OS_ERROR\n";
 	for (2..5) {
-	    print "not ok $_ # accept failed\n";
+	    print $^STDOUT, "not ok $_ # accept failed\n";
 	}
     }
 } elsif(defined $pid) {
 
-    my $sock = IO::Socket::UNIX->new(Peer => $PATH) or die "$!";
+    my $sock = IO::Socket::UNIX->new(Peer => $PATH) or die "$^OS_ERROR";
 
-    print $sock "ok 3\n";
+    print $sock, "ok 3\n";
 
-    print $sock->getline();
+    print $^STDOUT, $sock->getline();
 
     $sock->close;
 
     exit;
 } else {
- die;
+    die;
 }

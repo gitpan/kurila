@@ -2,7 +2,7 @@
 package Pod::Simple::PullParserEndToken;
 use Pod::Simple::PullParserToken ();
 our @ISA = @('Pod::Simple::PullParserToken');
-use strict;
+
 
 sub new {  # Class->new(tagname);
   my $class = shift;
@@ -11,7 +11,7 @@ sub new {  # Class->new(tagname);
 
 # Purely accessors:
 
-sub tagname { ((nelems @_) == 2) ?  @(@_[0]->[1] = @_[1]) : @_[0]->[1] }
+sub tagname { ((nelems @_) == 2) ??  @(@_[0]->[1] = @_[1]) !! @_[0]->[1] }
 sub tag { shift->tagname(< @_) }
 
 # shortcut:

@@ -1,14 +1,13 @@
 BEGIN {
-    if(%ENV{PERL_CORE}) {
+    if(env::var('PERL_CORE')) {
         chdir 't' if -d 't';
-        @INC = @( '../lib' );
+        $^INCLUDE_PATH = @( '../lib' );
     }
 }
 
 # Time-stamp: "2004-05-07 15:43:11 ADT"
 
-use strict;
-use Test;
+use Test::More;
 use utf8;
 
 my @them;
@@ -19,102 +18,102 @@ ok 1;
 
 eval " binmode(STDOUT, ':utf8') ";
 
-print "# Pod::Escapes version $Pod::Escapes::VERSION\n";
-print "# I'm ", (chr(65) eq 'A') ? '' : 'not ', "in ASCII world.\n";
-print "#\n#------------------------\n#\n";
+print $^STDOUT, "# Pod::Escapes version $Pod::Escapes::VERSION\n";
+print $^STDOUT, "# I'm ", (chr(65) eq 'A') ?? '' !! 'not ', "in ASCII world.\n";
+print $^STDOUT, "#\n#------------------------\n#\n";
 
 foreach my $quotie (qw( \n \r \cm \cj \t \f \b \a \e )) {
   my $val = eval "\"$quotie\"";
-  if($@) {
+  if($^EVAL_ERROR) {
     ok 0;
-    print "# Error in evalling quotie \"$quotie\"\n";
+    print $^STDOUT, "# Error in evalling quotie \"$quotie\"\n";
   } elsif(!defined $val) {
     ok 0;
-    print "# \"$quotie\" is undef!?\n";
+    print $^STDOUT, "# \"$quotie\" is undef!?\n";
   } else {
     ok 1;
-    print "# \"$quotie\" is ", ord($val), "\n";
+    print $^STDOUT, "# \"$quotie\" is ", ord($val), "\n";
   }
 }
 
-print "#\n#------------------------\n#\n";
+print $^STDOUT, "#\n#------------------------\n#\n";
 
-print "# 'A' tests...\n";
-ok e2char('65'), 'A';
-ok e2char('x41'), 'A';
-ok e2char('x041'), 'A';
-ok e2char('x0041'), 'A';
-ok e2char('x00041'), 'A';
-ok e2char('0101'), 'A';
-ok e2char('00101'), 'A';
-ok e2char('000101'), 'A';
-ok e2char('0000101'), 'A';
+print $^STDOUT, "# 'A' tests...\n";
+is e2char('65'), 'A';
+is e2char('x41'), 'A';
+is e2char('x041'), 'A';
+is e2char('x0041'), 'A';
+is e2char('x00041'), 'A';
+is e2char('0101'), 'A';
+is e2char('00101'), 'A';
+is e2char('000101'), 'A';
+is e2char('0000101'), 'A';
 
-print "# '<' tests...\n";
-ok e2char('lt'), '<';
-ok e2char('60'), '<';
-ok e2char('074'), '<';
-ok e2char('0074'), '<';
-ok e2char('00074'), '<';
-ok e2char('000074'), '<';
+print $^STDOUT, "# '<' tests...\n";
+is e2char('lt'), '<';
+is e2char('60'), '<';
+is e2char('074'), '<';
+is e2char('0074'), '<';
+is e2char('00074'), '<';
+is e2char('000074'), '<';
 
-ok e2char('x3c'), '<';
-ok e2char('x3C'), '<';
-ok e2char('x03c'), '<';
-ok e2char('x003c'), '<';
-ok e2char('x0003c'), '<';
-ok e2char('x00003c'), '<';
-ok e2char('0x3c'), '<';
-ok e2char('0x3C'), '<';
-ok e2char('0x03c'), '<';
-ok e2char('0x003c'), '<';
-ok e2char('0x0003c'), '<';
-ok e2char('0x00003c'), '<';
+is e2char('x3c'), '<';
+is e2char('x3C'), '<';
+is e2char('x03c'), '<';
+is e2char('x003c'), '<';
+is e2char('x0003c'), '<';
+is e2char('x00003c'), '<';
+is e2char('0x3c'), '<';
+is e2char('0x3C'), '<';
+is e2char('0x03c'), '<';
+is e2char('0x003c'), '<';
+is e2char('0x0003c'), '<';
+is e2char('0x00003c'), '<';
 
 ok e2char('65') ne e2char('lt');
 
-print "# eacute tests...\n";
+print $^STDOUT, "# eacute tests...\n";
 ok defined e2char('eacute');
 
-print "#    eacute is <", e2char('eacute'), "> which is code ",
+print $^STDOUT, "#    eacute is <", e2char('eacute'), "> which is code ",
       ord(e2char('eacute')), "\n";
 
-ok e2char('eacute'), e2char('233');
-ok e2char('eacute'), e2char('0351');
-ok e2char('eacute'), e2char('xe9');
-ok e2char('eacute'), e2char('xE9');
+is e2char('eacute'), e2char('233');
+is e2char('eacute'), e2char('0351');
+is e2char('eacute'), e2char('xe9');
+is e2char('eacute'), e2char('xE9');
 
-print "# pi tests...\n";
+print $^STDOUT, "# pi tests...\n";
 ok defined e2char('pi');
 
-print "#    pi is <", e2char('pi'), "> which is code ",
+print $^STDOUT, "#    pi is <", e2char('pi'), "> which is code ",
       ord(e2char('pi')), "\n";
 
-ok e2char('pi'), e2char('960');
-ok e2char('pi'), e2char('01700');
-ok e2char('pi'), e2char('001700');
-ok e2char('pi'), e2char('0001700');
-ok e2char('pi'), e2char('x3c0');
-ok e2char('pi'), e2char('x3C0');
-ok e2char('pi'), e2char('x03C0');
-ok e2char('pi'), e2char('x003C0');
-ok e2char('pi'), e2char('x0003C0');
+is e2char('pi'), e2char('960');
+is e2char('pi'), e2char('01700');
+is e2char('pi'), e2char('001700');
+is e2char('pi'), e2char('0001700');
+is e2char('pi'), e2char('x3c0');
+is e2char('pi'), e2char('x3C0');
+is e2char('pi'), e2char('x03C0');
+is e2char('pi'), e2char('x003C0');
+is e2char('pi'), e2char('x0003C0');
 
 
-print "# various hash tests...\n";
+print $^STDOUT, "# various hash tests...\n";
 
 ok nkeys %Name2character;
-ok defined %Name2character{'eacute'};
-ok %Name2character{'lt'} eq '<';
+ok defined %Name2character{?'eacute'};
+ok %Name2character{?'lt'} eq '<';
 
 ok nkeys %Latin1Code_to_fallback;
-ok defined %Latin1Code_to_fallback{233};
+ok defined %Latin1Code_to_fallback{?233};
 
 ok nkeys %Latin1Char_to_fallback;
-ok defined %Latin1Char_to_fallback{chr(233)};
+ok defined %Latin1Char_to_fallback{?chr(233)};
 
 ok nkeys %Code2USASCII;
-ok defined %Code2USASCII{65};
-ok %Code2USASCII{65} eq 'A';
+ok defined %Code2USASCII{?65};
+ok %Code2USASCII{?65} eq 'A';
 
 

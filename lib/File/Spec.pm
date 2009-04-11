@@ -1,6 +1,5 @@
 package File::Spec;
 
-use strict;
 our (@ISA, $VERSION);
 
 $VERSION = '3.2701';
@@ -17,7 +16,7 @@ my %module = %(MacOS   => 'Mac',
 	      cygwin  => 'Cygwin');
 
 
-my $module = %module{$^O} || 'Unix';
+my $module = %module{?$^OS_NAME} || 'Unix';
 
 require "File/Spec/$module.pm";
 @ISA = @("File::Spec::$module");

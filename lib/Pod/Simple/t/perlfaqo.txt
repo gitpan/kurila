@@ -24,7 +24,7 @@ Is there a Perl shell?
 In general, no. The Shell.pm module (distributed with Perl) makes Perl try commands which aren't part of the Perl language as shell commands. perlsh from the source distribution is simplistic and uninteresting, but may still be what you want.
 How do I debug my Perl programs?
 Have you tried use warnings or used -w? They enable warnings to detect dubious practices.
-Have you tried use strict? It prevents you from using symbolic references, makes you predeclare any subroutines that you call as bare words, and (probably most importantly) forces you to predeclare your variables with my, our, or use vars.
+Have you tried use strict? It prevents you from using symbolic references, makes you predeclare any subroutines that you call as bare words, and (probably most importantly) forces you to predeclare your variables with my, our.
 Did you check the return values of each and every system call? The operating system (and thus Perl) tells you whether they worked, and if not why.
   open(FH, "> /etc/cantwrite")
     or die "Couldn't write to /etc/cantwrite: $!\n";
@@ -251,10 +251,7 @@ If you want to call C from Perl, start with perlxstut, moving on to perlxs, xsub
 I've read perlembed, perlguts, etc., but I can't embed perl in my C program; what am I doing wrong?
 Download the ExtUtils::Embed kit from CPAN and run `make test'. If the tests pass, read the pods again and again and again. If they fail, see perlbug and send a bug report with the output of make test TEST_VERBOSE=1 along with perl -V.
 When I tried to run my script, I got this message. What does it mean?
-A complete list of Perl's error messages and warnings with explanatory text can be found in perldiag. You can also use the splain program (distributed with Perl) to explain the error messages:
-    perl program 2>diag.out
-    splain [-v] [-p] diag.out
-or change your program to explain the messages for you:
+A complete list of Perl's error messages and warnings with explanatory text can be found in perldiag. You can also change your program to explain the messages for you:
     use diagnostics;
 or
     use diagnostics -verbose;

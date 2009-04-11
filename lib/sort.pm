@@ -10,7 +10,6 @@ $sort::mergesort_bit   = 0x00000002;
 $sort::sort_bits       = 0x000000FF; # allow 256 different ones
 $sort::stable_bit      = 0x00000100;
 
-use strict;
 
 sub import {
     shift;
@@ -18,19 +17,19 @@ sub import {
 	require Carp;
 	Carp::croak("sort pragma requires arguments");
     }
-    local $_;
-    %^H{sort} //= 0;
+    local $_ = undef;
+    $^HINTS{+sort} //= 0;
     while ($_ = shift(@_)) {
 	if (m/^_q(?:uick)?sort$/) {
-	    %^H{sort} ^&^= ^~^$sort::sort_bits;
-	    %^H{sort} ^|^=  $sort::quicksort_bit;
+	    $^HINTS{+sort} ^&^= ^~^$sort::sort_bits;
+	    $^HINTS{+sort} ^|^=  $sort::quicksort_bit;
 	} elsif ($_ eq '_mergesort') {
-	    %^H{sort} ^&^= ^~^$sort::sort_bits;
-	    %^H{sort} ^|^=  $sort::mergesort_bit;
+	    $^HINTS{+sort} ^&^= ^~^$sort::sort_bits;
+	    $^HINTS{+sort} ^|^=  $sort::mergesort_bit;
 	} elsif ($_ eq 'stable') {
-	    %^H{sort} ^|^=  $sort::stable_bit;
+	    $^HINTS{+sort} ^|^=  $sort::stable_bit;
 	} elsif ($_ eq 'defaults') {
-	    %^H{sort} =   0;
+	    $^HINTS{+sort} =   0;
 	} else {
 	    die("sort: unknown subpragma '$_'");
 	}
@@ -42,15 +41,15 @@ sub unimport {
     if ((nelems @_) == 0) {
 	die("sort pragma requires arguments");
     }
-    local $_;
+    local $_ = undef;
     no warnings 'uninitialized';	# bitops would warn
     while ($_ = shift(@_)) {
 	if (m/^_q(?:uick)?sort$/) {
-	    %^H{sort} ^&^= ^~^$sort::sort_bits;
+	    $^HINTS{+sort} ^&^= ^~^$sort::sort_bits;
 	} elsif ($_ eq '_mergesort') {
-	    %^H{sort} ^&^= ^~^$sort::sort_bits;
+	    $^HINTS{+sort} ^&^= ^~^$sort::sort_bits;
 	} elsif ($_ eq 'stable') {
-	    %^H{sort} ^&^= ^~^$sort::stable_bit;
+	    $^HINTS{+sort} ^&^= ^~^$sort::stable_bit;
 	} else {
 	    die("sort: unknown subpragma '$_'");
 	}
@@ -59,10 +58,10 @@ sub unimport {
 
 sub current {
     my @sort;
-    if (%^H{sort}) {
-	push @sort, 'quicksort' if %^H{sort} ^&^ $sort::quicksort_bit;
-	push @sort, 'mergesort' if %^H{sort} ^&^ $sort::mergesort_bit;
-	push @sort, 'stable'    if %^H{sort} ^&^ $sort::stable_bit;
+    if ($^HINTS{?sort}) {
+	push @sort, 'quicksort' if $^HINTS{?sort} ^&^ $sort::quicksort_bit;
+	push @sort, 'mergesort' if $^HINTS{?sort} ^&^ $sort::mergesort_bit;
+	push @sort, 'stable'    if $^HINTS{?sort} ^&^ $sort::stable_bit;
     }
     push @sort, 'mergesort' unless (nelems @sort);
     join(' ', @sort);

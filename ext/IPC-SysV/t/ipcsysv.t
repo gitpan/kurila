@@ -3,13 +3,10 @@ BEGIN {
     require './test.pl';
 }
 
-if (%Config{'extensions'} !~ m/\bIPC\/SysV\b/) {
-    skip_all('IPC::SysV was not built');
-}
-elsif (%Config{'d_sem'} ne 'define') {
+if (config_value('d_sem') ne 'define') {
     skip_all('$Config{d_sem} undefined');
 }
-elsif (%Config{'d_msg'} ne 'define') {
+elsif (config_value('d_msg') ne 'define') {
     skip_all('$Config{d_msg} undefined');
 }
 else {
@@ -20,19 +17,19 @@ else {
 # Later the sem* tests will import more for themselves.
 
 use IPC::SysV < qw(IPC_PRIVATE IPC_NOWAIT IPC_STAT IPC_RMID S_IRWXU);
-use strict;
+
 
 my $msg;
 my $sem;
 
 # FreeBSD is known to throw this if there's no SysV IPC in the kernel.
-%SIG{SYS} = sub {
+signals::handler("SYS") = sub {
     diag(<<EOM);
 SIGSYS caught.
 It may be that your kernel does not have SysV IPC configured.
 
 EOM
-    if ($^O eq 'freebsd') {
+    if ($^OS_NAME eq 'freebsd') {
         diag(<<EOM);
 You must have following options in your kernel:
 
@@ -50,18 +47,18 @@ EOM
 
 my $perm = S_IRWXU;
 
-SKIP: {
+SKIP: do {
 
 skip( 'lacking d_msgget d_msgctl d_msgsnd d_msgrcv', 6 ) unless
-    %Config{'d_msgget'} eq 'define' &&
-    %Config{'d_msgctl'} eq 'define' &&
-    %Config{'d_msgsnd'} eq 'define' &&
-    %Config{'d_msgrcv'} eq 'define';
+    config_value('d_msgget') eq 'define' &&
+    config_value('d_msgctl') eq 'define' &&
+    config_value('d_msgsnd') eq 'define' &&
+    config_value('d_msgrcv') eq 'define';
 
     $msg = msgget(IPC_PRIVATE, $perm);
     # Very first time called after machine is booted value may be 0 
     if (!(defined($msg) && $msg +>= 0)) {
-        skip( "msgget failed: $!", 6);
+        skip( "msgget failed: $^OS_ERROR", 6);
     }
     else {
         pass('msgget IPC_PRIVATE S_IRWXU');
@@ -87,7 +84,7 @@ The failure of the subtest #2 may indicate that the message queue
 resource limits either of the system or of the testing account
 have been reached.  Error message "Operating would block" is
 usually indicative of this situation.  The error message was now:
-"$!"
+"$^OS_ERROR"
 
 You can check the message queues with the 'ipcs' command and
 you can remove unneeded queues with the 'ipcrm -q id' command.
@@ -121,7 +118,7 @@ EOM
 
     my $test_name = 'message get data';
     my($rmsgtype,$rmsgtext);
-    ($rmsgtype,$rmsgtext) = unpack("L! a*",$msgbuf);
+    @($rmsgtype,$rmsgtext) = @: unpack("L! a*",$msgbuf);
     if ($rmsgtype == $msgtype && $rmsgtext eq $msgtext) {
         pass($test_name);
     }
@@ -130,17 +127,17 @@ EOM
         $test6bad = 1;
     }
     if ($test6bad && $test2bad) {
-    print <<EOM;
+    print $^STDOUT, <<EOM;
 This failure was to be expected because the subtest #2 failed.
 EOM
      }
-} # SKIP
+}; # SKIP
 
-SKIP: {
+SKIP: do {
 
     skip('lacking d_semget d_semctl', 11) unless
-        %Config{'d_semget'} eq 'define' &&
-        %Config{'d_semctl'} eq 'define';
+        config_value('d_semget') eq 'define' &&
+        config_value('d_semctl') eq 'define';
 
     use IPC::SysV < qw(IPC_CREAT GETALL SETALL);
 
@@ -153,12 +150,12 @@ SKIP: {
         pass($test_name);
     }
     else {
-        diag("cannot proceed: semget() error: $!");
+        diag("cannot proceed: semget() error: $^OS_ERROR");
         skip('semget() resource unavailable', 11)
-            if $! eq 'No space left on device';
+            if $^OS_ERROR eq 'No space left on device';
 
         # Very first time called after machine is booted value may be 0 
-        die "semget: $!\n" unless defined($sem) && $sem +>= 0;
+        die "semget: $^OS_ERROR\n" unless defined($sem) && $sem +>= 0;
     }
 
     my $data;
@@ -166,12 +163,12 @@ SKIP: {
 
     cmp_ok(length($data),'+>',0,'sem data len');
 
-    ok(semctl($sem,0,SETALL,pack("s!*",(0) x $nsem)), 'set all sems');
+    ok(semctl($sem,0,SETALL,pack("s!*",< $: @(0) x $nsem)), 'set all sems');
 
     $data = "";
     ok(semctl($sem,0,GETALL,$data), 'get all sems');
 
-    is(length($data),length(pack("s!*",(0) x $nsem)), 'right length');
+    is(length($data),length(pack("s!*", < $: @(0) x $nsem)), 'right length');
 
     my @data = @(unpack("s!*",$data));
 
@@ -192,7 +189,7 @@ SKIP: {
     my $bdata = "0" x $poke . "1" . "0" x ($nsem-$poke-1);
 
     cmp_ok(join("",@data),'eq',$bdata,'changed');
-} # SKIP
+}; # SKIP
 
 END {
     msgctl($msg,IPC_RMID,0)       if defined $msg;

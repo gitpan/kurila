@@ -8,27 +8,19 @@
 # NOTE THAT THIS FILE IS COPIED FROM ext/Storable/t/st-dump.pl
 # TO t/lib/st-dump.pl.  One could also play games with
 # File::Spec->updir and catdir to get the st-dump.pl in
-# ext/Storable into @INC.
+# ext/Storable into $^INCLUDE_PATH.
 
-sub ok {
-	my ($num, $ok, $name) = < @_;
-        $num .= " - $name" if defined $name and length $name;
-	print $ok ? "ok $num\n" : "not ok $num\n";
-        $ok;
-}
-
-sub num_equal {
-	my ($num, $left, $right, $name) = < @_;
-        my $ok = ((defined $left) ? $left == $right : undef);
+sub num_equal($num, $left, $right, $name) {
+        my $ok = ((defined $left) ?? $left == $right !! undef);
         unless (ok ($num, $ok, $name)) {
-          print "# Expected $right\n";
+          print $^STDOUT, "# Expected $right\n";
           if (!defined $left) {
-            print "# Got undef\n";
+            print $^STDOUT, "# Got undef\n";
           } elsif ($left !~ m/[^0-9]/) {
-            print "# Got $left\n";
+            print $^STDOUT, "# Got $left\n";
           } else {
-            $left =~ s/([^-a-zA-Z0-9_+])/{sprintf "\\\%03o", ord $1}/g;
-            print "# Got \"$left\"\n";
+            $left =~ s/([^-a-zA-Z0-9_+])/$(sprintf "\\\%03o", ord $1)/g;
+            print $^STDOUT, "# Got \"$left\"\n";
           }
         }
         $ok;
@@ -48,8 +40,7 @@ my %dump = %(
 our (%dumped, %object, $count, $dumped);
 
 # Given an object, dump its transitive data closure
-sub main::dump {
-	my ($object) = < @_;
+sub main::dump($object) {
 	croak "Not a reference!" unless ref($object);
 	local %dumped;
 	local %object;
@@ -65,15 +56,14 @@ sub main::dump {
 # the routine is an internal temporay variable, implying the object's
 # address is not to be dumped in the %dumped table since it's not a
 # user-visible object.
-sub recursive_dump {
-	my ($object, $link) = < @_;
+sub recursive_dump($object, $link) {
 
 	# Get something like SCALAR(0x...) or TYPE=SCALAR(0x...).
 	# Then extract the bless, ref and address parts of that string.
 
 	my $what = dump::view($object);		# Stringify
-	my ($bless, $ref, $addr) = $what =~ m/^(\w+)=(\w+)\((0x.*)\)$/;
-	($ref, $addr) = $what =~ m/^(\w+)\((0x.*)\)$/ unless $bless;
+	my @(?$bless, ?$ref, ?$addr) = @: $what =~ m/^(\w+)=(\w+)\((0x.*)\)$/;
+	@($ref, $addr) = @: $what =~ m/^(\w+)\((0x.*)\)$/ unless $bless;
 
 	# Special case for references to references. When stringified,
 	# they appear as being scalars. However, ref() correctly pinpoints
@@ -85,36 +75,34 @@ sub recursive_dump {
 	# We don't want to duplicate data. Retrieval will know how to
 	# relink from the previously seen object.
 
-	if ($link && %dumped{$addr}++) {
-		my $num = %object{$addr};
+	if ($link && %dumped{+$addr}++) {
+		my $num = %object{?$addr};
 		$dumped .= "OBJECT #$num seen\n";
 		return;
 	}
 
 	my $objcount = $count++;
-	%object{$addr} = $objcount;
+	%object{+$addr} = $objcount;
 
 	# Call the appropriate dumping routine based on the reference type.
 	# If the referenced was blessed, we bless it once the object is dumped.
 	# The retrieval code will perform the same on the last object retrieved.
 
-	croak "Unknown simple type '$ref'" unless defined %dump{$ref};
+	croak "Unknown simple type '$ref'" unless defined %dump{?$ref};
 
-	&{*{Symbol::fetch_glob(%dump{$ref})}}($object);	# Dump object
+	&{*{Symbol::fetch_glob(%dump{?$ref})}}($object);	# Dump object
 	&bless($bless) if $bless;	# Mark it as blessed, if necessary
 
 	$dumped .= "OBJECT $objcount\n";
 }
 
 # Indicate that current object is blessed
-sub bless {
-	my ($class) = < @_;
+sub bless($class) {
 	$dumped .= "BLESS $class\n";
 }
 
 # Dump single scalar
-sub dump_scalar {
-	my ($sref) = < @_;
+sub dump_scalar($sref) {
 	my $scalar = $$sref;
 	unless (defined $scalar) {
 		$dumped .= "UNDEF\n";
@@ -125,8 +113,7 @@ sub dump_scalar {
 }
 
 # Dump array
-sub dump_array {
-	my ($aref) = < @_;
+sub dump_array($aref) {
 	my $items = nelems @{$aref};
 	$dumped .= "ARRAY items=$items\n";
 	foreach my $item ( @{$aref}) {
@@ -140,25 +127,23 @@ sub dump_array {
 }
 
 # Dump hash table
-sub dump_hash {
-	my ($href) = < @_;
+sub dump_hash($href) {
 	my $items = nelems(keys %{$href});
 	$dumped .= "HASH items=$items\n";
 	foreach my $key (sort keys %{$href}) {
 		$dumped .= 'KEY ';
 		&recursive_dump(\$key, undef);
-		unless (defined $href->{$key}) {
+		unless (defined $href->{?$key}) {
 			$dumped .= 'VALUE_UNDEF' . "\n";
 			next;
 		}
 		$dumped .= 'VALUE ';
-		&recursive_dump(\$href->{$key}, 1);
+		&recursive_dump(\$href->{+$key}, 1);
 	}
 }
 
 # Dump reference to reference
-sub dump_ref {
-	my ($rref) = < @_;
+sub dump_ref($rref) {
 	my $deref = $$rref;				# Follow reference to reference
 	$dumped .= 'REF ';
 	&recursive_dump($deref, 1);		# $dref is a reference

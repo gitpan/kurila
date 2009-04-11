@@ -1,9 +1,8 @@
 
 #use Pod::Simple::Debug (10);
-use Test;
+use Test::More;
 use File::Spec;
 #use utf8;
-use strict;
 #use Pod::Simple::Debug (10);
 
 BEGIN { plan tests => 6 }
@@ -20,7 +19,7 @@ BEGIN {
 # these tests are run as part of Perl core.
 sub source_path {
     my $file = shift;
-    if (%ENV{PERL_CORE}) {
+    if (env::var('PERL_CORE')) {
         require File::Spec;
         my $updir = File::Spec->updir;
         my $dir = File::Spec->catdir ($updir, 'lib', 'Pod', 'Simple', 't', 'corpus');
@@ -51,14 +50,14 @@ sub source_path {
 
 }
 
-print "# Testing that $thefile parses right.\n";
+print $^STDOUT, "# Testing that $thefile parses right.\n";
 my $outstring;
-{
+do {
   my $p = Pod::Simple::DumpAsXML->new;
   $p->output_string( \$outstring );
   $p->parse_file( $thefile );
   undef $p;
-}
+};
 ok 1 ; # make sure it parsed at all
 ok( $outstring && length($outstring) ); # make sure it parsed to something.
 #print $outstring;

@@ -1,6 +1,5 @@
 package ExtUtils::MM;
 
-use strict;
 use ExtUtils::MakeMaker::Config;
 
 our $VERSION = '6.44';
@@ -34,51 +33,51 @@ away.
 
 =cut
 
-{
+do {
     # Convenient alias.
     package MM;
     our @ISA = qw(ExtUtils::MM);
     sub DESTROY {}
-}
+};
 
 sub _is_win95 {
     # miniperl might not have the Win32 functions available and we need
     # to run in miniperl.
-    return defined &Win32::IsWin95 ? Win32::IsWin95() 
-                                   : ! defined %ENV{SYSTEMROOT}; 
+    return defined &Win32::IsWin95 ?? Win32::IsWin95() 
+                                   !! ! defined env::var('SYSTEMROOT'); 
 }
 
 my %Is = %( () );
-%Is{VMS}    = $^O eq 'VMS';
-%Is{OS2}    = $^O eq 'os2';
-%Is{MacOS}  = $^O eq 'MacOS';
-if( $^O eq 'MSWin32' ) {
-    _is_win95() ? %Is{Win95} = 1 : %Is{Win32} = 1;
+%Is{+VMS}    = $^OS_NAME eq 'VMS';
+%Is{+OS2}    = $^OS_NAME eq 'os2';
+%Is{+MacOS}  = $^OS_NAME eq 'MacOS';
+if( $^OS_NAME eq 'MSWin32' ) {
+    ( _is_win95() ?? %Is{+Win95} !! %Is{+Win32} ) = 1;
 }
-%Is{UWIN}   = $^O =~ m/^uwin(-nt)?$/;
-%Is{Cygwin} = $^O eq 'cygwin';
-%Is{NW5}    = %Config{osname} eq 'NetWare';  # intentional
-%Is{BeOS}   = $^O =~ m/beos/i;    # XXX should this be that loose?
-%Is{DOS}    = $^O eq 'dos';
-if( %Is{NW5} ) {
-    $^O = 'NetWare';
+%Is{+UWIN}   = $^OS_NAME =~ m/^uwin(-nt)?$/;
+%Is{+Cygwin} = $^OS_NAME eq 'cygwin';
+%Is{+NW5}    = %Config{?osname} eq 'NetWare';  # intentional
+%Is{+BeOS}   = $^OS_NAME =~ m/beos/i;    # XXX should this be that loose?
+%Is{+DOS}    = $^OS_NAME eq 'dos';
+if( %Is{?NW5} ) {
+    $^OS_NAME = 'NetWare';
     delete %Is{Win32};
 }
-%Is{VOS}    = $^O eq 'vos';
-%Is{QNX}    = $^O eq 'qnx';
-%Is{AIX}    = $^O eq 'aix';
-%Is{Darwin} = $^O eq 'darwin';
+%Is{+VOS}    = $^OS_NAME eq 'vos';
+%Is{+QNX}    = $^OS_NAME eq 'qnx';
+%Is{+AIX}    = $^OS_NAME eq 'aix';
+%Is{+Darwin} = $^OS_NAME eq 'darwin';
 
-%Is{Unix}   = !grep { $_ } values %Is;
+%Is{+Unix}   = !grep { $_ }, values %Is;
 
-map { delete %Is{$_} unless %Is{$_} } keys %Is;
+map { delete %Is{$_} unless %Is{?$_} }, keys %Is;
 _assert( nelems(%Is) == 2 );
-my($OS) = < keys %Is;
+my@($OS) =  keys %Is;
 
 
 my $class = "ExtUtils::MM_$OS";
-eval "require $class" unless %INC{"ExtUtils/MM_$OS.pm"}; ## no critic
-die $@ if $@;
+eval "require $class" unless $^INCLUDED{?"ExtUtils/MM_$OS.pm"}; ## no critic
+die $^EVAL_ERROR if $^EVAL_ERROR;
 unshift @ISA, $class;
 
 

@@ -2,8 +2,8 @@
 
 BEGIN {
 	require Config;
-	if ((%Config::Config{'extensions'} !~ m!\bList/Util\b!) ){
-		print "1..0 # Skip -- Perl configured without List::Util module\n";
+	if ((Config::config_value('extensions') !~ m!\bList/Util\b!) ){
+		print $^STDOUT, "1..0 # Skip -- Perl configured without List::Util module\n";
 		exit 0;
 	}
 }
@@ -201,8 +201,6 @@ SKIP: {
 
 # test DB::lineevents()
 {
-        use vars qw( *baz );
-
         local $DB::filename = 'baz';
         local *baz = *{Symbol::fetch_glob( "main::_<baz") };
         
@@ -481,7 +479,7 @@ for my $method (qw( cprestop cpoststop awaken init stop idle cleanup output )) {
 
 package FakeDB;
 
-use vars qw( $output );
+our $output;
 
 sub new {
         bless(\%(), @_[0]);

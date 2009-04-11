@@ -1,9 +1,9 @@
 require Test::Simple;
 use Carp;
 
-push @INC, 't/lib';
+push $^INCLUDE_PATH, 't/lib';
 require Test::Simple::Catch;
-my($out, $err) = Test::Simple::Catch::caught();
+my @($out, $err) = Test::Simple::Catch::caught();
 
 Test::Simple->import(tests => 5);
 

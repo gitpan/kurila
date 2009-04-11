@@ -1,11 +1,11 @@
 BEGIN {
-    if (%ENV{PERL_CORE}) {
-	push @INC, "lib/compress";
+    if (env::var('PERL_CORE')) {
+	push $^INCLUDE_PATH, "lib/compress";
     }
 }
 
 use lib < qw(t t/compress);
-use strict;
+
 use warnings;
 use bytes;
 
@@ -39,7 +39,7 @@ is Compress::Raw::Zlib::zlib_version, ZLIB_VERSION ;
 for my $i (1 .. 13)
 {
 
-    print "#\n#Length $i\n#\n";
+    print $^STDOUT, "#\n#Length $i\n#\n";
 
     my $hello = "I am a HAL 9000 computer" x 2001;
     my $tmp = $hello ;
@@ -51,7 +51,7 @@ for my $i (1 .. 13)
 
     my ($err, $x, $X, $status); 
  
-    ok( ($x, $err) = < Compress::Raw::Zlib::Deflate->new(-AppendOutput => 1));
+    ok( @($x, $err) =  Compress::Raw::Zlib::Deflate->new(AppendOutput => 1));
     ok $x ;
     cmp_ok $err, '==', Z_OK, "  status is Z_OK" ;
  
@@ -80,7 +80,7 @@ for my $i (1 .. 13)
     push @Answer, $tmp if length $tmp ;
      
     my $k;
-    ok(($k, $err) = < Compress::Raw::Zlib::Inflate->new( -AppendOutput => 1));
+    ok(@($k, $err) =  Compress::Raw::Zlib::Inflate->new( AppendOutput => 1));
     ok $k ;
     cmp_ok $err, '==', Z_OK, "  status is Z_OK" ;
  

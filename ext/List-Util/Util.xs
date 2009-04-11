@@ -7,8 +7,6 @@
 #include <perl.h>
 #include <XSUB.h>
 
-#include "multicall.h"
-
 #ifdef SVf_IVisUV
 #  define slu_sv_value(sv) (SvIOK(sv)) ? (SvIOK_UV(sv)) ? (NV)(SvUVX(sv)) : (NV)(SvIVX(sv)) : (SvNV(sv))
 #else
@@ -120,15 +118,13 @@ CODE:
 
 
 
-#ifdef dMULTICALL
-
 void
 reduce(block,...)
     SV * block
 PROTOTYPE: &@
 CODE:
 {
-    dVAR; dMULTICALL;
+    dVAR;
     SV *ret = sv_newmortal();
     int index;
     GV *agv,*bgv,*gv;
@@ -140,19 +136,24 @@ CODE:
 	XSRETURN_UNDEF;
     }
     cv = sv_2cv(block, &gv, 0);
-    PUSH_MULTICALL(cv);
     agv = gv_fetchpv("a", TRUE, SVt_PV);
     bgv = gv_fetchpv("b", TRUE, SVt_PV);
+    ENTER;
     SAVESPTR(GvSV(agv));
     SAVESPTR(GvSV(bgv));
     SVcpREPLACE(GvSV(agv), ret);
     SvSetSV(ret, args[1]);
     for(index = 2 ; index < items ; index++) {
+        SV* res;
 	SVcpREPLACE(GvSV(bgv), args[index]);
-	MULTICALL;
-	SvSetSV(ret, *PL_stack_sp);
+        ENTER;
+        PUSHMARK(SP);
+        PUTBACK;
+        res = call_sv(block, G_SCALAR);
+	SvSetSV(ret, res);
+        LEAVE;
     }
-    POP_MULTICALL;
+    LEAVE;
     ST(0) = ret;
     XSRETURN(1);
 }
@@ -163,34 +164,37 @@ first(block,...)
 PROTOTYPE: &@
 CODE:
 {
-    dVAR; dMULTICALL;
+    dVAR;
     int index;
     GV *gv;
     I32 gimme = G_SCALAR;
-    SV **args = &PL_stack_base[ax];
-    CV *cv;
 
     if(items <= 1) {
 	XSRETURN_UNDEF;
     }
-    cv = sv_2cv(block, &gv, 0);
-    PUSH_MULTICALL(cv);
-    SAVESPTR(GvSV(PL_defgv));
+
+    block = sv_mortalcopy(block);
 
     for(index = 1 ; index < items ; index++) {
-	SVcpREPLACE(GvSV(PL_defgv), args[index]);
-	MULTICALL;
-	if (SvTRUE(*PL_stack_sp)) {
-	  POP_MULTICALL;
-	  ST(0) = ST(index);
-	  XSRETURN(1);
+        bool res;
+        SV** args = &ST(0);
+        ENTER;
+        SAVETMPS;
+        PUSHMARK(SP);
+        XPUSHs(args[index]);
+        PUTBACK;
+        res = SvTRUE( call_sv(block, G_SCALAR) );
+        SPAGAIN;
+        PUTBACK;
+        FREETMPS;
+        LEAVE;
+	if (res) {
+            ST(0) = ST(index);
+            XSRETURN(1);
 	}
     }
-    POP_MULTICALL;
     XSRETURN_UNDEF;
 }
-
-#endif
 
 void
 shuffle(...)
@@ -252,8 +256,6 @@ CODE:
 	SvIV_set(ST(0), SvIV(num));
 	SvIOK_on(ST(0));
     }
-    if(PL_tainting && (SvTAINTED(num) || SvTAINTED(str)))
-	SvTAINTED_on(ST(0));
     XSRETURN(1);
 }
 
@@ -263,8 +265,6 @@ blessed(sv)
 PROTOTYPE: $
 CODE:
 {
-    if (SvMAGICAL(sv))
-	mg_get(sv);
     if(!sv_isobject(sv)) {
 	XSRETURN_UNDEF;
     }
@@ -279,8 +279,6 @@ reftype(sv)
 PROTOTYPE: $
 CODE:
 {
-    if (SvMAGICAL(sv))
-	mg_get(sv);
     if(!SvROK(sv)) {
 	XSRETURN_UNDEF;
     }
@@ -295,8 +293,6 @@ refaddr(sv)
 PROTOTYPE: $
 CODE:
 {
-    if (SvMAGICAL(sv))
-	mg_get(sv);
     if(!SvROK(sv)) {
 	XSRETURN_UNDEF;
     }
@@ -330,15 +326,6 @@ OUTPUT:
   RETVAL
 
 int
-tainted(sv)
-	SV *sv
-PROTOTYPE: $
-CODE:
-  RETVAL = SvTAINTED(sv);
-OUTPUT:
-  RETVAL
-
-int
 looks_like_number(sv)
 	SV *sv
 PROTOTYPE: $
@@ -346,36 +333,6 @@ CODE:
   RETVAL = looks_like_number(sv);
 OUTPUT:
   RETVAL
-
-void
-set_prototype(subref, proto)
-    SV *subref
-    SV *proto
-PROTOTYPE: &$
-CODE:
-{
-    if (SvROK(subref)) {
-	SV *sv = SvRV(subref);
-	if (SvTYPE(sv) != SVt_PVCV) {
-	    /* not a subroutine reference */
-	    croak("set_prototype: not a subroutine reference");
-	}
-	if (SvPOK(proto)) {
-	    /* set the prototype */
-	    STRLEN len;
-	    char *ptr = SvPV(proto, len);
-	    sv_setpvn(sv, ptr, len);
-	}
-	else {
-	    /* delete the prototype */
-	    SvPOK_off(sv);
-	}
-    }
-    else {
-	croak("set_prototype: not a reference");
-    }
-    XSRETURN(1);
-}
 
 BOOT:
 {

@@ -49,6 +49,8 @@ TEX  = $TEX
 # the dynamic loader path you are building a shared libperl.
 LDLIBPTH = $ldlibpth
 
+CPS = $cp
+
 !GROK!THIS!
 
 ## In the following dollars and backticks do not need the extra backslash.
@@ -66,6 +68,9 @@ POD2HTML = pod2html \
 PERL = ../miniperl
 PERLILIB = $(PERL) -I../lib
 REALPERL = ../perl
+
+# From MakeMaker.
+FIXIN = "-I../lib" "-MExtUtils::MY" -e "MY->fixin(shift @ARGV)"
 
 all: $(CONVERTERS) man
 
@@ -130,29 +135,37 @@ check:	checkpods
 	$(PERL) -I../lib checkpods $(POD)
 
 # Dependencies.
-pod2latex:	pod2latex.PL ../lib/Config.pm
-	$(LDLIBPTH) $(PERL) -I../lib pod2latex.PL
+pod2html:	pod2html.pl ../config.sh
+	$(CPS) $@.pl $@
+	$(LDLIBPTH) $(PERL) $(FIXIN) $@
 
-pod2html:	pod2html.PL ../lib/Config.pm
-	$(LDLIBPTH) $(PERL) -I ../lib pod2html.PL
+pod2latex:	pod2latex.pl ../config.sh
+	$(CPS) $@.pl $@
+	$(LDLIBPTH) $(PERL) $(FIXIN) $@
 
-pod2man:	pod2man.PL ../lib/Config.pm
-	$(LDLIBPTH) $(PERL) -I ../lib pod2man.PL
+pod2man:	pod2man.pl ../config.sh
+	$(CPS) $@.pl $@
+	$(LDLIBPTH) $(PERL) $(FIXIN) $@
 
-pod2text:	pod2text.PL ../lib/Config.pm
-	$(LDLIBPTH) $(PERL) -I ../lib pod2text.PL
+pod2text:	pod2text.pl ../config.sh
+	$(CPS) $@.pl $@
+	$(LDLIBPTH) $(PERL) $(FIXIN) $@
 
-checkpods:	checkpods.PL ../lib/Config.pm
-	$(LDLIBPTH) $(PERL) -I ../lib checkpods.PL
+checkpods:	checkpods.pl ../config.sh
+	$(CPS) $@.pl $@
+	$(LDLIBPTH) $(PERL) $(FIXIN) $@
 
-pod2usage:	pod2usage.PL ../lib/Config.pm
-	$(PERL) -I ../lib pod2usage.PL
+pod2usage:	pod2usage.pl ../config.sh
+	$(CPS) $@.pl $@
+	$(LDLIBPTH) $(PERL) $(FIXIN) $@
 
-podchecker:	podchecker.PL ../lib/Config.pm
-	$(PERL) -I ../lib podchecker.PL
+podchecker:	podchecker.pl ../config.sh
+	$(CPS) $@.pl $@
+	$(LDLIBPTH) $(PERL) $(FIXIN) $@
 
-podselect:	podselect.PL ../lib/Config.pm
-	$(PERL) -I ../lib podselect.PL
+podselect:	podselect.pl ../config.sh
+	$(CPS) $@.pl $@
+	$(LDLIBPTH) $(PERL) $(FIXIN) $@
 
 perlmodlib.pod:	$(PERL) perlmodlib.PL ../MANIFEST
 	rm -f perlmodlib.pod

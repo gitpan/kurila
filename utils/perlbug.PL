@@ -16,20 +16,20 @@ use File::Spec::Functions;
 # This forces PL files to create target in same directory as PL file.
 # This is so that make depend always knows where to find PL derivatives.
 my $origdir = cwd;
-chdir dirname($0);
-my $file = basename($0, '.PL');
-$file .= '.com' if $^O eq 'VMS';
+chdir dirname($^PROGRAM_NAME);
+my $file = basename($^PROGRAM_NAME, '.PL');
+$file .= '.com' if $^OS_NAME eq 'VMS';
 
-open OUT, ">", "$file" or die "Can't create $file: $!";
+open my $out, ">", "$file" or die "Can't create $file: $^OS_ERROR";
 
 # extract patchlevel.h information
 
-open PATCH_LEVEL, "<", catfile( updir, "patchlevel.h")
-    or die "Can't open patchlevel.h: $!";
+open my $patch_level, "<", catfile( updir, "patchlevel.h")
+    or die "Can't open patchlevel.h: $^OS_ERROR";
 
-my $patchlevel_date = @(stat *PATCH_LEVEL)[9];
+my $patchlevel_date = @(stat $patch_level)[9];
 
-while ( ~< *PATCH_LEVEL) {
+while ( ~< $patch_level) {
     last if $_ =~ m/^\s*static\s+(?:const\s+)?char.*?local_patches\[\]\s*=\s*{\s*$/;
 }
 
@@ -38,7 +38,7 @@ if (! defined($_)) {
 }
 
 my @patches;
-while ( ~< *PATCH_LEVEL) {
+while ( ~< $patch_level) {
     last if m/^\s*}/;
     chomp;
     s/^\s+,?\s*"?//;
@@ -47,28 +47,28 @@ while ( ~< *PATCH_LEVEL) {
     push @patches, $_ unless $_ eq 'NULL';
 }
 my $patch_desc = "'" . join("',\n    '", @patches) . "'";
-my $patch_tags = join "", map m/(\S+)/ ? "+$1 " : (), @patches;
+my $patch_tags = join "", map { m/(\S+)/ ?? "+$1 " !! () }, @patches;
 
-close(PATCH_LEVEL) or die "Error closing patchlevel.h: $!";
+close($patch_level) or die "Error closing patchlevel.h: $^OS_ERROR";
 
 # TO DO (prehaps): store/embed $Config::config_sh into perlbug. When perlbug is
 # used, compare $Config::config_sh with the stored version. If they differ then
 # append a list of individual differences to the bug report.
 
 
-print "Extracting $file (with variable substitutions)\n";
+print $^STDOUT, "Extracting $file (with variable substitutions)\n";
 
 # In this section, perl variables will be expanded during extraction.
 # You can use $Config{...} to use Configure variables.
 
-my $extract_version = sprintf("\%vd", $^V);
+my $extract_version = sprintf("\%vd", $^PERL_VERSION);
 
-print OUT <<"!GROK!THIS!";
-%Config{startperl}
-    eval 'exec %Config{perlpath} -S \$0 \$\{1+"\$@"\}'
+print $out, <<"!GROK!THIS!";
+$(config_value("startperl"))
+    eval 'exec $(config_value("perlpath")) -S \$0 \$\{1+"\$@"\}'
 	if \$running_under_some_shell;
 
-my \$config_tag1 = '$extract_version - %Config{cf_time}';
+my \$config_tag1 = '$extract_version - $(config_value("cf_time"))';
 
 my \$patchlevel_date = $patchlevel_date;
 my \$patch_tags = '$patch_tags';
@@ -79,7 +79,7 @@ my \@patches = (
 
 # In the following, perl variables are not expanded during extraction.
 
-print OUT <<'!NO!SUBS!';
+print $out, <<'!NO!SUBS!';
 
 use strict;
 use Config;
@@ -155,7 +155,7 @@ my( $file, $usefile, $cc, $address, $bugaddress, $testaddress, $thanksaddress,
 
 my $perl_version = $^V ? sprintf("%vd", $^V) : $];
 
-my $config_tag2 = "$perl_version - $Config{cf_time}";
+my $config_tag2 = "$perl_version - $(config_value('cf_time'))";
 
 Init();
 
@@ -207,7 +207,7 @@ Please pick a \u$name from the following:
 
 EOF
 	my $err = 0;
-	do {
+	{
 	    if ($err++ > 5) {
 		die "Invalid $name: aborting.\n";
 	    }
@@ -420,7 +420,7 @@ EOF
 	}
 
 	my $err = 0;
-	do {
+	{
 	    print "Subject: ";
 	    $subject = <>;
 	    chomp $subject;
@@ -686,72 +686,72 @@ EOF
 } # sub Query
 
 sub Dump {
-    local(*OUT) = @_;
+    my @($out) = @_;
 
-    print OUT <<EFF;
+    print {$out} <<EFF;
 ---
 Flags:
     category=$category
     severity=$severity
 EFF
     if ($::opt_A) {
-	print OUT <<EFF;
+	print {$out} <<EFF;
     ack=no
 EFF
     }
-    print OUT <<EFF;
+    print {$out} <<EFF;
 ---
 EFF
-    print OUT "This perlbug was built using Perl $config_tag1\n",
+    print {$out} "This perlbug was built using Perl $config_tag1\n",
 	    "It is being executed now by  Perl $config_tag2.\n\n"
 	if $config_tag2 ne $config_tag1;
 
-    print OUT <<EOF;
+    print {$out} <<EOF;
 Site configuration information for perl $perl_version:
 
 EOF
     if ($::Config{cf_by} and $::Config{cf_time}) {
-	print OUT "Configured by $::Config{cf_by} at $::Config{cf_time}.\n\n";
+	print {$out} "Configured by $::Config{cf_by} at $::Config{cf_time}.\n\n";
     }
-    print OUT Config::myconfig;
+    print {$out} Config::myconfig;
 
     if (@patches) {
-	print OUT join "\n    ", "Locally applied patches:", @patches;
-	print OUT "\n";
+	print {$out} join "\n    ", "Locally applied patches:", @patches;
+	print {$out} "\n";
     };
 
-    print OUT <<EOF;
+    print {$out} <<EOF;
 
 ---
-\@INC for perl $perl_version:
+\$^INCLUDE_PATH for perl $perl_version:
 EOF
-    for my $i (@INC) {
-	print OUT "    $i\n";
+    for my $i ($^INCLUDE_PATH) {
+	print {$out} "    $i\n";
     }
 
-    print OUT <<EOF;
+    print {$out} <<EOF;
 
 ---
 Environment for perl $perl_version:
 EOF
     my @env =
         qw(PATH LD_LIBRARY_PATH LANG PERL_BADLANG SHELL HOME LOGDIR LANGUAGE);
-    push @env, $Config{ldlibpthname} if $Config{ldlibpthname} ne '';
+    push @env, config_value("ldlibpthname') if config_value("ldlibpthname") ne '';
     push @env, grep /^(?:PERL|LC_|LANG|CYGWIN)/, keys %ENV;
     my %env;
     @env{@env} = @env;
     for my $env (sort keys %env) {
-	print OUT "    $env",
+	print {$out} "    $env",
 		exists $ENV{$env} ? "=$ENV{$env}" : ' (unset)',
 		"\n";
     }
     if ($verbose) {
-	print OUT "\nComplete configuration data for perl $perl_version:\n\n";
+	print {$out} "\nComplete configuration data for perl $perl_version:\n\n";
 	my $value;
 	foreach (sort keys %::Config) {
 	    $value = $::Config{$_};
 	    $value =~ s/'/\\'/g;
-	    print OUT "$_='$value'\n";
+	    print {$out} "$_='$value'\n";
 	}
     }
 } # sub Dump
@@ -1379,7 +1379,7 @@ None known (guess what must have been used to report them?)
 
 !NO!SUBS!
 
-close OUT or die "Can't close $file: $!";
-chmod 0755, $file or die "Can't reset permissions for $file: $!\n";
-exec("%Config{'eunicefix'} $file") if %Config{'eunicefix'} ne ':';
+close $out or die "Can't close $file: $^OS_ERROR";
+chmod 0755, $file or die "Can't reset permissions for $file: $^OS_ERROR\n";
+exec("$(config_value('eunicefix')) $file") if config_value('eunicefix') ne ':';
 chdir $origdir;

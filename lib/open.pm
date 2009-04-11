@@ -10,34 +10,18 @@ sub _get_encname {
     return;
 }
 
-sub _drop_oldenc {
-    # If by the time we arrive here there already is at the top of the
-    # perlio layer stack an encoding identical to what we would like
-    # to push via this open pragma, we will pop away the old encoding
-    # (+utf8) so that we can push ourselves in place (this is easier
-    # than ignoring pushing ourselves because of the way how $^OPEN
-    # works).  So we are looking for something like
-    #
-    #   stdio encoding(xxx) utf8
-    #
-    # in the existing layer stack, and in the new stack chunk for
-    #
-    #   :encoding(xxx)
-    #
-    # If we find a match, we pop the old stack (once, since
-    # the utf8 is just a flag on the encoding layer)
-    my ($h, < @new) = < @_;
+sub _drop_oldenc($h, @< @new) {
     return unless (nelems @new) +>= 1 && @new[-1] =~ m/^:encoding\(.+\)$/;
     my @old = PerlIO::get_layers($h);
     return unless (nelems @old) +>= 3 &&
 	          @old[-1] eq 'utf8' &&
                   @old[-2] =~ m/^encoding\(.+\)$/;
     require Encode;
-    my ($loname, $lcname) = < _get_encname(@old[-2]);
+    my @($loname, $lcname) =  _get_encname(@old[-2]);
     unless (defined $lcname) { # Should we trust get_layers()?
 	die("open: Unknown encoding '$loname'");
     }
-    my ($voname, $vcname) = < _get_encname(@new[-1]);
+    my @($voname, $vcname) =  _get_encname(@new[-1]);
     unless (defined $vcname) {
 	die("open: Unknown encoding '$voname'");
     }
@@ -46,11 +30,10 @@ sub _drop_oldenc {
     }
 }
 
-sub import {
-    my ($class,< @args) = < @_;
+sub import($class,@< @args) {
     die("open: needs explicit list of PerlIO layers") unless (nelems @args);
     my $std;
-    my ($in,$out) = < split(m/\0/,($^OPEN || "\0"), -1);
+    my @($in,$out) =  split(m/\0/,($^OPEN || "\0"), -1);
     while ((nelems @args)) {
 	my $type = shift(@args);
 	my $dscp;
@@ -74,20 +57,20 @@ sub import {
             }
 	    push(@val,":$layer");
 	    if ($layer =~ m/^(crlf|raw)$/) {
-		%^H{"open_$type"} = $layer;
+		$^HINTS{+"open_$type"} = $layer;
 	    }
 	}
 	if ($type eq 'IN') {
-	    _drop_oldenc(\*STDIN, < @val);
+	    _drop_oldenc($^STDIN, < @val);
 	    $in  = join(' ', @val);
 	}
 	elsif ($type eq 'OUT') {
-	    _drop_oldenc(\*STDOUT, < @val);
+	    _drop_oldenc($^STDOUT, < @val);
 	    $out = join(' ', @val);
 	}
 	elsif ($type eq 'IO') {
-	    _drop_oldenc(\*STDIN,  < @val);
-	    _drop_oldenc(\*STDOUT, < @val);
+	    _drop_oldenc($^STDIN,  < @val);
+	    _drop_oldenc($^STDOUT, < @val);
 	    $in = $out = join(' ', @val);
 	}
 	else {
@@ -98,18 +81,18 @@ sub import {
     if ($std) {
 	if ($in) {
 	    if ($in =~ m/:utf8\b/) {
-		    binmode(STDIN,  ":utf8");
+		    binmode($^STDIN,  ":utf8");
 		} elsif ($in =~ m/(\w+\(.+\))/) {
-		    binmode(STDIN,  ":$1");
+		    binmode($^STDIN,  ":$1");
 		}
 	}
 	if ($out) {
 	    if ($out =~ m/:utf8\b/) {
-		binmode(STDOUT,  ":utf8");
-		binmode(STDERR,  ":utf8");
+		binmode($^STDOUT,  ":utf8");
+		binmode($^STDERR,  ":utf8");
 	    } elsif ($out =~ m/(\w+\(.+\))/) {
-		binmode(STDOUT,  ":$1");
-		binmode(STDERR,  ":$1");
+		binmode($^STDOUT,  ":$1");
+		binmode($^STDERR,  ":$1");
 	    }
 	}
     }

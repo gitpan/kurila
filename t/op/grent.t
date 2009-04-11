@@ -5,14 +5,14 @@ BEGIN {
 }
 
 try {my @n = @( getgrgid 0 )};
-if ($@ and $@->{description} =~ m/(The \w+ function is unimplemented)/) {
+if ($^EVAL_ERROR and $^EVAL_ERROR->{?description} =~ m/(The \w+ function is unimplemented)/) {
     skip_all "getgrgid unimplemented";
 }
 
 our (%Config, $where);
 try { require Config; Config->import; };
 my $reason;
-if (%Config{'i_grp'} ne 'define') {
+if (%Config{?'i_grp'} ne 'define') {
 	$reason = '%Config{i_grp} not defined';
 }
 elsif (not -f "/etc/group" ) { # Play safe.
@@ -21,19 +21,20 @@ elsif (not -f "/etc/group" ) { # Play safe.
 
 if (not defined $where) {	# Try NIS.
     foreach my $ypcat (qw(/usr/bin/ypcat /bin/ypcat /etc/ypcat)) {
+        my $gr;
         if (-x $ypcat &&
-            open(GR, "$ypcat group 2>/dev/null |") &&
-            defined( ~< *GR)) 
+            open($gr, "$ypcat group 2>/dev/null |") &&
+            defined( ~< $gr)) 
         {
-            print "# `ypcat group` worked\n";
+            print $^STDOUT, "# `ypcat group` worked\n";
 
             # Check to make sure we're really using NIS.
-            if( open(NSSW, "<", "/etc/nsswitch.conf" ) ) {
-                my($group) = < grep m/^\s*group:/, @( ~< *NSSW);
+            if( open(my $nssw, "<", "/etc/nsswitch.conf" ) ) {
+                my@($group) =  grep { m/^\s*group:/ }, @( ~< $nssw);
 
                 # If there's no group line, assume it default to compat.
                 if( !$group || $group !~ m/(nis|compat)/ ) {
-                    print "# Doesn't look like you're using NIS in ".
+                    print $^STDOUT, "# Doesn't look like you're using NIS in ".
                           "/etc/nsswitch.conf\n";
                     last;
                 }
@@ -47,9 +48,10 @@ if (not defined $where) {	# Try NIS.
 
 if (not defined $where) {	# Try NetInfo.
     foreach my $nidump (qw(/usr/bin/nidump)) {
+        my $gr;
         if (-x $nidump &&
-            open(GR, "$nidump group . 2>/dev/null |") &&
-            defined( ~< *GR)) 
+            open($gr, "$nidump group . 2>/dev/null |") &&
+            defined( ~< $gr)) 
         {
             $where = "NetInfo group - $nidump";
             undef $reason;
@@ -60,7 +62,8 @@ if (not defined $where) {	# Try NetInfo.
 
 if (not defined $where) {	# Try local.
     my $GR = "/etc/group";
-    if (-f $GR && open(GR, "<", $GR) && defined( ~< *GR)) {
+    my $gr_fh;
+    if (-f $GR && open($gr_fh, "<", $GR) && defined( ~< $gr_fh)) {
         undef $reason;
         $where = "local $GR";
     }
@@ -84,23 +87,23 @@ my $tst = 1;
 my %perfect;
 my %seen;
 
-print "# where $where\n";
+print $^STDOUT, "# where $where\n";
 
-ok( setgrent(), 'setgrent' ) || print "# $!\n";
+ok( setgrent(), 'setgrent' ) || print $^STDOUT, "# $^OS_ERROR\n";
 
 while ( ~< *GR) {
     chomp;
     # LIMIT -1 so that groups with no users don't fall off
     my @s = split m/:/, $_, -1;
-    my ($name_s,$passwd_s,$gid_s,$members_s) = < @s;
+    my @($name_s,$passwd_s,$gid_s,$members_s) =  @s;
     if ((nelems @s)) {
-	push @{ %seen{$name_s} }, iohandle::input_line_number(\*GR);
+	push @{ %seen{+$name_s} }, iohandle::input_line_number(\*GR);
     } else {
-	warn "# Your $where line {iohandle::input_line_number(\*GR)} is empty.\n";
+	warn "# Your $where line $(iohandle::input_line_number(\*GR)) is empty.\n";
 	next;
     }
     if ($n == $max) {
-	local $/;
+	local $^INPUT_RECORD_SEPARATOR = undef;
 	my $junk = ~< *GR;
 	last;
     }
@@ -113,17 +116,17 @@ while ( ~< *GR) {
 	my @n = @( getgrgid($gid_s) );
 	# 'nogroup' et al.
 	next unless (nelems @n);
-	my ($name,$passwd,$gid,$members) = < @n;
+	my @($name,$passwd,$gid,$members) =  @n;
 	# Protect against one-to-many and many-to-one mappings.
 	if ($name_s ne $name) {
 	    @n = @( getgrnam($name_s) );
-	    ($name,$passwd,$gid,$members) = < @n;
+	    @($name,$passwd,$gid,$members) =  @n;
 	    next if $name_s ne $name;
 	}
 	# NOTE: group names *CAN* contain whitespace.
 	$members =~ s/\s+/,/g;
 	# what about different orders of members?
-	%perfect{$name_s}++
+	%perfect{+$name_s}++
 	    if $name    eq $name_s    and
 # Do not compare passwords: think shadow passwords.
 # Not that group passwords are used much but better not assume anything.
@@ -135,11 +138,11 @@ while ( ~< *GR) {
 
 endgrent();
 
-print "# max = $max, n = $n, perfect = ", nkeys %perfect, "\n";
+print $^STDOUT, "# max = $max, n = $n, perfect = ", nkeys %perfect, "\n";
 
 if (nkeys %perfect == 0 && $n) {
     $max++;
-    print <<EOEX;
+    print $^STDOUT, <<EOEX;
 #
 # The failure of op/grent test is not necessarily serious.
 # It may fail due to local group administration conventions.
@@ -155,7 +158,7 @@ if (nkeys %perfect == 0 && $n) {
 EOEX
 
     fail();
-    print "#\t (not necessarily serious: run t/op/grent.t by itself)\n";
+    print $^STDOUT, "#\t (not necessarily serious: run t/op/grent.t by itself)\n";
 } else {
     pass();
 }
@@ -176,12 +179,10 @@ my @gr2;
 
 setgrent();
 for (1..$max) {
-    my ($gr) = (getgrent());
+    my @($gr, ...) = @(getgrent());
     last unless defined $gr;
     push @gr2, $gr;
 }
 endgrent();
 
-is("{join ' ',@gr1}", "{join ' ',@gr2}");
-
-close(GR);
+is("$(join ' ',@gr1)", "$(join ' ',@gr2)");

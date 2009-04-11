@@ -1,10 +1,9 @@
 #!/usr/bin/perl
 
-use strict;
 use Test::More;
 
 BEGIN {
-	if ($^O =~ m/MSWin32/i) {
+	if ($^OS_NAME =~ m/MSWin32/i) {
 		plan tests => 41;
 	} else {
 		plan skip_all => 'This is not Win32';

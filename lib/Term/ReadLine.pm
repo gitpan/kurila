@@ -8,7 +8,7 @@ If no real package is found, substitutes stubs instead of basic functions.
   use Term::ReadLine;
   my $term = new Term::ReadLine 'Simple Perl calc';
   my $prompt = "Enter your arithmetic expression: ";
-  my $OUT = $term->OUT || \*STDOUT;
+  my $OUT = $term->OUT || $^STDOUT;
   while ( defined ($_ = $term->readline($prompt)) ) {
     my $res = eval($_);
     warn $@ if $@;
@@ -174,7 +174,6 @@ or you can try using the 4-argument form of Term::ReadLine->new().
 
 =cut
 
-use strict;
 
 package Term::ReadLine::Stub;
 our @ISA = qw'Term::ReadLine::Tk Term::ReadLine::TermCap';
@@ -188,19 +187,19 @@ sub PERL_UNICODE_STDIN () { 0x0001 }
 sub ReadLine {'Term::ReadLine::Stub'}
 sub readline {
   my $self = shift;
-  my ($in,$out,$str) = < @$self;
+  my @($in,$out,$str) =  @$self;
   my $prompt = shift;
-  print $out @rl_term_set[0], $prompt, @rl_term_set[1], @rl_term_set[2]; 
+  print $out, @rl_term_set[0], $prompt, @rl_term_set[1], @rl_term_set[2]; 
   $self->register_Tk 
      if not $Term::ReadLine::registered and $Term::ReadLine::toloop
 	and defined &Tk::DoOneEvent;
   #$str = scalar <$in>;
   $str = $self->get_line;
-  $str =~ s/^\s*\Q$prompt\E// if ($^O eq 'MacOS');
+  $str =~ s/^\s*\Q$prompt\E// if ($^OS_NAME eq 'MacOS');
   utf8::upgrade($str)
       if ($^UNICODE ^&^ PERL_UNICODE_STDIN || defined $^ENCODING) &&
          utf8::valid($str);
-  print $out @rl_term_set[3]; 
+  print $out, @rl_term_set[3]; 
   # bug in 5.000: chomping empty string creats length -1:
   chomp $str if defined $str;
   $str;
@@ -211,21 +210,21 @@ sub findConsole {
     my $console;
     my $consoleOUT;
 
-    if ($^O eq 'MacOS') {
+    if ($^OS_NAME eq 'MacOS') {
         $console = "Dev:Console";
     } elsif (-e "/dev/tty") {
 	$console = "/dev/tty";
-    } elsif (-e "con" or $^O eq 'MSWin32') {
+    } elsif (-e "con" or $^OS_NAME eq 'MSWin32') {
        $console = 'CONIN$';
        $consoleOUT = 'CONOUT$';
     } else {
 	$console = "sys\$command";
     }
 
-    if (($^O eq 'amigaos') || ($^O eq 'beos') || ($^O eq 'epoc')) {
+    if (($^OS_NAME eq 'amigaos') || ($^OS_NAME eq 'beos') || ($^OS_NAME eq 'epoc')) {
 	$console = undef;
     }
-    elsif ($^O eq 'os2') {
+    elsif ($^OS_NAME eq 'os2') {
       if ($DB::emacs) {
 	$console = undef;
       } else {
@@ -236,7 +235,7 @@ sub findConsole {
     $consoleOUT = $console unless defined $consoleOUT;
     $console = "&STDIN" unless defined $console;
     if (!defined $consoleOUT) {
-      $consoleOUT = defined fileno(STDERR) && $^O ne 'MSWin32' ? "&STDERR" : "&STDOUT";
+      $consoleOUT = defined fileno($^STDERR) && $^OS_NAME ne 'MSWin32' ?? "&STDERR" !! "&STDOUT";
     }
     return @($console,$consoleOUT);
 }
@@ -244,45 +243,35 @@ sub findConsole {
 sub new {
   die "method new called with wrong number of arguments" 
     unless (nelems @_)==2 or (nelems @_)==4;
-  #local (*FIN, *FOUT);
   my ($FIN, $FOUT, $ret);
   if ((nelems @_)==2) {
-    my($console, $consoleOUT) = < @_[0]->findConsole;
+    my@($console, $consoleOUT) =  @_[0]->findConsole;
 
 
     # the Windows CONIN$ needs GENERIC_WRITE mode to allow
     # a SetConsoleMode() if we end up using Term::ReadKey
-    open FIN, ((  $^O eq 'MSWin32' && $console eq 'CONIN$' ) ? "+<" : "<"), "$console";
-    open FOUT, ">","$consoleOUT";
+    open my $fin, ((  $^OS_NAME eq 'MSWin32' && $console eq 'CONIN$' ) ?? "+<" !! "<"), "$console";
+    open my $fout, ">","$consoleOUT";
 
-    #OUT->autoflush(1);		# Conflicts with debugger?
-    my $sel = select(FOUT);
-    $| = 1;				# for DB::OUT
-    select($sel);
-    $ret = bless \@(\*FIN, \*FOUT);
+    iohandle::output_autoflush($fout, 1);
+    $ret = bless \@(\*$fin, \*$fout);
   } else {			# Filehandles supplied
     $FIN = @_[2]; $FOUT = @_[3];
-    #OUT->autoflush(1);		# Conflicts with debugger?
-    my $sel = select($FOUT);
-    $| = 1;				# for DB::OUT
-    select($sel);
+    iohandle::output_autoflush($FOUT, 1);
     $ret = bless \@($FIN, $FOUT);
   }
-  if ($ret->Features->{ornaments} 
-      and not (%ENV{PERL_RL} and %ENV{PERL_RL} =~ m/\bo\w*=0/)) {
+  if ($ret->Features->{?ornaments} 
+      and not (env::var('PERL_RL') and env::var('PERL_RL') =~ m/\bo\w*=0/)) {
     local $Term::ReadLine::termcap_nowarn = 1;
     $ret->ornaments(1);
   }
   return $ret;
 }
 
-sub newTTY {
-  my ($self, $in, $out) = < @_;
+sub newTTY($self, $in, $out) {
   $self->[0] = $in;
   $self->[1] = $out;
-  my $sel = select($out);
-  $| = 1;				# for DB::OUT
-  select($sel);
+  iohandle::output_autoflush($out, 1);
 }
 
 sub IN { shift->[0] }
@@ -296,7 +285,7 @@ sub Features { \%features }
 sub get_line {
   my $self = shift;
   my $in = $self->IN;
-  local ($/) = "\n";
+  local ($^INPUT_RECORD_SEPARATOR) = "\n";
   return scalar ~< $in;
 }
 
@@ -304,7 +293,7 @@ package Term::ReadLine;		# So late to allow the above code be defined?
 
 our $VERSION = '1.03';
 
-my ($which) = exists %ENV{PERL_RL} ? < split m/\s+/, %ENV{PERL_RL} : undef;
+my @($which) = defined env::var('PERL_RL') ?? split m/\s+/, env::var('PERL_RL') !! @(undef);
 if ($which) {
   if ($which =~ m/\bgnu\b/i){
     eval "use Term::ReadLine::Gnu;";
@@ -359,11 +348,11 @@ sub ornaments {
   my @ts = split m/,/, $rl_term_set, 4;
   try { LoadTermCap };
   unless (defined $terminal) {
-    warn("Cannot find termcap: $@\n") unless $Term::ReadLine::termcap_nowarn;
+    warn("Cannot find termcap: $^EVAL_ERROR\n") unless $Term::ReadLine::termcap_nowarn;
     $rl_term_set = ',,,';
     return;
   }
-  @rl_term_set = map {$_ ? $terminal->Tputs($_,1) || '' : ''} @ts;
+  @rl_term_set = map {$_ ?? $terminal->Tputs($_,1) || '' !! ''}, @ts;
   return $rl_term_set;
 }
 
@@ -404,7 +393,7 @@ sub get_line {
   my $self = shift;
   $self->Tk_loop if $Term::ReadLine::toloop && defined &Tk::DoOneEvent;
   my $in = $self->IN;
-  local ($/) = "\n";
+  local ($^INPUT_RECORD_SEPARATOR) = "\n";
   return scalar ~< $in;
 }
 

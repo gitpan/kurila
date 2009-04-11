@@ -5,7 +5,7 @@
 package main;
 require './test.pl';
 
-plan( tests => 29 );
+plan( tests => 28 );
 
 my($x);
 
@@ -31,36 +31,40 @@ $x = '';
 $x //= 0;
 is($x, '', 		'//=: left-hand operand defined but empty');
 
-@ARGV = @(undef, 0, 3);
-is(shift       // 7, 7,	'shift // ... works');
-is(shift()     // 7, 0,	'shift() // ... works');
-is(shift @ARGV // 7, 3,	'shift @array // ... works');
+aap(undef, 0, 3);
+sub aap {
+    is(shift       // 7, 7,	'shift // ... works');
+    is(shift()     // 7, 0,	'shift() // ... works');
+    is(shift @_ // 7, 3,	'shift @array // ... works');
+}
 
-@ARGV = @(3, 0, undef);
-is(pop         // 7, 7,	'pop // ... works');
-is(pop()       // 7, 0,	'pop() // ... works');
-is(pop @ARGV   // 7, 3,	'pop @array // ... works');
+noot(3, 0, undef);
+sub noot {
+    is(pop         // 7, 7,	'pop // ... works');
+    is(pop()       // 7, 0,	'pop() // ... works');
+    is(pop @_   // 7, 3,	'pop @array // ... works');
+}
 
 # Test that various syntaxes are allowed
 
-for (qw(getc pos readlink undef umask ~<*ARGV ~<*FOO ~<$foo -f)) {
+for (qw(getc readlink undef umask ~<*ARGV ~<*FOO ~<$foo -f)) {
     our $foo;
     eval "sub \{ $_ // 0 \}";
-    is($@, '', "$_ // ... compiles");
+    is($^EVAL_ERROR, '', "$_ // ... compiles");
 }
 
 # Test for some ambiguous syntaxes
 
 our ($y, $fh);
 
-eval q# sub f ($) { } f $x / 2; #;
-is( $@, '' );
-eval q# sub f ($) { } f $x /2; #;
-is( $@, '' );
+eval q# sub f ($y) { } f $x / 2; #;
+is( $^EVAL_ERROR, '' );
+eval q# sub f ($y) { } f $x /2; #;
+is( $^EVAL_ERROR, '' );
 eval q# sub { print $fh / 2 } #;
-is( $@, '' );
+is( $^EVAL_ERROR, '' );
 eval q# sub { print $fh /2 } #;
-is( $@, '' );
+is( $^EVAL_ERROR, '' );
 
 # [perl #28123] Perl optimizes // away incorrectly
 

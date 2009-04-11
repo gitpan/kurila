@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-use strict;
+
 use Text::Wrap;
 $Text::Wrap::columns = 80;
 my ($committer, $patch, $log);
@@ -15,14 +15,14 @@ my $result = GetOptions ("rank" => \$rank,		    # rank authors
 			 "reverse" => \$reverse,
 			);
 
-if (!$result or (($rank||0) + ($ta||0) + ((nelems @authors) ? 1 : 0) != 1) or !nelems @ARGV) {
+if (!$result or (($rank||0) + ($ta||0) + ((nelems @authors) ?? 1 !! 0) != 1) or !nelems @ARGV) {
   die <<"EOS";
-$0 --rank Changelogs                        # rank authors by patches
-$0 --acknowledged <authors file> Changelogs # Display unacknowledged authors
-$0 --thanks-applied Changelogs		    # ranks committers
-$0 --percentage ...                         # show rankings as percentages
-$0 --cumulative ...                         # show rankings cumulatively
-$0 --reverse ...                            # show rankings in reverse
+$^PROGRAM_NAME --rank Changelogs                        # rank authors by patches
+$^PROGRAM_NAME --acknowledged <authors file> Changelogs # Display unacknowledged authors
+$^PROGRAM_NAME --thanks-applied Changelogs		    # ranks committers
+$^PROGRAM_NAME --percentage ...                         # show rankings as percentages
+$^PROGRAM_NAME --cumulative ...                         # show rankings cumulatively
+$^PROGRAM_NAME --reverse ...                            # show rankings in reverse
 Specify stdin as - if needs be. Remember that option names can be abbreviated.
 EOS
 }
@@ -35,16 +35,16 @@ while ( ~< *DATA) {
     chomp;
     s/\\100/\@/g;
     $_ = lc;
-    if (my ($correct, $alias) = m/^\s*([^#\s]\S*)\s+(.*\S)/) {
+    if (my @($correct, $alias) = m/^\s*([^#\s]\S*)\s+(.*\S)/) {
         if ($correct eq '+') {$correct = $prev} else {$prev = $correct}
-        %map {$alias} = $correct;
+        %map {+$alias} = $correct;
     }
 }
 
 #
 # Email addresses for we do not have names.
 #
-%map {$_} = "?" for @( 
+%map {+$_} = "?" for @( 
     "agrow\100thegotonerd.com",
     "alexander_bluhm\100genua.de",
     "alexander_gernler\100genua.de",
@@ -90,7 +90,7 @@ while ( ~< *DATA) {
 # Presumably deliberately?
 # 
 
-%map {$_} = '!' for @(
+%map {+$_} = '!' for @(
      # Nick Ing-Simmons has passed away (2006-09-25).
      "nick\100ing-simmons.net",
      "nik\100tiuk.ti.com",
@@ -121,16 +121,16 @@ while ( ~< *DATA) {
 if ((nelems @authors)) {
   my %raw;
   foreach my $filename ( @authors) {
-    open FH, "<", "$filename" or die "Can't open $filename: $!";
+    open FH, "<", "$filename" or die "Can't open $filename: $^OS_ERROR";
     while ( ~< *FH) {
       next if m/^\#/;
       next if m/^-- /;
       if (m/<([^>]+)>/) {
 	# Easy line.
-	%raw{$1}++;
+	%raw{+$1}++;
       } elsif (m/^([-A-Za-z0-9 .\'À-ÖØöø-ÿ]+)[\t\n]/) {
 	# Name only
-	%untraced{$1}++;
+	%untraced{+$1}++;
       } else {
 	chomp;
 	warn "Can't parse line '$_'";
@@ -138,12 +138,12 @@ if ((nelems @authors)) {
     }
   }
   foreach (keys %raw) {
-    print "E-mail $_ occurs %raw{$_} times\n" if %raw{$_} +> 1;
+    print "E-mail $_ occurs %raw{?$_} times\n" if %raw{?$_} +> 1;
     $_ = lc $_;
-    %authors{%map{$_} || $_}++;
+    %authors{+%map{?$_} || $_}++;
   }
-  ++%authors{'!'};
-  ++%authors{'?'};
+  ++%authors{+'!'};
+  ++%authors{+'?'};
 }
 
 while ( ~< *ARGV) {
@@ -152,7 +152,7 @@ while ( ~< *ARGV) {
     # new patch
     my @new = @($1, $2);
     &process ($committer, $patch, $log);
-    ($patch, $committer) = < @new;
+    @($patch, $committer) =  @new;
     undef $log;
   } elsif (s/^(\s+Log: )//) {
     die "Duplicate Log:" if $log;
@@ -182,13 +182,13 @@ if ($rank) {
 } elsif (%authors) {
   my %missing;
   foreach (sort keys %patchers) {
-    next if %authors{$_};
+    next if %authors{?$_};
     # Sort by number of patches, then name.
-    %missing{%patchers{$_}}->{$_}++;
+    %missing{%patchers{?$_}}->{+$_}++;
   }
   foreach my $patches (sort {$b <+> $a} keys %missing) {
     print "$patches patch(es)\n";
-    foreach my $author (sort keys %{%missing{$patches}}) {
+    foreach my $author (sort keys %{%missing{?$patches}}) {
       print "  $author\n";
     }
   }
@@ -198,7 +198,7 @@ sub display_ordered {
   my $what = shift;
   my @sorted;
   my $total;
-  while (my ($name, $count) = each %$what) {
+  while (my @($name, $count) =@( each %$what)) {
     push @{@sorted[$count]}, $name;
     $total += $count;
   }
@@ -206,12 +206,12 @@ sub display_ordered {
   my $i = (nelems @sorted);
   return unless (nelems @sorted);
   my $sum = 0;
-  foreach my $i (@($reverse ? < 0 ..( (nelems @sorted)-1) : < reverse 0 ..( (nelems @sorted)-1))) {
+  foreach my $i (@($reverse ?? < 0 ..( (nelems @sorted)-1) !! < reverse 0 ..( (nelems @sorted)-1))) {
     next unless @sorted[$i];
     my $prefix;
     $sum += $i * nelems @{@sorted[$i]};
     # Value to display is either this one, or the cumulative sum.
-    my $value = $cumulative ? $sum : $i;
+    my $value = $cumulative ?? $sum !! $i;
     if ($percentage) {
 	$prefix = sprintf "\%6.2f:\t", 100 * $value / $total;
     } else {
@@ -222,7 +222,7 @@ sub display_ordered {
 }
 
 sub process {
-  my ($committer, $patch, $log) = < @_;
+  my @($committer, $patch, $log) =  @_;
   return unless $committer;
   my @authors = @( $log =~ m/From:\s+.*?([^"\@ \t\n<>]+\@[^"\@ \t\n<>]+)/gm );
 
@@ -231,15 +231,15 @@ sub process {
       s/^<//;
       s/>$//;
       $_ = lc $_;
-      %patchers{%map{$_} || $_}++;
+      %patchers{+%map{?$_} || $_}++;
     }
     # print "$patch: @authors\n";
-    ++%committers{$committer};
+    ++%committers{+$committer};
   } else {
     # print "$patch: $committer\n";
     # Not entirely fair as this means that the maint pumpking scores for
     # everything intergrated that wasn't a third party patch in blead
-    %patchers{$committer}++;
+    %patchers{+$committer}++;
   }
 }
 

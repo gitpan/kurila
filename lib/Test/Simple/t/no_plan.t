@@ -1,12 +1,12 @@
 #!/usr/bin/perl -w
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't';
-        @INC = @('../lib', 'lib');
+        $^INCLUDE_PATH = @('../lib', 'lib');
     }
     else {
-        unshift @INC, 't/lib';
+        unshift $^INCLUDE_PATH, 't/lib';
     }
 }
 
@@ -17,12 +17,12 @@ $tb->level(0);
 
 #line 19
 ok !try { $tb->plan(tests => undef) };
-is($@->{description}, "Got an undefined number of tests");
+is($^EVAL_ERROR->{?description}, "Got an undefined number of tests");
 
 #line 23
 ok !try { $tb->plan(tests => 0) };
-is($@->{description}, "You said to run 0 tests");
+is($^EVAL_ERROR->{?description}, "You said to run 0 tests");
 
 #line 27
 ok !try { $tb->ok(1) };
-is( $@->{description}, "You tried to run a test without a plan");
+is( $^EVAL_ERROR->{?description}, "You tried to run a test without a plan");

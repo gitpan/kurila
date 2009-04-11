@@ -1,7 +1,7 @@
 
 package Pod::Simple::Progress;
 our $VERSION = "1.01";
-use strict;
+
 
 # Objects of this class are used for noting progress of an
 #  operation every so often.  Messages delivered more often than that
@@ -15,11 +15,10 @@ use strict;
 #
 #--------------------------------------------------------------------------
 
-sub new {
-  my($class,$delay) = < @_;
+sub new($class,$delay) {
   my $self = bless \%('quiet_until' => 1),  ref($class) || $class;
-  $self->to(*STDOUT{IO});
-  $self->delay(defined($delay) ? $delay : 5);
+  $self->to($^STDOUT{IO});
+  $self->delay(defined($delay) ?? $delay !! 5);
   return $self;
 }
 
@@ -29,34 +28,32 @@ sub copy {
 }
 #--------------------------------------------------------------------------
 
-sub reach {
-  my($self, $point, $note) = < @_;
-  if( (my $now = time) +>= $self->{'quiet_until'}) {
+sub reach($self, $point, $note) {
+  if( (my $now = time) +>= $self->{?'quiet_until'}) {
     my $goal;
-    my    $to = $self->{'to'};
-    print $to join('', @(
-      ($self->{'quiet_until'} == 1) ? () : '... ',
-      (defined $point) ? (
+    my    $to = $self->{?'to'};
+    print $to, join('', @(
+      ($self->{?'quiet_until'} == 1) ?? () !! '... ',
+      (defined $point) ?? (
         '#',
-        ($goal = $self->{'goal'}) ? (
+        ($goal = $self->{?'goal'}) ?? (
           ' ' x (length($goal) - length($point)),
           $point, '/', $goal,
-        ) : $point,
-        $note ? ': ' : (),
-      ) : (),
+        ) !! $point,
+        $note ?? ': ' !! (),
+      ) !! (),
       $note || '',
       "\n")
     );
-    $self->{'quiet_until'} = $now + $self->{'delay'};
+    $self->{+'quiet_until'} = $now + $self->{?'delay'};
   }
   return $self;
 }
 
 #--------------------------------------------------------------------------
 
-sub done {
-  my($self, $note) = < @_;
-  $self->{'quiet_until'} = 1;
+sub done($self, $note) {
+  $self->{+'quiet_until'} = 1;
   return $self->reach( undef, $note );
 }
 
@@ -64,11 +61,11 @@ sub done {
 # Simple accessors:
 
 sub delay {
-  return @_[0]->{'delay'} if (nelems @_) == 1; @_[0]->{'delay'} = @_[1]; return @_[0] }
+  return @_[0]->{?'delay'} if (nelems @_) == 1; @_[0]->{+'delay'} = @_[1]; return @_[0] }
 sub goal {
-  return @_[0]->{'goal' } if (nelems @_) == 1; @_[0]->{'goal' } = @_[1]; return @_[0] }
+  return @_[0]->{?'goal' } if (nelems @_) == 1; @_[0]->{+'goal' } = @_[1]; return @_[0] }
 sub to   {
-  return @_[0]->{'to'   } if (nelems @_) == 1; @_[0]->{'to'   } = @_[1]; return @_[0] }
+  return @_[0]->{?'to'   } if (nelems @_) == 1; @_[0]->{+'to'   } = @_[1]; return @_[0] }
 
 #--------------------------------------------------------------------------
 

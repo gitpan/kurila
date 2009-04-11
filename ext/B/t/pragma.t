@@ -1,20 +1,14 @@
 #!./perl -w
 
 BEGIN {    ## no critic strict
-    if ( %ENV{PERL_CORE} ) {
-	push @INC, < qw(lib);
+    if ( env::var('PERL_CORE') ) {
+	push $^INCLUDE_PATH, < qw(lib);
     }
     else {
-        unshift @INC, 't';
-    }
-    require Config;
-    if ( ( %Config::Config{'extensions'} !~ m/\bB\b/ ) ) {
-        print "1..0 # Skip -- Perl configured without B module\n";
-        exit 0;
+        unshift $^INCLUDE_PATH, 't';
     }
 }
 
-use strict;
 use warnings;
 use Test::More tests => 3 * 3;
 use B 'svref_2object';
@@ -36,7 +30,7 @@ sub foo {
     $z = $x - $y;
 }
 
-{
+do {
 
     # Pragmas don't appear til they're used.
     my $cop = find_op_cop( \&foo, qr/multiply/ );
@@ -46,9 +40,9 @@ sub foo {
     is( ref($hints_hash), 'HASH', 'Got hash reference' );
 
     ok( not( exists $hints_hash->{mypragma} ), q[! exists mypragma] );
-}
+};
 
-{
+do {
 
     # Pragmas can be fetched.
     my $cop = find_op_cop( \&foo, qr/add/ );
@@ -57,10 +51,10 @@ sub foo {
     my $hints_hash = $cop->hints_hash;
     is( ref($hints_hash), 'HASH', 'Got hash reference' );
 
-    is( $hints_hash->{mypragma}, 42, q[mypragma => 42] );
-}
+    is( $hints_hash->{?mypragma}, 42, q[mypragma => 42] );
+};
 
-{
+do {
 
     # Pragmas can be changed.
     my $cop = find_op_cop( \&foo, qr/subtract/ );
@@ -69,16 +63,15 @@ sub foo {
     my $hints_hash = $cop->hints_hash;
     is( ref($hints_hash), 'HASH', 'Got hash reference' );
 
-    is( $hints_hash->{mypragma}, 0, q[mypragma => 0] );
-}
+    is( $hints_hash->{?mypragma}, 0, q[mypragma => 0] );
+};
 exit;
 
 our $COP;
 
-sub find_op_cop {
-    my ( $sub, $op ) = < @_;
+sub find_op_cop( $sub, $op) {
     my $cv = svref_2object($sub);
-    local $COP;
+    local $COP = undef;
 
     if ( not _find_op_cop( $cv->ROOT, $op ) ) {
         $COP = undef;
@@ -87,8 +80,7 @@ sub find_op_cop {
     return $COP;
 }
 
-sub _find_op_cop {
-    my ( $op, $name ) = < @_;
+sub _find_op_cop( $op, $name) {
 
     # Fail on B::NULL or whatever.
     return 0 if not $op or $op->isa("B::NULL");

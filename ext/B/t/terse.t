@@ -1,16 +1,8 @@
 #!./perl
 
-BEGIN {
-	require Config;
-	if ((%Config::Config{'extensions'} !~ m/\bB\b/) ){
-		print "1..0 # Skip -- Perl configured without B module\n";
-		exit 0;
-	}
-}
+use Test::More tests => 15;
 
-use Test::More tests => 16;
-
-use_ok( 'B::Terse' );
+use B::Terse;
 
 # indent should return a string indented four spaces times the argument
 is( B::Terse::indent(2), ' ' x 8, 'indent with an argument' );
@@ -18,26 +10,26 @@ is( B::Terse::indent(), '', 'indent with no argument' );
 
 # this should fail without a reference
 try { B::Terse::terse('scalar') };
-like( $@->{description}, qr/not a reference/, 'terse() fed bad parameters' );
+like( $^EVAL_ERROR->{?description}, qr/not a reference/, 'terse() fed bad parameters' );
 
 # now point it at a sub and see what happens
 sub foo {}
 
 my $sub;
 try{ $sub = B::Terse::compile('', 'foo') };
-is( $@, '', 'compile()' );
+is( $^EVAL_ERROR, '', 'compile()' );
 ok( defined &$sub, 'valid subref back from compile()' );
 
 # and point it at a real sub and hope the returned ops look alright
 my $out = "";
 open my $ouf_fh, '>>', \$out or die;
-*STDOUT = *$ouf_fh{IO};
+B::Concise::walk_output($ouf_fh);
 $sub = B::Terse::compile('', 'bar');
 $sub->();
 
 # now build some regexes that should match the dumped ops
-my ($hex, $op) = ('\(0x[a-f0-9]+\)', '\s+\w+');
-my %ops = %( < map { $_ => qr/$_ $hex$op/ }
+my @($hex, $op) = @('\(0x[a-f0-9]+\)', '\s+\w+');
+my %ops = %( < @+: map { @: $_ => qr/$_ $hex$op/ },
 	qw ( OP	COP LOOP PMOP UNOP BINOP LOGOP LISTOP PVOP ) );
 
 # split up the output lines into individual ops (terse is, well, terse!)
@@ -49,8 +41,8 @@ foreach ( @lines) {
 	if (m/^([A-Z]+)\s+/) {
 		my $op = $1;
 		next unless exists %ops{$op};
-		like( $_, %ops{$op}, "$op " );
-		s/%ops{$op}//;
+		like( $_, %ops{?$op}, "$op " );
+		s/%ops{?$op}//;
 		delete %ops{$op};
 		redo if $_;
 	}
@@ -64,7 +56,7 @@ warn "# didn't find " . join(' ', keys %ops) if %ops;
 # add it to the regex above too. (PADOPs are currently only produced
 # under ithreads, though).
 #
-use vars < qw( $a $b );
+our ($a, $b);
 sub bar {
 	# OP SVOP COP IV here or in sub definition
 	my @bar = @(1, 2, 3);
@@ -91,10 +83,10 @@ sub bar {
 }
 
 # Schwern's example of finding an RV
-my $path = join " ", map { qq["-I$_"] } @INC;
-$path = '-I::lib -MMac::err=unix' if $^O eq 'MacOS';
-my $redir = $^O eq 'MacOS' ? '' : "2>&1";
-my $items = qx{$^X $path "-MO=Terse" -le "print \\42" $redir};
+my $path = join " ", map { qq["-I$_"] }, $^INCLUDE_PATH;
+$path = '-I::lib -MMac::err=unix' if $^OS_NAME eq 'MacOS';
+my $redir = $^OS_NAME eq 'MacOS' ?? '' !! "2>&1";
+my $items = qx{$^EXECUTABLE_NAME $path "-MO=Terse" -le "print \$^STDOUT, \\42" $redir};
 like( $items, qr/IV $hex \\42/, 'RV (but now stored in an IV)' );
 
 package TieOut;

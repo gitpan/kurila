@@ -4,16 +4,15 @@
 # WriteMakefile.
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't' if -d 't';
-        @INC = @('../lib', 'lib');
+        $^INCLUDE_PATH = @('../lib', 'lib');
     }
     else {
-        unshift @INC, 't/lib';
+        unshift $^INCLUDE_PATH, 't/lib';
     }
 }
 
-use strict;
 use Test::More tests => 12;
 
 use MakeMaker::Test::Utils;
@@ -32,12 +31,12 @@ END {
 }
 
 ok( chdir 'Big-Dummy', "chdir'd to Big-Dummy" ) ||
-  diag("chdir failed: $!");
+  diag("chdir failed: $^OS_ERROR");
 
-{
-    close *STDOUT;
+do {
+    close $^STDOUT;
     my $stdout = '';
-    open *STDOUT, '>>', \$stdout or die;
+    open $^STDOUT, '>>', \$stdout or die;
     my $warnings = '';
     local $^WARN_HOOK = sub {
         $warnings .= @_[0]->{description};
@@ -46,7 +45,7 @@ ok( chdir 'Big-Dummy', "chdir'd to Big-Dummy" ) ||
     WriteMakefile(
         NAME            => 'Big::Dummy',
         PREREQ_PM       => \%(
-            strict  => 0
+            error  => 0
         )
     );
     is $warnings, '';
@@ -55,12 +54,12 @@ ok( chdir 'Big-Dummy', "chdir'd to Big-Dummy" ) ||
     WriteMakefile(
         NAME            => 'Big::Dummy',
         PREREQ_PM       => \%(
-            strict  => 99999
+            error  => 99999
         )
     );
     is $warnings, 
-    sprintf("Warning: prerequisite strict 99999 not found. We have \%s.\n",
-            strict->VERSION);
+    sprintf("Warning: prerequisite error 99999 not found. We have \%s.\n",
+            error->VERSION);
 
     $warnings = '';
     WriteMakefile(
@@ -77,13 +76,13 @@ ok( chdir 'Big-Dummy', "chdir'd to Big-Dummy" ) ||
         NAME            => 'Big::Dummy',
         PREREQ_PM       => \%(
             "I::Do::Not::Exist" => 0,
-            "strict"            => 99999,
+            "error"            => 99999,
         )
     );
     is $warnings, 
     "Warning: prerequisite I::Do::Not::Exist 0 not found.".
-    sprintf("Warning: prerequisite strict 99999 not found. We have \%s.\n",
-            strict->VERSION);
+    sprintf("Warning: prerequisite error 99999 not found. We have \%s.\n",
+            error->VERSION);
     
     $warnings = '';
     try {
@@ -92,18 +91,18 @@ ok( chdir 'Big-Dummy', "chdir'd to Big-Dummy" ) ||
             PREREQ_PM       => \%(
                 "I::Do::Not::Exist" => 0,
                 "Nor::Do::I"        => 0,
-                "strict"            => 99999,
+                "error"            => 99999,
             ),
             PREREQ_FATAL    => 1,
         );
     };
     
     is $warnings, '';
-    is $@->{description}, <<'END', "PREREQ_FATAL";
+    is $^EVAL_ERROR->{description}, <<'END', "PREREQ_FATAL";
 MakeMaker FATAL: prerequisites not found.
     I::Do::Not::Exist not installed
     Nor::Do::I not installed
-    strict 99999
+    error 99999
 
 Please install these modules first and rerun 'perl Makefile.PL'.
 END
@@ -124,11 +123,11 @@ END
     };
     
     is $warnings, '';
-    is $@->{description}, <<'END', "PREREQ_FATAL happens before CONFIGURE";
+    is $^EVAL_ERROR->{description}, <<'END', "PREREQ_FATAL happens before CONFIGURE";
 MakeMaker FATAL: prerequisites not found.
     I::Do::Not::Exist not installed
 
 Please install these modules first and rerun 'perl Makefile.PL'.
 END
 
-}
+};

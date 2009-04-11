@@ -6,7 +6,6 @@ our @EXPORT_OK = qw(get reftype);
 our @EXPORT = @( () );
 our %EXPORT_TAGS = %(ALL => \@(< @EXPORT, < @EXPORT_OK));
 
-use strict;
 
 ## forward declaration(s) rather than wrapping the bootstrap call in BEGIN{}
 #sub reftype ($) ;
@@ -23,11 +22,11 @@ sub import {
 	require Exporter;
 	goto &Exporter::import;
     };
-    my (undef,$home_stash,$svref,< @attrs) = < @_;
+    my @(undef,$home_stash,$svref,@< @attrs) =  @_;
 
     my $svtype = uc reftype($svref);
     my $pkgmeth;
-    $pkgmeth = UNIVERSAL::can($home_stash, "MODIFY_{$svtype}_ATTRIBUTES")
+    $pkgmeth = UNIVERSAL::can($home_stash, "MODIFY_$($svtype)_ATTRIBUTES")
 	if defined $home_stash && $home_stash ne '';
     my @badattrs;
     if ($pkgmeth) {
@@ -41,7 +40,7 @@ sub import {
 		for my $attr ( @pkgattrs) {
 		    $attr =~ s/\(.+\z//s;
 		}
-		my $s = (((nelems @pkgattrs) == 1) ? '' : 's');
+		my $s = (((nelems @pkgattrs) == 1) ?? '' !! 's');
 		warn "$svtype package attribute$s " .
 		    "may clash with future reserved word$s: " .
 		    join(' : ', @pkgattrs);
@@ -53,7 +52,7 @@ sub import {
     }
     if ((nelems @badattrs)) {
 	die "Invalid $svtype attribute" .
-	    (( (nelems @badattrs) == 1 ) ? '' : 's') .
+	    (( (nelems @badattrs) == 1 ) ?? '' !! 's') .
 	    ": " .
 	    join(' : ', @badattrs);
     }
@@ -67,10 +66,10 @@ sub get ($) {
     my $stash = _guess_stash $svref;
     $stash = caller unless defined $stash;
     my $pkgmeth;
-    $pkgmeth = UNIVERSAL::can($stash, "FETCH_{$svtype}_ATTRIBUTES")
+    $pkgmeth = UNIVERSAL::can($stash, "FETCH_$($svtype)_ATTRIBUTES")
 	if defined $stash && $stash ne '';
-    return $pkgmeth ?
-		 @(_fetch_attrs($svref), $pkgmeth->($stash, $svref)) :
+    return $pkgmeth ??
+		 @(_fetch_attrs($svref), $pkgmeth->($stash, $svref)) !!
 		 @(_fetch_attrs($svref))
 	;
 }

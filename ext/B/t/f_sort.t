@@ -1,25 +1,21 @@
 #!perl
 
 BEGIN {
-    if (%ENV{PERL_CORE}){
-	push @INC, '../ext/B/t';
+    if (env::var('PERL_CORE')){
+	push $^INCLUDE_PATH, '../ext/B/t';
     } else {
-	unshift @INC, 't';
-	push @INC, "../../t";
+	unshift $^INCLUDE_PATH, 't';
+	push $^INCLUDE_PATH, "../../t";
     }
     require Config;
-    if ((%Config::Config{'extensions'} !~ m/\bB\b/) ){
-        print "1..0 # Skip -- Perl configured without B module\n";
-        exit 0;
-    }
-    if (!%Config::Config{useperlio}) {
-        print "1..0 # Skip -- need perlio to walk the optree\n";
+    if (!Config::config_value("useperlio")) {
+        print $^STDOUT, "1..0 # Skip -- need perlio to walk the optree\n";
         exit 0;
     }
     # require q(test.pl); # now done by OptreeCheck;
 }
 
-print "1..0 # Skip -- TODO for kurila\n";
+print $^STDOUT, "1..0 # Skip -- TODO for kurila\n";
 exit 0;
 
 use OptreeCheck;
@@ -520,7 +516,7 @@ checkOptree(name   => q{Compound sort/map Expression },
 # f      </> match(/"=(\\d+)"/) l/RTIME
 # g      <#> gvsv[*_] s
 # h      <1> uc[t17] sK/1
-# i      <@> anonlist lKRM/1
+# i      <@> anonarray lKRM/1
 # j      <1> refgen lK/1
 # k      <@> leave lKP
 #            goto 9
@@ -557,7 +553,7 @@ EOT_EOT
 # f      </> match(/"=(\\d+)"/) l/RTIME
 # g      <$> gvsv(*_) s
 # h      <1> uc[t9] sK/1
-# i      <@> anonlist lKRM/1
+# i      <@> anonarray lKRM/1
 # j      <1> refgen lK/1
 # k      <@> leave lKP
 #            goto 9
@@ -671,7 +667,7 @@ use sort 'stable';
 
 =cut
 
-my ($expect, $expect_nt) = (<<'EOT_EOT', <<'EONT_EONT');
+my @($expect, $expect_nt) = @(<<'EOT_EOT', <<'EONT_EONT');
 # 1  <;> nextstate(main 656 (eval 40):1) v:%,{
 # 2  <0> pushmark s
 # 3  <0> pushmark s

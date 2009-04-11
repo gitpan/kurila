@@ -1,10 +1,10 @@
-print "1..2\n";
+print $^STDOUT, "1..2\n";
 
 use Digest;
 
-{
+do {
     package Digest::Dummy;
-    use vars < qw($VERSION @ISA);
+    our ($VERSION, @ISA);
     $VERSION = 1;
 
     require Digest::base;
@@ -16,17 +16,17 @@ use Digest;
 	bless \%( d => $d ), $class;
     }
     sub add {}
-    sub digest { shift->{d} }
-}
+    sub digest { shift->{?d} }
+};
 
 my $d;
 $d = Digest->new("Dummy");
-print "not " unless $d->digest eq "ooo";
-print "ok 1\n";
+print $^STDOUT, "not " unless $d->digest eq "ooo";
+print $^STDOUT, "ok 1\n";
 
-%Digest::MMAP{"Dummy-24"} = \@(\@("NotThere"), "NotThereEither", \@("Digest::Dummy", 24));
+%Digest::MMAP{+"Dummy-24"} = \@(\@("NotThere"), "NotThereEither", \@("Digest::Dummy", 24));
 $d = Digest->new("Dummy-24");
-print "not " unless $d->digest eq "24";
-print "ok 2\n";
+print $^STDOUT, "not " unless $d->digest eq "24";
+print $^STDOUT, "ok 2\n";
 
 

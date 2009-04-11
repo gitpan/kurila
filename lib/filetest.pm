@@ -99,16 +99,16 @@ This limitation might be removed in a future version of perl.
 $filetest::hint_bits = 0x00400000; # HINT_FILETEST_ACCESS
 
 sub import {
-    if ( @_[1] eq 'access' ) {
-	$^H ^|^= $filetest::hint_bits;
+    if ( @_[?1] eq 'access' ) {
+	$^HINT_BITS ^|^= $filetest::hint_bits;
     } else {
 	die "filetest: the only implemented subpragma is 'access'.\n";
     }
 }
 
 sub unimport {
-    if ( @_[1] eq 'access' ) {
-	$^H ^&^= ^~^$filetest::hint_bits;
+    if ( @_[?1] eq 'access' ) {
+	$^HINT_BITS ^&^= ^~^$filetest::hint_bits;
     } else {
 	die "filetest: the only implemented subpragma is 'access'.\n";
     }

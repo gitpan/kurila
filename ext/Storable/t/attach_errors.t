@@ -29,56 +29,52 @@ use Storable ();
 
 
 # Good Case - should not die
-{
+do {
 	my $goodfreeze = bless \%(), 'My::GoodFreeze';
 	my $frozen = undef;
 	try {
 		$frozen = Storable::freeze( $goodfreeze );
 	};
-	ok( ! $@, 'Storable does not die when STORABLE_freeze does not return references' );
+	ok( ! $^EVAL_ERROR, 'Storable does not die when STORABLE_freeze does not return references' );
 	ok( $frozen, 'Storable freezes to a string successfully' );
 
 	package My::GoodFreeze;
 
-	sub STORABLE_freeze {
-		my ($self, $clone) = < @_;
+	sub STORABLE_freeze($self, $clone) {
 		
 		# Illegally include a reference in this return
 		return  @('');
 	}
 
-	sub STORABLE_attach {
-		my ($class, $clone, $string) = < @_;
+	sub STORABLE_attach($class, $clone, $string) {
 		return bless \%( ), 'My::GoodFreeze';
 	}
-}
+};
 
 
 
 # Error Case - should die on freeze
-{
+do {
 	my $badfreeze = bless \%(), 'My::BadFreeze';
 	try {
 		Storable::freeze( $badfreeze );
 	};
-	ok( $@, 'Storable dies correctly when STORABLE_freeze returns a referece' );
+	ok( $^EVAL_ERROR, 'Storable dies correctly when STORABLE_freeze returns a referece' );
 	# Check for a unique substring of the error message
-	ok( $@->{description} =~ m/cannot return references/, 'Storable dies with the expected error' );
+	ok( $^EVAL_ERROR->{?description} =~ m/cannot return references/, 'Storable dies with the expected error' );
 
 	package My::BadFreeze;
 
-	sub STORABLE_freeze {
-		my ($self, $clone) = < @_;
+	sub STORABLE_freeze($self, $clone) {
 		
 		# Illegally include a reference in this return
 		return  @('', \@());
 	}
 
-	sub STORABLE_attach {
-		my ($class, $clone, $string) = < @_;
+	sub STORABLE_attach($class, $clone, $string) {
 		return bless \%( ), 'My::BadFreeze';
 	}
-}
+};
 
 
 
@@ -93,7 +89,7 @@ use Storable ();
 
 
 # Good Case - should not die
-{
+do {
 	my $goodthaw = bless \%(), 'My::GoodThaw';
 	my $frozen = undef;
 	try {
@@ -104,26 +100,24 @@ use Storable ();
 		Storable::thaw( $frozen );
 	};
 	isa_ok( $thawed, 'My::GoodThaw' );
-	is( $thawed->{foo}, 'bar', 'My::GoodThaw thawed correctly as expected' );
+	is( $thawed->{?foo}, 'bar', 'My::GoodThaw thawed correctly as expected' );
 
 	package My::GoodThaw;
 
-	sub STORABLE_freeze {
-		my ($self, $clone) = < @_;
+	sub STORABLE_freeze($self, $clone) {
 
 		return  @('');
 	}
 
-	sub STORABLE_attach {
-		my ($class, $clone, $string) = < @_;
+	sub STORABLE_attach($class, $clone, $string) {
 		return bless \%( 'foo' => 'bar' ), 'My::GoodThaw';
 	}
-}
+};
 
 
 
 # Bad Case - should die on thaw
-{
+do {
 	# Create the frozen string normally
 	my $badthaw = bless \%( ), 'My::BadThaw';
 	my $frozen = undef;
@@ -143,25 +137,23 @@ use Storable ();
 	try {
 		$thawed = Storable::thaw( $frozen );
 	};
-	ok( $@, 'My::BadThaw object dies when thawing as expected' );
+	ok( $^EVAL_ERROR, 'My::BadThaw object dies when thawing as expected' );
 	# Check for a snippet from the error message
-	ok( $@->{description} =~ m/unexpected references/, 'Dies with the expected error message' );
+	ok( $^EVAL_ERROR->{?description} =~ m/unexpected references/, 'Dies with the expected error message' );
 
 	package My::BadThaw;
 
-	sub STORABLE_freeze {
-		my ($self, $clone) = < @_;
+	sub STORABLE_freeze($self, $clone) {
 
 		return  @('', \@());
 	}
 
 	# Start with no STORABLE_attach method so we can get a
 	# frozen object-containing-a-reference into the freeze string.
-	sub STORABLE_thaw {
-		my ($class, $clone, $string) = < @_;
+	sub STORABLE_thaw($class, $clone, $string) {
 		return bless \%( 'foo' => 'bar' ), 'My::BadThaw';
 	}
-}
+};
 
 
 
@@ -174,7 +166,7 @@ use Storable ();
 
 
 # Good Case - should not die
-{
+do {
 	my $goodattach = bless \%( ), 'My::GoodAttach';
 	my $frozen = Storable::freeze( $goodattach );
 	ok( $frozen, 'My::GoodAttach return as expected' );
@@ -187,13 +179,11 @@ use Storable ();
 
 	package My::GoodAttach;
 
-	sub STORABLE_freeze {
-		my ($self, $cloning) = < @_;
+	sub STORABLE_freeze($self, $cloning) {
 		return  @('');
 	}
 
-	sub STORABLE_attach {
-		my ($class, $cloning, $string) = < @_;
+	sub STORABLE_attach($class, $cloning, $string) {
 
 		return bless \%( ), 'My::GoodAttach::Subclass';
 	}
@@ -203,12 +193,12 @@ use Storable ();
 	BEGIN {
 		our @ISA = @( 'My::GoodAttach' );
 	}
-}
+};
 
 
 
 # Bad Cases - die on thaw
-{
+do {
 	my $returnvalue = undef;
 
 	# Create and freeze the object
@@ -234,22 +224,20 @@ use Storable ();
 		try {
 			$thawed = Storable::thaw( $frozen );
 		};
-		ok( $@, 'BadAttach dies on thaw' );
-		ok( $@->{description} =~ m/STORABLE_attach did not return a My::BadAttach object/,
+		ok( $^EVAL_ERROR, 'BadAttach dies on thaw' );
+		ok( $^EVAL_ERROR->{?description} =~ m/STORABLE_attach did not return a My::BadAttach object/,
 			'BadAttach dies on thaw with the expected error message' );
 		is( $thawed, undef, 'Double checking $thawed was not set' );
 	}
 	
 	package My::BadAttach;
 
-	sub STORABLE_freeze {
-		my ($self, $cloning) = < @_;
+	sub STORABLE_freeze($self, $cloning) {
 		return  @('');
 	}
 
-	sub STORABLE_attach {
-		my ($class, $cloning, $string) = < @_;
+	sub STORABLE_attach($class, $cloning, $string) {
 
 		return $returnvalue;
 	}
-}
+};

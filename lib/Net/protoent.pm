@@ -1,5 +1,5 @@
 package Net::protoent;
-use strict;
+
 
 our $VERSION = '1.00';
 our(@EXPORT, @EXPORT_OK, %EXPORT_TAGS);
@@ -9,10 +9,13 @@ BEGIN {
     @EXPORT_OK   = qw( $p_name @p_aliases $p_proto );
     %EXPORT_TAGS = %( FIELDS => \@( < @EXPORT_OK, < @EXPORT ) );
 }
-use vars      < @EXPORT_OK;
+our ($p_name, @p_aliases, $p_proto);
 
 # Class::Struct forbids use of @ISA
-sub import { goto &Exporter::import }
+sub import {
+    local $Exporter::ExportLevel = $Exporter::ExportLevel + 1;
+    return Exporter::import(< @_);
+}
 
 use Class::Struct < qw(struct);
 struct 'Net::protoent' => \@(
@@ -21,7 +24,7 @@ struct 'Net::protoent' => \@(
    proto	=> '$',
 );
 
-sub populate (@) {
+sub populate {
     return unless (nelems @_);
     my $pob = new();
     $p_name 	 =    $pob->[0]     	     = @_[0];
@@ -31,12 +34,11 @@ sub populate (@) {
 } 
 
 sub getprotoent      ( )  { populate(CORE::getprotoent()) } 
-sub getprotobyname   ($)  { populate(CORE::getprotobyname(shift)) } 
-sub getprotobynumber ($)  { populate(CORE::getprotobynumber(shift)) } 
+sub getprotobyname   ($name)  { populate(CORE::getprotobyname($name)) } 
+sub getprotobynumber ($number)  { populate(CORE::getprotobynumber($number)) } 
 
-sub getproto ($;$) {
-    no strict 'refs';
-    return &{'getprotoby' . (@_[0]=~m/^\d+$/ ? 'number' : 'name')}(< @_);
+sub getproto {
+    return &{'getprotoby' . (@_[0]=~m/^\d+$/ ?? 'number' !! 'name')}(< @_);
 }
 
 1;

@@ -13,14 +13,14 @@ sub import
    my $layer = shift;
    if (exists %alias{$layer})
     {
-     $layer = %alias{$layer}
+     $layer = %alias{?$layer}
     }
    else
     {
-     $layer = "{$class}::$layer";
+     $layer = "$($class)::$layer";
     }
    eval "require $layer";
-   warn "failed loading $layer\: {$@->message}" if $@;
+   warn "failed loading $layer\: $($^EVAL_ERROR->message)" if $^EVAL_ERROR;
   }
 }
 

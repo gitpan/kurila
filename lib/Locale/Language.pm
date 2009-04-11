@@ -5,14 +5,14 @@
 #
 
 package Locale::Language;
-use strict;
+
 
 require Exporter;
 
 #-----------------------------------------------------------------------
 #	Public Global Variables
 #-----------------------------------------------------------------------
-use vars < qw($VERSION @ISA @EXPORT);
+our ($VERSION, @ISA, @EXPORT);
 $VERSION      = sprintf("\%d.\%02d", q$Revision: 2.7 $ =~ m/(\d+)\.(\d+)/);
 @ISA          = qw(Exporter);
 @EXPORT       = qw(&code2language &language2code
@@ -39,7 +39,7 @@ sub code2language
     $code = lc($code);
     if (exists %CODES{$code})
     {
-        return %CODES{$code};
+        return %CODES{?$code};
     }
     else
     {
@@ -65,7 +65,7 @@ sub language2code
     $lang = lc($lang);
     if (exists %LANGUAGES{$lang})
     {
-        return %LANGUAGES{$lang};
+        return %LANGUAGES{?$lang};
     }
     else
     {
@@ -102,23 +102,23 @@ sub all_language_names
 #=======================================================================
 # initialisation code - stuff the DATA into the CODES hash
 #=======================================================================
-{
+do {
     my    $code;
     my    $language;
-    local $_;
+    local $_ = undef;
 
 
     while ( ~< *DATA)
     {
         next unless m/\S/;
         chop;
-        ($code, $language) = < split(m/:/, $_, 2);
-        %CODES{$code} = $language;
-        %LANGUAGES{lc "$language"} = $code;
+        @($code, $language) =  split(m/:/, $_, 2);
+        %CODES{+$code} = $language;
+        %LANGUAGES{+lc "$language"} = $code;
     }
 
-    close(DATA);
-}
+    close(\*DATA);
+};
 
 1;
 

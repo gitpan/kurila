@@ -1,5 +1,5 @@
 package Net::hostent;
-use strict;
+
 
 our $VERSION = '1.01';
 our(@EXPORT, @EXPORT_OK, %EXPORT_TAGS);
@@ -13,10 +13,14 @@ BEGIN {
 		   );
     %EXPORT_TAGS = %( FIELDS => \@( < @EXPORT_OK, < @EXPORT ) );
 }
-use vars      < @EXPORT_OK;
+our ($h_name, @h_aliases, $h_addrtype, $h_length,
+     @h_addr_list, $h_addr);
 
 # Class::Struct forbids use of @ISA
-sub import { goto &Exporter::import }
+sub import {
+    local $Exporter::ExportLevel = $Exporter::ExportLevel + 1;
+    return Exporter::import(< @_);
+}
 
 use Class::Struct < qw(struct);
 struct 'Net::hostent' => \@(
@@ -29,7 +33,7 @@ struct 'Net::hostent' => \@(
 
 sub addr { shift->addr_list->[0] }
 
-sub populate (@) {
+sub populate {
     return unless (nelems @_);
     my $hob = new();
     $h_name 	 =    $hob->[0]     	     = @_[0];
@@ -41,22 +45,20 @@ sub populate (@) {
     return $hob;
 } 
 
-sub gethostbyname ($)  { populate(CORE::gethostbyname(shift)) } 
+sub gethostbyname ($name)  { populate(CORE::gethostbyname($name)) } 
 
-sub gethostbyaddr ($;$) { 
-    my ($addr, $addrtype);
-    $addr = shift;
-    require Socket unless (nelems @_);
-    $addrtype = (nelems @_) ? shift : Socket::AF_INET();
+sub gethostbyaddr ($addr, ?$addrtype) { 
+    require Socket unless defined $addrtype;
+    $addrtype //= Socket::AF_INET();
     populate(CORE::gethostbyaddr($addr, $addrtype)) 
 } 
 
-sub gethost($) {
-    if (@_[0] =~ m/^\d+(?:\.\d+(?:\.\d+(?:\.\d+)?)?)?$/) {
+sub gethost($name_addr) {
+    if ($name_addr =~ m/^\d+(?:\.\d+(?:\.\d+(?:\.\d+)?)?)?$/) {
 	require Socket;
-	&gethostbyaddr( <Socket::inet_aton(shift));
+	&gethostbyaddr( <Socket::inet_aton($name_addr));
     } else {
-	&gethostbyname;
+	&gethostbyname( $name_addr );
     } 
 } 
 

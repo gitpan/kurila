@@ -30,7 +30,6 @@ static const char* const svclassnames[] = {
     "B::PVMG",
     "B::REGEXP",
     "B::GV",
-    "B::PVLV",
     "B::AV",
     "B::HV",
     "B::CV",
@@ -218,7 +217,6 @@ typedef SV	*B__PV;
 typedef SV	*B__NV;
 typedef SV	*B__PVMG;
 typedef SV	*B__REGEXP;
-typedef SV	*B__PVLV;
 typedef SV	*B__BM;
 typedef SV	*B__RV;
 typedef SV	*B__FM;
@@ -252,11 +250,9 @@ BOOT:
 
 #define B_main_cv()	PL_main_cv
 #define B_init_av()	PL_initav
-#define B_inc_gv()	PL_incgv
-#define B_check_av()	PL_checkav_save
-#define B_unitcheck_av()	PL_unitcheckav_save
-#define B_begin_av()	PL_beginav_save
 #define B_end_av()	PL_endav
+#define B_check_av()	PL_checkav
+#define B_unitcheck_av()	PL_unitcheckav
 #define B_sub_generation()	PL_sub_generation
 #define B_defstash()	PL_defstash
 #define B_curstash()	PL_curstash
@@ -265,9 +261,6 @@ BOOT:
 #define B_sv_undef()	&PL_sv_undef
 #define B_sv_yes()	&PL_sv_yes
 #define B_sv_no()	&PL_sv_no
-#ifdef USE_ITHREADS
-#define B_regex_padav()	PL_regex_padav
-#endif
 
 B::AV
 B_init_av()
@@ -279,20 +272,7 @@ B::AV
 B_unitcheck_av()
 
 B::AV
-B_begin_av()
-
-B::AV
 B_end_av()
-
-B::GV
-B_inc_gv()
-
-#ifdef USE_ITHREADS
-
-B::AV
-B_regex_padav()
-
-#endif
 
 B::CV
 B_main_cv()
@@ -451,10 +431,6 @@ SvREFCNT(sv)
 	B::SV	sv
 
 U32
-SvFLAGS(sv)
-	B::SV	sv
-
-U32
 SvPOK(sv)
 	B::SV	sv
 
@@ -465,6 +441,14 @@ SvROK(sv)
 U32
 SvMAGICAL(sv)
 	B::SV	sv
+
+SV*
+SvLOCATION(sv)
+	B::SV	sv
+    CODE:
+        RETVAL = SvREFCNT_inc(SvLOCATION(sv));
+    OUTPUT:
+        RETVAL
 
 MODULE = B	PACKAGE = B::IV		PREFIX = Sv
 
@@ -557,8 +541,12 @@ PARENT_FAKELEX_FLAGS(sv)
 
 MODULE = B	PACKAGE = B::PV		PREFIX = Sv
 
+const char*
+SvPVX_const(sv)
+	B::PV	sv
+
 char*
-SvPVX(sv)
+SvPVX_mutable(sv)
 	B::PV	sv
 
 B::SV
@@ -573,28 +561,6 @@ SvRV(sv)
         }
     OUTPUT:
         RETVAL
-
-void
-SvPV(sv)
-	B::PV	sv
-    CODE:
-        ST(0) = sv_newmortal();
-        if( SvPOK(sv) ) {
-	    /* FIXME - we need a better way for B to identify PVs that are
-	       in the pads as variable names.  */
-	    if((SvLEN(sv) && SvCUR(sv) >= SvLEN(sv))) {
-		/* It claims to be longer than the space allocated for it -
-		   presuambly it's a variable name in the pad  */
-		sv_setpv(ST(0), SvPV_nolen_const(sv));
-	    } else {
-		sv_setpvn(ST(0), SvPVX_const(sv), SvCUR(sv));
-	    }
-        }
-        else {
-            /* XXX for backward compatibility, but should fail */
-            /* croak( "argument is not SvPOK" ); */
-            sv_setpvn(ST(0), NULL, 0);
-        }
 
 # This used to read 257. I think that that was buggy - should have been 258.
 # (The "\0", the flags byte, and 256 for the table.  Not that anything
@@ -647,7 +613,7 @@ SV*
 precomp(sv)
 	B::REGEXP	sv
     CODE:
-	RETVAL = newSVpvn( RX_PRECOMP(sv), RX_PRELEN(sv) );
+	RETVAL = newSVpvn( RX_PRECOMP(svTre(sv)), RX_PRELEN(svTre(sv)) );
     OUTPUT:
         RETVAL
 
@@ -737,24 +703,6 @@ MgPTR(mg)
 		}
 	}
 
-MODULE = B	PACKAGE = B::PVLV	PREFIX = Lv
-
-U32
-LvTARGOFF(sv)
-	B::PVLV	sv
-
-U32
-LvTARGLEN(sv)
-	B::PVLV	sv
-
-char
-LvTYPE(sv)
-	B::PVLV	sv
-
-B::SV
-LvTARG(sv)
-	B::PVLV sv
-
 MODULE = B	PACKAGE = B::BM		PREFIX = Bm
 
 I32
@@ -773,9 +721,9 @@ void
 BmTABLE(sv)
 	B::BM	sv
 	STRLEN	len = NO_INIT
-	char *	str = NO_INIT
+	const char *	str = NO_INIT
     CODE:
-	str = SvPV(sv, len);
+	str = SvPV_const(sv, len);
 	/* Boyer-Moore table is just after string and its safety-margin \0 */
 	ST(0) = sv_2mortal(newSVpvn(str + len + PERL_FBM_TABLE_OFFSET, 256));
 
@@ -927,24 +875,12 @@ U32
 CvCONST(cv)
 	B::CV	cv
 
-B::GV
-CvGV(cv)
-	B::CV	cv
-
 long
 CvDEPTH(cv)
 	B::CV	cv
 
 B::AV
 CvPADLIST(cv)
-	B::CV	cv
-
-B::CV
-CvOUTSIDE(cv)
-	B::CV	cv
-
-U32
-CvOUTSIDE_SEQ(cv)
 	B::CV	cv
 
 void

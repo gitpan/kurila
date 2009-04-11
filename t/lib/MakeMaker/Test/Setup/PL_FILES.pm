@@ -4,7 +4,6 @@ our @ISA = qw(Exporter);
 require Exporter;
 our @EXPORT = qw(setup teardown);
 
-use strict;
 use File::Path;
 use File::Basename;
 use File::Spec;
@@ -28,7 +27,7 @@ END
 	     'PL_FILES-Module/multi.PL'         => _gen_pl_files(),
 	     'PL_FILES-Module/Bar_pm.PL'        => _gen_pm_files(),
 	     'PL_FILES-Module/lib/PL/Foo.pm' => <<'END',
-# Module to load to ensure PL_FILES have blib in @INC.
+# Module to load to ensure PL_FILES have blib in $^INCLUDE_PATH.
 package PL::Foo;
 sub bar { 42 }
 1;
@@ -41,19 +40,19 @@ sub _gen_pl_files {
     my $test = <<'END';
 #!/usr/bin/perl -w
 
-# Ensure we have blib in @INC
+# Ensure we have blib in $^INCLUDE_PATH
 use PL::Foo;
 die unless PL::Foo::bar() == 42;
 
 # Had a bug where PL_FILES weren't sent the file to generate
 die "argv empty\n" unless @ARGV;
-die "too many in argv: {join ' ', @ARGV}\n" unless nelems @ARGV == 1;
+die "too many in argv: $(join ' ', @ARGV)\n" unless nelems @ARGV == 1;
 
 my $file = @ARGV[0];
-open OUT, ">", "$file" or die $!;
+open my $out, ">", "$file" or die $^OS_ERROR;
 
-print OUT "Testing\n";
-close OUT
+print $out, "Testing\n";
+close $out
 END
 
     $test =~ s/^\n//;
@@ -66,19 +65,19 @@ sub _gen_pm_files {
     my $test = <<'END';
 #!/usr/bin/perl -w
 
-# Ensure we do NOT have blib in @INC when building a module
+# Ensure we do NOT have blib in $^INCLUDE_PATH when building a module
 try { require PL::Foo; };
-#die $@ unless $@ =~ m{^Can't locate PL/Foo.pm in \@INC };
+#die $@ unless $@ =~ m{^Can't locate PL/Foo.pm in \$^INCLUDE_PATH };
 
 # Had a bug where PL_FILES weren't sent the file to generate
 die "argv empty\n" unless @ARGV;
 die "too many in argv: @ARGV\n" unless nelems @ARGV == 1;
 
 my $file = @ARGV[0];
-open OUT, ">", "$file" or die $!;
+open my $out, ">", "$file" or die $^OS_ERROR;
 
-print OUT "Testing\n";
-close OUT
+print $out, "Testing\n";
+close $out
 END
 
     $test =~ s/^\n//;
@@ -89,17 +88,17 @@ END
 
 sub setup {
     setup_mm_test_root();
-    chdir 'MM_TEST_ROOT:[t]' if $^O eq 'VMS';
+    chdir 'MM_TEST_ROOT:[t]' if $^OS_NAME eq 'VMS';
 
-    while(my($file, $text) = each %Files) {
+    while(my@(?$file, ?$text) =@( each %Files)) {
         # Convert to a relative, native file path.
         $file = 'File::Spec'->catfile('File::Spec'->curdir, < split m{\/}, $file);
 
         my $dir = dirname($file);
         mkpath $dir;
-        open(FILE, ">", "$file") || die "Can't create $file: $!";
-        print FILE $text;
-        close FILE;
+        open(my $fh, ">", "$file") || die "Can't create $file: $^OS_ERROR";
+        print $fh, $text;
+        close $fh;
     }
 
     return 1;

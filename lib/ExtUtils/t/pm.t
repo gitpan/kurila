@@ -3,16 +3,15 @@
 # Test that MakeMaker honors user's PM override.
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't' if -d 't';
-        @INC = @('../lib', 'lib');
+        $^INCLUDE_PATH = @('../lib', 'lib');
     }
     else {
-        unshift @INC, 't/lib';
+        unshift $^INCLUDE_PATH, 't/lib';
     }
 }
 
-use strict;
 use Test::More tests => 5;
 
 use MakeMaker::Test::Utils;
@@ -31,13 +30,13 @@ END {
 }
 
 ok( chdir 'Big-Dummy', "chdir'd to Big-Dummy" ) ||
-  diag("chdir failed: $!");
+  diag("chdir failed: $^OS_ERROR");
 
 my $stdout = '';
-close STDOUT;
-open STDOUT, '>>', \$stdout or die;
+close $^STDOUT;
+open $^STDOUT, '>>', \$stdout or die;
 
-{
+do {
     my $mm = WriteMakefile(
         NAME            => 'Big::Dummy',
         VERSION_FROM    => 'lib/Big/Dummy.pm',
@@ -45,4 +44,4 @@ open STDOUT, '>>', \$stdout or die;
     );
 
     is_deeply( $mm->{PM},  \%( wibble => 'woof' ) );
-}
+};

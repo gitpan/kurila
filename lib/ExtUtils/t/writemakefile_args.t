@@ -4,15 +4,14 @@
 # WriteMakefile.
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
-        push @INC, 'lib';
+    if( env::var('PERL_CORE') ) {
+        push $^INCLUDE_PATH, 'lib';
     }
     else {
-        unshift @INC, 't/lib';
+        unshift $^INCLUDE_PATH, 't/lib';
     }
 }
 
-use strict;
 use Test::More tests => 24;
 
 use MakeMaker::Test::Utils;
@@ -29,15 +28,15 @@ END {
 }
 
 ok( chdir 'Big-Dummy', "chdir'd to Big-Dummy" ) ||
-  diag("chdir failed: $!");
+  diag("chdir failed: $^OS_ERROR");
 
-{
+do {
     my $stdout = \$( '' );
     open my $stdout_fh, '>>', $stdout or die;
-    *STDOUT = *{$stdout_fh}{IO};
+    $^STDOUT = *{$stdout_fh}{IO};
     my $warnings = '';
     local $^WARN_HOOK = sub {
-        $warnings .= @_[0]->{description};
+        $warnings .= @_[0]->description;
     };
 
     my $mm;
@@ -67,7 +66,7 @@ VERIFY
 
     # We'll get warnings about the bogus libs, that's ok.
     unlike( $warnings, qr/WARNING: .* takes/ );
-    is_deeply( $mm->{LIBS}, \@('-lwibble -lwobble') );
+    is_deeply( $mm->{?LIBS}, \@('-lwibble -lwobble') );
 
     $warnings = '';
     $mm = WriteMakefile(
@@ -78,7 +77,7 @@ VERIFY
 
     # We'll get warnings about the bogus libs, that's ok.
     unlike( $warnings, qr/WARNING: .* takes/ );
-    is_deeply( $mm->{LIBS}, \@('-lwibble', '-lwobble') );
+    is_deeply( $mm->{?LIBS}, \@('-lwibble', '-lwobble') );
 
     $warnings = '';
     try {
@@ -103,8 +102,8 @@ VERIFY
     like( $warnings, qr{^WARNING: WIBBLE is not a known parameter.\n}m );
     like( $warnings, qr{^WARNING: wump is not a known parameter.\n}m );
 
-    is( $mm->{WIBBLE}, 'something' );
-    is_deeply( $mm->{wump}, \%( foo => 42 ) );
+    is( $mm->{?WIBBLE}, 'something' );
+    is_deeply( $mm->{?wump}, \%( foo => 42 ) );
 
 
     # Test VERSION
@@ -125,7 +124,7 @@ VERIFY
         );
     };
     is( $warnings, '' );
-    is( $mm->{VERSION}, '1.002003' );
+    is( $mm->{?VERSION}, '1.002003' );
 
     $warnings = '';
     try {
@@ -135,7 +134,7 @@ VERIFY
         );
     };
     is( $warnings, '' );
-    is( $mm->{VERSION}, '1.002_003' );
+    is( $mm->{?VERSION}, '1.002_003' );
 
 
     $warnings = '';
@@ -148,7 +147,7 @@ VERIFY
     like( $warnings, '/^WARNING: VERSION takes a version object or string/number not a Some::Class object/' );
 
 
-    SKIP: {
+    SKIP: do {
         skip("Can't test version objects",6) unless try { require version };
         version->import;
 
@@ -159,7 +158,7 @@ VERIFY
             VERSION    => $version,
         );
         is( $warnings, '' );
-        is( $mm->{VERSION}, $version->stringify );
+        is( $mm->{?VERSION}, $version->stringify );
 
         $warnings = '';
         $version = qv('1.2.3');
@@ -168,6 +167,6 @@ VERIFY
             VERSION    => $version,
         );
         is( $warnings, '' );
-        is( $mm->{VERSION}, $version->stringify, 'correct version' );
-    }
-}
+        is( $mm->{?VERSION}, $version->stringify, 'correct version' );
+    };
+};

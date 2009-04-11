@@ -13,25 +13,14 @@ package DB_File::HASHINFO ;
 
 
 use warnings;
-use strict;
-use Carp;
+
 require Tie::Hash;
 @DB_File::HASHINFO::ISA = qw(Tie::Hash);
 
 sub new
 {
     my $pkg = shift ;
-    my %x ;
-    tie %x, $pkg ;
-    bless \%x, $pkg ;
-}
-
-
-sub TIEHASH
-{
-    my $pkg = shift ;
-
-    bless \%( VALID => \%( 
+    return bless \%( VALID => \%( 
 		       	bsize	  => 1,
 			ffactor	  => 1,
 			nelem	  => 1,
@@ -43,78 +32,18 @@ sub TIEHASH
           ), $pkg ;
 }
 
-
-sub FETCH 
-{  
-    my $self  = shift ;
-    my $key   = shift ;
-
-    return $self->{GOT}->{$key} if exists $self->{VALID}->{$key}  ;
-
-    my $pkg = ref $self ;
-    croak "{$pkg}::FETCH - Unknown element '$key'" ;
-}
-
-
-sub STORE 
-{
-    my $self  = shift ;
-    my $key   = shift ;
-    my $value = shift ;
-
-    my $type = $self->{VALID}->{$key};
-
-    if ( $type )
-    {
-    	croak "Key '$key' not associated with a code reference" 
-	    if $type == 2 && !ref $value && ref $value ne 'CODE';
-        $self->{GOT}->{$key} = $value ;
-        return ;
-    }
-    
-    my $pkg = ref $self ;
-    croak "{$pkg}::STORE - Unknown element '$key'" ;
-}
-
-sub DELETE 
-{
-    my $self = shift ;
-    my $key  = shift ;
-
-    if ( exists $self->{VALID}->{$key} )
-    {
-        delete $self->{GOT}->{$key} ;
-        return ;
-    }
-    
-    my $pkg = ref $self ;
-    croak "DB_File::HASHINFO::DELETE - Unknown element '$key'" ;
-}
-
-sub EXISTS
-{
-    my $self = shift ;
-    my $key  = shift ;
-
-    exists $self->{VALID}->{$key} ;
-}
-
 sub NotHere
 {
     my $self = shift ;
     my $method = shift ;
 
-    croak ref($self) . " does not define the method {$method}" ;
+    die ref($self) . " does not define the method $($method)" ;
 }
-
-sub FIRSTKEY { my $self = shift ; $self->NotHere("FIRSTKEY") }
-sub NEXTKEY  { my $self = shift ; $self->NotHere("NEXTKEY") }
-sub CLEAR    { my $self = shift ; $self->NotHere("CLEAR") }
 
 package DB_File::RECNOINFO ;
 
 use warnings;
-use strict ;
+ 
 
 @DB_File::RECNOINFO::ISA = qw(DB_File::HASHINFO) ;
 
@@ -122,7 +51,7 @@ sub TIEHASH
 {
     my $pkg = shift ;
 
-    bless \%( VALID => \%( < map {$_, 1} 
+    bless \%( VALID => \%( < @+: map { @: $_, 1}, 
 		       qw( bval cachesize psize flags lorder reclen bfname )
 		     ),
 	    GOT   => \%(),
@@ -132,7 +61,7 @@ sub TIEHASH
 package DB_File::BTREEINFO ;
 
 use warnings;
-use strict ;
+ 
 
 @DB_File::BTREEINFO::ISA = qw(DB_File::HASHINFO) ;
 
@@ -158,10 +87,9 @@ sub TIEHASH
 package DB_File ;
 
 use warnings;
-use strict;
+
 our ($VERSION, @ISA, @EXPORT, $DB_BTREE, $DB_HASH, $DB_RECNO);
 our ($db_version, $use_XSLoader, $splice_end_array, $Error);
-use Carp;
 
 
 $VERSION = "1.816_2" ;
@@ -178,13 +106,7 @@ require Tie::Hash;
 require Exporter;
 BEGIN {
     $use_XSLoader = 1 ;
-    { try { require XSLoader } ; }
-
-    if ($@) {
-        $use_XSLoader = 0 ;
-        require DynaLoader;
-        @ISA = qw(DynaLoader);
-    }
+    require XSLoader;
 }
 
 push @ISA, < qw(Tie::Hash Exporter);
@@ -224,7 +146,7 @@ push @ISA, < qw(Tie::Hash Exporter);
 try {
     # Make all Fcntl O_XXX constants available for importing
     require Fcntl;
-    my @O = grep m/^O_/, @Fcntl::EXPORT;
+    my @O = grep { m/^O_/ }, @Fcntl::EXPORT;
     Fcntl->import(< @O);  # first we import what we want to export
     push(@EXPORT, < @O);
 };
@@ -237,43 +159,25 @@ else
 # Preloaded methods go here.  Autoload methods go after __END__, and are
 # processed by the autosplit program.
 
-sub tie_hash_or_array
-{
-    my (@arg) = @_ ;
-    my $tieHASH = ( @(caller(1))[3] =~ m/TIEHASH/ ) ;
+sub new($class, $filename, ?$flags, ?$mode, ?$hash_info)
+{ 
 
-    use File::Spec;
-    @arg[1] = File::Spec->rel2abs(@arg[1]) 
-        if defined @arg[1] ;
-
-    @arg[4] = tied %{ @arg[4] } 
-	if (nelems @arg) +>= 5 && ref @arg[4] && (dump::view(@arg[4]) =~ m/=HASH/) && tied %{ @arg[4] } ;
-
-    @arg[2] = O_CREAT()^|^O_RDWR() if (nelems @arg) +>=3 && ! defined @arg[2];
-    @arg[3] = 0666               if (nelems @arg) +>=4 && ! defined @arg[3];
+    $flags //= O_CREAT()^|^O_RDWR();
+    $mode //= 0666;
 
     # make recno in Berkeley DB version 2 (or better) work like 
     # recno in version 1.
-    if ($db_version +>= 4 and ! $tieHASH) {
-        @arg[2] ^|^= O_CREAT();
+    if ($db_version +> 1 and defined $hash_info and (ref $hash_info) =~ m/RECNO/ and 
+	$filename and ! -e $filename) {
+	open(my $fh, ">", $filename) or return undef ;
+	close $fh ;
+	chmod $mode || 0666 , $filename;
     }
 
-    if ($db_version +> 1 and defined @arg[4] and (ref @arg[4]) =~ m/RECNO/ and 
-	@arg[1] and ! -e @arg[1]) {
-	open(FH, ">", "@arg[1]") or return undef ;
-	close FH ;
-	chmod @arg[3] ? @arg[3] : 0666 , @arg[1] ;
-    }
-
-    DoTie_($tieHASH, < @arg) ;
+    DoTie_(0, $class, $filename, $flags, $mode, $hash_info || () );
 }
 
-sub TIEHASH
-{
-    tie_hash_or_array(< @_) ;
-}
-
-sub CLEAR 
+sub clear
 {
     my $self = shift;
     my $key = 0 ;
@@ -285,45 +189,50 @@ sub CLEAR
         push @keys, $key;
         $status = $self->seq($key, $value, R_NEXT());
     }
-    foreach $key (reverse @keys) {
+    foreach my $key (reverse @keys) {
         my $s = $self->del($key); 
     }
 }
 
-sub EXTEND { }
+sub iterate($self, $callback) {
 
-sub STORESIZE
-{
-    my $self = shift;
-    my $length = shift ;
-    my $current_length = $self->length() ;
-
-    if ($length +< $current_length) {
-	my $key ;
-        for ($key = $current_length - 1 ; $key +>= $length ; -- $key)
-	  { $self->del($key) }
+    my ($key, $value);
+    my $status = $self->seq($key, $value, R_FIRST());
+    while ($status == 0) {
+        $callback->($key, $value);
+        $status = $self->seq($key, $value, R_NEXT());
     }
-    elsif ($length +> $current_length) {
-        $self->put($length-1, "") ;
-    }
+    return;
 }
- 
+
+sub keys {
+    my @($self) = @_;
+    my @keys = @();
+    $self->iterate( sub { my @($key, $value) = @_; push @keys, $key; } );
+    return @keys;
+}
+
+sub values {
+    my @($self) = @_;
+    my @values = @();
+    $self->iterate( sub { my @($key, $value) = @_; push @values, $value; } );
+    return @values;
+}
 
 sub find_dup
 {
-    croak "Usage: \$db->find_dup(key,value)\n"
+    die "Usage: \$db->find_dup(key,value)\n"
         unless (nelems @_) == 3 ;
  
     my $db        = shift ;
-    my ($origkey, $value_wanted) = < @_ ;
-    my ($key, $value) = ($origkey, 0);
-    my ($status) = 0 ;
+    my @($origkey, $value_wanted) =  @_ ;
+    my @($key, $value) = @($origkey, 0);
 
-    for ($status = $db->seq($key, $value, R_CURSOR() ) ;
-         $status == 0 ;
-         $status = $db->seq($key, $value, R_NEXT() ) ) {
-
+    my $status = $db->seq($key, $value, R_CURSOR());
+    while ($status == 0) {
         return 0 if $key eq $origkey and $value eq $value_wanted ;
+
+        $status = $db->seq($key, $value, R_NEXT() );
     }
 
     return $status ;
@@ -331,11 +240,11 @@ sub find_dup
 
 sub del_dup
 {
-    croak "Usage: \$db->del_dup(key,value)\n"
+    die "Usage: \$db->del_dup(key,value)\n"
         unless (nelems @_) == 3 ;
  
     my $db        = shift ;
-    my ($key, $value) = < @_ ;
+    my @($key, $value) =  @_ ;
     my $status = $db->find_dup($key, $value) ;
     return $status if $status != 0 ;
 
@@ -345,7 +254,7 @@ sub del_dup
 
 sub get_dup
 {
-    croak "Usage: \$db->get_dup(key [,flag])\n"
+    die "Usage: \$db->get_dup(key [,flag])\n"
         unless (nelems @_) == 2 or (nelems @_) == 3 ;
  
     my $db        = shift ;
@@ -356,22 +265,22 @@ sub get_dup
     my %values	  = %( () ) ;
     my @values    = @( () ) ;
     my $counter   = 0 ;
-    my $status    = 0 ;
  
     # iterate through the database until either EOF ($status == 0)
     # or a different key is encountered ($key ne $origkey).
-    for ($status = $db->seq($key, $value, R_CURSOR()) ;
-	 $status == 0 and $key eq $origkey ;
-         $status = $db->seq($key, $value, R_NEXT()) ) {
+    my $status = $db->seq($key, $value, R_CURSOR());
+    while ( $status == 0 and $key eq $origkey ) {
  
         # save the value or count number of matches
         if ($flag)
-          { ++ %values{$value} }
+          { ++ %values{+$value} }
         else
           { push (@values, $value) }
+
+        $status = $db->seq($key, $value, R_NEXT());
     }
  
-    return  $flag ? %values : @values;
+    return  $flag ?? %values !! @values;
 }
 
 
@@ -411,12 +320,6 @@ DB_File - Perl5 access to Berkeley DB version 1.x
  $a = $X->shift;
  $X->unshift(list);
  @r = $X->splice(offset, length, elements);
-
- # DBM Filters
- $old_filter = $db->filter_store_key  ( sub { ... } ) ;
- $old_filter = $db->filter_store_value( sub { ... } ) ;
- $old_filter = $db->filter_fetch_key  ( sub { ... } ) ;
- $old_filter = $db->filter_fetch_value( sub { ... } ) ;
 
  untie %hash ;
  untie @array ;
@@ -667,7 +570,6 @@ database, delete keys/value pairs and finally how to enumerate the
 contents of the database.
 
     use warnings ;
-    use strict ;
     use DB_File ;
     our (%h, $k, $v) ;
 
@@ -718,7 +620,6 @@ BTREE uses. Instead of using the normal lexical ordering, a case
 insensitive compare function will be used.
 
     use warnings ;
-    use strict ;
     use DB_File ;
 
     my %h ;
@@ -816,7 +717,6 @@ want to manipulate a BTREE database with duplicate keys. Consider this
 code:
 
     use warnings ;
-    use strict ;
     use DB_File ;
 
     my ($filename, %h) ;
@@ -871,7 +771,6 @@ and the API in general.
 Here is the script above rewritten using the C<seq> API method.
 
     use warnings ;
-    use strict ;
     use DB_File ;
 
     my ($filename, $x, %h, $status, $key, $value) ;
@@ -943,7 +842,6 @@ So assuming the database created above, we can use C<get_dup> like
 this:
 
     use warnings ;
-    use strict ;
     use DB_File ;
 
     my ($filename, $x, %h) ;
@@ -993,7 +891,6 @@ returns 0. Otherwise the method returns a non-zero value.
 Assuming the database from the previous example:
 
     use warnings ;
-    use strict ;
     use DB_File ;
 
     my ($filename, $x, %h, $found) ;
@@ -1032,7 +929,6 @@ Otherwise the method returns a non-zero value.
 Again assuming the existence of the C<tree> database
 
     use warnings ;
-    use strict ;
     use DB_File ;
 
     my ($filename, $x, %h, $found) ;
@@ -1077,7 +973,6 @@ In the example script below, the C<match> sub uses this feature to find
 and print the first matching key/value pair given a partial key.
 
     use warnings ;
-    use strict ;
     use DB_File ;
     use Fcntl ;
 
@@ -1185,7 +1080,6 @@ of Perl earlier than 5.004_57 this example won't work -- see
 L<Extra RECNO Methods> for a workaround).
 
     use warnings ;
-    use strict ;
     use DB_File ;
 
     my $filename = "text" ;
@@ -1279,7 +1173,6 @@ described above. It also makes use of the API interface directly (see
 L<THE API INTERFACE>).
 
     use warnings ;
-    use strict ;
     my (@h, $H, $file, $i) ;
     use DB_File ;
     use Fcntl ;
@@ -1558,144 +1451,8 @@ R_RECNOSYNC is the only valid flag at present.
 
 =back
 
-=head1 DBM FILTERS
 
-A DBM Filter is a piece of code that is be used when you I<always>
-want to make the same transformation to all keys and/or values in a
-DBM database.
-
-There are four methods associated with DBM Filters. All work identically,
-and each is used to install (or uninstall) a single DBM Filter. Each
-expects a single parameter, namely a reference to a sub. The only
-difference between them is the place that the filter is installed.
-
-To summarise:
-
-=over 5
-
-=item B<filter_store_key>
-
-If a filter has been installed with this method, it will be invoked
-every time you write a key to a DBM database.
-
-=item B<filter_store_value>
-
-If a filter has been installed with this method, it will be invoked
-every time you write a value to a DBM database.
-
-
-=item B<filter_fetch_key>
-
-If a filter has been installed with this method, it will be invoked
-every time you read a key from a DBM database.
-
-=item B<filter_fetch_value>
-
-If a filter has been installed with this method, it will be invoked
-every time you read a value from a DBM database.
-
-=back
-
-You can use any combination of the methods, from none, to all four.
-
-All filter methods return the existing filter, if present, or C<undef>
-in not.
-
-To delete a filter pass C<undef> to it.
-
-=head2 The Filter
-
-When each filter is called by Perl, a local copy of C<$_> will contain
-the key or value to be filtered. Filtering is achieved by modifying
-the contents of C<$_>. The return code from the filter is ignored.
-
-=head2 An Example -- the NULL termination problem.
-
-Consider the following scenario. You have a DBM database
-that you need to share with a third-party C application. The C application
-assumes that I<all> keys and values are NULL terminated. Unfortunately
-when Perl writes to DBM databases it doesn't use NULL termination, so
-your Perl application will have to manage NULL termination itself. When
-you write to the database you will have to use something like this:
-
-    $hash{"$key\0"} = "$value\0" ;
-
-Similarly the NULL needs to be taken into account when you are considering
-the length of existing keys/values.
-
-It would be much better if you could ignore the NULL terminations issue
-in the main application code and have a mechanism that automatically
-added the terminating NULL to all keys and values whenever you write to
-the database and have them removed when you read from the database. As I'm
-sure you have already guessed, this is a problem that DBM Filters can
-fix very easily.
-
-    use warnings ;
-    use strict ;
-    use DB_File ;
-
-    my %hash ;
-    my $filename = "filt" ;
-    unlink $filename ;
-
-    my $db = tie %hash, 'DB_File', $filename, O_CREAT|O_RDWR, 0666, $DB_HASH 
-      or die "Cannot open $filename: $!\n" ;
-
-    # Install DBM Filters
-    $db->filter_fetch_key  ( sub { s/\0$//    } ) ;
-    $db->filter_store_key  ( sub { $_ .= "\0" } ) ;
-    $db->filter_fetch_value( sub { s/\0$//    } ) ;
-    $db->filter_store_value( sub { $_ .= "\0" } ) ;
-
-    $hash{"abc"} = "def" ;
-    my $a = $hash{"ABC"} ;
-    # ...
-    undef $db ;
-    untie %hash ;
-
-Hopefully the contents of each of the filters should be
-self-explanatory. Both "fetch" filters remove the terminating NULL,
-and both "store" filters add a terminating NULL.
-
-
-=head2 Another Example -- Key is a C int.
-
-Here is another real-life example. By default, whenever Perl writes to
-a DBM database it always writes the key and value as strings. So when
-you use this:
-
-    $hash{12345} = "something" ;
-
-the key 12345 will get stored in the DBM database as the 5 byte string
-"12345". If you actually want the key to be stored in the DBM database
-as a C int, you will have to use C<pack> when writing, and C<unpack>
-when reading.
-
-Here is a DBM Filter that does it:
-
-    use warnings ;
-    use strict ;
-    use DB_File ;
-    my %hash ;
-    my $filename = "filt" ;
-    unlink $filename ;
-
-
-    my $db = tie %hash, 'DB_File', $filename, O_CREAT|O_RDWR, 0666, $DB_HASH 
-      or die "Cannot open $filename: $!\n" ;
-
-    $db->filter_fetch_key  ( sub { $_ = unpack("i", $_) } ) ;
-    $db->filter_store_key  ( sub { $_ = pack ("i", $_) } ) ;
-    $hash{123} = "def" ;
-    # ...
-    undef $db ;
-    untie %hash ;
-
-This time only two filters have been used -- we only need to manipulate
-the contents of the key, so it wasn't necessary to install any value
-filters.
-
-=head1 HINTS AND TIPS 
+=head1 HINTS AND TIPS
 
 
 =head2 Locking: The Trouble with fd
@@ -1841,7 +1598,6 @@ I<ggh> script (available from your nearest CPAN archive in
 F<authors/id/TOMC/scripts/nshist.gz>).
 
     use warnings ;
-    use strict ;
     use DB_File ;
     use Fcntl ;
 
@@ -1998,7 +1754,6 @@ C<strict 'subs'> pragma (or the full strict pragma) in your script.
 Consider this script:
 
     use warnings ;
-    use strict ;
     use DB_File ;
     my %x ;
     tie %x, DB_File, "filename" ;

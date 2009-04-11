@@ -98,26 +98,8 @@ Useless use of string in void context at - line 3 character 18.
 use warnings 'void' ;
 use Config ;
 BEGIN {
-    if ( ! %Config{d_telldir}) {
-        print <<EOM ;
-SKIPPED
-# telldir not present
-EOM
-        exit 
-    }
-}
-telldir 1 ;		# OP_TELLDIR
-no warnings 'void' ;
-telldir 1 ;		# OP_TELLDIR
-EXPECT
-Useless use of telldir in void context at - line 13 character 1.
-########
-# op.c
-use warnings 'void' ;
-use Config ;
-BEGIN {
-    if ( ! %Config{d_getppid}) {
-        print <<EOM ;
+    if ( ! config_value("d_getppid")) {
+        print $^STDOUT, <<EOM ;
 SKIPPED
 # getppid not present
 EOM
@@ -134,8 +116,8 @@ Useless use of getppid in void context at - line 13 character 1.
 use warnings 'void' ;
 use Config ;
 BEGIN {
-    if ( ! %Config{d_getpgrp}) {
-        print <<EOM ;
+    if ( ! config_value("d_getpgrp")) {
+        print $^STDOUT, <<EOM ;
 SKIPPED
 # getpgrp not present
 EOM
@@ -152,8 +134,8 @@ Useless use of getpgrp in void context at - line 13 character 1.
 use warnings 'void' ;
 use Config ;
 BEGIN {
-    if ( ! %Config{d_times}) {
-        print <<EOM ;
+    if ( ! config_value("d_times")) {
+        print $^STDOUT, <<EOM ;
 SKIPPED
 # times not present
 EOM
@@ -170,8 +152,8 @@ Useless use of times in void context at - line 13 character 1.
 use warnings 'void' ;
 use Config ;
 BEGIN {
-    if ( ! %Config{d_getprior} or $^O eq 'os2') { # Locks before fixpak22
-        print <<EOM ;
+    if ( ! config_value("d_getprior") or $^OS_NAME eq 'os2') { # Locks before fixpak22
+        print $^STDOUT, <<EOM ;
 SKIPPED
 # getpriority not present
 EOM
@@ -188,8 +170,8 @@ Useless use of getpriority in void context at - line 13 character 1.
 use warnings 'void' ;
 use Config ;
 BEGIN {
-    if ( ! %Config{d_getlogin}) {
-        print <<EOM ;
+    if ( ! config_value("d_getlogin")) {
+        print $^STDOUT, <<EOM ;
 SKIPPED
 # getlogin not present
 EOM
@@ -205,8 +187,8 @@ Useless use of getlogin in void context at - line 13 character 1.
 # op.c
 use warnings 'void' ;
 use Config ; BEGIN {
-if ( ! %Config{d_socket}) {
-    print <<EOM ;
+if ( ! config_value("d_socket")) {
+    print $^STDOUT, <<EOM ;
 SKIPPED
 # getsockname not present
 # getpeername not present
@@ -225,8 +207,8 @@ SKIPPED
 EOM
     exit 
 } }
-getsockname STDIN ;	# OP_GETSOCKNAME
-getpeername STDIN ;	# OP_GETPEERNAME
+getsockname $^STDIN ;	# OP_GETSOCKNAME
+getpeername $^STDIN ;	# OP_GETPEERNAME
 gethostbyname 1 ;	# OP_GHBYNAME
 gethostbyaddr 1,2;	# OP_GHBYADDR
 gethostent ;		# OP_GHOSTENT
@@ -241,8 +223,8 @@ getservbyport 1,2;	# OP_GSBYPORT
 getservent ;		# OP_GSERVENT
 
 no warnings 'void' ;
-getsockname STDIN ;	# OP_GETSOCKNAME
-getpeername STDIN ;	# OP_GETPEERNAME
+getsockname $^STDIN ;	# OP_GETSOCKNAME
+getpeername $^STDIN ;	# OP_GETPEERNAME
 gethostbyname 1 ;	# OP_GHBYNAME
 gethostbyaddr 1,2;	# OP_GHBYADDR
 gethostent ;		# OP_GHOSTENT
@@ -299,9 +281,8 @@ use warnings 'void' ;
 "x" . "y"; # optimized to OP_CONST
 2 + 2; # optimized to OP_CONST
 use constant U => undef;
-U;
-5 || print "bad\n";	# test OPpCONST_SHORTCIRCUIT
-print "boo\n" if U;	# test OPpCONST_SHORTCIRCUIT
+5 || print $^STDOUT, "bad\n";	# test OPpCONST_SHORTCIRCUIT
+print $^STDOUT, "boo\n" if U;	# test OPpCONST_SHORTCIRCUIT
 
 no warnings 'void' ;
 "abc"; # OP_CONST
@@ -309,65 +290,17 @@ no warnings 'void' ;
 "x" . "y"; # optimized to OP_CONST
 2 + 2; # optimized to OP_CONST
 EXPECT
-Useless use of a constant (abc) in void context at - line 3 character 6.
-Useless use of a constant (7) in void context at - line 4 character 1.
-Useless use of a constant (xy) in void context at - line 5 character 4.
-Useless use of a constant (4) in void context at - line 6 character 2.
-Useless use of a constant (undef) in void context at - line 8 character 1.
-########
-# op.c
-use warnings 'parenthesis' ;
-my $a, $b = (1,2);
-my @foo,%bar,	$quux; # there's a TAB here
-my $x, $y or print;
-no warnings 'parenthesis' ;
-my $c, $d = (1,2);
-EXPECT
-Parentheses missing around "my" list at - line 3 character 7.
-list may not be used in scalar context at - line 3, near ");"
-Parentheses missing around "my" list at - line 4 character 9.
-Global symbol "%bar" requires explicit package name at - line 4, near ",%bar"
-Global symbol "$quux" requires explicit package name at - line 4, near ",	$quux"
-Global symbol "$y" requires explicit package name at - line 5, near ", $y "
-BEGIN not safe after errors--compilation aborted at - line 6 character 28.
-########
-# op.c
-use warnings 'parenthesis' ;
-our $a, $b = (1,2);
-no warnings 'parenthesis' ;
-our $c, $d = (1,2);
-EXPECT
-Parentheses missing around "our" list at - line 3 character 8.
-list may not be used in scalar context at - line 3, near ");"
-BEGIN not safe after errors--compilation aborted at - line 4 character 28.
-########
-# op.c
-our ($b, $c, $d);
-use warnings 'parenthesis' ;
-local $a, $b = (1,2);
-local *f, *g;
-no warnings 'parenthesis' ;
-local $c, $d = (1,2);
-EXPECT
-Parentheses missing around "local" list at - line 4 character 10.
-list may not be used in scalar context at - line 4, near ");"
-Parentheses missing around "local" list at - line 5 character 10.
-BEGIN not safe after errors--compilation aborted at - line 6 character 28.
-########
-# op.c
-use warnings 'bareword' ;
-print (ABC || 1) ;
-no warnings 'bareword' ;
-print (ABC || 1) ;
-EXPECT
-Bareword found in conditional at - line 3 character 18.
+Useless use of a constant in void context at - line 3 character 6.
+Useless use of a constant in void context at - line 4 character 1.
+Useless use of a constant in void context at - line 5 character 5.
+Useless use of a constant in void context at - line 6 character 3.
 ########
 --FILE-- abc
 
 --FILE--
 # op.c
 use warnings 'misc' ;
-open FH, "<", "abc" ;
+open \*FH, "<", "abc" ;
 our $x;
 $x = 1 if $x = ~< *FH ;
 no warnings 'misc' ;
@@ -377,14 +310,14 @@ Value of <HANDLE> construct can be "0"; test with defined() at - line 5 characte
 ########
 # op.c
 use warnings 'misc' ;
-opendir FH, "." ;
+opendir \*FH, "." ;
 our $x;
-$x = 1 if $x = readdir FH ;
+$x = 1 if $x = readdir \*FH ;
 no warnings 'misc' ;
-$x = 1 if $x = readdir FH ;
-closedir FH ;
+$x = 1 if $x = readdir \*FH ;
+closedir \*FH ;
 EXPECT
-Value of readdir() operator can be "0"; test with defined() at - line 5 character 28.
+Value of readdir() operator can be "0"; test with defined() at - line 5 character 30.
 ########
 # op.c
 use warnings 'misc' ;
@@ -406,14 +339,14 @@ Value of glob construct can be "0"; test with defined() at - line 4 character 36
 ########
 # op.c
 use warnings 'misc' ;
-opendir FH, "." ;
+opendir \*FH, "." ;
 our $x;
-$x = 1 while $x = readdir FH and 0 ;
+$x = 1 while $x = readdir \*FH and 0 ;
 no warnings 'misc' ;
-$x = 1 while $x = readdir FH and 0 ;
-closedir FH ;
+$x = 1 while $x = readdir \*FH and 0 ;
+closedir \*FH ;
 EXPECT
-Value of readdir() operator can be "0"; test with defined() at - line 5 character 37.
+Value of readdir() operator can be "0"; test with defined() at - line 5 character 39.
 ########
 # op.c
 use warnings 'redefine' ;
@@ -422,7 +355,7 @@ sub fred {}
 no warnings 'redefine' ;
 sub fred {}
 EXPECT
-Subroutine fred redefined at - line 4 character 12.
+Subroutine fred redefined at - line 4 character 1.
 ########
 # op.c
 use warnings 'redefine' ;
@@ -431,26 +364,19 @@ sub fred () { 1 }
 no warnings 'redefine' ;
 sub fred () { 1 }
 EXPECT
-Constant subroutine fred redefined at - line 4 character 18.
-########
-# op.c
-no warnings 'redefine' ;
-sub fred () { 1 }
-sub fred () { 2 }
-EXPECT
-Constant subroutine fred redefined at - line 4 character 18.
+Constant subroutine fred redefined at - line 4 character 1.
 ########
 # op.c
 no warnings 'redefine' ;
 sub fred () { 1 }
 *fred = sub () { 2 };
 EXPECT
-Constant subroutine main::fred redefined at - line 4 character 6.
+Constant subroutine main::fred redefined at - line 4 character 1.
 ########
 # op.c
 BEGIN {
-    if ($^O eq 'MacOS') {
-	print <<EOM;
+    if ($^OS_NAME eq 'MacOS') {
+	print $^STDOUT, <<EOM;
 SKIPPED
 # no exec on Mac OS
 EOM
@@ -458,7 +384,7 @@ EOM
     }
 }
 use warnings 'syntax' ;
-exec "$^X -e 1" ; 
+exec "$^EXECUTABLE_NAME -e 1" ; 
 my $a
 EXPECT
 Statement unlikely to be reached at - line 12 character 1.
@@ -467,8 +393,8 @@ Statement unlikely to be reached at - line 12 character 1.
 ########
 # op.c
 BEGIN {
-    if ($^O eq 'MacOS') {
-	print <<EOM;
+    if ($^OS_NAME eq 'MacOS') {
+	print $^STDOUT, <<EOM;
 SKIPPED
 # no exec on Mac OS
 EOM
@@ -476,7 +402,7 @@ EOM
     }
 }
 no warnings 'syntax' ;
-exec "$^X -e 1" ; 
+exec "$^EXECUTABLE_NAME -e 1" ; 
 my $a
 EXPECT
 
@@ -484,15 +410,15 @@ EXPECT
 # op.c [Perl_newATTRSUB]
 --FILE-- abc.pm
 use warnings 'void' ;
-BEGIN { $| = 1; print "in begin\n"; }
-CHECK { print "in check\n"; }
-INIT { print "in init\n"; }
-END { print "in end\n"; }
-print "in mainline\n";
+BEGIN { $^OUTPUT_AUTOFLUSH = 1; print $^STDOUT, "in begin\n"; }
+CHECK { print $^STDOUT, "in check\n"; }
+INIT { print $^STDOUT, "in init\n"; }
+END { print $^STDOUT, "in end\n"; }
+print $^STDOUT, "in mainline\n";
 1;
 --FILE--
 use abc;
-delete %INC{"abc.pm"};
+delete $^INCLUDED{"abc.pm"};
 require abc;
 do "abc.pm";
 EXPECT
@@ -501,15 +427,15 @@ in mainline
 in check
 in init
 in begin
-Too late to run CHECK block at abc.pm line 3 character 30.
+Too late to run CHECK block at abc.pm line 3 character 40.
     (require) called at - line 3 character 1.
-Too late to run INIT block at abc.pm line 4 character 28.
+Too late to run INIT block at abc.pm line 4 character 38.
     (require) called at - line 3 character 1.
 in mainline
 in begin
-Too late to run CHECK block at abc.pm line 3 character 30.
+Too late to run CHECK block at abc.pm line 3 character 40.
     (eval) called at - line 4 character 1.
-Too late to run INIT block at abc.pm line 4 character 28.
+Too late to run INIT block at abc.pm line 4 character 38.
     (eval) called at - line 4 character 1.
 in mainline
 in end
@@ -519,11 +445,11 @@ in end
 # op.c [Perl_newATTRSUB]
 --FILE-- abc.pm
 no warnings 'void' ;
-BEGIN { $| = 1; print "in begin\n"; }
-CHECK { print "in check\n"; }
-INIT { print "in init\n"; }
-END { print "in end\n"; }
-print "in mainline\n";
+BEGIN { $^OUTPUT_AUTOFLUSH = 1; print $^STDOUT, "in begin\n"; }
+CHECK { print $^STDOUT, "in check\n"; }
+INIT { print $^STDOUT, "in init\n"; }
+END { print $^STDOUT, "in end\n"; }
+print $^STDOUT, "in mainline\n";
 1;
 --FILE--
 require abc;

@@ -7,7 +7,6 @@ package ExtUtils::Liblist::Kid;
 
 # Broken out of MakeMaker from version 4.11
 
-use strict;
 our $VERSION = 6.44;
 
 use Config;
@@ -16,28 +15,28 @@ use File::Basename;
 use File::Spec;
 
 sub ext {
-  if   ($^O eq 'VMS')     { return &_vms_ext;      }
-  elsif($^O eq 'MSWin32') { return &_win32_ext;    }
-  else                    { return &_unix_os2_ext; }
+  if   ($^OS_NAME eq 'VMS')     { return &_vms_ext( < @_ );      }
+  elsif($^OS_NAME eq 'MSWin32') { return &_win32_ext( < @_ );    }
+  else                    { return &_unix_os2_ext( < @_ ); }
 }
 
-sub _unix_os2_ext {
-    my($self,$potential_libs, $verbose, $give_libs) = < @_;
+sub _unix_os2_ext($self,$potential_libs, ?$verbose, ?$give_libs) {
     $verbose ||= 0;
 
-    if ($^O =~ 'os2' and %Config{perllibs}) { 
+    if ($^OS_NAME =~ 'os2' and config_value("perllibs")) { 
 	# Dynamic libraries are not transitive, so we may need including
 	# the libraries linked against perl.dll again.
 
 	$potential_libs .= " " if $potential_libs;
-	$potential_libs .= %Config{perllibs};
+	$potential_libs .= config_value("perllibs");
     }
-    return  @("", "", "", "",  @($give_libs ? \@() : ())) unless $potential_libs;
+    return  @("", "", "", "",  @($give_libs ?? \@() !! ())) unless $potential_libs;
     warn "Potential libraries are '$potential_libs':\n" if $verbose;
 
-    my($so)   = %Config{so};
-    my($libs) = defined %Config{perllibs} ? %Config{perllibs} : %Config{libs};
-    my $Config_libext = %Config{lib_ext} || ".a";
+    my $so   = config_value("so");
+    my $libs = defined config_value("perllibs") 
+      ?? config_value("perllibs") !! config_value("libs");
+    my $Config_libext = config_value("lib_ext") || ".a";
 
 
     # compute $extralibs, $bsloadlibs and $ldloadlibs from
@@ -45,28 +44,28 @@ sub _unix_os2_ext {
     # this is a rewrite of Andy Dougherty's extliblist in perl
 
     my(@searchpath); # from "-L/path" entries in $potential_libs
-    my @libpath = split " ", %Config{'libpth'};
+    my @libpath = split " ", config_value("libpth");
     my(@ldloadlibs, @bsloadlibs, @extralibs, @ld_run_path, %ld_run_path_seen);
     my(@libs, %libs_seen);
     my($fullname, @fullname);
     my $pwd = cwd(); # from Cwd.pm
-    my($found) = 0;
+    my $found = 0;
 
     foreach my $thislib (split ' ', $potential_libs) {
 
 	# Handle possible linker path arguments.
 	if ($thislib =~ s/^(-[LR]|-Wl,-R)//){	# save path flag type
-	    my($ptype) = $1;
+	    my $ptype = $1;
 	    unless (-d $thislib){
 		warn "$ptype$thislib ignored, directory does not exist\n"
 			if $verbose;
 		next;
 	    }
-	    my($rtype) = $ptype;
+	    my $rtype = $ptype;
 	    if (($ptype eq '-R') or ($ptype eq '-Wl,-R')) {
-		if (%Config{'lddlflags'} =~ m/-Wl,-R/) {
+		if (config_value('lddlflags') =~ m/-Wl,-R/) {
 		    $rtype = '-Wl,-R';
-		} elsif (%Config{'lddlflags'} =~ m/-R/) {
+		} elsif (config_value('lddlflags') =~ m/-R/) {
 		    $rtype = '-R';
 		}
 	    }
@@ -86,7 +85,7 @@ sub _unix_os2_ext {
 	  next;
 	}
 
-	my($found_lib)=0;
+	my $found_lib=0;
 	foreach my $thispth ( @( <@searchpath, < @libpath)) {
 
 		# Try to find the full name of the library.  We need this to
@@ -112,8 +111,8 @@ sub _unix_os2_ext {
 
 		#TODO: iterate through the directory instead of sorting
 
-		$fullname = "$thispth/" . (sort { my($ma) = $a;
-			my($mb) = $b;
+		$fullname = "$thispth/" . (sort { my $ma = $a;
+			my $mb = $b;
 			$ma =~ s/[A-Za-z]+/0/g;
 			$ma =~ s/\b(\d)\b/0$1/g;
 			$mb =~ s/[A-Za-z]+/0/g;
@@ -121,17 +120,17 @@ sub _unix_os2_ext {
 			while (length($ma) +< length($mb)) { $ma .= ".00"; }
 			while (length($mb) +< length($ma)) { $mb .= ".00"; }
 			# Comparison deliberately backwards
-			$mb cmp $ma;} @fullname )[0];
+			$mb cmp $ma;}, @fullname )[0];
 	    } elsif (-f ($fullname="$thispth/lib$thislib.$so")
-		 && ((%Config{'dlsrc'} ne "dl_dld.xs") || ($thislib eq "m"))){
-	    } elsif (-f ($fullname="$thispth/lib{$thislib}_s$Config_libext")
-                 && (! %Config{'archname'} =~ m/RM\d\d\d-svr4/)
+		 && ((config_value('dlsrc') ne "dl_dld.xs") || ($thislib eq "m"))){
+	    } elsif (-f ($fullname="$thispth/lib$($thislib)_s$Config_libext")
+                 && (! config_value('archname') =~ m/RM\d\d\d-svr4/)
 		 && ($thislib .= "_s") ){ # we must explicitly use _s version
 	    } elsif (-f ($fullname="$thispth/lib$thislib$Config_libext")){
 	    } elsif (-f ($fullname="$thispth/$thislib$Config_libext")){
             } elsif (-f ($fullname="$thispth/lib$thislib.dll$Config_libext")){
 	    } elsif (-f ($fullname="$thispth/Slib$thislib$Config_libext")){
-	    } elsif ($^O eq 'dgux'
+	    } elsif ($^OS_NAME eq 'dgux'
 		 && -l ($fullname="$thispth/lib$thislib$Config_libext")
 		 && readlink($fullname) =~ m/^elink:/s) {
 		 # Some of DG's libraries look like misconnected symbolic
@@ -147,7 +146,7 @@ sub _unix_os2_ext {
 		next;
 	    }
 	    warn "'-l$thislib' found at $fullname\n" if $verbose;
-	    push @libs, $fullname unless %libs_seen{$fullname}++;
+	    push @libs, $fullname unless %libs_seen{+$fullname}++;
 	    $found++;
 	    $found_lib++;
 
@@ -162,21 +161,22 @@ sub _unix_os2_ext {
             my $fullnamedir = dirname($fullname);
             push @ld_run_path, $fullnamedir
                  if $is_dyna && !$in_perl &&
-                    !%ld_run_path_seen{$fullnamedir}++;
+                    !%ld_run_path_seen{+$fullnamedir}++;
 
 	    # Do not add it into the list if it is already linked in
 	    # with the main perl executable.
 	    # We have to special-case the NeXT, because math and ndbm 
 	    # are both in libsys_s
 	    unless ($in_perl || 
-		(%Config{'osname'} eq 'next' &&
+		(config_value('osname') eq 'next' &&
 		    ($thislib eq 'm' || $thislib eq 'ndbm')) ){
 		push(@extralibs, "-l$thislib");
 	    }
 
 	    # We might be able to load this archive file dynamically
-	    if ( (%Config{'dlsrc'} =~ m/dl_next/ && (%Config{'osvers'} cmp '4_0') +<= 0)
-	    ||   (%Config{'dlsrc'} =~ m/dl_dld/) )
+	    if ( (config_value('dlsrc') =~ m/dl_next/ &&
+                    (config_value('osvers') cmp '4_0') +<= 0)
+	    ||   (config_value('dlsrc') =~ m/dl_dld/) )
 	    {
 		# We push -l$thislib instead of $fullname because
 		# it avoids hardwiring a fixed path into the .bs file.
@@ -191,7 +191,7 @@ sub _unix_os2_ext {
                     # For SunOS4, do not add in this shared library if
                     # it is already linked in the main perl executable
 		    push(@ldloadlibs, "-l$thislib")
-			unless ($in_perl and $^O eq 'sunos');
+			unless ($in_perl and $^OS_NAME eq 'sunos');
 		} else {
 		    push(@ldloadlibs, "-l$thislib");
 		}
@@ -204,33 +204,32 @@ sub _unix_os2_ext {
     }
 
     unless( $found ) {
-        return  @('','','','', $give_libs ? \@libs : ());
+        return  @('','','','', $give_libs ?? \@libs !! ());
     }
     else {
-        return  @("{join ' ',@extralibs}", "{join ' ',@bsloadlibs}", "{join ' ',@ldloadlibs}",
-                join(":", @ld_run_path),  @($give_libs ? \@libs : ()));
+        return  @("$(join ' ',@extralibs)", "$(join ' ',@bsloadlibs)", "$(join ' ',@ldloadlibs)",
+                join(":", @ld_run_path),  @($give_libs ?? \@libs !! ()));
     }
 }
 
-sub _win32_ext {
+sub _win32_ext($self, $potential_libs, $verbose, $give_libs) {
 
     require Text::ParseWords;
 
-    my($self, $potential_libs, $verbose, $give_libs) = < @_;
     $verbose ||= 0;
 
     # If user did not supply a list, we punt.
     # (caller should probably use the list in $Config{libs})
-    return  @("", "", "", "",  @($give_libs ? \@() : ())) unless $potential_libs;
+    return  @("", "", "", "",  @($give_libs ?? \@() !! ())) unless $potential_libs;
 
-    my $cc		= %Config{cc};
+    my $cc		= config_value("cc");
     my $VC		= $cc =~ m/^cl/i;
     my $BC		= $cc =~ m/^bcc/i;
     my $GC		= $cc =~ m/^gcc/i;
-    my $so		= %Config{'so'};
-    my $libs		= %Config{'perllibs'};
-    my $libpth		= %Config{'libpth'};
-    my $libext		= %Config{'lib_ext'} || ".lib";
+    my $so		= config_value('so');
+    my $libs		= config_value('perllibs');
+    my $libpth		= config_value('libpth');
+    my $libext		= config_value('lib_ext') || ".lib";
     my(@libs, %libs_seen);
 
     if ($libs and $potential_libs !~ m/:nodefault/i) { 
@@ -259,12 +258,13 @@ sub _win32_ext {
     my($fullname);
 
     # add "$Config{installarchlib}/CORE" to default search path
-    push @libpath, "%Config{installarchlib}/CORE";
+    push @libpath, config_value("installarchlib") . "/CORE";
 
-    if ($VC and exists %ENV{LIB} and %ENV{LIB}) {
-        push @libpath, < split m/;/, %ENV{LIB};
+    if ($VC and env::var('LIB')) {
+        push @libpath, < split m/;/, env::var('LIB');
     }
 
+  LIBS:
     foreach ( Text::ParseWords::quotewords('\s+', 0, $potential_libs)){
 
 	my $thislib = $_;
@@ -309,53 +309,54 @@ sub _win32_ext {
 	$_ .= $libext if !m/\Q$libext\E$/i;
 
 	my $secondpass = 0;
-    LOOKAGAIN:
+      LOOKAGAIN:
+        do {
 
-        # look for the file itself
-	if (-f) {
-	    warn "'$thislib' found as '$_'\n" if $verbose;
-	    $found++;
-	    push(@extralibs, $_);
-	    next;
-	}
+            # look for the file itself
+            if (-f) {
+                warn "'$thislib' found as '$_'\n" if $verbose;
+                $found++;
+                push(@extralibs, $_);
+                next LIBS;
+            }
 
-	my $found_lib = 0;
-	foreach my $thispth ( @searchpath, < @libpath){
-	    unless (-f ($fullname="$thispth\\$_")) {
-		warn "'$thislib' not found as '$fullname'\n" if $verbose;
-		next;
-	    }
-	    warn "'$thislib' found as '$fullname'\n" if $verbose;
-	    $found++;
-	    $found_lib++;
-	    push(@extralibs, $fullname);
-	    push @libs, $fullname unless %libs_seen{$fullname}++;
-	    last;
-	}
+            my $found_lib = 0;
+            foreach my $thispth ( @searchpath +@+ @libpath){
+                unless (-f ($fullname="$thispth\\$_")) {
+                    warn "'$thislib' not found as '$fullname'\n" if $verbose;
+                    next;
+                }
+                warn "'$thislib' found as '$fullname'\n" if $verbose;
+                $found++;
+                $found_lib++;
+                push(@extralibs, $fullname);
+                push @libs, $fullname unless %libs_seen{+$fullname}++;
+                last;
+            }
 
-	# do another pass with (or without) leading 'lib' if they used -l
-	if (!$found_lib and $thislib =~ m/^-l/ and !$secondpass++) {
-	    if ($GC) {
-		goto LOOKAGAIN if s/^lib//i;
-	    }
-	    elsif (!m/^lib/i) {
-		$_ = "lib$_";
-		goto LOOKAGAIN;
-	    }
-	}
+            # do another pass with (or without) leading 'lib' if they used -l
+            if (!$found_lib and $thislib =~ m/^-l/ and !$secondpass++) {
+                if ($GC) {
+                    redo LOOKAGAIN if s/^lib//i;
+                }
+                elsif (!m/^lib/i) {
+                    $_ = "lib$_";
+                    redo LOOKAGAIN;
+                }
+            }
 
-	# give up
-	warn "Note (probably harmless): "
-		     ."No library found for $thislib\n"
-	    unless $found_lib+>0;
-
+            # give up
+            warn "Note (probably harmless): "
+              ."No library found for $thislib\n"
+                unless $found_lib+>0;
+        };
     }
 
-    return  @('','','','',  @($give_libs ? \@libs : ())) unless $found;
+    return  @('','','','',  @($give_libs ?? \@libs !! ())) unless $found;
 
     # make sure paths with spaces are properly quoted
-    @extralibs = map { (m/\s/ && !m/^".*"$/) ? qq["$_"] : $_ } @extralibs;
-    @libs = map { (m/\s/ && !m/^".*"$/) ? qq["$_"] : $_ } @libs;
+    @extralibs = map { (m/\s/ && !m/^".*"$/) ?? qq["$_"] !! $_ }, @extralibs;
+    @libs = map { (m/\s/ && !m/^".*"$/) ?? qq["$_"] !! $_ }, @libs;
     $lib = join(' ', @extralibs);
 
     # normalize back to backward slashes (to help braindead tools)
@@ -364,46 +365,45 @@ sub _win32_ext {
     $lib =~ s,/,\\,g;
 
     warn "Result: $lib\n" if $verbose;
-    return @($lib, '', $lib, '', ($give_libs ? \@libs : ()));
+    return @($lib, '', $lib, '', ($give_libs ?? \@libs !! ()));
 }
 
 
-sub _vms_ext {
-  my($self, $potential_libs, $verbose, $give_libs) = < @_;
+sub _vms_ext($self, $potential_libs, $verbose, $give_libs) {
   $verbose ||= 0;
 
   my(@crtls,$crtlstr);
-  @crtls = @( (%Config{'ldflags'} =~ m-/Debug-i ? %Config{'dbgprefix'} : '')
+  @crtls = @( (config_value('ldflags') =~ m-/Debug-i ?? config_value('dbgprefix') !! '')
               . 'PerlShr/Share' );
-  push(@crtls, < grep { not m/\(/ } split m/\s+/, %Config{'perllibs'});
-  push(@crtls, < grep { not m/\(/ } split m/\s+/, %Config{'libc'});
+  push(@crtls, < grep { not m/\(/ }, split m/\s+/, config_value('perllibs'));
+  push(@crtls, < grep { not m/\(/ }, split m/\s+/, config_value('libc'));
   # In general, we pass through the basic libraries from %Config unchanged.
   # The one exception is that if we're building in the Perl source tree, and
   # a library spec could be resolved via a logical name, we go to some trouble
   # to insure that the copy in the local tree is used, rather than one to
   # which a system-wide logical may point.
-  if ($self->{PERL_SRC}) {
+  if ($self->{?PERL_SRC}) {
     my($locspec,$type);
     foreach my $lib ( @crtls) { 
-      if (($locspec,$type) = $lib =~ m{^([\w\$-]+)(/\w+)?} and $locspec =~ m/perl/i) {
-        if    (lc $type eq '/share')   { $locspec .= %Config{'exe_ext'}; }
-        elsif (lc $type eq '/library') { $locspec .= %Config{'lib_ext'}; }
-        else                           { $locspec .= %Config{'obj_ext'}; }
-        $locspec = $self->catfile($self->{PERL_SRC},$locspec);
+      if (@($locspec,$type) = $lib =~ m{^([\w\$-]+)(/\w+)?} and $locspec =~ m/perl/i) {
+        if    (lc $type eq '/share')   { $locspec .= config_value('exe_ext'); }
+        elsif (lc $type eq '/library') { $locspec .= config_value('lib_ext'); }
+        else                           { $locspec .= config_value('obj_ext'); }
+        $locspec = $self->catfile($self->{?PERL_SRC},$locspec);
         $lib = "$locspec$type" if -e $locspec;
       }
     }
   }
-  $crtlstr = (nelems @crtls) ? join(' ', @crtls) : '';
+  $crtlstr = (nelems @crtls) ?? join(' ', @crtls) !! '';
 
   unless ($potential_libs) {
     warn "Result:\n\tEXTRALIBS: \n\tLDLOADLIBS: $crtlstr\n" if $verbose;
-    return  @('', '', $crtlstr, '',  @($give_libs ? \@() : ()));
+    return  @('', '', $crtlstr, '',  @($give_libs ?? \@() !! ()));
   }
 
   my(%found,@fndlibs,$ldlib);
   my $cwd = cwd();
-  my($so,$lib_ext,$obj_ext) = < %Config{[@('so','lib_ext','obj_ext')]};
+  my@($so,$lib_ext,$obj_ext) =  map { config_value($_) }, @: 'so','lib_ext','obj_ext';
   # List of common Unix library names and their VMS equivalents
   # (VMS equivalent of '' indicates that the library is automatically
   # searched by the linker, and should be skipped here.)
@@ -413,7 +413,7 @@ sub _vms_ext {
                  'socket' => '', 'X11' => 'DECW$XLIBSHR',
                  'Xt' => 'DECW$XTSHR', 'Xm' => 'DECW$XMLIBSHR',
                  'Xmu' => 'DECW$XMULIBSHR');
-  if (%Config{'vms_cc_type'} ne 'decc') { %libmap{'curses'} = 'VAXCCURSE'; }
+  if (config_value('vms_cc_type') ne 'decc') { %libmap{+'curses'} = 'VAXCCURSE'; }
 
   warn "Potential libraries are '$potential_libs'\n" if $verbose;
 
@@ -426,7 +426,7 @@ sub _vms_ext {
     push(@libs,$1),   next if $lib =~ m/^-l(.*)/;
     push(@libs,$lib);
   }
-  push(@dirs, <split(' ',%Config{'libpth'}));
+  push(@dirs, <split(' ',config_value('libpth')));
 
   # Now make sure we've got VMS-syntax absolute directory specs
   # (We don't, however, check whether someone's hidden a relative
@@ -445,24 +445,24 @@ sub _vms_ext {
         $dir = $self->catdir($cwd,$dir); 
     }
   }
-  @dirs = grep { length($_) } @dirs;
+  @dirs = grep { length($_) }, @dirs;
   unshift(@dirs,''); # Check each $lib without additions first
 
   LIB: foreach my $lib ( @libs) {
     if (exists %libmap{$lib}) {
-      next unless length %libmap{$lib};
-      $lib = %libmap{$lib};
+      next unless length %libmap{?$lib};
+      $lib = %libmap{?$lib};
     }
 
     my(@variants,$cand);
-    my($ctype) = '';
+    my@($ctype) = '';
 
     # If we don't have a file type, consider it a possibly abbreviated name and
     # check for common variants.  We try these first to grab libraries before
     # a like-named executable image (e.g. -lperl resolves to perlshr.exe
     # before perl.exe).
     if ($lib !~ m/\.[^:>\]]*$/) {
-      push(@variants,"{$lib}shr","{$lib}rtl","{$lib}lib");
+      push(@variants,"$($lib)shr","$($lib)rtl","$($lib)lib");
       push(@variants,"lib$lib") if $lib !~ m/[:>\]]/;
     }
     push(@variants,$lib);
@@ -523,7 +523,7 @@ sub _vms_ext {
         else                      { push    @{%found{$ctype}}, $cand; }
         warn "\tFound as $cand (really $fullname), type $ctype\n" 
           if $verbose +> 1;
-	push @flibs, $name unless %libs_seen{$fullname}++;
+	push @flibs, $name unless %libs_seen{+$fullname}++;
         next LIB;
       }
     }
@@ -531,14 +531,14 @@ sub _vms_ext {
 		 ."No library found for $lib\n";
   }
 
-  push @fndlibs, < @{%found{OBJ}}                      if exists %found{OBJ};
-  push @fndlibs, < map { "$_/Library" } @{%found{OLB}} if exists %found{OLB};
-  push @fndlibs, < map { "$_/Share"   } @{%found{SHR}} if exists %found{SHR};
+  push @fndlibs, < @{%found{?OBJ}}                      if exists %found{OBJ};
+  push @fndlibs, < map { "$_/Library" }, @{%found{OLB}} if exists %found{OLB};
+  push @fndlibs, < map { "$_/Share"   }, @{%found{SHR}} if exists %found{SHR};
   my $lib = join(' ', @fndlibs);
 
-  $ldlib = $crtlstr ? "$lib $crtlstr" : $lib;
+  $ldlib = $crtlstr ?? "$lib $crtlstr" !! $lib;
   warn "Result:\n\tEXTRALIBS: $lib\n\tLDLOADLIBS: $ldlib\n" if $verbose;
-  return @($lib, '', $ldlib, '', ($give_libs ? \@flibs : ()));
+  return @($lib, '', $ldlib, '', ($give_libs ?? \@flibs !! ()));
 }
 
 1;

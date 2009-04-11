@@ -1,37 +1,36 @@
 #!perl -w
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't';
-        @INC = @('../lib', 'lib');
+        $^INCLUDE_PATH = @('../lib', 'lib');
     }
     else {
-        unshift @INC, 't/lib';
+        unshift $^INCLUDE_PATH, 't/lib';
     }
 }
 
-use strict;
 
 require Test::Simple::Catch;
-my($out, $err) = < Test::Simple::Catch::caught();
-local %ENV{HARNESS_ACTIVE} = 0;
+use env;
+my@($out, $err) =  Test::Simple::Catch::caught();
+local env::var('HARNESS_ACTIVE' ) = 0;
 
 
 # Can't use Test.pm, that's a 5.005 thing.
 package My::Test;
 
-print "1..2\n";
+print $^STDOUT, "1..2\n";
 
 my $test_num = 1;
 # Utility testing functions.
-sub ok ($;$) {
-    my($test, $name) = < @_;
+sub ok($test, ?$name) {
     my $ok = '';
     $ok .= "not " unless $test;
     $ok .= "ok $test_num";
     $ok .= " - $name" if defined $name;
     $ok .= "\n";
-    print $ok;
+    print $^STDOUT, $ok;
     $test_num++;
 }
 
@@ -61,9 +60,9 @@ OUT
 
     My::Test::ok($$err eq <<ERR);
 #   Failed test 'oh no!'
-#   at $0 line 38.
+#   at $^PROGRAM_NAME line 38.
 #   Failed test 'damnit'
-#   at $0 line 39.
+#   at $^PROGRAM_NAME line 39.
 # Looks like you failed 2 tests of 5.
 ERR
 

@@ -293,7 +293,7 @@ and omits the hash parameter.
 #define newSVpvs_flags(str,flags)	\
     Perl_newSVpvn_flags(aTHX_ STR_WITH_LEN(str), flags)
 #define newSVpvs_share(str) Perl_newSVpvn_share(aTHX_ STR_WITH_LEN(str), 0)
-#define sv_catpvs(sv, str) Perl_sv_catpvn_flags(aTHX_ sv, STR_WITH_LEN(str), SV_GMAGIC)
+#define sv_catpvs(sv, str) Perl_sv_catpvn_flags(aTHX_ sv, STR_WITH_LEN(str), 0)
 #define sv_setpvs(sv, str) Perl_sv_setpvn(aTHX_ sv, STR_WITH_LEN(str))
 #define savepvs(str) Perl_savepvn(aTHX_ STR_WITH_LEN(str))
 #define gv_stashpvs(str, create) Perl_gv_stashpvn(aTHX_ STR_WITH_LEN(str), create)
@@ -840,21 +840,12 @@ Malloc_t Perl_mem_log_free(Malloc_t oldalloc, const char *filename, const int li
 #endif
 
 /* convenience debug macros */
-#ifdef USE_ITHREADS
-#define pTHX_FORMAT  "Perl interpreter: 0x%p"
-#define pTHX__FORMAT ", Perl interpreter: 0x%p"
-#define pTHX_VALUE_   (void *)my_perl,
-#define pTHX_VALUE    (void *)my_perl
-#define pTHX__VALUE_ ,(void *)my_perl,
-#define pTHX__VALUE  ,(void *)my_perl
-#else
 #define pTHX_FORMAT
 #define pTHX__FORMAT
 #define pTHX_VALUE_
 #define pTHX_VALUE
 #define pTHX__VALUE_
 #define pTHX__VALUE
-#endif /* USE_ITHREADS */
 
 /*
  * Local variables:

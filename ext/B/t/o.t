@@ -1,15 +1,9 @@
 #!./perl -w
 
 BEGIN {
-	require Config;
-	if ((%Config::Config{'extensions'} !~ m/\bB\b/) ){
-		print "1..0 # Skip -- Perl configured without B module\n";
-		exit 0;
-	}
-	require './test.pl';
+    require './test.pl';
 }
 
-use strict;
 use Config;
 use File::Spec;
 use File::Path;
@@ -20,10 +14,10 @@ unless (-d $path) {
 }
 
 my $file = File::Spec->catfile( $path, 'success.pm' );
-local *OUT;
-open(OUT, '>', $file) or skip_all( 'Cannot write fake backend module');
-print OUT while ~< *DATA;
-close *OUT;
+my $out_fh;
+open($out_fh, '>', $file) or skip_all( 'Cannot write fake backend module');
+print $out_fh, $_ while ~< *DATA;
+close $out_fh;
 
 plan( 9 ); # And someone's responsible.
 
@@ -42,15 +36,15 @@ is( @lines[3], '-e syntax OK', 'O.pm should not munge perl output without -qq');
 @lines = get_lines( < @args );
 isnt( @lines[1], 'Compiling!', 'Output should not be printed with -q switch' );
 
-SKIP: {
+SKIP: do {
 	skip( '-q redirection does not work without PerlIO', 2)
-		unless %Config{useperlio};
+		unless config_value("useperlio");
 	is( @lines[1], "[Compiling!", '... but should be in $O::BEGIN_output' );
 
 	@args[1] = '-MO=-qq,success,foo,bar';
 	@lines = get_lines( < @args );
 	is( scalar nelems @lines, 3, '-qq should suppress even the syntax OK message' );
-}
+};
 
 @args[1] = '-MO=success,fail';
 @lines = get_lines( < @args );
@@ -68,13 +62,13 @@ END {
 __END__
 package B::success;
 
-$| = 1;
-print "Compiling!\n";
+$^OUTPUT_AUTOFLUSH = 1;
+print $^STDOUT, "Compiling!\n";
 
 sub compile {
 	return 'fail' if (@_[0] eq 'fail');
-	print "(@_[0]) <@_[1]>\n";
-	return sub { print "[$O::BEGIN_output]\n" };
+	print $^STDOUT, "(@_[0]) <@_[1]>\n";
+	return sub { print $^STDOUT, "[$O::BEGIN_output]\n" };
 }
 
 1;

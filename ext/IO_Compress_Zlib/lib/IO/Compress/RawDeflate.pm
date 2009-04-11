@@ -1,8 +1,7 @@
 package IO::Compress::RawDeflate ;
 
 # create RFC1951
-#
-use strict ;
+# 
 use warnings;
 use bytes;
 
@@ -46,16 +45,16 @@ $RawDeflateError = '';
 
               );
 
-{
+do {
     my %seen;
     foreach (keys %EXPORT_TAGS )
     {
-        push @{%EXPORT_TAGS{constants}}, 
-                 < grep { !%seen{$_}++ } 
+        push @{%EXPORT_TAGS{+constants}}, 
+                 < grep { !%seen{+$_}++ }, 
  @{ %EXPORT_TAGS{$_} }
     }
-    %EXPORT_TAGS{all} = %EXPORT_TAGS{constants} ;
-}
+    %EXPORT_TAGS{+all} = %EXPORT_TAGS{?constants} ;
+};
 
 
 %DEFLATE_CONSTANTS = %( < %EXPORT_TAGS );
@@ -95,7 +94,7 @@ sub mkComp
     my $class = shift ;
     my $got = shift ;
 
-    my ($obj, $errstr, $errno) = < IO::Compress::Adapter::Deflate::mkCompObject(
+    my @($obj, ?$errstr, ?$errno) =  IO::Compress::Adapter::Deflate::mkCompObject(
                                                  $got->value('CRC32'),
                                                  $got->value('Adler32'),
                                                  $got->value('Level'),

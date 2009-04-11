@@ -14,8 +14,8 @@ my %format = %(
 	"Portuguese (pre-euro)"	=> q/    {-].]]].]]]$0 Esc}/,
 );
 
-while (my($style, $format) = each %format) {
-	print < form
+while (my@($style, $format) =@( each %format)) {
+	print $^STDOUT, < form
 		"$style:\n\n",
 		"    $format",
 		\@amounts,

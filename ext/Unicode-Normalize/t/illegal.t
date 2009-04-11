@@ -1,16 +1,8 @@
 
 BEGIN {
-    unless ("A" eq pack('U', 0x41)) {
-	print "1..0 # Unicode::Normalize " .
-	    "cannot stringify a Unicode code point\n";
-	exit 0;
-    }
-}
-
-BEGIN {
-    if (%ENV{PERL_CORE}) {
+    if (env::var('PERL_CORE')) {
         chdir('t') if -d 't';
-        @INC = @( $^O eq 'MacOS' ? < qw(::lib) : < qw(../lib) );
+        $^INCLUDE_PATH = @( $^OS_NAME eq 'MacOS' ?? < qw(::lib) !! < qw(../lib) );
     }
 }
 
@@ -18,8 +10,8 @@ BEGIN {
 
 use Unicode::Normalize < qw(:all);
 
-use Test;
-use strict;
+use Test::More;
+
 use warnings;
 
 use utf8;
@@ -52,7 +44,7 @@ our $unproc;  # the last starter and after
 
 sub _pack_U   { Unicode::Normalize::pack_U(< @_) }
 
-($proc, $unproc) = < splitOnLastStarter(_pack_U(0x41, 0x300, 0x327, 0xFFFF));
+@($proc, $unproc) = splitOnLastStarter(_pack_U(0x41, 0x300, 0x327, 0xFFFF));
 ok($proc   eq _pack_U(0x41, 0x300, 0x327));
 ok($unproc eq "\x{FFFF}");
 

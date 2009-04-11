@@ -4,22 +4,21 @@ BEGIN {
     require './test.pl';
 }
 
-use strict;
 use warnings;
 
 BEGIN {
     if (!-c "/dev/null") {
-	print "1..0 # Skip: no /dev/null\n";
+	print $^STDOUT, "1..0 # Skip: no /dev/null\n";
 	exit 0;
     }
     if (!-c "/dev/tty") {
-	print "1..0 # Skip: no /dev/tty\n";
+	print $^STDOUT, "1..0 # Skip: no /dev/tty\n";
 	exit 0;
     }
 }
 
 BEGIN {
-  print "1..0 # TODO: fix perl5db.pl\n";
+  print $^STDOUT, "1..0 # TODO: fix perl5db.pl\n";
   exit 0;
 }
 

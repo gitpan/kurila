@@ -1,6 +1,6 @@
 
 package Pod::Perldoc::ToMan;
-use strict;
+
 use warnings;
 
 # This class is unlike ToText.pm et al, because we're NOT paging thru
@@ -35,25 +35,25 @@ use File::Spec::Functions < qw(catfile);
 
 sub parse_from_file {
   my $self = shift;
-  my($file, $outfh) = < @_;
+  my@($file, $outfh) =  @_;
 
-  my $render = $self->{'__nroffer'} || die "no nroffer set!?";
+  my $render = $self->{?'__nroffer'} || die "no nroffer set!?";
   
   # turn the switches into CLIs
-  my $switches = join ' ', map qq{"--$_=$self->{$_}"}, grep !m/^_/s,
+  my $switches = join ' ', map { qq{"--$_=$self->{?$_}"} }, grep { !m/^_/s },
         keys %$self
   ;
 
   my $pod2man =
     catfile(
-      ($self->{'__bindir'}  || die "no bindir set?!"  ),
-      ($self->{'__pod2man'} || die "no pod2man set?!" ),
+      ($self->{?'__bindir'}  || die "no bindir set?!"  ),
+      ($self->{?'__pod2man'} || die "no pod2man set?!" ),
     )
   ;
   unless(-e $pod2man) {
     # This is rarely needed, I think.
-    $pod2man = $self->{'__pod2man'} || die "no pod2man set?!";
-    die "Can't find a pod2man?! (". $self->{'__pod2man'} .")\nAborting"
+    $pod2man = $self->{?'__pod2man'} || die "no pod2man set?!";
+    die "Can't find a pod2man?! (". $self->{?'__pod2man'} .")\nAborting"
       unless -e $pod2man;
   }
 
@@ -61,11 +61,11 @@ sub parse_from_file {
          # no temp file, just a pipe!
 
   # Thanks to Brendan O'Dea for contributing the following block
-  if('Pod::Perldoc::IS_Linux' and -t *STDOUT
-    and my ($cols) = `stty -a` =~ m/\bcolumns\s+(\d+)/
+  if('Pod::Perldoc::IS_Linux' and -t $^STDOUT
+    and my @($cols) = `stty -a` =~ m/\bcolumns\s+(\d+)/
   ) {
     my $c = $cols * 39 / 40;
-    $cols = $c +> $cols - 2 ? $c : $cols -2;
+    $cols = $c +> $cols - 2 ?? $c !! $cols -2;
     $command .= ' -rLL=' . (int $c) . 'n' if $cols +> 80;
   }
 
@@ -82,28 +82,28 @@ sub parse_from_file {
   
   defined(&Pod::Perldoc::DEBUG)
    and Pod::Perldoc::DEBUG()
-   and print "About to run $command\n";
+   and print $^STDOUT, "About to run $command\n";
   ;
   
   my $rslt = `$command`;
 
   my $err;
 
-  if( $self->{'__filter_nroff'} ) {
+  if( $self->{?'__filter_nroff'} ) {
     defined(&Pod::Perldoc::DEBUG)
      and &Pod::Perldoc::DEBUG()
-     and print "filter_nroff is set, so filtering...\n";
+     and print $^STDOUT, "filter_nroff is set, so filtering...\n";
     $rslt = $self->___Do_filter_nroff($rslt);
   } else {
     defined(&Pod::Perldoc::DEBUG)
      and Pod::Perldoc::DEBUG()
-     and print "filter_nroff isn't set, so not filtering.\n";
+     and print $^STDOUT, "filter_nroff isn't set, so not filtering.\n";
   }
 
-  if (($err = $?)) {
+  if (($err = $^CHILD_ERROR)) {
     defined(&Pod::Perldoc::DEBUG)
      and Pod::Perldoc::DEBUG()
-     and print "Nonzero exit ($?) while running $command.\n",
+     and print $^STDOUT, "Nonzero exit ($^CHILD_ERROR) while running $command.\n",
                "Falling back to Pod::Perldoc::ToPod\n ",
     ;
     # A desperate fallthru:
@@ -111,8 +111,8 @@ sub parse_from_file {
     return  Pod::Perldoc::ToPod->new->parse_from_file(< @_);
     
   } else {
-    print $outfh $rslt
-     or die "Can't print to %$self{__output_file}: $!";
+    print $outfh, $rslt
+     or die "Can't print to %$self{?__output_file}: $^OS_ERROR";
   }
   
   return;

@@ -7,17 +7,17 @@
 use Test::More < qw(no_plan);
 use POSIX;
 
-diag "Tests with base class" unless %ENV{PERL_CORE};
+diag "Tests with base class" unless env::var('PERL_CORE');
 
 BEGIN {
-    use_ok("version", 0.50); # If we made it this far, we are ok.
+    use_ok("version", v0.50); # If we made it this far, we are ok.
 }
 
 our $Verbose;
 
 BaseTests("version");
 
-diag "Tests with empty derived class" unless %ENV{PERL_CORE};
+diag "Tests with empty derived class" unless env::var('PERL_CORE');
 
 package version::Empty;
 use base 'version';
@@ -27,7 +27,7 @@ no warnings 'redefine';
 
 package version::Bad;
 use base 'version';
-sub new { my($self,$n)=< @_;  bless \$n, $self }
+sub new($self,$n) {  bless \$n, $self }
 
 package main;
 my $testobj = version::Empty->new(1.002_003);
@@ -40,31 +40,31 @@ my $verobj = version->new("1.2.4");
 is( $verobj->vcmp($testobj), 1, "Comparison vs parent class" );
 BaseTests("version::Empty");
 
-diag "tests with bad subclass" unless %ENV{PERL_CORE};
+diag "tests with bad subclass" unless env::var('PERL_CORE');
 $testobj = version::Bad->new(1.002_003);
 isa_ok( $testobj, "version::Bad" );
 try { my $string = $testobj->numify };
-like($@->{description}, qr/Invalid version object/,
+like($^EVAL_ERROR->{?description}, qr/Invalid version object/,
     "Bad subclass numify");
 try { my $string = $testobj->normal };
-like($@->{description}, qr/Invalid version object/,
+like($^EVAL_ERROR->{?description}, qr/Invalid version object/,
     "Bad subclass normal");
 try { my $string = $testobj->stringify };
-like($@->{description}, qr/Invalid version object/,
+like($^EVAL_ERROR->{?description}, qr/Invalid version object/,
     "Bad subclass stringify");
 try { my $test = $testobj->vcmp(1.0) };
-like($@->{description}, qr/Invalid version object/,
+like($^EVAL_ERROR->{?description}, qr/Invalid version object/,
     "Bad subclass vcmp");
 
 # dummy up a redundant call to satify David Wheeler
 local $^WARN_HOOK = sub { die @_[0] };
 eval 'use version;';
-unlike ($@, qr/^Subroutine main::qv redefined/,
+unlike ($^EVAL_ERROR, qr/^Subroutine main::qv redefined/,
     "Only export qv once per package (to prevent redefined warnings)."); 
 
 sub BaseTests {
 
-    my ($CLASS, $no_qv) = < @_;
+    my @($CLASS, ?$no_qv) =  @_;
     
     # Insert your test code below, the Test module is use()ed here so read
     # its man page ( perldoc Test ) for help writing this test script.
@@ -95,32 +95,32 @@ sub BaseTests {
     # test illegal formats
     diag "test illegal formats" if $Verbose;
     try {my $version = $CLASS->new("1.2_3_4")};
-    like($@->{description}, qr/multiple underscores/,
+    like($^EVAL_ERROR->{?description}, qr/multiple underscores/,
 	"Invalid version format (multiple underscores)");
     
     try {my $version = $CLASS->new("1.2_3.4")};
-    like($@->{description}, qr/underscores before decimal/,
+    like($^EVAL_ERROR->{?description}, qr/underscores before decimal/,
 	"Invalid version format (underscores before decimal)");
     
     try {my $version = $CLASS->new("1_2")};
-    like($@->{description}, qr/alpha without decimal/,
+    like($^EVAL_ERROR->{?description}, qr/alpha without decimal/,
 	"Invalid version format (alpha without decimal)");
     
     # for this first test, just upgrade the warn() to die()
     try {
-	local $^WARN_HOOK = sub { die @_[0]->{description} };
+	local $^WARN_HOOK = sub { die @_[0]->{?description} };
 	$version = $CLASS->new("1.2b3");
     };
     my $warnregex = "Version string '.+' contains invalid data; ".
 	    "ignoring: '.+'";
 
-    like($@->{description}, qr/$warnregex/,
+    like($^EVAL_ERROR->{?description}, qr/$warnregex/,
 	"Version string contains invalid data; ignoring");
 
     # from here on out capture the warning and test independently
-    {
+    do {
     my $warning;
-    local $^WARN_HOOK = sub { $warning = @_[0]->{description} };
+    local $^WARN_HOOK = sub { $warning = @_[0]->{?description} };
     $version = $CLASS->new("99 and 44/100 pure");
 
     like($warning, qr/$warnregex/,
@@ -227,7 +227,7 @@ sub BaseTests {
     ok ( !try { $version*3 }, "noop *" );
     ok ( !try { abs($version) }, "noop abs" );
 
-SKIP: {
+SKIP: do {
     skip "version require'd instead of use'd, cannot test qv", 3
     	if defined $no_qv;
     # test the qv() sub
@@ -237,7 +237,7 @@ SKIP: {
     $version = qv(1.2);
     is ( $version->stringify, "v1.2", 'qv(1.2) == "1.2.0"' );
     isa_ok( qv('5.008'), $CLASS );
-}
+};
 
     # test creation from existing version object
     diag "create new from existing version" if $Verbose;
@@ -270,81 +270,81 @@ SKIP: {
     my $error_regex = 'does not define \$...::VERSION';
     
     
-    {
-	open F, ">", "aaa.pm" or die "Cannot open aaa.pm: $!\n";
-	print F "package aaa;\n\$aaa::VERSION=0.58;\n1;\n";
-	close F;
+    do {
+	open my $f, ">", "aaa.pm" or die "Cannot open aaa.pm: $^OS_ERROR\n";
+	print $f, "package aaa;\n\$aaa::VERSION=0.58;\n1;\n";
+	close $f;
 
 	$version = "v0.580";
 	eval "use lib '.'; use aaa $version";
-	unlike($@, qr/aaa version $version/,
+	unlike($^EVAL_ERROR, qr/aaa version $version/,
 		'Replacement eval works with exact version');
 	
 	# test as class method
 	$new_version = "aaa"->VERSION;
 	is($new_version, '0.58', "Called as class method");
 
-	eval "print Completely::Unknown::Module->VERSION";
-        unlike($@, qr/$error_regex/,
+	eval "print \$^STDOUT, Completely::Unknown::Module->VERSION";
+        unlike($^EVAL_ERROR, qr/$error_regex/,
                "Don't freak if the module doesn't even exist");
 
 	# this should fail even with old UNIVERSAL::VERSION
 	$version = "v0.590";
 	eval "use lib '.'; use aaa $version";
-	like($@->{description}, qr/aaa version $version/,
+	like($^EVAL_ERROR->{?description}, qr/aaa version $version/,
 		'Replacement eval works with incremented version');
 	
 	$version =~ s/0+$//; #convert to string and remove trailing 0's
 	chop($version);	# shorten by 1 digit, should still succeed
 	eval "use lib '.'; use aaa $version";
-	unlike($@, qr/aaa version $version/,
+	unlike($^EVAL_ERROR, qr/aaa version $version/,
 		'Replacement eval works with single digit');
 	
 	unlink 'aaa.pm';
-    }
+    };
 
-    { # dummy up some variously broken modules for testing
-	open F, ">", "xxx.pm" or die "Cannot open xxx.pm: $!\n";
-	print F "1;\n";
-	close F;
+    do { # dummy up some variously broken modules for testing
+	open my $f, ">", "xxx.pm" or die "Cannot open xxx.pm: $^OS_ERROR\n";
+	print $f, "1;\n";
+	close $f;
 
 	eval "use lib '.'; use xxx v3;";
-        like($@->{description}, qr/xxx defines neither package nor VERSION/,
+        like($^EVAL_ERROR->{?description}, qr/xxx defines neither package nor VERSION/,
              'Replacement handles modules without package or VERSION'); 
 	eval "use lib '.'; use xxx; \$version = xxx->VERSION";
-	unlike ($@, qr/$error_regex/,
+	unlike ($^EVAL_ERROR, qr/$error_regex/,
 	    'Replacement handles modules without package or VERSION'); 
 	ok (!defined($version), "Called as class method");
 	unlink 'xxx.pm';
-    }
+    };
     
-    { # dummy up some variously broken modules for testing
-	open F, ">", "yyy.pm" or die "Cannot open yyy.pm: $!\n";
-	print F "package yyy;\n#look ma no VERSION\n1;\n";
-	close F;
+    do { # dummy up some variously broken modules for testing
+	open my $f, ">", "yyy.pm" or die "Cannot open yyy.pm: $^OS_ERROR\n";
+	print $f, "package yyy;\n#look ma no VERSION\n1;\n";
+	close $f;
 	eval "use lib '.'; use yyy v3;";
-	like ($@->{description}, qr/$error_regex/,
+	like ($^EVAL_ERROR->{?description}, qr/$error_regex/,
 	    'Replacement handles modules without VERSION'); 
-	eval "use lib '.'; use yyy; print yyy->VERSION";
-	unlike ($@, qr/$error_regex/,
+	eval "use lib '.'; use yyy; print \$^STDOUT, yyy->VERSION";
+	unlike ($^EVAL_ERROR, qr/$error_regex/,
 	    'Replacement handles modules without VERSION'); 
 	unlink 'yyy.pm';
-    }
+    };
 
-    { # dummy up some variously broken modules for testing
-	open F, ">", "zzz.pm" or die "Cannot open zzz.pm: $!\n";
-	print F "package zzz;\nour \@VERSION = ();\n1;\n";
-	close F;
+    do { # dummy up some variously broken modules for testing
+	open my $f, ">", "zzz.pm" or die "Cannot open zzz.pm: $^OS_ERROR\n";
+	print $f, "package zzz;\nour \@VERSION = ();\n1;\n";
+	close $f;
 	eval "use lib '.'; use zzz v3;";
-	like ($@->{description}, qr/$error_regex/,
+	like ($^EVAL_ERROR->{?description}, qr/$error_regex/,
 	    'Replacement handles modules without VERSION'); 
-	eval "use lib '.'; use zzz; print zzz->VERSION";
-	unlike ($@, qr/$error_regex/,
+	eval "use lib '.'; use zzz; print \$^STDOUT, zzz->VERSION";
+	unlike ($^EVAL_ERROR, qr/$error_regex/,
 	    'Replacement handles modules without VERSION'); 
 	unlink 'zzz.pm';
-    }
+    };
 
-SKIP: 	{
+SKIP: 	do {
 	diag "Tests with v-strings" if $Verbose;
 	$version = $CLASS->new(v1.2.3);
 	is($version->stringify, "v1.2.3", '"$version" == 1.2.3');
@@ -355,7 +355,7 @@ SKIP: 	{
 	    if defined $no_qv;
 	$version = qv("v1.2.3");
 	ok($version->stringify == "v1.2.3", 'v-string initialized qv()');
-    }
+    };
 
     diag "Tests with real-world (malformed) data" if $Verbose;
 
@@ -390,54 +390,54 @@ SKIP: 	{
     is($version->vcmp('undef'), 0, "Undef version comparison #3");
     is($version->vcmp(undef), 0,  "Undef version comparison #4");
     eval "\$version = \$CLASS->new()"; # no parameter at all
-    unlike($@, qr/^Bizarre copy of CODE/, "No initializer at all");
+    unlike($^EVAL_ERROR, qr/^Bizarre copy of CODE/, "No initializer at all");
     is($version->vcmp('undef'), 0, "Undef version comparison #5");
     is($version->vcmp(undef), 0,  "Undef version comparison #6");
 
     $version = $CLASS->new(0.000001);
     unlike($warning, qr/^Version string '1e-06' contains invalid data/,
     	"Very small version objects");
-    }
+    };
 
-SKIP: {
+SKIP: do {
 	# dummy up a legal module for testing RT#19017
-	open F, ">", "www.pm" or die "Cannot open www.pm: $!\n";
-	print F <<"EOF";
+	open my $f, ">", "www.pm" or die "Cannot open www.pm: $^OS_ERROR\n";
+	print $f ,<<"EOF";
 package www;
 use version; our \$VERSION = qv('0.0.4');
 1;
 EOF
-	close F;
+	close $f;
 
 	eval "use lib '.'; use www v0.000008;";
-	like ($@->{description}, qr/^www version v0.8.0 required/,
+	like ($^EVAL_ERROR->{?description}, qr/^www version v0.8.0 required/,
 	    "Make sure very small versions don't freak"); 
 	eval "use lib '.'; use www v1;";
-	like ($@->{description}, qr/^www version v1.0.0 required/,
+	like ($^EVAL_ERROR->{?description}, qr/^www version v1.0.0 required/,
 	    "Comparing vs. version with no decimal"); 
 	eval "use lib '.'; use www v1.;";
-	like ($@->{description}, qr/^www version v1.0.0 required/,
+	like ($^EVAL_ERROR->{?description}, qr/^www version v1.0.0 required/,
 	    "Comparing vs. version with decimal only"); 
 
 	eval "use lib '.'; use www v0.0.8;";
 	my $regex = "^www version v0.0.8 required";
-	like ($@->{description}, qr/$regex/, "Make sure very small versions don't freak"); 
+	like ($^EVAL_ERROR->{?description}, qr/$regex/, "Make sure very small versions don't freak"); 
 
 	$regex =~ s/8/4/; # set for second test
 	eval "use lib '.'; use www v0.0.4;";
-	unlike($@, qr/$regex/, 'Succeed - required == VERSION');
+	unlike($^EVAL_ERROR, qr/$regex/, 'Succeed - required == VERSION');
 	cmp_ok ( "www"->VERSION, 'eq', '0.0.4', 'No undef warnings' );
 
 	unlink 'www.pm';
-    }
+    };
 
-    open F, ">", "vvv.pm" or die "Cannot open vvv.pm: $!\n";
-    print F <<"EOF";
+    open my $f, ">", "vvv.pm" or die "Cannot open vvv.pm: $^OS_ERROR\n";
+    print $f ,<<"EOF";
 package vvv;
 use base q(version);
 1;
 EOF
-    close F;
+    close $f;
     # need to eliminate any other qv()'s
     undef *main::qv;
     ok(!defined(&{Symbol::fetch_glob("main\::qv")}), "make sure we cleared qv() properly");
@@ -446,24 +446,24 @@ EOF
     isa_ok( qv(1.2), "vvv");
     unlink 'vvv.pm';
 
-SKIP: {
-	open F, ">", "uuu.pm" or die "Cannot open uuu.pm: $!\n";
-	print F <<"EOF";
+SKIP: do {
+	open my $f, ">", "uuu.pm" or die "Cannot open uuu.pm: $^OS_ERROR\n";
+	print $f ,<<"EOF";
 package uuu;
 our \$VERSION = 1.0;
 1;
 EOF
-	close F;
+	close $f;
 	eval "use lib '.'; use uuu v1.001;";
-	like ($@->{description}, qr/^uuu version v1.1.0 required/,
+	like ($^EVAL_ERROR->{?description}, qr/^uuu version v1.1.0 required/,
 	    "User typed numeric so we error with numeric"); 
 	eval "use lib '.'; use uuu v1.1.0;";
-	like ($@->{description}, qr/^uuu version v1.1.0 required/,
+	like ($^EVAL_ERROR->{?description}, qr/^uuu version v1.1.0 required/,
 	    "User typed extended so we error with extended"); 
 	unlink 'uuu.pm';
-    }
+    };
 
-SKIP: {
+SKIP: do {
 	# test locale handling
 	my $warning;
 	local $^WARN_HOOK = sub { $warning = @_[0] };
@@ -471,10 +471,10 @@ SKIP: {
 	my $loc;
 	while ( ~< *DATA) {
 	    chomp;
-	    $loc = POSIX::setlocale(&POSIX::LC_ALL, $_);
-	    last if POSIX::localeconv()->{decimal_point} eq ',';
+	    $loc = POSIX::setlocale(&POSIX::LC_ALL( < @_ ), $_);
+	    last if POSIX::localeconv()->{?decimal_point} eq ',';
 	}
-	skip 'Cannot test locale handling without a comma locale', 4
+	skip 'Cannot test locale handling without a comma locale', 3
 	    unless ( $loc and ($ver eq '1,23') );
 
 	diag ("Testing locale handling with $loc") if $Verbose;
@@ -482,21 +482,20 @@ SKIP: {
 	my $v = $CLASS->new($ver);
 	unlike($warning,qr/Version string '1,23' contains invalid data/,
 	    "Process locale-dependent floating point");
-	is ($v, "1.23", "Locale doesn't apply to version objects");
-	ok ($v == $ver, "Comparison to locale floating point");
-    }
+	is ($v->stringify, "1.23", "Locale doesn't apply to version objects");
+    };
 
     eval 'my $v = $CLASS->new("1._1");';
-    unlike($@, qr/^Invalid version format \(alpha with zero width\)/,
+    unlike($^EVAL_ERROR->{?description}, qr/^Invalid version format \(alpha with zero width\)/,
     	"Invalid version format 1._1");
 
-    {
+    do {
 	my $warning;
 	local $^WARN_HOOK = sub { $warning = @_[0] };
 	try { my $v = $CLASS->new(^~^0); };
-	unlike($@, qr/Integer overflow in version/, "Too large version");
-	like($warning->{description}, qr/Integer overflow in version/, "Too large version");
-    }
+	unlike($^EVAL_ERROR, qr/Integer overflow in version/, "Too large version");
+	like($warning->{?description}, qr/Integer overflow in version/, "Too large version");
+    };
 
 }
 

@@ -22,7 +22,7 @@ ok(2,"two");
 test_test("multiple tests");
 
 test_out("not ok 1 - should fail");
-test_err("#     Failed test ($0 at line 28)");
+test_err("#     Failed test ($^PROGRAM_NAME at line 28)");
 test_err("#          got: 'foo'");
 test_err("#     expected: 'bar'");
 is("foo","bar","should fail");
@@ -31,25 +31,25 @@ test_test("testing failing");
 
 test_out("not ok 1");
 test_out("not ok 2");
-test_fail(+2);
-test_fail(+1);
+test_fail(2);
+test_fail(1);
 fail();  fail();
 test_test("testing failing on the same line with no name");
 
 
 test_out("not ok 1 - name");
 test_out("not ok 2 - name");
-test_fail(+2);
-test_fail(+1);
+test_fail(2);
+test_fail(1);
 fail("name");  fail("name");
 test_test("testing failing on the same line with the same name");
 
 
 test_out("not ok 1 - name # TODO Something");
-test_err("#     Failed (TODO) test ($0 at line 52)");
-TODO: { 
+test_err("#     Failed (TODO) test ($^PROGRAM_NAME at line 52)");
+TODO: do { 
     local $TODO = "Something";
     fail("name");
-}
+};
 test_test("testing failing with todo");
 

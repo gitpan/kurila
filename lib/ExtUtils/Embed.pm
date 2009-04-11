@@ -2,7 +2,7 @@
 
 package ExtUtils::Embed;
 require Exporter;
-require FileHandle;
+require IO::File;
 use Config;
 use Getopt::Std;
 use File::Spec;
@@ -11,11 +11,11 @@ use File::Spec;
 #require ExtUtils::MakeMaker;
 #require ExtUtils::Liblist;
 
-use vars < qw(@ISA @EXPORT $VERSION
-	    @Extensions $Verbose $lib_ext
-	    $opt_o $opt_s 
-	    );
-use strict;
+our (@ISA, @EXPORT, $VERSION
+	,    @Extensions, $Verbose, $lib_ext
+	,    $opt_o, $opt_s, 
+	,    );
+
 
 $VERSION = '1.26_01';
 
@@ -29,14 +29,14 @@ $VERSION = '1.26_01';
 #*canon = \&ExtUtils::Miniperl::canon;
 
 $Verbose = 0;
-$lib_ext = %Config{lib_ext} || '.a';
+$lib_ext = config_value("lib_ext") || '.a';
 
-sub is_cmd { $0 eq '-e' }
+sub is_cmd { $^PROGRAM_NAME eq '-e' }
 
 sub my_return {
     my $val = shift;
     if(is_cmd) {
-	print $val;
+	print $^STDOUT, $val;
     }
     else {
 	return $val;
@@ -44,7 +44,7 @@ sub my_return {
 }
 
 sub xsinit { 
-    my($file, $std, $mods) = < @_;
+    my@($file, $std, $mods) =  @_;
     my($fh,@mods,%seen);
     $file ||= "perlxsi.c";
     my $xsinit_proto = "pTHX";
@@ -61,22 +61,22 @@ sub xsinit {
     $std = 1 unless scalar nelems @mods;
 
     if ($file eq "STDOUT") {
-	$fh = \*STDOUT;
+	$fh = $^STDOUT;
     }
     else {
-	$fh = FileHandle->new("$file", ">");
+	$fh = IO::File->new("$file", ">");
     }
 
     push(@mods, < static_ext()) if defined $std;
-    @mods = grep(!%seen{$_}++, @mods);
+    @mods = grep( {!%seen{+$_}++ }, @mods);
 
-    print $fh < &xsi_header();
-    print $fh "EXTERN_C void xs_init ($xsinit_proto);\n\n";     
-    print $fh < &xsi_protos(< @mods);
+    print $fh, < &xsi_header();
+    print $fh, "EXTERN_C void xs_init ($xsinit_proto);\n\n";     
+    print $fh, < &xsi_protos(< @mods);
 
-    print $fh "\nEXTERN_C void\nxs_init($xsinit_proto)\n\{\n";
-    print $fh < &xsi_body(< @mods);
-    print $fh "\}\n";
+    print $fh, "\nEXTERN_C void\nxs_init($xsinit_proto)\n\{\n";
+    print $fh, < &xsi_body(< @mods);
+    print $fh, "\}\n";
 
 }
 
@@ -88,43 +88,41 @@ sub xsi_header {
 EOF
 }    
 
-sub xsi_protos {
-    my(@exts) = @_;
+sub xsi_protos(@exts) {
     my(@retval,%seen);
     my $boot_proto = "pTHX_ CV* cv";
-    foreach $_ ( @exts){
-        my($pname) = < canon('/', $_);
+    foreach my $_ ( @exts){
+        my@($pname) =  canon('/', $_);
         my($mname, $cname);
         ($mname = $pname) =~ s!/!::!g;
         ($cname = $pname) =~ s!/!__!g;
-	my($ccode) = "EXTERN_C void boot_{$cname} ($boot_proto);\n";
-	next if %seen{$ccode}++;
+	my@($ccode) = "EXTERN_C void boot_$($cname) ($boot_proto);\n";
+	next if %seen{+$ccode}++;
         push(@retval, $ccode);
     }
     return join '', @retval;
 }
 
-sub xsi_body {
-    my(@exts) = @_;
+sub xsi_body(@exts) {
     my($pname,@retval,%seen);
-    my($dl) = < canon('/','DynaLoader');
+    my@($dl) =  canon('/','DynaLoader');
     push(@retval, "\tchar *file = __FILE__;\n");
     push(@retval, "\tdXSUB_SYS;\n");
     push(@retval, "\n");
 
-    foreach $_ ( @exts){
-        my($pname) = < canon('/', $_);
+    foreach my $_ ( @exts){
+        my@($pname) =  canon('/', $_);
         my($mname, $cname, $ccode);
         ($mname = $pname) =~ s!/!::!g;
         ($cname = $pname) =~ s!/!__!g;
         if ($pname eq $dl){
             # Must NOT install 'DynaLoader::boot_DynaLoader' as 'bootstrap'!
             # boot_DynaLoader is called directly in DynaLoader.pm
-            $ccode = "\t/* DynaLoader is a special case */\n\tnewXS(\"{$mname}::boot_{$cname}\", boot_{$cname}, file);\n";
-            push(@retval, $ccode) unless %seen{$ccode}++;
+            $ccode = "\t/* DynaLoader is a special case */\n\tnewXS(\"$($mname)::boot_$($cname)\", boot_$($cname), file);\n";
+            push(@retval, $ccode) unless %seen{+$ccode}++;
         } else {
-            $ccode = "\tnewXS(\"{$mname}::bootstrap\", boot_{$cname}, file);\n";
-            push(@retval, $ccode) unless %seen{$ccode}++;
+            $ccode = "\tnewXS(\"$($mname)::bootstrap\", boot_$($cname), file);\n";
+            push(@retval, $ccode) unless %seen{+$ccode}++;
         }
     }
     return join '', @retval;
@@ -132,7 +130,7 @@ sub xsi_body {
 
 sub static_ext {
     unless (scalar nelems @Extensions) {
-      my $static_ext = %Config{static_ext};
+      my $static_ext = config_value("static_ext");
       $static_ext =~ s/^\s+//;
       @Extensions = sort split m/\s+/, $static_ext;
 	unshift @Extensions, < qw(DynaLoader);
@@ -146,19 +144,19 @@ sub _escape {
 }
 
 sub _ldflags {
-    my $ldflags = %Config{ldflags};
+    my $ldflags = config_value("ldflags");
     _escape(\$ldflags);
     return $ldflags;
 }
 
 sub _ccflags {
-    my $ccflags = %Config{ccflags};
+    my $ccflags = config_value("ccflags");
     _escape(\$ccflags);
     return $ccflags;
 }
 
 sub _ccdlflags {
-    my $ccdlflags = %Config{ccdlflags};
+    my $ccdlflags = config_value("ccdlflags");
     _escape(\$ccdlflags);
     return $ccdlflags;
 }
@@ -166,10 +164,9 @@ sub _ccdlflags {
 sub ldopts {
     require ExtUtils::MakeMaker;
     require ExtUtils::Liblist;
-    my($std,$mods,$link_args,$path) = < @_;
+    my @(?$std,?$mods,?$link_args,?$path) =  @_;
     my(@mods,@link_args,@argv);
     my($dllib,$config_libs,@potential_libs,@path);
-    local($") = ' ' unless $" eq ' ';
     if (scalar nelems @_) {
        @link_args = @$link_args if $link_args;
        @mods = @$mods if $mods;
@@ -185,32 +182,31 @@ sub ldopts {
        }
     }
     $std = 1 unless scalar nelems @link_args;
-    my $sep = %Config{path_sep} || ':';
-    @path = @( $path ? < split(m/\Q$sep/, $path) : < @INC );
+    my $sep = config_value("path_sep") || ':';
+    @path = @( $path ?? < split(m/\Q$sep/, $path) !! < $^INCLUDE_PATH );
 
     push(@potential_libs, < @link_args)    if scalar nelems @link_args;
     # makemaker includes std libs on windows by default
-    if ($^O ne 'MSWin32' and defined($std)) {
-	push(@potential_libs, %Config{perllibs});
+    if ($^OS_NAME ne 'MSWin32' and defined($std)) {
+	push(@potential_libs, config_value("perllibs"));
     }
 
     push(@mods, < static_ext()) if $std;
 
-    my($mod,@ns,$root,$sub,$extra,$archive,@archives);
-    print STDERR "Searching ({join ' ',@path}) for archives\n" if $Verbose;
-    foreach $mod ( @mods) {
+    my(@ns,$root,$sub,$extra,$archive,@archives);
+    print $^STDERR, "Searching ($(join ' ',@path)) for archives\n" if $Verbose;
+    foreach my $mod ( @mods) {
 	@ns = split(m/::|\/|\\/, $mod);
 	$sub = @ns[-1];
 	$root = File::Spec->catdir(< @ns);
 	
-	print STDERR "searching for '{$sub}{$lib_ext}'\n" if $Verbose;
+	print $^STDERR, "searching for '$($sub)$($lib_ext)'\n" if $Verbose;
 	foreach ( @path) {
 	    next unless -e ($archive = File::Spec->catdir($_,"auto",$root,"$sub$lib_ext"));
 	    push @archives, $archive;
 	    if(-e ($extra = File::Spec->catdir($_,"auto",$root,"extralibs.ld"))) {
-		local(*FH); 
-		if(open(FH, "<", $extra)) {
-		    my($libs) = ~< *FH; chomp $libs;
+		if(open(my $fh, "<", $extra)) {
+		    my@($libs) = ~< *$fh; chomp $libs;
 		    push @potential_libs, < split m/\s+/, $libs;
 		}
 		else {  
@@ -223,29 +219,29 @@ sub ldopts {
     #print STDERR "\@potential_libs = @potential_libs\n";
 
     my $libperl;
-    if ($^O eq 'MSWin32') {
-	$libperl = %Config{libperl};
+    if ($^OS_NAME eq 'MSWin32') {
+	$libperl = config_value("libperl");
     }
-    elsif ($^O eq 'os390' && %Config{usedl}) {
+    elsif ($^OS_NAME eq 'os390' && config_value("usedl")) {
 	# Nothing for OS/390 (z/OS) dynamic.
     } else {
-	$libperl = (grep(m/^-l\w*perl\w*$/, @link_args))[0]
-	    || (%Config{libperl} =~ m/^lib(\w+)(\Q$lib_ext\E|\.\Q%Config{dlext}\E)$/
-		? "-l$1" : '')
+	$libperl = (grep( {m/^-l\w*perl\w*$/ }, @link_args))[?0]
+	    || (config_value("libperl") =~ m/^lib(\w+)(\Q$lib_ext\E|\.\Q$(config_value("dlext"))\E)$/
+		?? "-l$1" !! '')
 		|| "-lperl";
     }
 
-    my $lpath = File::Spec->catdir(%Config{archlibexp}, 'CORE');
-    $lpath = qq["$lpath"] if $^O eq 'MSWin32';
-    my($extralibs, $bsloadlibs, $ldloadlibs, $ld_run_path) = <
+    my $lpath = File::Spec->catdir(config_value("archlibexp"), 'CORE');
+    $lpath = qq["$lpath"] if $^OS_NAME eq 'MSWin32';
+    my @($extralibs, $bsloadlibs, $ldloadlibs, $ld_run_path, ...) = 
 	MM->ext(join ' ', @( "-L$lpath", $libperl, < @potential_libs));
 
     my $ld_or_bs = $bsloadlibs || $ldloadlibs;
-    print STDERR "bs: $bsloadlibs ** ld: $ldloadlibs" if $Verbose;
+    print $^STDERR, "bs: $bsloadlibs ** ld: $ldloadlibs" if $Verbose;
     my $ccdlflags = _ccdlflags();
     my $ldflags   = _ldflags();
-    my $linkage = "$ccdlflags $ldflags {join ' ',@archives} $ld_or_bs";
-    print STDERR "ldopts: '$linkage'\n" if $Verbose;
+    my $linkage = "$ccdlflags $ldflags $(join ' ',@archives) $ld_or_bs";
+    print $^STDERR, "ldopts: '$linkage'\n" if $Verbose;
 
     return $linkage if scalar nelems @_;
     my_return("$linkage\n");
@@ -262,8 +258,8 @@ sub ccdlflags {
 }
 
 sub perl_inc {
-    my $dir = File::Spec->catdir(%Config{archlibexp}, 'CORE');
-    $dir = qq["$dir"] if $^O eq 'MSWin32';
+    my $dir = File::Spec->catdir(config_value("archlibexp"), 'CORE');
+    $dir = qq["$dir"] if $^OS_NAME eq 'MSWin32';
     my_return(" -I$dir ");
 }
 
@@ -271,15 +267,14 @@ sub ccopts {
    ccflags . perl_inc;
 }
 
-sub canon {
-    my($as, < @ext) = < @_;
+sub canon($as, @< @ext) {
     foreach( @ext) {
        # might be X::Y or lib/auto/X/Y/Y.a
        next if s!::!/!g;
        s:^(lib|ext)/(auto/)?::;
        s:/\w+\.\w+$::;
     }
-    map(s:/:$as:, @ext) if ($as ne '/');
+    map( {s:/:$as: }, @ext) if ($as ne '/');
     @ext;
 }
 
@@ -386,7 +381,7 @@ with the current Perl.
 B<-I> E<lt>path1:path2E<gt>
 
 Search path for ModuleName.a archives.  
-Default path is B<@INC>.
+Default path is B<$^INCLUDE_PATH>.
 Library archives are expected to be found as 
 B</some/path/auto/ModuleName/ModuleName.a>
 For example, when looking for B<Socket.a> relative to a search path, 
@@ -431,7 +426,7 @@ rather than print it to STDOUT.
 This will print arguments for linking with B<libperl> and
 extensions found in B<$Config{static_ext}>.  This includes libraries
 found in B<$Config{libs}> and the first ModuleName.a library
-for each extension that is found by searching B<@INC> or the path 
+for each extension that is found by searching B<$^INCLUDE_PATH> or the path 
 specified by the B<-I> option.  
 In addition, when ModuleName.a is found, additional linker arguments
 are picked up from the B<extralibs.ld> file in the same directory.

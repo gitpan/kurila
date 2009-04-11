@@ -40,7 +40,7 @@ is_deeply( $struct, $thawed, 'Struct superficially looks like the original' );
 is( $struct->[1], $thawed->[1], 'Singleton thaws correctly' );
 
 # We can also test this empirically
-$struct->[1]->{value} = 'Goodbye cruel world!';
+$struct->[1]->{+value} = 'Goodbye cruel world!';
 is_deeply( $struct, $thawed, 'Empiric testing corfirms correct behaviour' );
 
 # End Tests
@@ -63,8 +63,7 @@ sub STORABLE_freeze {
 	return  @('foo');
 }
 
-sub STORABLE_attach {
-	my ($class, $clone, $string) = < @_;
+sub STORABLE_attach($class, $clone, $string) {
 	Test::More::ok( ! ref $class, 'STORABLE_attach passed class, and not an object' );
 	Test::More::is( $class, 'My::Singleton', 'STORABLE_attach is passed the correct class name' );
 	Test::More::is( $clone, 0, 'We are not in a dclone' );

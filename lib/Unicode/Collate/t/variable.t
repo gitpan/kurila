@@ -2,7 +2,6 @@
 use Test::More;
 BEGIN { plan tests => 37 };
 
-use strict;
 use warnings;
 use Unicode::Collate;
 
@@ -55,7 +54,7 @@ is($Collator->cmp("deLuge", "de Luge"), -1);
 
 $Collator->change(< %origVar);
 
-ok($Collator->{variable}, 'shifted');
+ok($Collator->{?variable}, 'shifted');
 
 ##############
 

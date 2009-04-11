@@ -54,7 +54,7 @@ to detect dubious practices.
 Have you tried C<use strict>?  It prevents you from using symbolic
 references, makes you predeclare any subroutines that you call as bare
 words, and (probably most importantly) forces you to predeclare your
-variables with C<my>, C<our>, or C<use vars>.
+variables with C<my>, C<our>.
 
 Did you check the return values of each and every system call?  The operating
 system (and thus Perl) tells you whether they worked, and if not
@@ -777,13 +777,8 @@ C<make test TEST_VERBOSE=1> along with C<perl -V>.
 mean?
 
 A complete list of Perl's error messages and warnings with explanatory
-text can be found in L<perldiag>. You can also use the splain program
-(distributed with Perl) to explain the error messages:
-
-    perl program 2>diag.out
-    splain [-v] [-p] diag.out
-
-or change your program to explain the messages for you:
+text can be found in L<perldiag>. You can also change your program to
+explain the messages for you:
 
     use diagnostics;
 

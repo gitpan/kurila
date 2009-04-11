@@ -3,8 +3,7 @@ package IO::Uncompress::Gunzip ;
 
 
 # for RFC1952
-
-use strict ;
+ 
 use warnings;
 use bytes;
 
@@ -22,7 +21,7 @@ our ($VERSION, @ISA, @EXPORT_OK, %EXPORT_TAGS, $GunzipError);
 @ISA = qw( IO::Uncompress::RawInflate Exporter );
 @EXPORT_OK = qw( $GunzipError gunzip );
 %EXPORT_TAGS = %( < %IO::Uncompress::RawInflate::DEFLATE_CONSTANTS ) ;
-push @{ %EXPORT_TAGS{all} }, < @EXPORT_OK ;
+push @{ %EXPORT_TAGS{+all} }, < @EXPORT_OK ;
 Exporter::export_ok_tags('all');
 
 $GunzipError = '';
@@ -68,7 +67,7 @@ sub ckMagic
     my $magic ;
     $self->smartReadExact(\$magic, GZIP_ID_SIZE);
 
-    $self->{HeaderPending} = $magic ;
+    $self->{+HeaderPending} = $magic ;
 
     return $self->HeaderError("Minimum header size is " . 
                               GZIP_MIN_HEADER_SIZE . " bytes") 
@@ -77,7 +76,7 @@ sub ckMagic
     return $self->HeaderError("Bad Magic")
         if ! isGzipMagic($magic) ;
 
-    $self->{Type} = 'rfc1952';
+    $self->{+Type} = 'rfc1952';
 
     return $magic ;
 }
@@ -96,11 +95,11 @@ sub chkTrailer
     my $trailer = shift;
 
     # Check CRC & ISIZE 
-    my ($CRC32, $ISIZE) = unpack("V V", $trailer) ;
-    $self->{Info}->{CRC32} = $CRC32;    
-    $self->{Info}->{ISIZE} = $ISIZE;    
+    my @($CRC32, $ISIZE) = @: unpack("V V", $trailer) ;
+    $self->{Info}->{+CRC32} = $CRC32;    
+    $self->{Info}->{+ISIZE} = $ISIZE;    
 
-    if ($self->{Strict}) {
+    if ($self->{?Strict}) {
         return $self->TrailerError("CRC mismatch")
             if $CRC32 != $self->{Uncomp}->crc32() ;
 
@@ -117,18 +116,17 @@ sub isGzipMagic
 {
     my $buffer = shift ;
     return 0 if length $buffer +< GZIP_ID_SIZE ;
-    my ($id1, $id2) = unpack("C C", $buffer) ;
+    my @($id1, $id2) = @: unpack("C C", $buffer) ;
     return $id1 == GZIP_ID1 && $id2 == GZIP_ID2 ;
 }
 
-sub _readFullGzipHeader($)
-{
-    my ($self) = < @_ ;
+sub _readFullGzipHeader($self)
+{ 
     my $magic = '' ;
 
     $self->smartReadExact(\$magic, GZIP_ID_SIZE);
 
-    $self->{HeaderPending} = $magic ;
+    $self->{+HeaderPending} = $magic ;
 
     return $self->HeaderError("Minimum header size is " . 
                               GZIP_MIN_HEADER_SIZE . " bytes") 
@@ -143,21 +141,20 @@ sub _readFullGzipHeader($)
     return $status ;
 }
 
-sub _readGzipHeader($)
-{
-    my ($self, $magic) = < @_ ;
+sub _readGzipHeader($self, $magic)
+{ 
     my ($HeaderCRC) ;
-    my ($buffer) = '' ;
+    my $buffer = '' ;
 
     $self->smartReadExact(\$buffer, GZIP_MIN_HEADER_SIZE - GZIP_ID_SIZE)
         or return $self->HeaderError("Minimum header size is " . 
                                      GZIP_MIN_HEADER_SIZE . " bytes") ;
 
     my $keep = $magic . $buffer ;
-    $self->{HeaderPending} = $keep ;
+    $self->{+HeaderPending} = $keep ;
 
     # now split out the various parts
-    my ($cm, $flag, $mtime, $xfl, $os) = unpack("C C V C C", $buffer) ;
+    my @($cm, $flag, $mtime, $xfl, $os) = @: unpack("C C V C C", $buffer) ;
 
     $cm == GZIP_CM_DEFLATED 
         or return $self->HeaderError("Not Deflate (CM is $cm)") ;
@@ -173,12 +170,12 @@ sub _readGzipHeader($)
         $self->smartReadExact(\$buffer, GZIP_FEXTRA_HEADER_SIZE) 
             or return $self->TruncatedHeader("FEXTRA Length") ;
 
-        my ($XLEN) = unpack("v", $buffer) ;
+        my @($XLEN) = unpack@("v", $buffer) ;
         $self->smartReadExact(\$EXTRA, $XLEN) 
             or return $self->TruncatedHeader("FEXTRA Body");
         $keep .= $buffer . $EXTRA ;
 
-        if ($XLEN && $self->{'ParseExtra'}) {
+        if ($XLEN && $self->{?'ParseExtra'}) {
             my $bad = IO::Compress::Zlib::Extra::parseRawExtra($EXTRA,
                                                 \@EXTRA, 1, 1);
             return $self->HeaderError($bad)
@@ -198,7 +195,7 @@ sub _readGzipHeader($)
         $keep .= $origname . GZIP_NULL_BYTE ;
 
         return $self->HeaderError("Non ISO 8859-1 Character found in Name")
-            if $self->{Strict} && $origname =~ m/$GZIP_FNAME_INVALID_CHAR_RE/o ;
+            if $self->{?Strict} && $origname =~ m/$GZIP_FNAME_INVALID_CHAR_RE/o ;
     }
 
     my $comment ;
@@ -213,7 +210,7 @@ sub _readGzipHeader($)
         $keep .= $comment . GZIP_NULL_BYTE ;
 
         return $self->HeaderError("Non ISO 8859-1 Character found in Comment")
-            if $self->{Strict} && $comment =~ m/$GZIP_FCOMMENT_INVALID_CHAR_RE/o ;
+            if $self->{?Strict} && $comment =~ m/$GZIP_FCOMMENT_INVALID_CHAR_RE/o ;
     }
 
     if ($flag ^&^ GZIP_FLG_FHCRC) {
@@ -224,7 +221,7 @@ sub _readGzipHeader($)
         my $crc16 = crc32($keep) ^&^ 0xFF ;
 
         return $self->HeaderError("CRC16 mismatch.")
-            if $self->{Strict} && $crc16 != $HeaderCRC;
+            if $self->{?Strict} && $crc16 != $HeaderCRC;
 
         $keep .= $buffer ;
     }
@@ -233,7 +230,7 @@ sub _readGzipHeader($)
     #if ($xfl) {
     #}
 
-    $self->{Type} = 'rfc1952';
+    $self->{+Type} = 'rfc1952';
 
     return \%(
         'Type'          => 'rfc1952',
@@ -241,21 +238,21 @@ sub _readGzipHeader($)
         'HeaderLength'  => length $keep,
         'TrailerLength' => GZIP_TRAILER_SIZE,
         'Header'        => $keep,
-        'isMinimalHeader' => $keep eq GZIP_MINIMUM_HEADER ? 1 : 0,
+        'isMinimalHeader' => $keep eq GZIP_MINIMUM_HEADER ?? 1 !! 0,
 
         'MethodID'      => $cm,
-        'MethodName'    => $cm == GZIP_CM_DEFLATED ? "Deflated" : "Unknown" ,
-        'TextFlag'      => $flag ^&^ GZIP_FLG_FTEXT ? 1 : 0,
-        'HeaderCRCFlag' => $flag ^&^ GZIP_FLG_FHCRC ? 1 : 0,
-        'NameFlag'      => $flag ^&^ GZIP_FLG_FNAME ? 1 : 0,
-        'CommentFlag'   => $flag ^&^ GZIP_FLG_FCOMMENT ? 1 : 0,
-        'ExtraFlag'     => $flag ^&^ GZIP_FLG_FEXTRA ? 1 : 0,
+        'MethodName'    => $cm == GZIP_CM_DEFLATED ?? "Deflated" !! "Unknown" ,
+        'TextFlag'      => $flag ^&^ GZIP_FLG_FTEXT ?? 1 !! 0,
+        'HeaderCRCFlag' => $flag ^&^ GZIP_FLG_FHCRC ?? 1 !! 0,
+        'NameFlag'      => $flag ^&^ GZIP_FLG_FNAME ?? 1 !! 0,
+        'CommentFlag'   => $flag ^&^ GZIP_FLG_FCOMMENT ?? 1 !! 0,
+        'ExtraFlag'     => $flag ^&^ GZIP_FLG_FEXTRA ?? 1 !! 0,
         'Name'          => $origname,
         'Comment'       => $comment,
         'Time'          => $mtime,
         'OsID'          => $os,
-        'OsName'        => defined %GZIP_OS_Names{$os} 
-                                 ? %GZIP_OS_Names{$os} : "Unknown",
+        'OsName'        => defined %GZIP_OS_Names{?$os} 
+                                 ?? %GZIP_OS_Names{?$os} !! "Unknown",
         'HeaderCRC'     => $HeaderCRC,
         'Flags'         => $flag,
         'ExtraFlags'    => $xfl,

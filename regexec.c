@@ -75,7 +75,6 @@
 #  include "regcomp.h"
 #endif
 
-#define RF_tainted	1		/* tainted information used? */
 #define RF_warned	2		/* warned about big count? */
 
 #define RF_utf8		8		/* Pattern contains multibyte chars? */
@@ -1042,7 +1041,6 @@ if ((!reginfo || regtry(reginfo, &s))) \
     break
 
 #define REXEC_FBC_CSCAN_TAINT(CoNdUtF8,CoNd)                   \
-    PL_reg_flags |= RF_tainted;                                \
     if (do_utf8) {                                             \
 	REXEC_FBC_UTF8_CLASS_SCAN(CoNdUtF8);                   \
     }                                                          \
@@ -1114,7 +1112,6 @@ S_find_byclass(pTHX_ regexp * prog, const regnode *c, char *s,
 	    );
 	    break;
 	case BOUNDL:
-	    PL_reg_flags |= RF_tainted;
 	    /* FALL THROUGH */
 	case BOUND:
 	    if (do_utf8) {
@@ -1152,7 +1149,6 @@ S_find_byclass(pTHX_ regexp * prog, const regnode *c, char *s,
 		goto got_it;
 	    break;
 	case NBOUNDL:
-	    PL_reg_flags |= RF_tainted;
 	    /* FALL THROUGH */
 	case NBOUND:
 	    if (do_utf8) {
@@ -1818,8 +1814,6 @@ Perl_regexec_flags(pTHX_ REGEXP * const rx, char *stringarg, register char *stre
     goto phooey;
 
 got_it:
-    RX_MATCH_TAINTED_set(rx, PL_reg_flags & RF_tainted);
-
     if (PL_reg_eval_set)
 	restore_pos(aTHX_ prog);
     if (RXp_PAREN_NAMES(prog)) 
@@ -1931,26 +1925,7 @@ S_regtry(pTHX_ regmatch_info *reginfo, char **startpos)
         }
         if (!PL_reg_curpm) {
 	    Newxz(PL_reg_curpm, 1, PMOP);
-#ifdef USE_ITHREADS
-            {
-		SV* const repointer = &PL_sv_undef;
-                /* this regexp is also owned by the new PL_reg_curpm, which
-		   will try to free it.  */
-                av_push(PL_regex_padav, repointer);
-                PL_reg_curpm->op_pmoffset = av_len(PL_regex_padav);
-                PL_regex_pad = AvARRAY(PL_regex_padav);
-            }
-#endif      
         }
-#ifdef USE_ITHREADS
-	/* It seems that non-ithreads works both with and without this code.
-	   So for efficiency reasons it seems best not to have the code
-	   compiled when it is not needed.  */
-	/* This is safe against NULLs: */
-	ReREFCNT_dec(PM_GETRE(PL_reg_curpm));
-	/* PM_reg_curpm owns a reference to this regexp.  */
-	ReREFCNT_inc(rx);
-#endif
 	PM_SETRE(PL_reg_curpm, rx);
 	PL_reg_oldcurpm = PL_curpm;
 	PL_curpm = PL_reg_curpm;
@@ -2241,7 +2216,7 @@ regmatch(), slabs allocated since entry are freed.
 #ifdef DEBUGGING
 
 STATIC void
-S_debug_start_match(pTHX_ const REGEXP *prog, const bool do_utf8, 
+S_debug_start_match(pTHX_ REGEXP *prog, const bool do_utf8, 
     const char *start, const char *end, const char *blurb)
 {
     const bool utf8_pat= RX_EXTFLAGS(prog) & RXf_PMf_UTF8 ? 1 : 0;
@@ -2348,7 +2323,7 @@ S_reg_check_named_buff_matched(pTHX_ const regexp *rex, const regnode *scan)
     I32 n;
     RXi_GET_DECL(rex,rexi);
     SV *sv_dat=(SV*)rexi->data->data[ ARG( scan ) ];
-    I32 *nums=(I32*)SvPVX(sv_dat);
+    I32 *nums=(I32*)SvPVX_mutable(sv_dat);
 
     PERL_ARGS_ASSERT_REG_CHECK_NAMED_BUFF_MATCHED;
 
@@ -2435,7 +2410,6 @@ S_regmatch(pTHX_ regmatch_info *reginfo, regnode *prog)
                                during a successfull match */
     U32 lastopen = 0;       /* last open we saw */
     bool has_cutgroup = RX_HAS_CUTGROUP(rex) ? 1 : 0;   
-    SV* const oreplsv = GvSV(PL_replgv);
     /* these three flags are set by various ops to signal information to
      * the very next op. They have a useful lifetime of exactly one loop
      * iteration, and are not preserved or restored by state pushes/pops
@@ -2935,7 +2909,6 @@ S_regmatch(pTHX_ regmatch_info *reginfo, regnode *prog)
 	    break;
 	case BOUNDL:
 	case NBOUNDL:
-	    PL_reg_flags |= RF_tainted;
 	    /* FALL THROUGH */
 	case BOUND:
 	case NBOUND:
@@ -2997,7 +2970,6 @@ S_regmatch(pTHX_ regmatch_info *reginfo, regnode *prog)
 	{
 	    char *s;
 	    char type;
-	    PL_reg_flags |= RF_tainted;
 	    /* FALL THROUGH */
 	case NREF:
 	case NREFF:
@@ -3012,7 +2984,6 @@ S_regmatch(pTHX_ regmatch_info *reginfo, regnode *prog)
             }
             /* unreached */
 	case REFFL:
-	    PL_reg_flags |= RF_tainted;
 	    /* FALL THROUGH */
         case REF:
 	case REFF: 
@@ -3126,12 +3097,12 @@ S_regmatch(pTHX_ regmatch_info *reginfo, regnode *prog)
 		/* execute the code in the {...} */
 		dSP;
 		SV ** const before = SP;
-		OP_4tree * const oop = PL_op;
+		OP * const oop = PL_op;
 		COP * const ocurcop = PL_curcop;
 		PAD *old_comppad;
 	    
 		n = ARG(scan);
-		PL_op = (OP_4tree*)rexi->data->data[n];
+		PL_op = ((OP*)rexi->data->data[n])->op_next;
 		DEBUG_STATE_r( PerlIO_printf(Perl_debug_log, 
 		    "  re_eval 0x%"UVxf"\n", PTR2UV(PL_op)) );
 		PAD_SAVE_LOCAL(old_comppad, (PAD*)rexi->data->data[n + 2]);
@@ -3156,7 +3127,6 @@ S_regmatch(pTHX_ regmatch_info *reginfo, regnode *prog)
 		PL_curcop = ocurcop;
 		if (!logical) {
 		    /* /(?{...})/ */
-		    sv_setsv(save_scalar(PL_replgv), ret);
 		    break;
 		}
 	    }
@@ -3180,20 +3150,12 @@ S_regmatch(pTHX_ regmatch_info *reginfo, regnode *prog)
 		    } else if (SvTYPE(ret) == SVt_REGEXP) {
 			rx = (REGEXP*) ret;
 		    } else if (SvSMAGICAL(ret)) {
-			if (SvGMAGICAL(ret)) {
-			    /* I don't believe that there is ever qr magic
-			       here.  */
-			    assert(!mg_find(ret, PERL_MAGIC_qr));
-			    sv_unmagic(ret, PERL_MAGIC_qr);
-			}
-			else {
-			    mg = mg_find(ret, PERL_MAGIC_qr);
+			mg = mg_find(ret, PERL_MAGIC_qr);
 			    /* testing suggests mg only ends up non-NULL for
 			       scalars who were upgraded and compiled in the
 			       else block below. In turn, this is only
 			       triggered in the "postponed utf8 string" tests
 			       in t/op/pat.t  */
-			}
 		    }
 
 		    if (mg) {
@@ -3210,8 +3172,7 @@ S_regmatch(pTHX_ regmatch_info *reginfo, regnode *prog)
 			if (DO_UTF8(ret)) pm_flags |= RXf_PMf_UTF8;
 			rx = CALLREGCOMP(ret, pm_flags);
 			if (!(SvFLAGS(ret)
-			      & (SVs_TEMP | SVs_PADTMP | SVf_READONLY
-				 | SVs_GMG))) {
+			      & (SVs_TEMP | SVs_PADTMP | SVf_READONLY ))) {
 			    /* This isn't a first class regexp. Instead, it's
 			       caching a regexp onto an existing, Perl visible
 			       scalar.  */
@@ -4640,15 +4601,6 @@ yes:
     DEBUG_EXECUTE_r(PerlIO_printf(Perl_debug_log, "%sMatch successful!%s\n",
 			  PL_colors[4], PL_colors[5]));
 
-    if (PL_reg_eval_set) {
-	/* each successfully executed (?{...}) block does the equivalent of
-	 *   local $^R = do {...}
-	 * When popping the save stack, all these locals would be undone;
-	 * bypass this by setting the outermost saved $^R to the latest
-	 * value */
-	if (oreplsv != GvSV(PL_replgv))
-	    sv_setsv(oreplsv, GvSV(PL_replgv));
-    }
     result = 1;
     goto final_exit;
 
@@ -4853,9 +4805,6 @@ S_reginclass(pTHX_ const regexp *prog, register const regnode *n, register const
     GET_RE_DEBUG_FLAGS_DECL;
     PERL_ARGS_ASSERT_REGINCLASS;
 
-    if (flags & ANYOF_FOLD)
-	PL_reg_flags |= RF_tainted;
-
     if ((flags & ANYOF_UNICODE) && (!UTF8_IS_INVARIANT(c))) {
 	c = utf8n_to_uvchr(p, UTF8_MAXBYTES, &len,
 		(UTF8_ALLOW_DEFAULT & UTF8_ALLOW_ANYUV) | UTF8_CHECK_ONLY);
@@ -4891,7 +4840,8 @@ S_reginclass(pTHX_ const regexp *prog, register const regnode *n, register const
 		    match = TRUE;
 		else if (flags & ANYOF_FOLD) {
 		    AV** const unicode_alternate = (AV**) av_fetch(av, 2, FALSE);
-		    if (!match && lenp && unicode_alternate) {
+		    if (!match && lenp 
+			&& unicode_alternate && SvAVOK(*unicode_alternate)) {
 		        I32 i;
 			for (i = 0; i <= av_len(*unicode_alternate); i++) {
 			    SV* const sv = *av_fetch(*unicode_alternate, i, FALSE);

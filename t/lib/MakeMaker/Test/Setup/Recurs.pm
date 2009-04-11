@@ -4,7 +4,6 @@ our @ISA = qw(Exporter);
 require Exporter;
 our @EXPORT = qw(setup_recurs teardown_recurs);
 
-use strict;
 use File::Path;
 use File::Basename;
 use MakeMaker::Test::Utils;
@@ -39,17 +38,17 @@ END
 
 sub setup_recurs {
     setup_mm_test_root();
-    chdir 'MM_TEST_ROOT:[t]' if $^O eq 'VMS';
+    chdir 'MM_TEST_ROOT:[t]' if $^OS_NAME eq 'VMS';
 
-    while(my($file, $text) = each %Files) {
+    while(my@(?$file, ?$text) =@( each %Files)) {
         # Convert to a relative, native file path.
         $file = 'File::Spec'->catfile('File::Spec'->curdir, < split m{\/}, $file);
 
         my $dir = dirname($file);
         mkpath $dir;
-        open(FILE, ">", "$file") || die "Can't create $file: $!";
-        print FILE $text;
-        close FILE;
+        open(my $fh, ">", "$file") || die "Can't create $file: $^OS_ERROR";
+        print $fh, $text;
+        close $fh;
     }
 
     return 1;

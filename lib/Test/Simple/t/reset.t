@@ -3,12 +3,12 @@
 # Test Test::Builder->reset;
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't';
-        @INC = @('../lib', 'lib');
+        $^INCLUDE_PATH = @('../lib', 'lib');
     }
     else {
-        unshift @INC, 't/lib';
+        unshift $^INCLUDE_PATH, 't/lib';
     }
 }
 chdir 't';
@@ -18,7 +18,7 @@ use Test::Builder;
 my $tb = Test::Builder->new;
 
 my %Original_Output;
-%Original_Output{$_} = $tb->?$_ for qw(output failure_output todo_output);
+%Original_Output{+$_} = $tb->?$_ for qw(output failure_output todo_output);
 
 
 $tb->plan(tests => 14);
@@ -51,14 +51,13 @@ $tb->reset;
 
 my $test_num = 2;   # since we already printed 1
 # Utility testing functions.
-sub ok ($;$) {
-    my($test, $name) = < @_;
+sub ok($test, $name) {
     my $ok = '';
     $ok .= "not " unless $test;
     $ok .= "ok $test_num";
     $ok .= " - $name" if defined $name;
     $ok .= "\n";
-    print $ok;
+    print $^STDOUT, $ok;
     $test_num++;
 
     return $test;
@@ -71,11 +70,11 @@ ok( $tb->level          == 1,           'level' );
 ok( $tb->use_numbers    == 1,           'use_numbers' );
 ok( $tb->no_header      == 0,           'no_header' );
 ok( $tb->no_ending      == 0,           'no_ending' );
-ok( fileno $tb->output         == fileno %Original_Output{output},    
+ok( fileno $tb->output         == fileno %Original_Output{?output},    
                                         'output' );
-ok( fileno $tb->failure_output == fileno %Original_Output{failure_output},    
+ok( fileno $tb->failure_output == fileno %Original_Output{?failure_output},    
                                         'failure_output' );
-ok( fileno $tb->todo_output    == fileno %Original_Output{todo_output},
+ok( fileno $tb->todo_output    == fileno %Original_Output{?todo_output},
                                         'todo_output' );
 ok( $tb->current_test   == 0,           'current_test' );
 ok( (nelems $tb->summary)        == 0,           'summary' );
@@ -84,6 +83,6 @@ ok( (nelems $tb->details)        == 0,           'details' );
 $tb->no_ending(1);
 $tb->no_header(1);
 $tb->plan(tests => 14);
-$tb->current_test(13);
+$tb->current_test = 13;
 $tb->level(0);
 $tb->ok(1, 'final test to make sure output was reset');

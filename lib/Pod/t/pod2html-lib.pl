@@ -1,10 +1,9 @@
 require Cwd;
 require Pod::Html;
-require Config;
+use Config < qw(config_value);
 use File::Spec::Functions;
 
-sub convert_n_test {
-    my($podfile, $testname) = < @_;
+sub convert_n_test($podfile, $testname) {
 
     my $cwd = Cwd::cwd();
     my $base_dir = catdir $cwd, updir(), "lib", "Pod";
@@ -22,32 +21,29 @@ sub convert_n_test {
 
 
     my ($expect, $result);
-    {
-	local $/;
+    do {
+	local $^INPUT_RECORD_SEPARATOR = undef;
 	# expected
 	$expect = ~< *DATA;
-	$expect =~ s/\[PERLADMIN\]/%Config::Config{perladmin}/;
-	if (ord("A") == 193) { # EBCDIC.
-	    $expect =~ s/item_mat_3c_21_3e/item_mat_4c_5a_6e/;
-	}
+	$expect =~ s/\[PERLADMIN\]/$(config_value('perladmin'))/;
 
 	# result
-	open my $in, "<", $outfile or die "cannot open $outfile: $!";
+	open my $in, "<", $outfile or die "cannot open $outfile: $^OS_ERROR";
 	$result = ~< $in;
 	close $in;
-    }
+    };
 
     ok($expect eq $result, $testname) or do {
 	my $diff = '/bin/diff';
 	-x $diff or $diff = '/usr/bin/diff';
 	if (-x $diff) {
 	    my $expectfile = "pod2html-lib.tmp";
-	    open my $tmpfile, ">", $expectfile or die $!;
-	    print $tmpfile $expect;
+	    open my $tmpfile, ">", $expectfile or die $^OS_ERROR;
+	    print $tmpfile, $expect;
 	    close $tmpfile;
-	    my $diffopt = $^O eq 'linux' ? 'u' : 'c';
-	    open my $diff, "diff -$diffopt $expectfile $outfile |" or die $!;
-	    print "# $_" while ~< $diff;
+	    my $diffopt = $^OS_NAME eq 'linux' ?? 'u' !! 'c';
+	    open my $diff, "-|", "diff -$diffopt $expectfile $outfile" or die $^OS_ERROR;
+	    print $^STDOUT, "# $_" while ~< $diff;
 	    close $diff;
 	    unlink $expectfile;
 	}

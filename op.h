@@ -38,6 +38,7 @@
  */
 
 #define OPCODE U16
+#define OPFLAGS U16
 
 #ifdef PERL_MAD
 #  define MADPROP_IN_BASEOP	MADPROP*	op_madprop;
@@ -59,11 +60,8 @@ typedef PERL_BITFIELD16 optype;
     PADOFFSET	op_targ;		\
     PERL_BITFIELD16 op_type:9;		\
     PERL_BITFIELD16 op_opt:1;		\
-    PERL_BITFIELD16 op_latefree:1;	\
-    PERL_BITFIELD16 op_latefreed:1;	\
-    PERL_BITFIELD16 op_attached:1;	\
     PERL_BITFIELD16 op_spare:3;		\
-    U8		op_flags;		\
+    OPFLAGS		op_flags;		\
     U8		op_private;
 #endif
 
@@ -134,10 +132,18 @@ Deprecated.  Use C<GIMME_V> instead.
 				/*  On OP_AELEMFAST, indiciates pad var */
 				/*  On OP_REQUIRE, was seen as CORE::require */
 				/*  On OP_BREAK, an implicit break */
-				/*  On OP_SMARTMATCH, an implicit smartmatch */
-				/*  On OP_ANONHASH and OP_ANONLIST, create a
+				/*  On OP_ANONHASH and OP_ANONARRAY, create a
 				    reference to the new anon hash or array */
 				/*  On OP_AASIGN last element of the assignment is an expanded array/hash */
+#define OPf_ASSIGN      0x100   /*  op should do an assignment */
+#define OPf_ASSIGN_PART 0x200   /* op should do an assignment using
+                                   "pop_assing_part" and without pusing
+                                   onto the stack */
+#define OPf_OPTIONAL      0x400   /*  assignment is optional, flags
+				      should be passed to "pop_assign_part"
+				  */
+#define OPf_TARGET_MY	0x800	/* Target is PADMY. (for ops with TARGLEX */
+
 
 /* old names; don't use in new code, but don't break them, either */
 #define OPf_LIST	OPf_WANT_LIST
@@ -156,15 +162,6 @@ Deprecated.  Use C<GIMME_V> instead.
 /* Private for lvalues */
 #define OPpLVAL_INTRO	128	/* Lvalue must be localized or lvalue sub */
 
-/* Private for OP_LEAVE, OP_LEAVESUB, OP_LEAVESUBLV and OP_LEAVEWRITE */
-#define OPpREFCOUNTED		64	/* op_targ carries a refcount */
-
-/* Private for OP_AASSIGN */
-#define OPpASSIGN_COMMON	64	/* Left & right have syms in common. */
-
-/* Private for OP_SASSIGN */
-#define OPpASSIGN_BACKWARDS	64	/* Left & right switched. */
-
 /* Private for OP_MATCH and OP_SUBST{,CONST} */
 #define OPpRUNTIME		64	/* Pattern coming in on the stack */
 
@@ -176,40 +173,38 @@ Deprecated.  Use C<GIMME_V> instead.
 #define OPpDEREF_AV		32	/*   Want ref to AV. */
 #define OPpDEREF_HV		64	/*   Want ref to HV. */
 #define OPpDEREF_SV		(32|64)	/*   Want ref to SV. */
+
   /* OP_ENTERSUB only */
+#define OPpENTERSUB_BLOCK       2       /* Accepts only one arguments which is assigned to my $_ */
 #define OPpENTERSUB_DB		16	/* Debug subroutine. */
 #define OPpENTERSUB_HASTARG	32	/* Called from OP tree. */
-#define OPpENTERSUB_NOMOD	64	/* Immune to mod() for :attrlist. */
   /* OP_ENTERSUB and OP_RV2CV only */
 #define OPpENTERSUB_AMPER	8	/* Used & form to call. */
-#define OPpENTERSUB_NOPAREN	128	/* bare sub call (without parens) */
 #define OPpENTERSUB_INARGS	4	/* Lval used as arg to a sub. */
+#define OPpENTERSUB_SAVEARGS    128     /* Save the arguments in the targ */
+#define OPpENTERSUB_TARGARGS    64      /* Use the save argument in targ */
+#define OPpENTERSUB_SAVE_DISCARD  2   /* Discard the value returned */
+
   /* OP_GV only */
 #define OPpEARLY_CV		32	/* foo() called before sub foo was parsed */
-  /* OP_?ELEM only */
-#define OPpLVAL_DEFER		16	/* Defer creation of array/hash elem */
+/* Private for OP_HELEM and OP_AELEM */
+#define OPpELEM_ADD            8       /* Add key if it doesn't exist */
+#define OPpELEM_OPTIONAL       4       /* Ignore if the key does not exist */
+
   /* OP_RV2?V, OP_GVSV, OP_ENTERITER only */
 #define OPpOUR_INTRO		16	/* Variable was in an our() */
   /* OP_PADSV only */
-#define OPpPAD_STATE		16	/* is a "state" pad */
   /* for OP_RV2?V, lower bits carry hints (currently only HINT_STRICT_REFS) */
-
-/* Private for OPs with TARGLEX */
-  /* (lower bits may carry MAXARG) */
-#define OPpTARGET_MY		16	/* Target is PADMY. */
 
 /* Private for OP_ENTERITER and OP_ITER */
 #define OPpITER_REVERSED	4	/* for (reverse ...) */
 #define OPpITER_DEF		8	/* for $_ or for my $_ */
 
 /* Private for OP_CONST */
-#define	OPpCONST_NOVER		2	/* no 6; */
 #define	OPpCONST_SHORTCIRCUIT	4	/* eg the constant 5 in (5 || foo) */
 #define	OPpCONST_STRICT		8	/* bearword subject to strict 'subs' */
 #define OPpCONST_ENTERED	16	/* Has been entered as symbol. */
-#define OPpCONST_NOTUSED	32	/* Was OPpCONST_ARYBASE: Was a $[ translated to constant. */
 #define OPpCONST_BARE		64	/* Was a bare word (filehandle?). */
-#define OPpCONST_WARNING	128	/* Was a $^W translated to constant. */
 
 /* Private for OP_FLIP/FLOP */
 #define OPpFLIP_LINENUM		64	/* Range arg potentially a line num. */
@@ -245,12 +240,9 @@ Deprecated.  Use C<GIMME_V> instead.
 #define OPpFT_ACCESS		2	/* use filetest 'access' */
 #define OPpFT_STACKED		4	/* stacked filetest, as in "-f -x $f" */
 
-/* Private for OP_(MAP|GREP)(WHILE|START) */
-#define OPpGREP_LEX		2	/* iterate over lexical $_ */
-    
 /* Private for OP_ENTEREVAL */
 #define OPpEVAL_HAS_HH		2	/* Does it have a copy of %^H */
-    
+
 struct op {
     BASEOP
 };
@@ -282,48 +274,21 @@ struct pmop {
     BASEOP
     OP *	op_first;
     OP *	op_last;
-#ifdef USE_ITHREADS
-    IV          op_pmoffset;
-#else
     REGEXP *    op_pmregexp;            /* compiled expression */
-#endif
     U32         op_pmflags;
     union {
 	OP *	op_pmreplroot;		/* For OP_SUBST */
-#ifdef USE_ITHREADS
-	PADOFFSET  op_pmtargetoff;	/* For OP_PUSHRE */
-#else
 	GV *	op_pmtargetgv;
-#endif
     }	op_pmreplrootu;
     union {
 	OP *	op_pmreplstart;	/* Only used in OP_SUBST */
     }		op_pmstashstartu;
 };
 
-#ifdef USE_ITHREADS
-#define PM_GETRE(o)	(SvTYPE(PL_regex_pad[(o)->op_pmoffset]) == SVt_REGEXP \
-		 	 ? (REGEXP*)(PL_regex_pad[(o)->op_pmoffset]) : NULL)
-/* The assignment is just to enforce type safety (or at least get a warning).
- */
-/* With first class regexps not via a reference one needs to assign
-   &PL_sv_undef under ithreads. (This would probably work unthreaded, but NULL
-   is cheaper. I guess we could allow NULL, but the check above would get
-   more complex, and we'd have an AV with (SV*)NULL in it, which feels bad */
-/* BEWARE - something that calls this macro passes (r) which has a side
-   effect.  */
-#define PM_SETRE(o,r)	STMT_START {					\
-                            const REGEXP *const whap = (r);		\
-                            assert(whap);				\
-			    PL_regex_pad[(o)->op_pmoffset] = (SV*)whap;	\
-                        } STMT_END
-#else
 #define PM_GETRE(o)     ((o)->op_pmregexp)
 #define PM_SETRE(o,r)   ((o)->op_pmregexp = (r))
-#endif
 
 
-#define PMf_RETAINT	0x0001		/* taint $1 etc. if target tainted */
 #define PMf_UNSED	0x0002		/* was PMf_ONCE */
 
 #define PMf_NOTUSED2	0x0004		/* free for use */
@@ -335,7 +300,6 @@ struct pmop {
 #define PMf_KEEP	0x0080		/* keep 1st runtime pattern forever */
 #define PMf_GLOBAL	0x0100		/* pattern had a g modifier */
 #define PMf_CONTINUE	0x0200		/* don't reset pos() if //g fails */
-#define PMf_EVAL	0x0400		/* evaluating replacement as expr */
 
 /* The following flags have exact equivalents in regcomp.h with the prefix RXf_
  * which are stored in the regexp->extflags member. If you change them here,
@@ -374,6 +338,13 @@ struct loop {
     OP *	op_redoop;
     OP *	op_nextop;
     OP *	op_lastop;
+};
+
+struct rootop {
+    BASEOP
+    OP *	op_first;
+    ROOTOP *	op_prev_root;
+    ROOTOP *	op_next_root;
 };
 
 #define cUNOPx(o)	((UNOP*)o)
@@ -421,22 +392,11 @@ struct loop {
 #define kLOOP		cLOOPx(kid)
 
 
-#ifdef USE_ITHREADS
-#  define	cGVOPx_gv(o)	((GV*)PAD_SVl(cPADOPx(o)->op_padix))
-#  define	IS_PADGV(v)	(v && SvTYPE(v) == SVt_PVGV && isGV_with_GP(v) \
-				 && GvIN_PAD(v))
-#  define	IS_PADCONST(v)	(v && SvREADONLY(v))
-#  define	cSVOPx_sv(v)	(cSVOPx(v)->op_sv \
-				 ? cSVOPx(v)->op_sv : PAD_SVl((v)->op_targ))
-#  define	cSVOPx_svp(v)	(cSVOPx(v)->op_sv \
-				 ? &cSVOPx(v)->op_sv : &PAD_SVl((v)->op_targ))
-#else
 #  define	cGVOPx_gv(o)	((GV*)cSVOPx(o)->op_sv)
 #  define	IS_PADGV(v)	FALSE
 #  define	IS_PADCONST(v)	FALSE
 #  define	cSVOPx_sv(v)	(cSVOPx(v)->op_sv)
 #  define	cSVOPx_svp(v)	(&cSVOPx(v)->op_sv)
-#endif
 
 #define	cGVOP_gv		cGVOPx_gv(PL_op)
 #define	cGVOPo_gv		cGVOPx_gv(o)
@@ -444,6 +404,13 @@ struct loop {
 #define cSVOP_sv		cSVOPx_sv(PL_op)
 #define cSVOPo_sv		cSVOPx_sv(o)
 #define kSVOP_sv		cSVOPx_sv(kid)
+
+#define ROOTOPcpNULL(rootop) STMT_START {	\
+	if ((rootop)) {				\
+	    rootop_refcnt_dec((rootop));	\
+	    (rootop) = NULL;			\
+	}					\
+    } STMT_END
 
 #ifndef PERL_CORE
 #  define Nullop ((OP*)NULL)
@@ -478,6 +445,7 @@ struct loop {
 #define OA_BASEOP_OR_UNOP (11 << OCSHIFT)
 #define OA_FILESTATOP (12 << OCSHIFT)
 #define OA_LOOPEXOP (13 << OCSHIFT)
+#define OA_ROOTOP (14 << OCSHIFT)
 
 #define OASHIFT 13
 
@@ -500,23 +468,12 @@ struct loop {
  * regexes.
  */
 
-#ifdef USE_ITHREADS
-#  define OP_REFCNT_INIT		MUTEX_INIT(&PL_op_mutex)
-#  ifdef PERL_CORE
-#    define OP_REFCNT_LOCK		MUTEX_LOCK(&PL_op_mutex)
-#    define OP_REFCNT_UNLOCK		MUTEX_UNLOCK(&PL_op_mutex)
-#  else
-#    define OP_REFCNT_LOCK		op_refcnt_lock()
-#    define OP_REFCNT_UNLOCK		op_refcnt_unlock()
-#  endif
-#  define OP_REFCNT_TERM		MUTEX_DESTROY(&PL_op_mutex)
-#else
 #  define OP_REFCNT_INIT		NOOP
 #  define OP_REFCNT_LOCK		NOOP
 #  define OP_REFCNT_UNLOCK		NOOP
 #  define OP_REFCNT_TERM		NOOP
-#endif
 
+#define OpREFCNT(o)		((o)->op_targ)
 #define OpREFCNT_set(o,n)		((o)->op_targ = (n))
 #ifdef PERL_DEBUG_READONLY_OPS
 #  define OpREFCNT_inc(o)		Perl_op_refcnt_inc(aTHX_ o)
@@ -548,15 +505,11 @@ struct loop {
 #if defined(PL_OP_SLAB_ALLOC)
 #define NewOp(m,var,c,type)	\
 	(var = (type *) Perl_Slab_Alloc(aTHX_ c*sizeof(type)))
-#define NewOpSz(m,var,size)	\
-	(var = (OP *) Perl_Slab_Alloc(aTHX_ size))
 #define FreeOp(p) Perl_Slab_Free(aTHX_ p)
 #else
 #define NewOp(m, var, c, type)	\
 	(var = (MEM_WRAP_CHECK_(c,type) \
 	 (type*)PerlMemShared_calloc(c, sizeof(type))))
-#define NewOpSz(m, var, size)	\
-	(var = (OP*)PerlMemShared_calloc(1, size))
 #define FreeOp(p) PerlMemShared_free(p)
 #endif
 

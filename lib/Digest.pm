@@ -1,7 +1,6 @@
 package Digest;
 
-use strict;
-use vars < qw($VERSION %MMAP $AUTOLOAD);
+our ($VERSION, %MMAP, $AUTOLOAD);
 
 $VERSION = "1.15";
 
@@ -22,7 +21,7 @@ sub new
 {
     shift;  # class ignored
     my $algorithm = shift;
-    my $impl = %MMAP{$algorithm} || do {
+    my $impl = %MMAP{?$algorithm} || do {
 	$algorithm =~ s/\W+//;
 	"Digest::$algorithm";
     };
@@ -31,12 +30,11 @@ sub new
     for  ( @$impl) {
 	my $class = $_;
 	my @args;
-	($class, < @args) = < @$class if ref($class);
-	no strict 'refs';
+	@($class, @< @args) =  @$class if ref($class);
 	unless (exists %{*{Symbol::fetch_glob("$class\::")}}{"VERSION"}) {
 	    eval "require $class";
-	    if ($@) {
-		$err ||= $@;
+	    if ($^EVAL_ERROR) {
+		$err ||= $^EVAL_ERROR;
 		next;
 	    }
 	}

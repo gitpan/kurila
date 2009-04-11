@@ -5,64 +5,64 @@
 
 # Run some code, return its wait status.
 sub run {
-    my($code) = shift;
-    $code = "\"" . $code . "\"" if $^O eq 'VMS'; #VMS needs quotes for this.
-    return system($^X, "-e", $code);
+    my@($code) =@( shift);
+    $code = "\"" . $code . "\"" if $^OS_NAME eq 'VMS'; #VMS needs quotes for this.
+    return system($^EXECUTABLE_NAME, "-e", $code);
 }
 
 our $numtests;
 BEGIN {
     # MacOS system() doesn't have good return value
-    $numtests = ($^O eq 'VMS') ? 16 : ($^O eq 'MacOS') ? 0 : 17;
+    $numtests = ($^OS_NAME eq 'VMS') ?? 16 !! ($^OS_NAME eq 'MacOS') ?? 0 !! 17;
 }
 
 require "./test.pl";
 plan(tests => $numtests);
 
 my $native_success = 0;
-   $native_success = 1 if $^O eq 'VMS';
+   $native_success = 1 if $^OS_NAME eq 'VMS';
 
-if ($^O ne 'MacOS') {
+if ($^OS_NAME ne 'MacOS') {
 my ($exit, $exit_arg);
 
 $exit = run('exit');
 is( $exit >> 8, 0,              'Normal exit' );
-is( $exit, $?,                  'Normal exit $?' );
+is( $exit, $^CHILD_ERROR,                  'Normal exit $?' );
 is( $^CHILD_ERROR_NATIVE, $native_success,  'Normal exit $^CHILD_ERROR_NATIVE' );
 
-if ($^O ne 'VMS') {
+if ($^OS_NAME ne 'VMS') {
   my $posix_ok = try { require POSIX; };
   my $wait_macros_ok = defined &POSIX::WIFEXITED;
 
   $exit = run('exit 42');
   is( $exit >> 8, 42,             'Non-zero exit' );
-  is( $exit, $?,                  'Non-zero exit $?' );
+  is( $exit, $^CHILD_ERROR,                  'Non-zero exit $?' );
   isnt( !$^CHILD_ERROR_NATIVE, 0, 'Non-zero exit $^CHILD_ERROR_NATIVE' );
-  SKIP: {
+  SKIP: do {
     skip("No POSIX", 3) unless $posix_ok;
     skip("No POSIX wait macros", 3) unless $wait_macros_ok;
     ok(POSIX::WIFEXITED($^CHILD_ERROR_NATIVE), "WIFEXITED");
     ok(!POSIX::WIFSIGNALED($^CHILD_ERROR_NATIVE), "WIFSIGNALED");
     is(POSIX::WEXITSTATUS($^CHILD_ERROR_NATIVE), 42, "WEXITSTATUS");
-  }
+  };
 
-  SKIP: {
-    skip("Skip signals and core dump tests on Win32", 7) if $^O eq 'MSWin32';
+  SKIP: do {
+    skip("Skip signals and core dump tests on Win32", 7) if $^OS_NAME eq 'MSWin32';
 
-    $exit = run('kill 15, $$; sleep(1);');
+    $exit = run('kill 15, $^PID; sleep(1);');
 
     is( $exit ^&^ 127, 15,            'Term by signal' );
     ok( !($exit ^&^ 128),             'No core dump' );
-    is( $? ^&^ 127, 15,               'Term by signal $?' );
+    is( $^CHILD_ERROR ^&^ 127, 15,               'Term by signal $?' );
     isnt( $^CHILD_ERROR_NATIVE,  0, 'Term by signal $^CHILD_ERROR_NATIVE' );
-    SKIP: {
+    SKIP: do {
       skip("No POSIX", 3) unless $posix_ok;
       skip("No POSIX wait macros", 3) unless $wait_macros_ok;
       ok(!POSIX::WIFEXITED($^CHILD_ERROR_NATIVE), "WIFEXITED");
       ok(POSIX::WIFSIGNALED($^CHILD_ERROR_NATIVE), "WIFSIGNALED");
       is(POSIX::WTERMSIG($^CHILD_ERROR_NATIVE), 15, "WTERMSIG");
-    }
-  }
+    };
+  };
 
 } else {
 
@@ -118,7 +118,7 @@ if ($^O ne 'VMS') {
 }
 
 $exit_arg = 42;
-$exit = run("END \{ \$? = $exit_arg \}");
+$exit = run("END \{ \$^CHILD_ERROR = $exit_arg \}");
 
 # On VMS, in the child process the actual exit status will be SS$_ABORT, 
 # or 44, which is what you get from any non-zero value of $? except for
@@ -134,7 +134,7 @@ $exit = run("END \{ \$? = $exit_arg \}");
 # status codes to SS$_ABORT on exit, but passes through unmodified UNIX
 # status codes that exit() is called with by scripts.
 
-$exit_arg = (44 ^&^ 7) if $^O eq 'VMS';  
+$exit_arg = (44 ^&^ 7) if $^OS_NAME eq 'VMS';  
 
 is( $exit >> 8, $exit_arg,             'Changing $? in END block' );
 }

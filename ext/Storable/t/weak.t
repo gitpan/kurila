@@ -8,42 +8,29 @@
 
 use Config;
 
-sub BEGIN {
-  if (%ENV{PERL_CORE}){
+BEGIN {
+  if (env::var('PERL_CORE')){
     chdir('t') if -d 't';
-    @INC = @('.', '../lib', '../ext/Storable/t');
+    $^INCLUDE_PATH = @('.', '../lib', '../ext/Storable/t');
   } else {
     # This lets us distribute Test::More in t/
-    unshift @INC, 't';
-  }
-  if (%ENV{PERL_CORE} and %Config{'extensions'} !~ m/\bStorable\b/) {
-    print "1..0 # Skip: Storable was not built\n";
-    exit 0;
-  }
-  if (%Config{extensions} !~ m/\bList\/Util\b/) {
-    print "1..0 # Skip: List::Util was not built\n";
-    exit 0;
-  }
-
-  require Scalar::Util;
-  Scalar::Util->import(qw(weaken isweak));
-  if (grep { m/weaken/ } < @Scalar::Util::EXPORT_FAIL) {
-    print("1..0 # Skip: No support for weaken in Scalar::Util\n");
-    exit 0;
+    unshift $^INCLUDE_PATH, 't';
   }
 }
 
+use Scalar::Util < qw(weaken isweak);
+
 use Test::More 'no_plan';
-use Storable qw (store retrieve freeze thaw nstore nfreeze);
+use Storable < qw(store retrieve freeze thaw nstore nfreeze);
 require 'testlib.pl';
-use vars '$file';
-use strict;
+our $file;
+
 
 sub tester {
-  my ($contents, $sub, $testersub, $what) = < @_;
+  my @($contents, $sub, $testersub, $what) = @_;
   # Test that if we re-write it, everything still works:
   my $clone = &$sub ($contents);
-  is ($@, "", "There should be no error extracting for $what");
+  is ($^EVAL_ERROR, "", "There should be no error extracting for $what");
   &$testersub ($clone, $what);
 }
 
@@ -60,71 +47,48 @@ my $w = \@($r);
 weaken $w->[0];
 ok (isweak($w->[0]), "element 0 is a weak reference");
 
-package OVERLOADED;
-
-use overload
-	'""' => sub { @_[0]->[0] };
-
 package main;
-
-$a = bless \@(77), 'OVERLOADED';
-
-my $o = \@($a, $a);
-weaken $o->[0];
-ok (isweak($o->[0]), "element 0 is a weak reference");
 
 my @tests = @(
 \@($s1,
  sub  {
-  my ($clone, $what) = < @_;
+  my @($clone, $what) = @_;
   isa_ok($clone,'ARRAY');
   isa_ok($clone->[0],'HASH');
   isa_ok($clone->[1],'HASH');
-  ok(!isweak $clone->[0], "Element 0 isn't weak");
-  ok(isweak $clone->[1], "Element 1 is weak");
+  ok(!isweak($clone->[0]), "Element 0 isn't weak");
+  ok(isweak($clone->[1]), "Element 1 is weak");
 }
 ),
 # The weak reference needs to hang around long enough for other stuff to
 # be able to make references to it. So try it second.
 \@($s0,
  sub  {
-  my ($clone, $what) = < @_;
+  my @($clone, $what) = @_;
   isa_ok($clone,'ARRAY');
   isa_ok($clone->[0],'HASH');
   isa_ok($clone->[1],'HASH');
-  ok(isweak $clone->[0], "Element 0 is weak");
-  ok(!isweak $clone->[1], "Element 1 isn't weak");
+  ok(isweak($clone->[0]), "Element 0 is weak");
+  ok(!isweak($clone->[1]), "Element 1 isn't weak");
 }
 ),
 \@($w,
  sub  {
-  my ($clone, $what) = < @_;
+  my @($clone, $what) = @_;
   isa_ok($clone,'ARRAY');
   if ($what eq 'nothing') {
     # We're the original, so we're still a weakref to a hash
     isa_ok($clone->[0],'HASH');
-    ok(isweak $clone->[0], "Element 0 is weak");
+    ok(isweak($clone->[0]), "Element 0 is weak");
   } else {
     is($clone->[0],undef);
   }
 }
 ),
-\@($o,
-sub {
-  my ($clone, $what) = < @_;
-  isa_ok($clone,'ARRAY');
-  isa_ok($clone->[0],'OVERLOADED');
-  isa_ok($clone->[1],'OVERLOADED');
-  ok(isweak $clone->[0], "Element 0 is weak");
-  ok(!isweak $clone->[1], "Element 1 isn't weak");
-  is ("$clone->[0]", 77, "Element 0 stringifies to 77");
-  is ("$clone->[1]", 77, "Element 1 stringifies to 77");
-}
-),
 );
 
-foreach (< @tests) {
-  my ($input, $testsub) = < @$_;
+foreach (@tests) {
+  my @($input, $testsub) = @$_;
 
   tester($input, sub {return shift}, $testsub, 'nothing');
 

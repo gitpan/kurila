@@ -1,12 +1,11 @@
 package TestCompare;
 
-use vars < qw(@ISA @EXPORT $MYPKG);
-#use strict;
+our (@ISA, @EXPORT, $MYPKG);
 #use diagnostics;
 use Exporter;
 use File::Basename;
 use File::Spec;
-use FileHandle;
+use IO::File;
 
 @ISA = qw(Exporter);
 @EXPORT = qw(&testcmp);
@@ -24,7 +23,7 @@ testcmp -- compare two files line-by-line
 
 or
 
-    $is_diff = testcmp({-cmplines => \&mycmp}, $file1, $file2);
+    $is_diff = testcmp({cmplines => \&mycmp}, $file1, $file2);
 
 =head2 DESCRIPTION
 
@@ -32,7 +31,7 @@ Compare two text files line-by-line and return 0 if they are the
 same, 1 if they differ. Each of $file1 and $file2 may be a filenames,
 or a filehandles (in which case it must already be open for reading).
 
-If the first argument is a hashref, then the B<-cmplines> key in the
+If the first argument is a hashref, then the B<cmplines> key in the
 hash may have a subroutine reference as its corresponding value.
 The referenced user-defined subroutine should be a line-comparator
 function that takes two pre-chomped text-lines as its arguments
@@ -44,20 +43,20 @@ otherwise.
 
 ##--------------------------------------------------------------------------
 
-sub testcmp( $ $ ; $) {
-   my %opts = %( ref(@_[0]) eq 'HASH' ? < %{shift()} : () );
-   my ($file1, $file2) = < @_;
-   my ($fh1, $fh2) = ($file1, $file2);
+sub testcmp {
+   my %opts = %( ref(@_[0]) eq 'HASH' ?? < %{shift()} !! () );
+   my @($file1, $file2) =  @_;
+   my @($fh1, $fh2) = @($file1, $file2);
    unless (ref $fh1) {
-      $fh1 = FileHandle->new($file1, "r") or die "Can't open $file1: $!";
+      $fh1 = IO::File->new($file1, "r") or die "Can't open $file1: $^OS_ERROR";
    }
    unless (ref $fh2) {
-      $fh2 = FileHandle->new($file2, "r") or die "Can't open $file2: $!";
+      $fh2 = IO::File->new($file2, "r") or die "Can't open $file2: $^OS_ERROR";
    }
   
-   my $cmplines = %opts{'-cmplines'} || undef;
-   my ($f1text, $f2text) = ("", "");
-   my ($line, $diffs)    = (0, 0);
+   my $cmplines = %opts{?'cmplines'} || undef;
+   my @($f1text, $f2text) = @("", "");
+   my @($line, $diffs)    = @(0, 0);
   
    while ( defined($f1text) and defined($f2text) ) {
       defined($f1text = ~< $fh1)  and  chomp($f1text);
@@ -67,8 +66,8 @@ sub testcmp( $ $ ; $) {
       # kill any extra line endings
       $f1text =~ s/[\r\n]+$//s;
       $f2text =~ s/[\r\n]+$//s;
-      $diffs = (ref $cmplines) ? &$cmplines($f1text, $f2text)
-                               : ($f1text ne $f2text);
+      $diffs = (ref $cmplines) ?? &$cmplines($f1text, $f2text)
+                               !! ($f1text ne $f2text);
       last if $diffs;
    }
    close($fh1) unless (ref $file1);

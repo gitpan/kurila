@@ -1,105 +1,105 @@
 
-use Test;
+use Test::More;
 # Time-stamp: "2004-07-01 14:33:50 ADT"
 BEGIN { plan tests => 12; }
 use I18N::LangTags::Detect v1.01;
-print "# Hi there...\n";
+print $^STDOUT, "# Hi there...\n";
 ok 1;
 
-print "# Using I18N::LangTags::Detect v$I18N::LangTags::Detect::VERSION\n";
+print $^STDOUT, "# Using I18N::LangTags::Detect v$I18N::LangTags::Detect::VERSION\n";
 
-print "# Make sure we can assign to ENV entries\n",
+print $^STDOUT, "# Make sure we can assign to ENV entries\n",
       "# (Otherwise we can't run the subsequent tests)...\n";
-%ENV{'MYORP'}   = 'Zing';          ok %ENV{'MYORP'}, 'Zing';
-%ENV{'SWUZ'}   = 'KLORTHO HOOBOY'; ok %ENV{'SWUZ'}, 'KLORTHO HOOBOY';
+env::var('MYORP'   ) = 'Zing';          is env::var('MYORP'), 'Zing';
+env::var('SWUZ'    ) = 'KLORTHO HOOBOY'; is env::var('SWUZ'), 'KLORTHO HOOBOY';
 
-delete %ENV{'MYORP'};
-delete %ENV{'SWUZ'};
+env::var('MYORP') = undef;
+env::var('SWUZ') = undef;
 
-sub j { "[" . join(' ', map "\"$_\"", @_) . "]" ;}
+sub j { "[" . join(' ', map { "\"$_\"" }, @_) . "]" ;}
 
 sub show {
-  print "#  (Seeing \{", join(' ', map(dump::view($_), @_)), "\} at line ", @(caller)[2], ")\n";
+  print $^STDOUT, "#  (Seeing \{", join(' ', map( {dump::view($_) }, @_)), "\} at line ", @(caller)[2], ")\n";
   printenv();
   return @_[0] || '';
 }
 sub printenv {
-  print "# ENV:\n";
-  foreach my $k (sort keys %ENV) {
-    my $p = %ENV{$k};  $p =~ s/\n/\n#/g;
-    print "#   [$k] = [$p]\n"; }
-  print "# [end of ENV]\n#\n";
+  print $^STDOUT, "# ENV:\n";
+  foreach my $k (sort { $a cmp $b }, env::keys()) {
+    my $p = env::var($k);  $p =~ s/\n/\n#/g;
+    print $^STDOUT, "#   [$k] = [$p]\n"; }
+  print $^STDOUT, "# [end of ENV]\n#\n";
 }
 
-%ENV{'IGNORE_WIN32_LOCALE'} = 1; # a hack, just for testing's sake.
+env::var('IGNORE_WIN32_LOCALE' ) = 1; # a hack, just for testing's sake.
 
 
-print "# Test LANGUAGE...\n";
-%ENV{'REQUEST_METHOD'} = '';
-%ENV{'LANGUAGE'}       = 'Eu-MT';
-%ENV{'LC_ALL'}         = '';
-%ENV{'LC_MESSAGES'}    = '';
-%ENV{'LANG'}           = '';
-ok show( j <      I18N::LangTags::Detect::detect()), q{["eu-mt"]};
+print $^STDOUT, "# Test LANGUAGE...\n";
+env::var('REQUEST_METHOD' ) = '';
+env::var('LANGUAGE'       ) = 'Eu-MT';
+env::var('LC_ALL'         ) = '';
+env::var('LC_MESSAGES'    ) = '';
+env::var('LANG'           ) = '';
+is show( j <      I18N::LangTags::Detect::detect()), q{["eu-mt"]};
 
 
-print "# Test LC_ALL...\n";
-%ENV{'REQUEST_METHOD'} = '';
-%ENV{'LANGUAGE'}       = '';
-%ENV{'LC_ALL'}         = 'Eu-MT';
-%ENV{'LC_MESSAGES'}    = '';
-%ENV{'LANG'}           = '';
+print $^STDOUT, "# Test LC_ALL...\n";
+env::var('REQUEST_METHOD' ) = '';
+env::var('LANGUAGE'       ) = '';
+env::var('LC_ALL'         ) = 'Eu-MT';
+env::var('LC_MESSAGES'    ) = '';
+env::var('LANG'           ) = '';
 
-ok show( j <      I18N::LangTags::Detect::detect()), q{["eu-mt"]};
+is show( j <      I18N::LangTags::Detect::detect()), q{["eu-mt"]};
 
-print "# Test LC_MESSAGES...\n";
-%ENV{'REQUEST_METHOD'} = '';
-%ENV{'LANGUAGE'}       = '';
-%ENV{'LC_ALL'}         = '';
-%ENV{'LC_MESSAGES'}    = 'Eu-MT';
-%ENV{'LANG'}           = '';
+print $^STDOUT, "# Test LC_MESSAGES...\n";
+env::var('REQUEST_METHOD' ) = '';
+env::var('LANGUAGE'       ) = '';
+env::var('LC_ALL'         ) = '';
+env::var('LC_MESSAGES'    ) = 'Eu-MT';
+env::var('LANG'           ) = '';
 
-ok show( j <      I18N::LangTags::Detect::detect()), q{["eu-mt"]};
-
-
-print "# Test LANG...\n";
-%ENV{'REQUEST_METHOD'} = '';
-%ENV{'LANGUAGE'}       = '';
-%ENV{'LC_ALL'}         = '';
-%ENV{'LC_MESSAGES'}    = '';
-%ENV{'LANG'}           = 'Eu_MT';
-
-ok show( j <      I18N::LangTags::Detect::detect()), q{["eu-mt"]};
+is show( j <      I18N::LangTags::Detect::detect()), q{["eu-mt"]};
 
 
+print $^STDOUT, "# Test LANG...\n";
+env::var('REQUEST_METHOD' ) = '';
+env::var('LANGUAGE'       ) = '';
+env::var('LC_ALL'         ) = '';
+env::var('LC_MESSAGES'    ) = '';
+env::var('LANG'           ) = 'Eu_MT';
 
-print "# Test LANG...\n";
-%ENV{'LANGUAGE'} = '';
-%ENV{'REQUEST_METHOD'} = '';
-%ENV{'LC_ALL'} = '';
-%ENV{'LC_MESSAGES'} = '';
-%ENV{'LANG'}     = 'Eu_MT';
-
-ok show( j <      I18N::LangTags::Detect::detect()), q{["eu-mt"]};
+is show( j <      I18N::LangTags::Detect::detect()), q{["eu-mt"]};
 
 
 
+print $^STDOUT, "# Test LANG...\n";
+env::var('LANGUAGE' ) = '';
+env::var('REQUEST_METHOD' ) = '';
+env::var('LC_ALL' ) = '';
+env::var('LC_MESSAGES' ) = '';
+env::var('LANG'     ) = 'Eu_MT';
 
-print "# Test HTTP_ACCEPT_LANGUAGE...\n";
-%ENV{'REQUEST_METHOD'}       = 'GET';
-%ENV{'HTTP_ACCEPT_LANGUAGE'} = 'eu-MT';
-ok show( j <      I18N::LangTags::Detect::detect()), q{["eu-mt"]};
-
-
-%ENV{'HTTP_ACCEPT_LANGUAGE'} = 'x-plorp, zaz, eu-MT, i-klung';
-ok show( j <      I18N::LangTags::Detect::detect()), qq{["x-plorp" "i-plorp" "zaz" "eu-mt" "i-klung" "x-klung"]};
-
-%ENV{'HTTP_ACCEPT_LANGUAGE'} = 'x-plorp, zaz, eU-Mt, i-klung';
-ok show( j <      I18N::LangTags::Detect::detect()), qq{["x-plorp" "i-plorp" "zaz" "eu-mt" "i-klung" "x-klung"]};
+is show( j <      I18N::LangTags::Detect::detect()), q{["eu-mt"]};
 
 
 
 
-print "# Byebye!\n";
+print $^STDOUT, "# Test HTTP_ACCEPT_LANGUAGE...\n";
+env::var('REQUEST_METHOD'       ) = 'GET';
+env::var('HTTP_ACCEPT_LANGUAGE' ) = 'eu-MT';
+is show( j <      I18N::LangTags::Detect::detect()), q{["eu-mt"]};
+
+
+env::var('HTTP_ACCEPT_LANGUAGE' ) = 'x-plorp, zaz, eu-MT, i-klung';
+is show( j <      I18N::LangTags::Detect::detect()), qq{["x-plorp" "i-plorp" "zaz" "eu-mt" "i-klung" "x-klung"]};
+
+env::var('HTTP_ACCEPT_LANGUAGE' ) = 'x-plorp, zaz, eU-Mt, i-klung';
+is show( j <      I18N::LangTags::Detect::detect()), qq{["x-plorp" "i-plorp" "zaz" "eu-mt" "i-klung" "x-klung"]};
+
+
+
+
+print $^STDOUT, "# Byebye!\n";
 ok 1;
 

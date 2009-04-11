@@ -192,7 +192,7 @@ C<do>, C<import>, C<no>, C<package>, C<require>, C<use>
 X<object> X<class> X<package>
 
 C<bless>, C<package>, C<ref>, C<tie>, C<tied>,
-C<untie>, C<use>
+C<use>
 
 =item Low-level socket functions
 X<socket> X<sock>
@@ -235,7 +235,7 @@ C<abs>, C<bless>, C<break>, C<chomp>, C<chr>, C<continue>, C<default>,
 C<exists>, C<formline>, C<given>, C<glob>, C<import>, C<lc>, C<lcfirst>,
 C<lock>, C<map>, C<my>, C<no>, C<our>, C<prototype>, C<qr//>, C<qw//>, C<qx//>,
 C<readline>, C<readpipe>, C<ref>, C<sub>*, C<sysopen>, C<tie>, C<tied>, C<uc>,
-C<ucfirst>, C<untie>, C<use>, C<when>
+C<ucfirst>, C<use>, C<when>
 
 * - C<sub> was a keyword in perl4, but in perl5 it is an
 operator, which can be used in expressions.
@@ -634,7 +634,7 @@ print a stack trace.  The value of EXPR indicates how many call frames
 to go back before the current one.
 
     #  0         1          2      3            4
-    ($package, $filename, $line, $subroutine, $hasargs,
+    ($package, $filename, $line, $subroutine, $args,
 
     #  5          6          7            8       9         10
     $wantarray, $evaltext, $is_require, $hints, $bitmask, $hinthash)
@@ -649,7 +649,7 @@ $subroutine is C<(eval)>, but $evaltext is undefined.  (Note also that
 each C<use> statement creates a C<require> frame inside an C<eval EXPR>
 frame.)  $subroutine may also be C<(unknown)> if this particular
 subroutine happens to have been deleted from the symbol table.
-C<$hasargs> is true if a new instance of C<@_> was set up for the frame.
+C<$args> is has the value of C<@_> of the frame or C<undef> if the frame has no C<@_>.
 C<$hints> and C<$bitmask> contain pragmatic hints that the caller was
 compiled with.  The C<$hints> and C<$bitmask> values are subject to change
 between versions of Perl, and are not meant for external use.
@@ -658,15 +658,10 @@ C<$hinthash> is a reference to a hash containing the value of C<%^H> when the
 caller was compiled, or C<undef> if C<%^H> was empty. Do not modify the values
 of this hash, as they are the actual values stored in the optree.
 
-Furthermore, when called from within the DB package, caller returns more
-detailed information: it sets the list variable C<@DB::args> to be the
-arguments with which the subroutine was invoked.
-
 Be aware that the optimizer might have optimized call frames away before
 C<caller> had a chance to get the information.  That means that C<caller(N)>
 might not return information about the call frame you expect it do, for
-C<< N > 1 >>.  In particular, C<@DB::args> might have information from the
-previous time C<caller> was called.
+C<< N > 1 >>.
 
 =item chdir EXPR
 X<chdir>
@@ -1306,8 +1301,8 @@ is just like
     eval `cat stat.pl`;
 
 except that it's more efficient and concise, keeps track of the current
-filename for error messages, searches the @INC directories, and updates
-C<%INC> if the file is found.  See L<perlvar/Predefined Names> for these
+filename for error messages, searches the $^INCLUDE_PATH directories, and updates
+C<$^INCLUDED> if the file is found.  See L<perlvar/Predefined Names> for these
 variables.  It also differs in that code evaluated with C<do FILENAME>
 cannot see lexicals in the enclosing scope; C<eval STRING> does.  It's the
 same, however, in that it does reparse the file every time you call it,
@@ -3134,7 +3129,7 @@ C<STDERR> using various methods:
 
     #!/usr/bin/perl
     open my $oldout, ">&" \*STDOUT"     or die "Can't dup STDOUT: $!";
-    open OLDERR,     ">&", \*STDERR or die "Can't dup STDERR: $!";
+    open OLDERR,     ">&", $^STDERR or die "Can't dup STDERR: $!";
 
     open STDOUT, '>', "foo.out" or die "Can't redirect STDOUT: $!";
     open STDERR, ">&", \*STDOUT"     or die "Can't dup STDOUT: $!";
@@ -4142,7 +4137,7 @@ operator, but you can use it directly.  The C<< <EXPR> >>
 operator is discussed in more detail in L<perlop/"I/O Operators">.
 
     $line = <STDIN>;
-    $line = readline(*STDIN);		# same thing
+    $line = readline($^STDIN);		# same thing
 
 If readline encounters an operating system error, C<$!> will be set with the
 corresponding error message.  It can be helpful to check C<$!> when you are
@@ -4322,7 +4317,7 @@ to the included code.  Has semantics similar to the following subroutine:
        }
        my ($realfilename,$result);
        ITER: {
-           foreach $prefix (@INC) {
+           foreach $prefix ($^INCLUDE_PATH) {
                $realfilename = "$prefix/$filename";
                if (-f $realfilename) {
                    $INC{$filename} = $realfilename;
@@ -4330,7 +4325,7 @@ to the included code.  Has semantics similar to the following subroutine:
                    last ITER;
                }
            }
-           die "Can't find $filename in \@INC";
+           die "Can't find $filename in \$^INCLUDE_PATH";
        }
        if ($@) {
            $INC{$filename} = undef;
@@ -4362,7 +4357,7 @@ In other words, if you try this:
         require Foo::Bar;    # a splendid bareword
 
 The require function will actually look for the "F<Foo/Bar.pm>" file in the
-directories specified in the C<@INC> array.
+directories specified in the C<$^INCLUDE_PATH> array.
 
 But if you try this:
 
@@ -4371,7 +4366,7 @@ But if you try this:
     #or
         require "Foo::Bar";  # not a bareword because of the ""
 
-The require function will look for the "F<Foo::Bar>" file in the @INC array and
+The require function will look for the "F<Foo::Bar>" file in the $^INCLUDE_PATH array and
 will complain about not finding "F<Foo::Bar>" there.  In this case you can do:
 
         eval "require $class";
@@ -4384,11 +4379,11 @@ is found, it will be loaded in place of any file ending in a "F<.pm>"
 extension.
 
 You can also insert hooks into the import facility, by putting directly
-Perl code into the @INC array.  There are three forms of hooks: subroutine
+Perl code into the $^INCLUDE_PATH array.  There are three forms of hooks: subroutine
 references, array references and blessed objects.
 
 Subroutine references are the simplest case.  When the inclusion system
-walks through @INC and encounters a subroutine, this subroutine gets
+walks through $^INCLUDE_PATH and encounters a subroutine, this subroutine gets
 called with two parameters, the first being a reference to itself, and the
 second the name of the file to be included (e.g. "F<Foo/Bar.pm>").  The
 subroutine should return nothing, or a list of up to three values in the
@@ -4418,7 +4413,7 @@ reference to the subroutine itself is passed in as C<$_[0]>.
 =back
 
 If an empty list, C<undef>, or nothing that matches the first 3 values above
-is returned then C<require> will look at the remaining elements of @INC.
+is returned then C<require> will look at the remaining elements of $^INCLUDE_PATH.
 Note that this file handle must be a real file handle (strictly a typeglob,
 or reference to a typeglob, blessed or unblessed) - tied file handles will be
 ignored and return value processing will stop there.
@@ -4430,7 +4425,7 @@ the subroutine.
 
 In other words, you can write:
 
-    push @INC, \&my_sub;
+    push $^INCLUDE_PATH, \&my_sub;
     sub my_sub {
 	my ($coderef, $filename) = @_;	# $coderef is \&my_sub
 	...
@@ -4438,7 +4433,7 @@ In other words, you can write:
 
 or:
 
-    push @INC, [ \&my_sub, $x, $y, ... ];
+    push $^INCLUDE_PATH, [ \&my_sub, $x, $y, ... ];
     sub my_sub {
 	my ($arrayref, $filename) = @_;
 	# Retrieve $x, $y, ...
@@ -4460,10 +4455,10 @@ into package C<main>.)  Here is a typical code layout:
     }
 
     # In the main program
-    push @INC, new Foo(...);
+    push $^INCLUDE_PATH, new Foo(...);
 
-Note that these hooks are also permitted to set the %INC entry
-corresponding to the files they have loaded. See L<perlvar/%INC>.
+Note that these hooks are also permitted to set the $^INCLUDED entry
+corresponding to the files they have loaded. See L<perlvar/$^INCLUDED>.
 
 For a yet-more-powerful import facility, see L</use> and L<perlmod>.
 
@@ -6593,12 +6588,6 @@ error. If the input string is longer than one described by the TEMPLATE,
 the rest is ignored.
 
 See L</pack> for more examples and notes.
-
-=item untie VARIABLE
-X<untie>
-
-Breaks the binding between a variable and a package.  (See C<tie>.)
-Has no effect if the variable is not tied.
 
 =item unshift ARRAY,LIST
 X<unshift>

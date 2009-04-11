@@ -1,17 +1,11 @@
 #!./perl
 
 BEGIN {
-    require Config;
-    if ((%Config::Config{'extensions'} !~ m/\bB\b/) ){
-        print "1..0 # Skip -- Perl configured without B module\n";
-        exit 0;
-    }
     require './test.pl';		# we use runperl from 'test.pl', so can't use Test::More
 }
 
-use strict;
 
-plan tests => 151;
+plan tests => 150;
 
 require_ok("B::Concise");
 
@@ -26,8 +20,8 @@ $out = runperl(switches => \@("-MO=Concise"), prog => '$a', stderr => 1);
 
 is($op_base, 1, "Smallest OP sequence number");
 
-($op_base_p1, $cop_base)
-  = ($out =~ m/^(\d+)\s*<;>\s*nextstate\(main (-?\d+) /m);
+@($op_base_p1, $cop_base)
+  = @($out =~ m/^(\d+)\s*<;>\s*nextstate\(main (-?\d+) /m);
 
 is($op_base_p1, 2, "Second-smallest OP sequence number");
 
@@ -37,7 +31,7 @@ is($cop_base, 1, "Smallest COP sequence number");
 
 $out = runperl(
     switches => \@("-MO=Concise,-exec"),
-    prog => q{$a=$b && print q/foo/},
+    prog => q{$a=$b && print \*STDOUT, q/foo/},
     stderr => 1,
 );
 #diag($out);
@@ -54,70 +48,66 @@ B::Concise->import( <qw( set_style set_style_standard add_callback
 # test that walk_output rejects non-HANDLE args
 foreach my $foo (@("string", \@(), \%())) {
     try {  walk_output($foo) };
-    isnt ($@ && $@->message, '', "walk_output() rejects arg {dump::view($foo)}");
-    $@=''; # clear the fail for next test
+    isnt ($^EVAL_ERROR && $^EVAL_ERROR->message, '', "walk_output() rejects arg $(dump::view($foo))");
+    $^EVAL_ERROR=''; # clear the fail for next test
 }
 # test accessor mode when arg undefd or 0
 foreach my $foo (@(undef, 0)) {
     my $handle = walk_output($foo);
-    is ($handle, \*STDOUT, "walk_output set to STDOUT (default)");
+    is ($handle, $^STDOUT, "walk_output set to STDOUT (default)");
 }
 
-{   # any object that can print should be ok for walk_output
+do {   # any object that can print should be ok for walk_output
     package Hugo;
     sub new { my $foo = bless \%() };
-    sub print { CORE::print < @_ }
-}
+    sub print { CORE::print $^STDOUT, < @_ }
+};
 my $foo = Hugo->new();	# suggested this API fix
 try {  walk_output($foo) };
-is ($@, '', "walk_output() accepts obj that can print");
+is ($^EVAL_ERROR, '', "walk_output() accepts obj that can print");
 
 # test that walk_output accepts a HANDLE arg
-SKIP: {
+SKIP: do {
     skip("no perlio in this build", 4)
-        unless %Config::Config{useperlio};
+        unless Config::config_value("useperlio");
 
-    foreach my $foo (@(\*STDOUT, \*STDERR)) {
-	try {  walk_output($foo) };
-	is ($@, '', "walk_output() accepts STD* " . ref $foo);
+    foreach my $foo (@($^STDOUT, $^STDERR)) {
+	walk_output($foo);
+	pass("walk_output() accepts STD* " . ref $foo);
     }
 
     # now test a ref to scalar
     try {  walk_output(\my $junk) };
-    is ($@, '', "walk_output() accepts ref-to-sprintf target");
+    is ($^EVAL_ERROR, '', "walk_output() accepts ref-to-sprintf target");
 
     my $junk = "non-empty";
     try {  walk_output(\$junk) };
-    is ($@, '', "walk_output() accepts ref-to-non-empty-scalar");
-}
+    is ($^EVAL_ERROR, '', "walk_output() accepts ref-to-non-empty-scalar");
+};
 
 ## add_style
 my @stylespec;
-$@='';
+$^EVAL_ERROR='';
 try { add_style ('junk_B' => < @stylespec) };
-like ($@->{description}, 'expecting 3 style-format args',
+like ($^EVAL_ERROR->{?description}, 'expecting 3 style-format args',
     "add_style rejects insufficient args");
 
 @stylespec = @(0,0,0); # right length, invalid values
-$@='';
+$^EVAL_ERROR='';
 try { add_style ('junk' => < @stylespec) };
-is ($@, '', "add_style accepts: stylename => 3-arg-array");
+is ($^EVAL_ERROR, '', "add_style accepts: stylename => 3-arg-array");
 
-$@='';
+$^EVAL_ERROR='';
 try { add_style (junk => < @stylespec) };
-like ($@->{description}, qr/style 'junk' already exists, choose a new name/,
+like ($^EVAL_ERROR->{?description}, qr/style 'junk' already exists, choose a new name/,
     "add_style correctly disallows re-adding same style-name" );
 
 # test new arg-checks on set_style
-$@='';
+$^EVAL_ERROR='';
 try { set_style (< @stylespec) };
-is ($@, '', "set_style accepts 3 style-format args");
+is ($^EVAL_ERROR, '', "set_style accepts 3 style-format args");
 
 @stylespec = @( () ); # bad style
-
-try { set_style (< @stylespec) };
-like ($@->{description}, qr/expecting 3 style-format args/,
-      "set_style rejects bad style-format args");
 
 #### for content with doc'd options
 
@@ -128,13 +118,13 @@ sub render {
     walk_output(\my $out);
     try { B::Concise::compile(< @_)->() };
     # diag "rendering $@\n";
-    return  @($out, $@);
+    return  @($out, $^EVAL_ERROR);
 }
 
-SKIP: {
+SKIP: do {
     # tests output to GLOB, using perlio feature directly
     skip "no perlio on this build", 127
-	unless %Config::Config{useperlio};
+	unless Config::config_value("useperlio");
     
     set_style_standard('concise');  # MUST CALL before output needed
     
@@ -143,7 +133,7 @@ SKIP: {
 		  -base10 -bigendian -littleendian
 		  );
     foreach my $opt ( @options) {
-	my ($out) = < render($opt, $func);
+	my @($out, ...) =  render($opt, $func);
 	isnt($out, '', "got output with option $opt");
     }
     
@@ -151,12 +141,12 @@ SKIP: {
     
     my $treegen = B::Concise::compile('-basic', $func); # reused
     
-    { # test output into a package global string (sprintf-ish)
+    do { # test output into a package global string (sprintf-ish)
 	our $thing;
 	walk_output(\$thing);
 	$treegen->();
 	ok($thing, "walk_output to our SCALAR, output seen");
-    }
+    };
     
     # test walkoutput acceptance of a scalar-bound IO handle
     open (my $fh, '>', \my $buf);
@@ -174,7 +164,7 @@ SKIP: {
 	    my $typ = ref $ref;
 	    walk_output(\my $out);
 	    try { B::Concise::compile('-basic', $ref)->() };
-	    like ($@->{description}, qr/^err: not a coderef: $typ/,
+	    like ($^EVAL_ERROR->{?description}, qr/^err: not a coderef: $typ/,
 		  "compile detects $typ-ref where expecting subref");
 	    is($out,'', "no output when errd"); # announcement prints
 	}
@@ -186,38 +176,36 @@ SKIP: {
     #      -> &CODE(0x84840cc) in ???
 
     my ($res,$err);
-    TODO: {
+    TODO: do {
 	#local $TODO = "\tdoes this handling make sense ?";
 
 	sub defd_empty {};
-	($res,$err) = < render('-basic', \&defd_empty);
+	@($res,$err) =  render('-basic', \&defd_empty);
 	my @lines = split(m/\n/, $res);
-	is(scalar nelems @lines, 3,
-	   "'sub defd_empty \{\}' seen as 3 liner");
+	is(scalar nelems @lines, 4,
+	   "'sub defd_empty \{\}' seen as 4 liner");
 
-	is(1, $res =~ m/leavesub/ && $res =~ m/(next|db)state/,
+	is(1, ($: $res =~ m/leavesub/ && $res =~ m/(next|db)state/),
 	   "'sub defd_empty \{\}' seen as 2 ops: leavesub,nextstate");
 
-	{
+	do {
 	    package Bar;
 	    our $AUTOLOAD = 'garbage';
-	    sub AUTOLOAD { print "# in AUTOLOAD body: $AUTOLOAD\n" }
-	}
-        no strict 'subs';
-	($res,$err) = < render('-basic', 'Bar::auto_func');
+	    sub AUTOLOAD { print $^STDOUT, "# in AUTOLOAD body: $AUTOLOAD\n" }
+	};
+	@($res,$err) =  render('-basic', 'Bar::auto_func');
 	like ($res, qr/unknown function \(Bar::auto_func\)/,
 	      "Bar::auto_func seen as unknown function");
 
-	($res,$err) = < render('-basic', \&Bar::AUTOLOAD);
+	@($res,$err) =  render('-basic', \&Bar::AUTOLOAD);
 	like ($res, qr/in AUTOLOAD body: /, "found body of Bar::AUTOLOAD");
 
-    }
-    {
-        no strict 'subs';
-        ($res,$err) = < render('-basic', 'Foo::bar');
+    };
+    do {
+        @($res,$err) =  render('-basic', 'Foo::bar');
         like ($res, qr/unknown function \(Foo::bar\)/,
               "BC::compile detects fn-name as unknown function");
-    }
+    };
 
     # v.62 tests
 
@@ -246,14 +234,14 @@ SKIP: {
 	    walk_output(\$sample);
 	    reset_sequence();
 	    $walker->($style, $mode);
-	    %combos{"$style$mode"} = $sample;
+	    %combos{+"$style$mode"} = $sample;
 	}
     }
     # crosscheck that samples are all text-different
     my @list = sort keys %combos;
     for my $i (0..((nelems @list)-1)) {
 	for my $j ($i+1..((nelems @list)-1)) {
-	    isnt (%combos{@list[$i]}, %combos{@list[$j]},
+	    isnt (%combos{?@list[$i]}, %combos{?@list[$j]},
 		  "combos for @list[$i] and @list[$j] are different, as expected");
 	}
     }
@@ -264,14 +252,14 @@ SKIP: {
 	    reset_sequence();
 	    walk_output(\$sample);
 	    $walker->($mode, $style);
-	    %combos{"$mode$style"} = $sample;
+	    %combos{+"$mode$style"} = $sample;
 	}
     }
     # test commutativity of flags, ie that AB == BA
     for my $mode ( @modes) {
 	for my $style ( @styles) {
-	    is ( %combos{"$style$mode"},
-		 %combos{"$mode$style"},
+	    is ( %combos{?"$style$mode"},
+		 %combos{?"$mode$style"},
 		 "results for $style$mode vs $mode$style are the same" );
 	}
     }
@@ -288,14 +276,14 @@ SKIP: {
 	    walk_output(\$sample);
 	    reset_sequence();
 	    $walker->($mode);
-	    %combos{"$style/$mode"} = $sample;
+	    %combos{+"$style/$mode"} = $sample;
 	}
     }
     # crosscheck that samples are all text-different
     my @nm = sort keys %combos;
     for my $i (0..((nelems @nm)-1)) {
 	for my $j ($i+1..((nelems @nm)-1)) {
-	    isnt (%combos{@nm[$i]}, %combos{@nm[$j]},
+	    isnt (%combos{?@nm[$i]}, %combos{?@nm[$j]},
 		  "results for @nm[$i] and @nm[$j] are different, as expected");
 	}
     }
@@ -309,14 +297,14 @@ SKIP: {
 	    walk_output(\$sample);
 	    reset_sequence();
 	    $walker->($style);
-	    %combos{"$mode/$style"} = $sample;
+	    %combos{+"$mode/$style"} = $sample;
 	}
     }
     # test commutativity of flags, ie that AB == BA
     for my $mode ( @modes) {
 	for my $style ( @styles) {
-	    is ( %combos{"$style/$mode"},
-		 %combos{"$mode/$style"},
+	    is ( %combos{?"$style/$mode"},
+		 %combos{?"$mode/$style"},
 		 "results for $style/$mode vs $mode/$style are the same" );
 	}
     }
@@ -329,24 +317,24 @@ SKIP: {
     for my $mode ( @modes) {
 	for my $style ( @styles) {
 
-	    is ( %combos{"$style$mode"},
-		 %combos{"$style/$mode"},
+	    is ( %combos{?"$style$mode"},
+		 %combos{?"$style/$mode"},
 		 "$style$mode VS $style/$mode are the same" );
 
-	    is ( %combos{"$mode$style"},
-		 %combos{"$mode/$style"},
+	    is ( %combos{?"$mode$style"},
+		 %combos{?"$mode/$style"},
 		 "$mode$style VS $mode/$style are the same" );
 
-	    is ( %combos{"$style$mode"},
-		 %combos{"$mode/$style"},
+	    is ( %combos{?"$style$mode"},
+		 %combos{?"$mode/$style"},
 		 "$style$mode VS $mode/$style are the same" );
 
-	    is ( %combos{"$mode$style"},
-		 %combos{"$style/$mode"},
+	    is ( %combos{?"$mode$style"},
+		 %combos{?"$style/$mode"},
 		 "$mode$style VS $style/$mode are the same" );
 	}
     }
-}
+};
 
 
 # test -stash and -src rendering
@@ -376,7 +364,7 @@ $out = runperl ( switches => \@("-MO=Concise,-stash=Data::Dumper,-src,-exec"),
 like($out, qr/FUNC: \*Data::Dumper::format_refaddr/,
      "stash rendering loads package as needed");
 
-my $prog = q{package FOO; sub bar { print "bar" } package main; FOO::bar(); };
+my $prog = q{package FOO; sub bar { print \*STDOUT, "bar" } package main; FOO::bar(); };
 
 # this would fail if %INC used for -stash test
 $out = runperl ( switches => \@("-MO=Concise,-src,-stash=FOO,-main"),

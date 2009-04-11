@@ -1,6 +1,5 @@
 package File::GlobMapper;
 
-use strict;
 use warnings;
 use Carp;
 
@@ -35,13 +34,10 @@ $matchMetaRE = '[' . quotemeta($metachars) . ']';
                 ')' => ')',
            );
 
-%wildCount = %( < map { $_ => 1 } qw/ * ? . { ( [ / );           
+%wildCount = %( < @+: map { @: $_ => 1 }, qw/ * ? . { ( [ / );           
 
-sub globmap ($$;)
+sub globmap($inputGlob, $outputGlob)
 {
-    my $inputGlob = shift ;
-    my $outputGlob = shift ;
-
     my $obj = File::GlobMapper->new($inputGlob, $outputGlob, < @_)
         or croak "globmap: $Error" ;
     return $obj->getFileMap();
@@ -80,26 +76,26 @@ sub new
     $self->_parseOutputGlob()
         or return undef ;
     
-    my @inputFiles = globber($self->{InputGlob}, $flags) ;
+    my @inputFiles = globber($self->{?InputGlob}, $flags) ;
 
     if (GLOB_ERROR)
     {
-        $Error = $!;
+        $Error = $^OS_ERROR;
         return undef ;
     }
 
     #if (whatever)
-    {
-        my $missing = grep { ! -e $_ } @inputFiles ;
+    do {
+        my $missing = grep { ! -e $_ }, @inputFiles ;
 
         if ($missing)
         {
             $Error = "$missing input files do not exist";
             return undef ;
         }
-    }
+    };
 
-    $self->{InputFiles} = \@inputFiles ;
+    $self->{+InputFiles} = \@inputFiles ;
 
     $self->_getFiles()
         or return undef ;
@@ -134,9 +130,9 @@ sub _parseBit
     while ($string =~ s/(.*?)$noPreBS(,|$matchMetaRE)//)
     {
         $out .= quotemeta($1) ;
-        $out .= %mapping{$2} if defined %mapping{$2};
+        $out .= %mapping{?$2} if defined %mapping{?$2};
 
-        ++ $self->{WildCount} if %wildCount{$2} ;
+        ++ $self->{+WildCount} if %wildCount{?$2} ;
 
         if ($2 eq ',')
         { 
@@ -186,7 +182,7 @@ sub _parseInputGlob
 {
     my $self = shift ;
 
-    my $string = $self->{InputGlob} ;
+    my $string = $self->{?InputGlob} ;
     my $inGlob = '';
 
     # Multiple concatenated *'s don't make sense
@@ -201,8 +197,8 @@ sub _parseInputGlob
     while ($string =~ s/(.*?)$noPreBS($matchMetaRE)//)
     {
         $out .= quotemeta($1) ;
-        $out .= %mapping{$2} if defined %mapping{$2};
-        ++ $self->{WildCount} if %wildCount{$2} ;
+        $out .= %mapping{?$2} if defined %mapping{?$2};
+        ++ $self->{+WildCount} if %wildCount{?$2} ;
 
         if ($2 eq '(')
         { 
@@ -250,7 +246,7 @@ sub _parseInputGlob
             defined $alt or return 0 ;
             $out .= "($alt)" ;
 
-            ++ $self->{Braces} ;
+            ++ $self->{+Braces} ;
         }
     }
 
@@ -260,8 +256,8 @@ sub _parseInputGlob
     $out .= quotemeta $string ;
 
 
-    $self->{InputGlob} =~ s/$noPreBS(?:)[\(\)]//g;
-    $self->{InputPattern} = $out ;
+    $self->{+InputGlob} =~ s/$noPreBS(?:)[\(\)]//g;
+    $self->{+InputPattern} = $out ;
 
     #print "# INPUT '$self->{InputGlob}' => '$out'\n";
 
@@ -273,10 +269,10 @@ sub _parseOutputGlob
 {
     my $self = shift ;
 
-    my $string = $self->{OutputGlob} ;
-    my $maxwild = $self->{WildCount};
+    my $string = $self->{?OutputGlob} ;
+    my $maxwild = $self->{?WildCount};
 
-    if ($self->{GlobFlags} ^&^ GLOB_TILDE)
+    if ($self->{?GlobFlags} ^&^ GLOB_TILDE)
     #if (1)
     {
         $string =~ s{
@@ -285,11 +281,11 @@ sub _parseOutputGlob
                   [^/]        # a non-slash character
                         *     # repeated 0 or more times (0 means me)
               )
-            }{{
+            }{$(
               $1
-                  ? (getpwnam($1))[[7]]
-                  : ( %ENV{HOME} || %ENV{LOGDIR} )
-            }}x;
+                  ?? (getpwnam($1))[[7]]
+                  !! ( $(env::var('HOME')) || $(env::var('LOGDIR')) )
+            )}x;
 
     }
 
@@ -303,13 +299,13 @@ sub _parseOutputGlob
     my $noPreBS = '(?<!\\)' ; # no preceeding backslash
     #warn "noPreBS = '$noPreBS'\n";
 
-    #$string =~ s/${noPreBS}\$(\d)/\${$1}/g;
-    $string =~ s/$noPreBS(?:)#(\d)/\{\$$1\}/g;
-    $string =~ s#$noPreBS(?:)\*#\{\$inFile\}#g;
+    #$string =~ s/${noPreBS}\$(\d)/\$\$($1)/g;
+    $string =~ s/$noPreBS(?:)#(\d)/\$(\$$1)/g;
+    $string =~ s#$noPreBS(?:)\*#\$(\$inFile)#g;
     $string = '"' . $string . '"';
 
     #print "OUTPUT '$self->{OutputGlob}' => '$string'\n";
-    $self->{OutputPattern} = $string ;
+    $self->{+OutputPattern} = $string ;
 
     return 1 ;
 }
@@ -323,21 +319,21 @@ sub _getFiles
 
     foreach my $inFile ( @{ $self->{InputFiles} })
     {
-        next if %inFiles{$inFile} ++ ;
+        next if %inFiles{+$inFile} ++ ;
 
         my $outFile = $inFile ;
 
-        if ( $inFile =~ m/$self->{InputPattern}/ )
+        if ( $inFile =~ m/$self->{?InputPattern}/ )
         {
             no warnings 'uninitialized';
-            eval "\$outFile = $self->{OutputPattern};" ;
+            eval "\$outFile = $self->{?OutputPattern};" ;
 
-            if (defined %outInMapping{$outFile})
+            if (defined %outInMapping{?$outFile})
             {
                 $Error =  "multiple input files map to one output file";
                 return undef ;
             }
-            %outInMapping{$outFile} = $inFile;
+            %outInMapping{+$outFile} = $inFile;
             push @{ $self->{Pairs} }, \@($inFile, $outFile);
         }
     }
@@ -349,14 +345,14 @@ sub getFileMap
 {
     my $self = shift ;
 
-    return $self->{Pairs} ;
+    return $self->{?Pairs} ;
 }
 
 sub getHash
 {
     my $self = shift ;
 
-    return \%( < map { $_->[0] => $_->[1] } @{ $self->{Pairs} } ) ;
+    return \%( < @+: map { @: $_->[0] => $_->[1] }, @{ $self->{Pairs} } ) ;
 }
 
 1;

@@ -31,7 +31,6 @@ The values are the original list elements.
 
 =cut
 
-use strict;
 
 our @ISA = qw(Exporter);
 our @EXPORT = qw(abbrev);
@@ -42,20 +41,20 @@ our @EXPORT = qw(abbrev);
 #	$long = $foo{$short};
 
 sub abbrev {
-    my ($word, $hashref, $glob, %table, $returnvoid);
+    my ($hashref, $glob, %table, $returnvoid);
 
     (nelems @_) or return;   # So we don't autovivify onto @_ and trigger warning
     $hashref = shift;
     $returnvoid = 1;
     %{$hashref} = %( () );
 
-    WORD: foreach $word ( @_) {
-        for (my $len = (length $word) - 1; $len +> 0; --$len) {
+    WORD: foreach my $word ( @_) {
+        for my $len ( reverse( 1 .. (length $word) - 1 ) ) {
 	    my $abbrev = substr($word,0,$len);
-	    my $seen = ++%table{$abbrev};
+	    my $seen = ++%table{+$abbrev};
 	    if ($seen == 1) {	    # We're the first word so far to have
 	    			    # this abbreviation.
-	        $hashref->{$abbrev} = $word;
+	        $hashref->{+$abbrev} = $word;
 	    } elsif ($seen == 2) {  # We're the second word to have this
 	    			    # abbreviation, so we can't use it.
 	        delete $hashref->{$abbrev};
@@ -66,8 +65,8 @@ sub abbrev {
 	}
     }
     # Non-abbreviations always get entered, even if they aren't unique
-    foreach $word ( @_) {
-        $hashref->{$word} = $word;
+    foreach my $word ( @_) {
+        $hashref->{+$word} = $word;
     }
     return if $returnvoid;
     %{$hashref};

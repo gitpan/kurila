@@ -1,5 +1,5 @@
 package Time::localtime;
-use strict;
+
 
 use Time::tm;
 
@@ -16,21 +16,23 @@ BEGIN {
     %EXPORT_TAGS = %( FIELDS => \@( < @EXPORT_OK, < @EXPORT ) );
     $VERSION     = 1.02;
 }
-use vars      < @EXPORT_OK;
+our ($tm_sec, $tm_min, $tm_hour, $tm_mday,
+     $tm_mon, $tm_year, $tm_wday, $tm_yday,
+     $tm_isdst);
 
-sub populate (@) {
+sub populate {
     return unless (nelems @_);
     my $tmob = Time::tm->new();
-    @$tmob = @( (
+    @$tmob = @(
 		$tm_sec, $tm_min, $tm_hour, $tm_mday, 
 		$tm_mon, $tm_year, $tm_wday, $tm_yday, 
 		$tm_isdst )
-	    = < @_ );
+	    =  @_ ;
     return $tmob;
 } 
 
-sub localtime (;$) { populate CORE::localtime((nelems @_) ? shift : time)}
-sub ctime (;$)     { scalar   CORE::localtime((nelems @_) ? shift : time) } 
+sub localtime { populate CORE::localtime((nelems @_) ?? shift !! time)}
+sub ctime     { scalar   CORE::localtime((nelems @_) ?? shift !! time) } 
 
 1;
 

@@ -1,10 +1,9 @@
 # Test problems in Makefile.PL's and hint files.
 
 BEGIN {
-  unshift @INC, 'lib', '../../lib';
+  unshift $^INCLUDE_PATH, 'lib', '../../lib';
 }
 
-use strict;
 use Test::More tests => 6;
 use ExtUtils::MM;
 use MakeMaker::Test::Setup::Problem;
@@ -18,23 +17,23 @@ END {
 }
 
 ok( chdir 'Problem-Module', "chdir'd to Problem-Module" ) ||
-  diag("chdir failed: $!");
+  diag("chdir failed: $^OS_ERROR");
 
 
 # Make sure when Makefile.PL's break, they issue a warning.
-# Also make sure Makefile.PL's in subdirs still have '.' in @INC.
-{
+# Also make sure Makefile.PL's in subdirs still have '.' in $^INCLUDE_PATH.
+do {
     my $stdout;
-    close STDOUT;
-    open *STDOUT, '>>', \$stdout or die "$!";
+    close $^STDOUT;
+    open $^STDOUT, '>>', \$stdout or die "$^OS_ERROR";
 
     my $warning = '';
-    local $^WARN_HOOK = sub { $warning = @_[0]->{description} };
+    local $^WARN_HOOK = sub { $warning = @_[0]->{?description} };
     try { $MM->eval_in_subdirs; };
 
-    is( $stdout, qq{\@INC has .\n}, 'cwd in @INC' );
+    is( $stdout, qq{\$^INCLUDE_PATH has .\n}, 'cwd in $^INCLUDE_PATH' );
     $stdout = '';
-    like( $@->{description}, 
+    like( $^EVAL_ERROR->{?description}, 
           qr{^ERROR from evaluation of .*subdir.*Makefile.PL: YYYAaaaakkk},
           'Makefile.PL death in subdir warns' );
-}
+};

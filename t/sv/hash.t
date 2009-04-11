@@ -4,25 +4,24 @@ BEGIN {
     require './test.pl';
 }
 
-use strict;
 
 plan tests => 6;
 
 my %h;
 
-ok (!Internals::HvREHASH(%h), "hash doesn't start with rehash flag on");
+ok (!Internals::HvREHASH(\%h), "hash doesn't start with rehash flag on");
 
 foreach (1..10) {
-  %h{"\0"x$_}++;
+  %h{+"\0"x$_}++;
 }
 
-ok (!Internals::HvREHASH(%h), "10 entries doesn't trigger rehash");
+ok (!Internals::HvREHASH(\%h), "10 entries doesn't trigger rehash");
 
 foreach (11..20) {
-  %h{"\0"x$_}++;
+  %h{+"\0"x$_}++;
 }
 
-ok (Internals::HvREHASH(%h), "20 entries triggers rehash");
+ok (Internals::HvREHASH(\%h), "20 entries triggers rehash");
 
 
 
@@ -37,14 +36,14 @@ use constant THRESHOLD => 14;
 use constant START     => "a";
 
 # some initial hash data
-my %h2 = %( < map {$_ => 1} 'a'..'cc' );
+my %h2 = %( < @+: map { @: $_ => 1 }, 11..222 );
 
-ok (!Internals::HvREHASH(%h2), 
+ok (!Internals::HvREHASH(\%h2), 
     "starting with pre-populated non-pathological hash (rehash flag if off)");
 
 my @keys = get_keys(\%h2);
-%h2{$_}++ for  @keys;
-ok (Internals::HvREHASH(%h2), 
+%h2{+$_}++ for  @keys;
+ok (Internals::HvREHASH(\%h2), 
     scalar(nelems @keys) . " colliding into the same bucket keys are triggering rehash");
 
 sub get_keys {
@@ -56,14 +55,14 @@ sub get_keys {
     # if the hash has already been populated with a significant amount
     # of entries the number of mask bits can be higher
     my $keys = nelems( keys %$hr);
-    my $bits = $keys ? log($keys)/log(2) : 0;
+    my $bits = $keys ?? log($keys)/log(2) !! 0;
     $bits = $min_bits if $min_bits +> $bits;
 
-    $bits = int($bits) +< $bits ? int($bits) + 1 : int($bits);
+    $bits = int($bits) +< $bits ?? int($bits) + 1 !! int($bits);
     # need to add 2 bits to cover the internal split cases
     $bits += 2;
     my $mask = 2**$bits-1;
-    print "# using mask: $mask ($bits)\n";
+    print $^STDOUT, "# using mask: $mask ($bits)\n";
 
     my @keys;
     my $s = START;
@@ -75,7 +74,7 @@ sub get_keys {
         $hash = hash($s);
         next unless ($hash ^&^ $mask) == 0;
         $c++;
-        printf "# \%2d: \%5s, \%10s\n", $c, $s, $hash;
+        printf $^STDOUT, "# \%2d: \%5s, \%10s\n", $c, $s, $hash;
         push @keys, $s;
     } continue {
         $s++;
@@ -115,4 +114,4 @@ use constant PVBM => 'foo';
 my $dummy = index 'foo', PVBM;
 try { my %h = %(a => PVBM); 1 };
 
-ok (!$@, 'fbm scalar can be inserted into a hash');
+ok (!$^EVAL_ERROR, 'fbm scalar can be inserted into a hash');

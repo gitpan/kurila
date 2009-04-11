@@ -1,7 +1,7 @@
 BEGIN {
 	require Config; Config->import;
 	unless (PerlIO::Layer->find( 'perlio')) {
-	    print "1..0 # Skip: PerlIO not used\n";
+	    print $^STDOUT, "1..0 # Skip: PerlIO not used\n";
 	    exit 0;
 	}
 }
@@ -10,9 +10,9 @@ use Test::More tests => 37;
 
 use_ok('PerlIO');
 
-my $txt = "txt$$";
-my $bin = "bin$$";
-my $utf = "utf$$";
+my $txt = "txt$^PID";
+my $bin = "bin$^PID";
+my $utf = "utf$^PID";
 
 my $txtfh;
 my $binfh;
@@ -24,18 +24,18 @@ ok(open($binfh, ">:raw",  $bin));
 
 ok(open($utffh, ">:utf8", $utf));
 
-print $txtfh "foo\n";
-print $txtfh "bar\n";
+print $txtfh, "foo\n";
+print $txtfh, "bar\n";
 
 ok(close($txtfh));
 
-print $binfh "foo\n";
-print $binfh "bar\n";
+print $binfh, "foo\n";
+print $binfh, "bar\n";
 
 ok(close($binfh));
 
-print $utffh "foo\x{ff}\n";
-print $utffh "bar\x{abcd}\n";
+print $utffh, "foo\x{ff}\n";
+print $utffh, "bar\x{abcd}\n";
 
 ok(close($utffh));
 
@@ -68,62 +68,54 @@ ok(close($binfh));
 ok(close($utffh));
 
 # magic temporary file via 3 arg open with undef
-{
+do {
     ok( open(my $x,"+<",undef), 'magic temp file via 3 arg open with undef');
     ok( defined fileno($x),     '       fileno' );
-
-    select $x;
-    ok( (print "ok\n"),         '       print' );
-
-    select STDOUT;
+    ok( (print $x, "ok\n"),         '       print' );
     ok( seek($x,0,0),           '       seek' );
     is( scalar ~< $x, "ok\n",    '       readline' );
     ok( tell($x) +>= 3,          '       tell' );
 
     # test magic temp file over STDOUT
-    open OLDOUT, ">&", \*STDOUT or die "cannot dup STDOUT: $!";
-    my $status = open(STDOUT,"+<",undef);
-    open STDOUT, ">&",  \*OLDOUT or die "cannot dup OLDOUT: $!";
+    open my $oldout, ">&", $^STDOUT or die "cannot dup STDOUT: $^OS_ERROR";
+    my $status = open($^STDOUT,"+<",undef);
+    open $^STDOUT, ">&",  \*$oldout or die "cannot dup OLDOUT: $^OS_ERROR";
     # report after STDOUT is restored
     ok($status, '       re-open STDOUT');
-    close OLDOUT;
-}
+    close $oldout;
+};
 
 # in-memory open
-{
+do {
     my $var;
     ok( open(my $x,"+<",\$var), 'magic in-memory file via 3 arg open with \$var');
     ok( defined fileno($x),     '       fileno' );
-
-    select $x;
-    ok( (print "ok\n"),         '       print' );
-
-    select STDOUT;
+    ok( (print $x, "ok\n"),         '       print' );
     ok( seek($x,0,0),           '       seek' );
     is( scalar ~< $x, "ok\n",    '       readline' );
     ok( tell($x) +>= 3,          '       tell' );
 
-  TODO: {
+  TODO: do {
         local $TODO = "broken";
 
         # test in-memory open over STDOUT
-        open OLDOUT, ">&", \*STDOUT or die "cannot dup STDOUT: $!";
+        open my $oldout, ">&", $^STDOUT or die "cannot dup STDOUT: $^OS_ERROR";
         #close STDOUT;
-        my $status = open(STDOUT,">",\$var);
-        my $error = "$!" unless $status; # remember the error
-	close STDOUT unless $status;
-        open STDOUT, ">&",  \*OLDOUT or die "cannot dup OLDOUT: $!";
-        print "# $error\n" unless $status;
+        my $status = open($^STDOUT,">",\$var);
+        my $error = "$^OS_ERROR" unless $status; # remember the error
+	close $^STDOUT unless $status;
+        open $^STDOUT, ">&",  \*$oldout or die "cannot dup OLDOUT: $^OS_ERROR";
+        print $^STDOUT, "# $error\n" unless $status;
         # report after STDOUT is restored
         ok($status, '       open STDOUT into in-memory var');
 
         # test in-memory open over STDERR
-        open OLDERR, ">&", \*STDERR or die "cannot dup STDERR: $!";
+        open my $olderr, ">&", $^STDERR or die "cannot dup STDERR: $^OS_ERROR";
         #close STDERR;
-        ok( open(STDERR,">",\$var), '       open STDERR into in-memory var');
-        open STDERR, ">&",  \*OLDERR or die "cannot dup OLDERR: $!";
-    }
-}
+        ok( open($^STDERR,">",\$var), '       open STDERR into in-memory var');
+        open $^STDERR, ">&",  \*$olderr or die "cannot dup OLDERR: $^OS_ERROR";
+    };
+};
 
 
 END {

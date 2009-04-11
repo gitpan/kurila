@@ -5,6 +5,7 @@
 #   will be lost!
 #
 
+Perl_ck_anonarray
 Perl_ck_anoncode
 Perl_ck_bitop
 Perl_ck_chdir
@@ -13,6 +14,7 @@ Perl_ck_concat
 Perl_ck_defined
 Perl_ck_delete
 Perl_ck_die
+Perl_ck_dotdotdot
 Perl_ck_eof
 Perl_ck_eval
 Perl_ck_exec
@@ -24,7 +26,6 @@ Perl_ck_glob
 Perl_ck_grep
 Perl_ck_index
 Perl_ck_lfun
-Perl_ck_listiob
 Perl_ck_match
 Perl_ck_method
 Perl_ck_null
@@ -32,15 +33,11 @@ Perl_ck_open
 Perl_ck_readline
 Perl_ck_repeat
 Perl_ck_require
-Perl_ck_return
 Perl_ck_rfun
 Perl_ck_rvconst
 Perl_ck_sassign
-Perl_ck_select
 Perl_ck_shift
-Perl_ck_smartmatch
 Perl_ck_sort
-Perl_ck_spair
 Perl_ck_split
 Perl_ck_subr
 Perl_ck_substr
@@ -52,13 +49,13 @@ Perl_pp_null
 Perl_pp_stub
 Perl_pp_scalar
 Perl_pp_pushmark
-Perl_pp_wantarray
+Perl_pp_logassign_assign
 Perl_pp_const
 Perl_pp_gvsv
 Perl_pp_gv
 Perl_pp_gelem
 Perl_pp_padsv
-Perl_pp_padany
+Perl_pp_magicsv
 Perl_pp_pushre
 Perl_pp_rv2gv
 Perl_pp_rv2sv
@@ -81,11 +78,10 @@ Perl_pp_qr
 Perl_pp_subst
 Perl_pp_substcont
 Perl_pp_sassign
-Perl_pp_aassign
+Perl_pp_dotdotdot
+Perl_pp_placeholder
 Perl_pp_chop
-Perl_pp_schop
 Perl_pp_chomp
-Perl_pp_schomp
 Perl_pp_defined
 Perl_pp_undef
 Perl_pp_study
@@ -136,7 +132,6 @@ Perl_pp_negate
 Perl_pp_i_negate
 Perl_pp_not
 Perl_pp_complement
-Perl_pp_smartmatch
 Perl_pp_atan2
 Perl_pp_sin
 Perl_pp_cos
@@ -182,10 +177,17 @@ Perl_pp_split
 Perl_pp_join
 Perl_pp_list
 Perl_pp_lslice
-Perl_pp_anonlist
+Perl_pp_enter_anonarray_assign
+Perl_pp_enter_anonhash_assign
+Perl_pp_anonarray
 Perl_pp_anonhash
 Perl_pp_listlast
+Perl_pp_listfirst
 Perl_pp_expand
+Perl_pp_arrayexpand
+Perl_pp_enter_arrayexpand_assign
+Perl_pp_hashexpand
+Perl_pp_enter_hashexpand_assign
 Perl_pp_nelems
 Perl_pp_splice
 Perl_pp_push
@@ -194,13 +196,15 @@ Perl_pp_shift
 Perl_pp_unshift
 Perl_pp_sort
 Perl_pp_reverse
+Perl_pp_arrayjoin
+Perl_pp_hashjoin
+Perl_pp_arrayconcat
+Perl_pp_hashconcat
 Perl_pp_grepstart
 Perl_pp_grepwhile
 Perl_pp_mapstart
 Perl_pp_mapwhile
 Perl_pp_range
-Perl_pp_flip
-Perl_pp_flop
 Perl_pp_and
 Perl_pp_or
 Perl_pp_xor
@@ -211,10 +215,13 @@ Perl_pp_orassign
 Perl_pp_dorassign
 Perl_pp_method
 Perl_pp_entersub
+Perl_pp_entersub_targargs
+Perl_pp_entersub_save
 Perl_pp_leavesub
 Perl_pp_caller
 Perl_pp_warn
 Perl_pp_die
+Perl_pp_dynascope
 Perl_pp_lineseq
 Perl_pp_nextstate
 Perl_pp_dbstate
@@ -230,8 +237,6 @@ Perl_pp_return
 Perl_pp_last
 Perl_pp_next
 Perl_pp_redo
-Perl_pp_dump
-Perl_pp_goto
 Perl_pp_exit
 Perl_pp_method_named
 Perl_pp_open
@@ -240,10 +245,6 @@ Perl_pp_pipe_op
 Perl_pp_fileno
 Perl_pp_umask
 Perl_pp_binmode
-Perl_pp_tie
-Perl_pp_untie
-Perl_pp_tied
-Perl_pp_sselect
 Perl_pp_select
 Perl_pp_getc
 Perl_pp_read
@@ -389,5 +390,6 @@ Perl_pp_getlogin
 Perl_pp_syscall
 Perl_pp_lock
 Perl_pp_compsub
+Perl_pp_root
 
 # ex: set ro:

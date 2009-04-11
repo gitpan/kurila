@@ -1,6 +1,5 @@
 package Benchmark;
 
-use strict;
 
 
 =head1 NAME
@@ -423,7 +422,7 @@ time consistently with style argument, default is 'all' not 'noc' any more.
 =cut
 
 # evaluate something in a clean lexical environment
-sub _doeval { no strict;  eval shift }
+sub _doeval { eval shift }
 
 #
 # put any lexicals at file scope AFTER here
@@ -458,9 +457,9 @@ sub BEGIN {
 
 sub import {
     my $class = shift;
-    if (grep { $_ eq ":hireswallclock" } @_) {
-	@_ = grep { $_ ne ":hireswallclock" } @_;
-	local $^W=0;
+    if (grep { $_ eq ":hireswallclock" }, @_) {
+	@_ = grep { $_ ne ":hireswallclock" }, @_;
+	local $^WARNING =0;
 	*mytime = $hirestime if defined $hirestime;
     }
     Benchmark->export_to_level(1, $class, < @_);
@@ -487,13 +486,13 @@ sub debug { $Debug = (@_[1] != 0); }
 sub usage { 
     my $calling_sub = @(caller(1))[3];
     $calling_sub =~ s/^Benchmark:://;
-    return %_Usage{$calling_sub} || '';
+    return %_Usage{?$calling_sub} || '';
 }
 
 # The cache needs two branches: 's' for strings and 'c' for code.  The
 # empty loop is different in these two cases.
 
-%_Usage{clearcache} = <<'USAGE';
+%_Usage{+clearcache} = <<'USAGE';
 usage: clearcache($count);
 USAGE
 
@@ -502,7 +501,7 @@ sub clearcache    {
     delete %Cache{"@_[0]c"}; delete %Cache{"@_[0]s"}; 
 }
 
-%_Usage{clearallcache} = <<'USAGE';
+%_Usage{+clearallcache} = <<'USAGE';
 usage: clearallcache();
 USAGE
 
@@ -511,7 +510,7 @@ sub clearallcache {
     %Cache = %( () ); 
 }
 
-%_Usage{enablecache} = <<'USAGE';
+%_Usage{+enablecache} = <<'USAGE';
 usage: enablecache();
 USAGE
 
@@ -520,7 +519,7 @@ sub enablecache   {
     $Do_Cache = 1; 
 }
 
-%_Usage{disablecache} = <<'USAGE';
+%_Usage{+disablecache} = <<'USAGE';
 usage: disablecache();
 USAGE
 
@@ -532,28 +531,27 @@ sub disablecache  {
 
 # --- Functions to process the 'time' data type
 
-sub new { my @t = @( mytime, times, (nelems @_) == 2 ? @_[1] : 0);
-	  print STDERR "new={join ' ',@t}\n" if $Debug;
+sub new { my @t = @( mytime, times, (nelems @_) == 2 ?? @_[1] !! 0);
+	  print $^STDERR, "new=$(join ' ',@t)\n" if $Debug;
 	  bless \@t; }
 
-sub cpu_p { my($r,$pu,$ps,$cu,$cs) = < @{@_[0]}; $pu+$ps         ; }
-sub cpu_c { my($r,$pu,$ps,$cu,$cs) = < @{@_[0]};         $cu+$cs ; }
-sub cpu_a { my($r,$pu,$ps,$cu,$cs) = < @{@_[0]}; $pu+$ps+$cu+$cs ; }
-sub real  { my($r,$pu,$ps,$cu,$cs) = < @{@_[0]}; $r              ; }
+sub cpu_p { my@($r,$pu,$ps,$cu,$cs, ...) =  @{@_[0]}; $pu+$ps         ; }
+sub cpu_c { my@($r,$pu,$ps,$cu,$cs, ...) =  @{@_[0]};         $cu+$cs ; }
+sub cpu_a { my@($r,$pu,$ps,$cu,$cs, ...) =  @{@_[0]}; $pu+$ps+$cu+$cs ; }
+sub real  { my@($r,$pu,$ps,$cu,$cs, ...) =  @{@_[0]}; $r              ; }
 sub iters { @_[0]->[5] ; }
 
 
-%_Usage{timediff} = <<'USAGE';
+%_Usage{+timediff} = <<'USAGE';
 usage: $result_diff = timediff($result1, $result2);
 USAGE
 
-sub timediff {
-    my($a, $b) = < @_;
+sub timediff($a, $b) {
 
     die usage unless ref $a and ref $b;
 
     my @r;
-    for (my $i=0; $i +< nelems @$a; ++$i) {
+    for my $i (0 .. nelems(@$a) -1) {
 	push(@r, $a->[$i] - $b->[$i]);
     }
     #die "Bad timediff(): ($r[1] + $r[2]) <= 0 (@$a[1,2]|@$b[1,2])\n"
@@ -561,43 +559,41 @@ sub timediff {
     bless \@r;
 }
 
-%_Usage{timesum} = <<'USAGE';
+%_Usage{+timesum} = <<'USAGE';
 usage: $sum = timesum($result1, $result2);
 USAGE
 
-sub timesum {
-    my($a, $b) = < @_;
+sub timesum($a, $b) {
 
     die usage unless ref $a and ref $b;
 
     my @r;
-    for (my $i=0; $i +< nelems @$a; ++$i) {
+    for my $i (0 .. nelems(@$a) -1) {
  	push(@r, $a->[$i] + $b->[$i]);
     }
     bless \@r;
 }
 
 
-%_Usage{timestr} = <<'USAGE';
+%_Usage{+timestr} = <<'USAGE';
 usage: $formatted_result = timestr($result1);
 USAGE
 
-sub timestr {
-    my($tr, $style, $f) = < @_;
+sub timestr($tr, ?$style, ?$f) {
 
     die usage unless ref $tr;
 
     my @t = @$tr;
-    warn "bad time value ({join ' ',@t})" unless (nelems @t)==6;
-    my($r, $pu, $ps, $cu, $cs, $n) = < @t;
-    my($pt, $ct, $tt) = ( $tr->cpu_p, $tr->cpu_c, $tr->cpu_a);
+    warn "bad time value ($(join ' ',@t))" unless (nelems @t)==6;
+    my@($r, $pu, $ps, $cu, $cs, $n) =  @t;
+    my@($pt, $ct, $tt) = @( $tr->cpu_p, $tr->cpu_c, $tr->cpu_a);
     $f = $Default_Format unless defined $f;
     # format a time in the required style, other formats may be added here
     $style ||= $Default_Style;
     return '' if $style eq 'none';
-    $style = ($ct+>0) ? 'all' : 'noc' if $style eq 'auto';
-    my $s = "{join ' ',@t} $style"; # default for unknown style
-    my $w = $hirestime ? "\%2g" : "\%2d";
+    $style = ($ct+>0) ?? 'all' !! 'noc' if $style eq 'auto';
+    my $s = "$(join ' ',@t) $style"; # default for unknown style
+    my $w = $hirestime ?? "\%2g" !! "\%2d";
     $s = sprintf("$w wallclock secs (\%$f usr \%$f sys + \%$f cusr \%$f csys = \%$f CPU)",
 			    $r,$pu,$ps,$cu,$cs,$tt) if $style eq 'all';
     $s = sprintf("$w wallclock secs (\%$f usr + \%$f sys = \%$f CPU)",
@@ -613,19 +609,17 @@ sub timestr {
     $s;
 }
 
-sub timedebug {
-    my($msg, $t) = < @_;
-    print STDERR "$msg",timestr($t),"\n" if $Debug;
+sub timedebug($msg, $t) {
+    print $^STDERR, "$msg",timestr($t),"\n" if $Debug;
 }
 
 # --- Functions implementing low-level support for timing loops
 
-%_Usage{runloop} = <<'USAGE';
+%_Usage{+runloop} = <<'USAGE';
 usage: runloop($number, [$string | $coderef])
 USAGE
 
-sub runloop {
-    my($n, $c) = < @_;
+sub runloop($n, $c) {
 
     $n+=0; # force numeric now, so garbage won't creep into the eval
     die "negative loopcount $n" if $n+<0;
@@ -633,23 +627,24 @@ sub runloop {
     my($t0, $t1, $td); # before, after, difference
 
     # find package of caller so we can execute code there
-    my($curpack) = caller(0);
-    my($i, $pack)= 0;
+    my @($curpack, ...) = @: caller(0);
+    my $i = 0;
+    my $pack;
     while (($pack) = caller(++$i)) {
 	last if $pack ne $curpack;
     }
 
     my ($subcode, $subref);
     if (ref $c eq 'CODE') {
-	$subcode = "sub \{ for (1 .. $n) \{ local \$_; package $pack; &\$c; \} \}";
+	$subcode = "sub \{ for (1 .. $n) \{ package $pack; &\$c(); \} \}";
         $subref  = eval $subcode;
     }
     else {
-	$subcode = "sub \{ for (1 .. $n) \{ local \$_; package $pack; $c;\} \}";
+	$subcode = "sub \{ for (1 .. $n) \{ package $pack; $c;\} \}";
         $subref  = _doeval($subcode);
     }
-    die "runloop unable to compile '$c': {$@->message}\ncode: $subcode\n" if $@;
-    print STDERR "runloop $n '$subcode'\n" if $Debug;
+    die "runloop unable to compile '$c': $($^EVAL_ERROR->message)\ncode: $subcode\n" if $^EVAL_ERROR;
+    print $^STDERR, "runloop $n '$subcode'\n" if $Debug;
 
     # Wait for the user timer to tick.  This makes the error range more like 
     # -0.01, +0.  If we don't wait, then it's more like -0.01, +0.01.  This
@@ -666,38 +661,37 @@ sub runloop {
     $td;
 }
 
-%_Usage{timeit} = <<'USAGE';
+%_Usage{+timeit} = <<'USAGE';
 usage: $result = timeit($count, 'code' );        or
        $result = timeit($count, sub { code } );
 USAGE
 
-sub timeit {
-    my($n, $code) = < @_;
+sub timeit($n, $code) {
     my($wn, $wc, $wd);
 
     die usage unless defined $code and
                      (!ref $code or ref $code eq 'CODE');
 
-    printf STDERR "timeit $n $code\n" if $Debug;
-    my $cache_key = $n . ( ref( $code ) ? 'c' : 's' );
+    printf $^STDERR, "timeit $n $code\n" if $Debug;
+    my $cache_key = $n . ( ref( $code ) ?? 'c' !! 's' );
     if ($Do_Cache && exists %Cache{$cache_key} ) {
-	$wn = %Cache{$cache_key};
+	$wn = %Cache{?$cache_key};
     } else {
-	$wn = &runloop($n, ref( $code ) ? sub { } : '' );
+	$wn = runloop($n, ref( $code ) ?? sub { } !! '' );
 	# Can't let our baseline have any iterations, or they get subtracted
 	# out of the result.
 	$wn->[5] = 0;
-	%Cache{$cache_key} = $wn;
+	%Cache{+$cache_key} = $wn;
     }
 
-    $wc = &runloop($n, $code);
+    $wc = runloop($n, $code);
 
     $wd = timediff($wc, $wn);
     timedebug("timeit: ",$wc);
     timedebug("      - ",$wn);
     timedebug("      = ",$wd);
 
-    $wd;
+    return $wd;
 }
 
 
@@ -705,13 +699,13 @@ my $default_for = 3;
 my $min_for     = 0.1;
 
 
-%_Usage{countit} = <<'USAGE';
+%_Usage{+countit} = <<'USAGE';
 usage: $result = countit($time, 'code' );        or
        $result = countit($time, sub { code } );
 USAGE
 
 sub countit {
-    my ( $tmax, $code ) = < @_;
+    my @( $tmax, $code ) =  @_;
 
     die usage unless (nelems @_);
 
@@ -724,11 +718,12 @@ sub countit {
     die "countit($tmax, ...): timelimit cannot be less than $min_for.\n"
 	if $tmax +< $min_for;
 
-    my ($n, $tc);
+    my ($tc);
 
     # First find the minimum $n that gives a significant timing.
     my $zeros=0;
-    for ($n = 1; ; $n *= 2 ) {
+    my $n = 1;
+    while (1) {
 	my $td = timeit($n, $code);
 	$tc = $td->[1] + $td->[2];
 	if ( $tc +<= 0 and $n +> 1024 ) {
@@ -738,6 +733,7 @@ sub countit {
 	    $zeros = 0;
 	}
 	last if $tc +> 0.1;
+        $n *= 2;
     }
 
     my $nmin = $n;
@@ -753,7 +749,7 @@ sub countit {
 	my $td = timeit($n, $code);
 	my $new_tc = $td->[1] + $td->[2];
         # Make sure we are making progress.
-        $tc = $new_tc +> 1.2 * $tc ? $new_tc : 1.2 * $tc;
+        $tc = $new_tc +> 1.2 * $tc ?? $new_tc !! 1.2 * $tc;
     }
 
     # Now, do the 'for real' timing(s), repeating until we exceed
@@ -800,16 +796,15 @@ sub countit {
 
 sub n_to_for {
     my $n = shift;
-    return $n == 0 ? $default_for : $n +< 0 ? -$n : undef;
+    return $n == 0 ?? $default_for !! $n +< 0 ?? -$n !! undef;
 }
 
-%_Usage{timethis} = <<'USAGE';
+%_Usage{+timethis} = <<'USAGE';
 usage: $result = timethis($time, 'code' );        or
        $result = timethis($time, sub { code } );
 USAGE
 
-sub timethis{
-    my($n, $code, $title, $style) = < @_;
+sub timethis($n, $code, ?$title, ?$style){
     my($t, $forn);
 
     die usage unless defined $code and
@@ -825,17 +820,17 @@ sub timethis{
 	$title = "timethis for $fort" unless defined $title;
 	$forn  = $t->[-1];
     }
-    local $| = 1;
+    local $^OUTPUT_AUTOFLUSH = 1;
     $style = "" unless defined $style;
-    printf("\%10s: ", $title) unless $style eq 'none';
-    print timestr($t, $style, $Default_Format),"\n" unless $style eq 'none';
+    printf($^STDOUT, "\%10s: ", $title) unless $style eq 'none';
+    print $^STDOUT, timestr($t, $style, $Default_Format),"\n" unless $style eq 'none';
 
     $n = $forn if defined $forn;
 
     # A conservative warning to spot very silly tests.
     # Don't assume that your benchmark is ok simply because
     # you don't get this warning!
-    print "            (warning: too few iterations for a reliable count)\n"
+    print $^STDOUT, "            (warning: too few iterations for a reliable count)\n"
 	if     $n +< $Min_Count
 	    || ($t->real +< 1 && $n +< 1000)
 	    || $t->cpu_a +< $Min_CPU;
@@ -843,44 +838,43 @@ sub timethis{
 }
 
 
-%_Usage{timethese} = <<'USAGE';
+%_Usage{+timethese} = <<'USAGE';
 usage: timethese($count, { Name1 => 'code1', ... });        or
        timethese($count, { Name1 => sub { code1 }, ... });
 USAGE
 
-sub timethese{
-    my($n, $alt, $style) = < @_;
+sub timethese($n, $alt, ?$style){
     die usage unless ref $alt eq 'HASH';
 
     my @names = sort keys %$alt;
     $style = "" unless defined $style;
-    print "Benchmark: " unless $style eq 'none';
+    print $^STDOUT, "Benchmark: " unless $style eq 'none';
     if ( $n +> 0 ) {
 	die "non-integer loopcount $n, stopped" if int($n)+<$n;
-	print "timing $n iterations of" unless $style eq 'none';
+	print $^STDOUT, "timing $n iterations of" unless $style eq 'none';
     } else {
-	print "running" unless $style eq 'none';
+	print $^STDOUT, "running" unless $style eq 'none';
     }
-    print " ", join(', ', @names) unless $style eq 'none';
+    print $^STDOUT, " ", join(', ', @names) unless $style eq 'none';
     unless ( $n +> 0 ) {
 	my $for = n_to_for( $n );
-	print ", each" if $n +> 1 && $style ne 'none';
-	print " for at least $for CPU seconds" unless $style eq 'none';
+	print $^STDOUT, ", each" if $n +> 1 && $style ne 'none';
+	print $^STDOUT, " for at least $for CPU seconds" unless $style eq 'none';
     }
-    print "...\n" unless $style eq 'none';
+    print $^STDOUT, "...\n" unless $style eq 'none';
 
     # we could save the results in an array and produce a summary here
     # sum, min, max, avg etc etc
     my %results;
     foreach my $name ( @names) {
-        %results{$name} = timethis ($n, $alt -> {$name}, $name, $style);
+        %results{+$name} = timethis ($n, $alt -> {?$name}, $name, $style);
     }
 
     return \%results;
 }
 
 
-%_Usage{cmpthese} = <<'USAGE';
+%_Usage{+cmpthese} = <<'USAGE';
 usage: cmpthese($count, { Name1 => 'code1', ... });        or
        cmpthese($count, { Name1 => sub { code1 }, ... });  or
        cmpthese($result, $style);
@@ -891,11 +885,11 @@ sub cmpthese{
 
     # $count can be a blessed object.
     if ( ref @_[0] eq 'HASH' ) {
-        ($results, $style) = < @_;
+        @($results, ?$style) =  @_;
     }
     else {
-        my($count, $code) = < @_[[@(0,1)]];
-        $style = @_[2] if defined @_[2];
+        my@($count, $code) =  @_[[@(0,1)]];
+        $style = @_[2] if defined @_[?2];
 
         die usage unless ref $code eq 'HASH';
 
@@ -905,7 +899,7 @@ sub cmpthese{
     $style = "" unless defined $style;
 
     # Flatten in to an array of arrays with the name as the first field
-    my @vals = map{ \@( $_, < @{$results->{$_}} ) } keys %$results;
+    my @vals = map{ \@( $_, < @{$results->{?$_}} ) }, keys %$results;
 
     for ( @vals) {
 	# The epsilon fudge here is to prevent div by 0.  Since clock
@@ -916,26 +910,26 @@ sub cmpthese{
 	    else {$_->[2]+$_->[3]+$_->[4]+$_->[5]}
 	};
 	my $rate = $_->[6]/(($elapsed)+0.000000000000001);
-	$_->[7] = $rate;
+	$_->[+7] = $rate;
     }
 
     # Sort by rate
-    @vals =sort { $a->[7] <+> $b->[7] } @vals;
+    @vals =sort { $a->[7] <+> $b->[7] }, @vals;
 
     # If more than half of the rates are greater than one...
-    my $display_as_rate = (nelems @vals) ? (@vals[((nelems @vals)-1)>>1]->[7] +> 1) : 0;
+    my $display_as_rate = (nelems @vals) ?? (@vals[((nelems @vals)-1)>>1]->[7] +> 1) !! 0;
 
     my @rows;
     my @col_widths;
 
     my @top_row = @( 
         '', 
-	$display_as_rate ? 'Rate' : 's/iter', 
-	< map { $_->[0] } @vals 
+	$display_as_rate ?? 'Rate' !! 's/iter', 
+	< map { $_->[0] }, @vals 
     );
 
     push @rows, \@top_row;
-    @col_widths = map { length( $_ ) } @top_row;
+    @col_widths = map { length( $_ ) }, @top_row;
 
     # Build the data rows
     # We leave the last column in even though it never has any data.  Perhaps
@@ -953,19 +947,19 @@ sub cmpthese{
 	my $row_rate = $row_val->[7];
 
 	# We assume that we'll never get a 0 rate.
-	my $rate = $display_as_rate ? $row_rate : 1 / $row_rate;
+	my $rate = $display_as_rate ?? $row_rate !! 1 / $row_rate;
 
 	# Only give a few decimal places before switching to sci. notation,
 	# since the results aren't usually that accurate anyway.
 	my $format = 
-	   $rate +>= 100 ? 
-	       "\%0.0f" : 
-	   $rate +>= 10 ?
-	       "\%0.1f" :
-	   $rate +>= 1 ?
-	       "\%0.2f" :
-	   $rate +>= 0.1 ?
-	       "\%0.3f" :
+	   $rate +>= 100 ?? 
+	       "\%0.0f" !! 
+	   $rate +>= 10 ??
+	       "\%0.1f" !!
+	   $rate +>= 1 ??
+	       "\%0.2f" !!
+	   $rate +>= 0.1 ??
+	       "\%0.3f" !!
 	       "\%0.2e";
 
 	$format .= "/s"
@@ -978,7 +972,7 @@ sub cmpthese{
 
         # Columns 2..N = performance ratios
 	my $skip_rest = 0;
-	for ( my $col_num = 0 ; $col_num +< nelems @vals ; ++$col_num ) {
+	for my $col_num (0 .. nelems(@vals) -1) {
 	    my $col_val = @vals[$col_num];
 	    my $out;
 	    if ( $skip_rest ) {
@@ -1008,7 +1002,7 @@ sub cmpthese{
     # Equalize column widths in the chart as much as possible without
     # exceeding 80 characters.  This does not use or affect cols 0 or 1.
     my @sorted_width_refs = 
-       sort { $$a <+> $$b } map { \$_ } @col_widths[[2..((nelems @col_widths)-1)]];
+       sort { $$a <+> $$b }, map { \$_ }, @col_widths[[2..((nelems @col_widths)-1)]];
     my $max_width = ${@sorted_width_refs[-1]};
 
     my $total = (nelems @col_widths) - 1 ;
@@ -1030,10 +1024,10 @@ sub cmpthese{
     }
 
     # Dump the output
-    my $format = join( ' ', map { "\%{$_}s" } @col_widths ) . "\n";
+    my $format = join( ' ', map { "\%$($_)s" }, @col_widths ) . "\n";
     substr( $format, 1, 0, '-' );
     for (  @rows ) {
-	printf $format, < @$_;
+	printf $^STDOUT, $format, < @$_;
     }
 
     return \@rows ;

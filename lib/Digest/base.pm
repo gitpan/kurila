@@ -1,7 +1,6 @@
 package Digest::base;
 
-use strict;
-use vars < qw($VERSION);
+our ($VERSION);
 $VERSION = "1.00";
 
 # subclass is supposed to implement at least these
@@ -15,8 +14,7 @@ sub reset {
     $self->new(< @_);  # ugly
 }
 
-sub addfile {
-    my ($self, $handle) = < @_;
+sub addfile($self, $handle) {
 
     my $n;
     my $buf = "";
@@ -26,7 +24,7 @@ sub addfile {
     }
     unless (defined $n) {
 	require Carp;
-	Carp::croak("Read failed: $!");
+	Carp::croak("Read failed: $^OS_ERROR");
     }
 
     $self;
@@ -42,7 +40,7 @@ sub add_bits {
 	$nbits = length($arg);
     }
     else {
-	($bits, $nbits) = < @_;
+	@($bits, $nbits) =  @_;
     }
     if (($nbits % 8) != 0) {
 	require Carp;

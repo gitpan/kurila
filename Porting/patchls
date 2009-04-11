@@ -15,9 +15,8 @@ use Getopt::Std;
 use Text::Wrap qw(wrap $columns);
 use Text::Tabs qw(expand unexpand);
 use strict;
-use vars qw($VERSION);
 
-$VERSION = 2.11;
+our $VERSION = 2.11;
 
 sub usage {
 die qq{
@@ -161,7 +160,7 @@ foreach my $argv (< @ARGV) {
 	next;
     }
     if ($in eq "-") {
-      *F = \*STDIN;
+      *F = $^STDIN;
     } elsif (not open F, "<", "$in") {
 	warn "Unable to open $in: $!\n";
 	next;

@@ -1020,8 +1020,6 @@ open(filename, flags = O_RDONLY, mode = 0666)
 	int		flags
 	Mode_t		mode
     CODE:
-	if (flags & (O_APPEND|O_CREAT|O_TRUNC|O_RDWR|O_WRONLY|O_EXCL))
-	    TAINT_PROPER("open");
 	RETVAL = open(filename, flags, mode);
     OUTPUT:
 	RETVAL
@@ -1261,7 +1259,6 @@ sigaction(sig, optaction, oldaction = 0)
 	{
 	    dVAR;
 	    POSIX__SigAction action;
-	    GV *siggv = gv_fetchpv("SIG", TRUE, SVt_PVHV);
 	    struct sigaction act;
 	    struct sigaction oact;
 	    sigset_t sset;
@@ -1269,7 +1266,7 @@ sigaction(sig, optaction, oldaction = 0)
 	    sigset_t osset;
 	    POSIX__SigSet sigset;
 	    SV** svp;
-	    SV** sigsvp;
+	    SV* sigsv;
 
             if (sig < 0) {
                 croak("Negative signals are not allowed");
@@ -1297,10 +1294,13 @@ sigaction(sig, optaction, oldaction = 0)
 	        XSRETURN_UNDEF;
 	    }
 #endif
-	    sigsvp = hv_fetch(GvHVn(siggv),
-			      PL_sig_name[sig],
-			      strlen(PL_sig_name[sig]),
-			      TRUE);
+            ENTER;
+            PUSHMARK(SP);
+            mXPUSHs(newSVpv(PL_sig_name[sig], 0));
+            PUTBACK;
+            sigsv = call_pv("signals::handler", G_SCALAR);
+            SPAGAIN;
+            LEAVE;
 
 	    /* Check optaction and set action */
 	    if(SvTRUE(optaction)) {
@@ -1335,8 +1335,8 @@ sigaction(sig, optaction, oldaction = 0)
 		svp = hv_fetchs(oldaction, "HANDLER", TRUE);
 		if(!svp)
 		    croak("Can't supply an oldaction without a HANDLER");
-		if(SvTRUE(*sigsvp)) { /* TBD: what if "0"? */
-			sv_setsv(*svp, *sigsvp);
+		if(SvTRUE(sigsv)) { /* TBD: what if "0"? */
+			sv_setsv(*svp, sigsv);
 		}
 		else {
 			sv_setpv(*svp, "DEFAULT");
@@ -1384,13 +1384,14 @@ sigaction(sig, optaction, oldaction = 0)
 		svp = hv_fetchs(action, "HANDLER", FALSE);
 		if (!svp)
 		    croak("Can't supply an action without a HANDLER");
-		sv_setsv(*sigsvp, *svp);
 
-		/* This call actually calls sigaction() with almost the
-		   right settings, including appropriate interpretation
-		   of DEFAULT and IGNORE.  However, why are we doing
-		   this when we're about to do it again just below?  XXX */
-		mg_set(*sigsvp);
+                ENTER;
+                XPUSHs(*svp);
+                PUSHMARK(SP);
+                mXPUSHs(newSVpv(PL_sig_name[sig], 0));
+                PUTBACK;
+                call_pv("signals::handler", G_VOID|G_DISCARD|G_ASSIGNMENT);
+                LEAVE;
 
 		/* And here again we duplicate -- DEFAULT/IGNORE checking. */
 		if(SvPOK(*svp)) {
@@ -1530,7 +1531,6 @@ read(fd, buffer, nbytes)
             SvCUR_set(sv_buffer, RETVAL);
             SvPOK_only(sv_buffer);
             *SvEND(sv_buffer) = '\0';
-            SvTAINTED_on(sv_buffer);
         }
 
 SysRet
@@ -1695,11 +1695,11 @@ strxfrm(src)
           char *p = SvPV(src,srclen);
           srclen++;
           ST(0) = sv_2mortal(newSV(srclen*4+1));
-          dstlen = strxfrm(SvPVX(ST(0)), p, (size_t)srclen);
+          dstlen = strxfrm(SvPVX_mutable(ST(0)), p, (size_t)srclen);
           if (dstlen > srclen) {
               dstlen++;
               SvGROW(ST(0), dstlen);
-              strxfrm(SvPVX(ST(0)), p, (size_t)dstlen);
+              strxfrm(SvPVX_mutable(ST(0)), p, (size_t)dstlen);
               dstlen--;
           }
           SvCUR_set(ST(0), dstlen);
@@ -1711,7 +1711,6 @@ mkfifo(filename, mode)
 	char *		filename
 	Mode_t		mode
     CODE:
-	TAINT_PROPER("mkfifo");
 	RETVAL = mkfifo(filename, mode);
     OUTPUT:
 	RETVAL

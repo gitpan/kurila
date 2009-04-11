@@ -6,7 +6,7 @@
 # Originally by Larry Shatzer
 #
 
-use strict;
+
 use File::Find;
 
 find(
@@ -17,24 +17,23 @@ find(
 		 print "$File::Find::name\n";
 	     }
 	 }
-     }, (nelems @ARGV) ? shift : ".");
+     }, (nelems @ARGV) ?? shift !! ".");
 
 sub parse_file {
     my $parsefile = shift;
 
     my $result;
 
-    open(FH, "<",$parsefile) or warn "Could not open '$parsefile': $!";
+    open(FH, "<",$parsefile) or warn "Could not open '$parsefile': $^OS_ERROR";
 
     my $inpod = 0;
     while ( ~< *FH) {
-	$inpod = m/^=(?!cut)/ ? 1 : m/^=cut/ ? 0 : $inpod;
+	$inpod = m/^=(?!cut)/ ?? 1 !! m/^=cut/ ?? 0 !! $inpod;
 	next if $inpod || m/^\s*\#/;
 	chomp;
 	next unless m/([\$*])(([\w\:\']*)\bVERSION)\b.*\=/;
 	my $eval = qq{
 	    package ExtUtils::MakeMaker::_version;
-	    no strict;
 	    local $1$2;
 	    \$$2=undef; do \{
 		$_
@@ -42,7 +41,7 @@ sub parse_file {
 	};
 	no warnings;
 	$result = eval($eval);
-	warn "Could not eval '$eval' in $parsefile: $@" if $@;
+	warn "Could not eval '$eval' in $parsefile: $^EVAL_ERROR" if $^EVAL_ERROR;
 	$result = "undef" unless defined $result;
 	last;
     }

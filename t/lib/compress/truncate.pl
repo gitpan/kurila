@@ -1,6 +1,6 @@
 
 use lib 't';
-use strict;
+
 use warnings;
 use bytes;
 
@@ -24,11 +24,11 @@ EOM
     my $blocksize = 10 ;
 
 
-    my ($info, $compressed) = < mkComplete($CompressClass, $hello);
+    my @($info, $compressed) =  mkComplete($CompressClass, $hello);
 
-    my $header_size  = $info->{HeaderLength};
-    my $trailer_size = $info->{TrailerLength};
-    my $fingerprint_size = $info->{FingerprintLength};
+    my $header_size  = $info->{?HeaderLength};
+    my $trailer_size = $info->{?TrailerLength};
+    my $fingerprint_size = $info->{?FingerprintLength};
     ok 1, "Compressed size is " . length($compressed) ;
     ok 1, "Fingerprint size is $fingerprint_size" ;
     ok 1, "Header size is $header_size" ;

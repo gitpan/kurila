@@ -1,12 +1,11 @@
 BEGIN {
-    if(%ENV{PERL_CORE}) {
+    if(env::var('PERL_CORE')) {
         chdir 't';
-        @INC = @( '../lib' );
+        $^INCLUDE_PATH = @( '../lib' );
     }
 }
 
-use strict;
-use Test;
+use Test::More;
 BEGIN { plan tests => 5 };
 
 my $d;
@@ -16,29 +15,29 @@ ok 1;
 
 use Pod::Simple::DumpAsXML;
 use Pod::Simple::XMLOutStream;
-print "# Pod::Simple version $Pod::Simple::VERSION\n";
-sub e     ($$) { Pod::Simple::XMLOutStream->_duo(\&nowhine, < @_) }
+print $^STDOUT, "# Pod::Simple version $Pod::Simple::VERSION\n";
+sub e     ($x, $y) { Pod::Simple::XMLOutStream->_duo(\&nowhine, $x, $y) }
 
 sub nowhine {
-  @_[0]->{'no_whining'} = 1;
+  @_[0]->{+'no_whining'} = 1;
 }
 
-&ok( <e(
+is( <e(
 "=head2 BLOOP\n\nHoopbehwo!\n\n=over\n\n=item Stuff.  Um.\n\nBrop.\n\n=head1 SVUP\n\nMyup.",
 "=head2 BLOOP\n\nHoopbehwo!\n\n=over\n\n=item Stuff.  Um.\n\nBrop.\n\n=back\n\n=head1 SVUP\n\nMyup.",
 ));
 
-&ok( <e(
+is( <e(
 "=head2 BLOOP\n\nHoopbehwo!\n\n=over\n\n=item Stuff.  Um.\n\nBrop.\n\n=head2 SVUP\n\nMyup.",
 "=head2 BLOOP\n\nHoopbehwo!\n\n=over\n\n=item Stuff.  Um.\n\nBrop.\n\n=back\n\n=head2 SVUP\n\nMyup.",
 ));
 
-&ok( <e(
+is( <e(
 "=head2 BLOOP\n\nHoopbehwo!\n\n=over\n\n=item Stuff.  Um.\n\nBrop.\n\n=head3 SVUP\n\nMyup.",
 "=head2 BLOOP\n\nHoopbehwo!\n\n=over\n\n=item Stuff.  Um.\n\nBrop.\n\n=back\n\n=head3 SVUP\n\nMyup.",
 ));
 
-&ok( <e(
+is( <e(
 "=head2 BLOOP\n\nHoopbehwo!\n\n=over\n\n=item Stuff.  Um.\n\nBrop.\n\n=head4 SVUP\n\nMyup.",
 "=head2 BLOOP\n\nHoopbehwo!\n\n=over\n\n=item Stuff.  Um.\n\nBrop.\n\n=back\n\n=head4 SVUP\n\nMyup.",
 ));

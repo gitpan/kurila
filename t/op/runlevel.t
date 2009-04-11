@@ -8,7 +8,7 @@
 
 require './test.pl';
 
-undef $/;
+undef $^INPUT_RECORD_SEPARATOR;
 our @prgs = split "\n########\n", ~< *DATA;
 
 plan(tests => nelems @prgs);
@@ -18,92 +18,51 @@ for ( @prgs){
     if (s/^\s*(-\w+)//){
        $switch = $1;
     }
-    my($prog,$expected) = < split(m/\nEXPECT\n/, $_);
+    my@($prog,$expected) =  split(m/\nEXPECT\n/, $_);
 
     fresh_perl_is( $prog, $expected, \%( switch => $switch, stderr => 1, ) );
 }
 
 __END__
 our @a = @(1, 2, 3);
-{
-  @a = sort { last ; } @a;
-}
+do {
+  @a = sort { last ; }, @a;
+};
 EXPECT
 Can't "last" outside a loop block at - line 3 character 15.
+    main::__ANON__ called at - line 3 character 8.
 ########
 sub warnhook {
-  print "WARNHOOK\n";
+  print $^STDOUT, "WARNHOOK\n";
   eval('die("foooo\n")');
 }
 $^WARN_HOOK = \&warnhook;
 warn("dfsds\n");
-print "END\n";
+print $^STDOUT, "END\n";
 EXPECT
 WARNHOOK
 END
 ########
-sub foo {
-  goto bar if $a == 0 || $b == 0;
-  $a <+> $b;
-}
-our @a = @(3, 2, 0, 1);
-@a = sort foo @a;
-print join(', ', @a)."\n";
-exit;
-bar:
-print "bar reached\n";
-EXPECT
-Can't "goto" out of a pseudo block at - line 2 character 3.
-    main::foo called at - line 6 character 6.
-########
 our @a = @(3, 2, 1);
-@a = sort { eval('die("no way")') ;  $a <+> $b} @a;
-print join(", ", @a)."\n";
+@a = sort { eval('die("no way")') ;  $a <+> $b}, @a;
+print $^STDOUT, join(", ", @a)."\n";
 EXPECT
 1, 2, 3
 ########
 our @a = @(1, 2, 3);
 foo:
-{
-  @a = sort { last foo; } @a;
-}
+do {
+  @a = sort { last foo; }, @a;
+};
 EXPECT
 Label not found for "last foo" at - line 4 character 15.
+    main::__ANON__ called at - line 4 character 8.
 ########
 our @a = @(1, 2, 3);
 foo:
-{
-  @a = sort { exit(0) } @a;
-}
-END { print "foobar\n" }
+do {
+  @a = sort { exit(0) }, @a;
+};
+END { print $^STDOUT, "foobar\n" }
 EXPECT
 foobar
-########
-package TH;
-sub TIEHASH { bless \%(), 'TH' }
-sub STORE { try { print "{ join ' ', @_[[1..2]]}\n" }; die "bar\n" }
-tie our %h, 'TH';
-try { %h{A} = 1; print "never\n"; };
-print $@->{description};
-try { %h{B} = 2; };
-print $@->{description};
-EXPECT
-A 1
-bar
-B 2
-bar
-########
-sub n { 0 }
-sub f { my $x = shift; d(); }
-f(n());
-f();
-
-sub d {
-    my $i = 0; my @a;
-    while (do { { package DB; @a = @( caller($i++) ) } } ) {
-        @a = @DB::args;
-        for (@a) { print "$_\n"; $_ = '' }
-    }
-}
-EXPECT
-0

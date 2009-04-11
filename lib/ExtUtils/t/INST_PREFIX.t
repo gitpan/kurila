@@ -6,16 +6,15 @@
 # Essentially, this test is a Makefile.PL.
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't' if -d 't';
-        @INC = @('../lib', 'lib');
+        $^INCLUDE_PATH = @('../lib', 'lib');
     }
     else {
-        unshift @INC, 't/lib';
+        unshift $^INCLUDE_PATH, 't/lib';
     }
 }
 
-use strict;
 use Test::More tests => 52;
 use MakeMaker::Test::Utils;
 use MakeMaker::Test::Setup::BFD;
@@ -23,13 +22,13 @@ use ExtUtils::MakeMaker;
 use File::Spec;
 use ExtUtils::MakeMaker::Config;
 
-my $Is_VMS = $^O eq 'VMS';
+my $Is_VMS = $^OS_NAME eq 'VMS';
 
 chdir 't';
 
 perl_lib;
 
-$| = 1;
+$^OUTPUT_AUTOFLUSH = 1;
 
 my $Makefile = makefile_name;
 my $Curdir = File::Spec->curdir;
@@ -42,17 +41,17 @@ END {
 }
 
 ok( chdir 'Big-Dummy', "chdir'd to Big-Dummy" ) ||
-  diag("chdir failed: $!");
+  diag("chdir failed: $^OS_ERROR");
 
 my $stdout = '';
-close STDOUT;
-open STDOUT, '>>', \$stdout or die;
+close $^STDOUT;
+open $^STDOUT, '>>', \$stdout or die;
 
 my $mm = WriteMakefile(
     NAME          => 'Big::Dummy',
     VERSION_FROM  => 'lib/Big/Dummy.pm',
     PREREQ_PM     => \%(),
-    PERL_CORE     => %ENV{PERL_CORE},
+    PERL_CORE     => env::var('PERL_CORE'),
 );
 
 like( $stdout, qr{
@@ -81,7 +80,7 @@ $mm = WriteMakefile(
     NAME          => 'Big::Dummy',
     VERSION_FROM  => 'lib/Big/Dummy.pm',
     PREREQ_PM     => \%(),
-    PERL_CORE     => %ENV{PERL_CORE},
+    PERL_CORE     => env::var('PERL_CORE'),
     PREFIX        => $PREFIX,
 );
 like( $stdout, qr{
@@ -99,10 +98,10 @@ foreach my $prefix (qw(PERLPREFIX SITEPREFIX VENDORPREFIX)) {
     is( $mm->{$prefix}, '$(PREFIX)', "\$(PREFIX) overrides $prefix" );
 }
 
-is( !!$mm->{PERL_CORE}, !!%ENV{PERL_CORE}, 'PERL_CORE' );
+is( ! ! $mm->{PERL_CORE}, ! ! env::var('PERL_CORE'), 'PERL_CORE' );
 
 my($perl_src, $mm_perl_src);
-if( %ENV{PERL_CORE} ) {
+if( env::var('PERL_CORE') ) {
     $perl_src = File::Spec->catdir($Updir, $Updir);
     $perl_src = File::Spec->canonpath($perl_src);
     $mm_perl_src = File::Spec->canonpath($mm->{PERL_SRC});
@@ -121,8 +120,8 @@ my %Install_Vars = %(
  VENDOR => \qw(vendorarch vendorlib vendorbin vendorman1dir vendorman3dir)
 );
 
-while( my($type, $vars) = each %Install_Vars) {
-    SKIP: {
+while( my@(?$type, ?$vars) =@( each %Install_Vars)) {
+    SKIP: do {
         skip "VMS must expand macros in INSTALL* vars", scalar nelems @$vars 
           if $Is_VMS;    
         skip '$Config{usevendorprefix} not set', scalar nelems @$vars
@@ -132,7 +131,7 @@ while( my($type, $vars) = each %Install_Vars) {
             my $installvar = "install$var";
             my $prefix = '$('.$type.'PREFIX)';
 
-            SKIP: {
+          SKIP: do {
                 skip uc($installvar).' set to another INSTALL variable', 1
                   if $mm->{uc $installvar} =~ m/^\$\(INSTALL.*\)$/;
 
@@ -142,14 +141,14 @@ while( my($type, $vars) = each %Install_Vars) {
                                     !%Config{$installvar};
                 like( $mm->{uc $installvar}, qr/^\Q$prefix\E/, 
                       "$prefix + $var" );
-            }
+            };
         }
-    }
+    };
 }
 
 # Check that when installman*dir isn't set in Config no man pages
 # are generated.
-{
+do {
     _set_config(installman1dir => '');
     _set_config(installman3dir => '');
 
@@ -158,18 +157,18 @@ while( my($type, $vars) = each %Install_Vars) {
                            NAME          => 'Big::Dummy',
                            VERSION_FROM  => 'lib/Big/Dummy.pm',
                            PREREQ_PM     => \%(),
-                           PERL_CORE     => %ENV{PERL_CORE},
+                           PERL_CORE     => env::var('PERL_CORE'),
                            PREFIX        => $PREFIX,
                            INSTALLMAN1DIR=> $wibble,
                           );
 
     is( $mm->{INSTALLMAN1DIR}, $wibble );
     is( $mm->{INSTALLMAN3DIR}, 'none'  );
-}
+};
 
 # Check that when installvendorman*dir is set in Config it is honored
 # [rt.cpan.org 2949]
-{
+do {
     _set_config(installvendorman1dir => File::Spec->catdir('foo','bar') );
     _set_config(installvendorman3dir => '' );
     _set_config(usevendorprefix => 1 );
@@ -179,7 +178,7 @@ while( my($type, $vars) = each %Install_Vars) {
                    NAME          => 'Big::Dummy',
                    VERSION_FROM  => 'lib/Big/Dummy.pm',
                    PREREQ_PM     => \%(),
-                   PERL_CORE     => %ENV{PERL_CORE},
+                   PERL_CORE     => env::var('PERL_CORE'),
 
                    # In case the local installation doesn't have man pages.
                    INSTALLMAN1DIR=> 'foo/bar/baz',
@@ -190,11 +189,11 @@ while( my($type, $vars) = each %Install_Vars) {
                       'installvendorman1dir (in %Config) not modified' );
     isnt( $mm->{INSTALLVENDORMAN3DIR}, '', 
                       'installvendorman3dir (not in %Config) set'  );
-}
+};
 
 # Check that when installsiteman*dir isn't set in Config it falls back
 # to installman*dir
-{
+do {
     _set_config(installman1dir => File::Spec->catdir('foo', 'bar') );
     _set_config(installman3dir => File::Spec->catdir('foo', 'baz') );
     _set_config(installsiteman1dir => '' );
@@ -208,25 +207,25 @@ while( my($type, $vars) = each %Install_Vars) {
     my $mm = WriteMakefile(
                            NAME          => 'Big::Dummy',
                            VERSION_FROM  => 'lib/Big/Dummy.pm',
-                           PERL_CORE     => %ENV{PERL_CORE},
+                           PERL_CORE     => env::var('PERL_CORE'),
                           );
 
     is( $mm->{INSTALLMAN1DIR}, File::Spec->catdir('foo', 'bar') );
     is( $mm->{INSTALLMAN3DIR}, File::Spec->catdir('foo', 'baz') );
-    SKIP: {
+  SKIP: do {
         skip "VMS must expand macros in INSTALL* vars", 4 if $Is_VMS;
 
         is( $mm->{INSTALLSITEMAN1DIR},   '$(INSTALLMAN1DIR)' );
         is( $mm->{INSTALLSITEMAN3DIR},   '$(INSTALLMAN3DIR)' );
         is( $mm->{INSTALLVENDORMAN1DIR}, '$(INSTALLMAN1DIR)' );
         is( $mm->{INSTALLVENDORMAN3DIR}, '$(INSTALLMAN3DIR)' );
-    }
-}
+    };
+};
 
 
 # Check that when usevendoprefix and installvendorman*dir aren't set in 
 # Config it leaves them unset.
-{
+do {
     _set_config(installman1dir => File::Spec->catdir('foo', 'bar') );
     _set_config(installman3dir => File::Spec->catdir('foo', 'baz') );
     _set_config(installsiteman1dir => '' );
@@ -240,23 +239,23 @@ while( my($type, $vars) = each %Install_Vars) {
     my $mm = WriteMakefile(
                            NAME          => 'Big::Dummy',
                            VERSION_FROM  => 'lib/Big/Dummy.pm',
-                           PERL_CORE     => %ENV{PERL_CORE},
+                           PERL_CORE     => env::var('PERL_CORE'),
                           );
 
     is( $mm->{INSTALLMAN1DIR}, File::Spec->catdir('foo', 'bar') );
     is( $mm->{INSTALLMAN3DIR}, File::Spec->catdir('foo', 'baz') );
-    SKIP: {
+  SKIP: do {
         skip "VMS must expand macros in INSTALL* vars", 2 if $Is_VMS;
         is( $mm->{INSTALLSITEMAN1DIR},   '$(INSTALLMAN1DIR)' );
         is( $mm->{INSTALLSITEMAN3DIR},   '$(INSTALLMAN3DIR)' );
-    }
+    };
     is( $mm->{INSTALLVENDORMAN1DIR}, '' );
     is( $mm->{INSTALLVENDORMAN3DIR}, '' );
-}
+};
 
 
 sub _set_config {
-    my($k,$v) = < @_;
+    my@($k,$v) =  @_;
     (my $k_no_install = $k) =~ s/^install//i;
     %Config{$k} = $v;
 

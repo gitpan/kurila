@@ -1,9 +1,9 @@
 #!./perl -w
 
 use warnings;
-use strict;
-use vars < qw($foo $bar $baz $ballast);
-use Test::More tests => 192;
+
+our ($foo, $bar, $baz, $ballast);
+use Test::More tests => 182;
 
 use Benchmark < qw(:all);
 
@@ -39,12 +39,11 @@ isa_ok(timeit(5, '++ our $bar'), 'Benchmark', "timeit eval");
 is ($bar, 5, "benchmarked code was run 5 times");
 
 # is coderef called with spurious arguments?
-my $foo;
-timeit( 1, sub { $foo = @_[0] });
+timeit( 1, sub { $foo = @_[?0] });
 is ($foo, undef, "benchmarked code called without arguments");
 
 
-print "# Burning CPU to benchmark things will take time...\n";
+print $^STDOUT, "# Burning CPU to benchmark things will take time...\n";
 
 
 
@@ -58,35 +57,35 @@ my $threesecs = countit(0, $coderef);
 isa_ok($threesecs, 'Benchmark', "countit 0, CODEREF");
 isnt ($baz, 0, "benchmarked code was run");
 my $in_threesecs = $threesecs->iters;
-print "# $in_threesecs iterations\n";
+print $^STDOUT, "# $in_threesecs iterations\n";
 ok ($in_threesecs +> 0, "iters returned positive iterations");
 
 my $estimate = int (100 * $in_threesecs / 3) / 100;
-print "# from the 3 second run estimate $estimate iterations in 1 second...\n";
+print $^STDOUT, "# from the 3 second run estimate $estimate iterations in 1 second...\n";
 $baz = 0;
 my $onesec = countit(1, $coderef);
 isa_ok($onesec, 'Benchmark', "countit 1, CODEREF");
 isnt ($baz, 0, "benchmarked code was run");
 my $in_onesec = $onesec->iters;
-print "# $in_onesec iterations\n";
+print $^STDOUT, "# $in_onesec iterations\n";
 ok ($in_onesec +> 0, "iters returned positive iterations");
 
-{
+do {
   my $difference = $in_onesec - $estimate;
   my $actual = abs ($difference / $in_onesec);
   ok ($actual +< $delta, "is $in_onesec within $delta of estimate ($estimate)");
-  print "# $in_onesec is between " . ($delta / 2) .
+  print $^STDOUT, "# $in_onesec is between " . ($delta / 2) .
     " and $delta of estimate. Not that safe.\n" if $actual +> $delta/2;
-}
+};
 
 # I found that the eval'ed version was 3 times faster than the coderef.
 # (now it has a different ballast value)
 $baz = 0;
-my $again = countit(1, '$baz += fib($ballast)');
+my $again = countit(1, '$main::baz += fib($main::ballast)');
 isa_ok($onesec, 'Benchmark', "countit 1, eval");
 isnt ($baz, 0, "benchmarked code was run");
 my $in_again = $again->iters;
-print "# $in_again iterations\n";
+print $^STDOUT, "# $in_again iterations\n";
 ok ($in_again +> 0, "iters returned positive iterations");
 
 
@@ -102,12 +101,12 @@ isnt ($default, '', 'timestr ($diff)');
 my $auto = timestr ($diff, 'auto');
 is ($auto, $default, 'timestr ($diff, "auto") matches timestr ($diff)');
 
-{
+do {
     my $all = timestr ($diff, 'all');
     like ($all, $All_Pattern, 'timestr ($diff, "all")');
-    print "# $all\n";
+    print $^STDOUT, "# $all\n";
 
-    my ($wallclock, $usr, $sys, $cusr, $csys, $cpu) = $all =~ $All_Pattern;
+    my @($wallclock, $usr, $sys, $cusr, $csys, $cpu) = @: $all =~ $All_Pattern;
 
     is (timestr ($diff, 'none'), '', "none supresses output");
 
@@ -125,29 +124,34 @@ is ($auto, $default, 'timestr ($diff, "auto") matches timestr ($diff)');
 
     like (timestr ($diff, 'all', 'E'), 
           qr/(\d+) +wallclock secs? +\( *\d\.\d+E[-+]?\d\d\d? +usr +\d\.\d+E[-+]?\d\d\d? +sys +\+ +\d\.\d+E[-+]?\d\d\d? +cusr +\d\.\d+E[-+]?\d\d\d? +csys += +\d\.\d+E[-+]?\d\d\d? +CPU\)/, 'timestr ($diff, "all", "E") [sprintf format of "E"]');
-}
+};
 
 my $out = "";
 open my $out_fh, '>>', \$out or die;
 
+sub do_with_out($sub) {
+    open my $real_stdout, ">&", $^STDOUT;
+    close $^STDOUT;
+    $^STDOUT = *$out_fh{IO};
+
+    my $res = $sub->();
+
+    $^STDOUT = *$real_stdout{IO};
+    return $res;
+}
+
 my $iterations = 3;
 
 $foo = 0;
-select($out_fh);
-my $got = timethis($iterations, sub {++$foo});
-select(STDOUT);
+my $got = do_with_out( { timethis($iterations, sub {++$foo}) } );
 isa_ok($got, 'Benchmark', "timethis CODEREF");
 is ($foo, $iterations, "benchmarked code was run $iterations times");
-
 $got = $out;
 like ($got, qr/^timethis $iterations/, 'default title');
 like ($got, $Default_Pattern, 'default format is all or noc');
-
 $out = "";
 $bar = 0;
-select($out_fh);
-$got = timethis($iterations, '++$bar');
-select(STDOUT);
+$got = do_with_out({ timethis($iterations, '++$main::bar') });
 isa_ok($got, 'Benchmark', "timethis eval");
 is ($bar, $iterations, "benchmarked code was run $iterations times");
 
@@ -158,9 +162,7 @@ like ($got, $Default_Pattern, 'default format is all or noc');
 my $title = 'lies, damn lies and benchmarks';
 $foo = 0;
 $out = "";
-select($out_fh);
-$got = timethis($iterations, sub {++$foo}, $title);
-select(STDOUT);
+$got = do_with_out({ timethis($iterations, sub {++$foo}, $title) });
 isa_ok($got, 'Benchmark', "timethis with title");
 is ($foo, $iterations, "benchmarked code was run $iterations times");
 
@@ -171,9 +173,7 @@ like ($got, $Default_Pattern, 'default format is all or noc');
 # default is auto, which is all or noc. nop can never match the default
 $foo = 0;
 $out = "";
-select($out_fh);
-$got = timethis($iterations, sub {++$foo}, $title, 'nop');
-select(STDOUT);
+$got = do_with_out({ timethis($iterations, sub {++$foo}, $title, 'nop') });
 isa_ok($got, 'Benchmark', "timethis with format");
 is ($foo, $iterations, "benchmarked code was run $iterations times");
 
@@ -181,14 +181,12 @@ $got = $out;
 like ($got, qr/^$title:/, 'specify title');
 like ($got, $Nop_Pattern, 'specify format as nop');
 
-{
+do {
     $foo = 0;
     $out = "";
-    select($out_fh);
     my $start = time;
-    $got = timethis(-2, sub {$foo+= fib($ballast)}, $title, 'none');
+    $got = do_with_out({ timethis(-2, sub {$foo+= fib($ballast)}, $title, 'none') });
     my $end = time;
-    select(STDOUT);
     isa_ok($got, 'Benchmark',
            "timethis, at least 2 seconds with format 'none'");
     ok ($foo +> 0, "benchmarked code was run");
@@ -200,18 +198,16 @@ like ($got, $Nop_Pattern, 'specify format as nop');
     $got =~ s/^[ \t\n]+//s; # Remove all the whitespace from the beginning
 
     is ($got, '', "format 'none' should suppress output");
-}
+};
 
 $foo = $bar = $baz = 0;
 $out = "";
-select($out_fh);
-$got = timethese($iterations, \%( Foo => sub {++$foo}, Bar => '++$bar',
-                                Baz => sub {++$baz} ));
-select(STDOUT);
+$got = do_with_out({ timethese($iterations, \%( Foo => sub {++$foo}, Bar => '++$main::bar',
+                                Baz => sub {++$baz} )) });
 is(ref ($got), 'HASH', "timethese should return a hashref");
-isa_ok($got->{Foo}, 'Benchmark', "Foo value");
-isa_ok($got->{Bar}, 'Benchmark', "Bar value");
-isa_ok($got->{Baz}, 'Benchmark', "Baz value");
+isa_ok($got->{?Foo}, 'Benchmark', "Foo value");
+isa_ok($got->{?Bar}, 'Benchmark', "Bar value");
+isa_ok($got->{?Baz}, 'Benchmark', "Baz value");
 eq_set(\keys %$got, \qw(Foo Bar Baz), 'should be exactly three objects');
 is ($foo, $iterations, "Foo code was run $iterations times");
 is ($bar, $iterations, "Bar code was run $iterations times");
@@ -233,18 +229,16 @@ my $code_to_test =  \%( Foo => sub {$foo+=fib($ballast-2)},
                       Bar => sub {$bar+=fib($ballast)});
 # Keep these for later.
 my $results;
-{
+do {
     $foo = $bar = 0;
     $out = "";
-    select($out_fh);
     my $start = times;
-    $results = timethese(-0.1, $code_to_test, 'none');
+    $results = do_with_out({ timethese(-0.1, $code_to_test, 'none') });
     my $end = times;
-    select(STDOUT);
 
     is(ref ($results), 'HASH', "timethese should return a hashref");
-    isa_ok($results->{Foo}, 'Benchmark', "Foo value");
-    isa_ok($results->{Bar}, 'Benchmark', "Bar value");
+    isa_ok($results->{?Foo}, 'Benchmark', "Foo value");
+    isa_ok($results->{?Bar}, 'Benchmark', "Bar value");
     eq_set(\keys %$results, \qw(Foo Bar), 'should be exactly two objects');
     ok ($foo +> 0, "Foo code was run");
     ok ($bar +> 0, "Bar code was run");
@@ -255,17 +249,15 @@ my $results;
     # Remove any warnings about having too few iterations.
     $got =~ s/\(warning:[^\)]+\)//gs;
     ok ($got !~ m/[^ \t\n]/, "format 'none' should suppress output");
-}
+};
 my $graph_dissassembly =
     qr!^[ \t]+(\S+)[ \t]+(\w+)[ \t]+(\w+)[ \t]*		# Title line
     \n[ \t]*(\w+)[ \t]+([0-9.]+(?:/s)?)[ \t]+(-+)[ \t]+(-?\d+%)[ \t]*
     \n[ \t]*(\w+)[ \t]+([0-9.]+(?:/s)?)[ \t]+(-?\d+%)[ \t]+(-+)[ \t]*$!xm;
 
-sub check_graph_consistency {
-    my (	$ratetext, $slowc, $fastc,
+sub check_graph_consistency(	$ratetext, $slowc, $fastc,
         $slowr, $slowratet, $slowslow, $slowfastt,
-        $fastr, $fastratet, $fastslowt, $fastfast)
-        = < @_;
+        $fastr, $fastratet, $fastslowt, $fastfast) {
     my $all_passed = 1;
     $all_passed
       ^&^= is ($slowc, $slowr, "left col tag should be top row tag");
@@ -304,11 +296,11 @@ sub check_graph_consistency {
         pass ("slow rate is less than fast rate");
         unless (ok ($slowfast +<= 0 && $slowfast +>= -100,
                     "slowfast should be less than or equal to zero, and >= -100")) {
-          print STDERR "# slowfast $slowfast\n";
+          print $^STDERR, "# slowfast $slowfast\n";
           $all_passed = 0;
         }
         unless (ok ($fastslow +> 0, "fastslow should be > 0")) {
-          print STDERR "# fastslow $fastslow\n";
+          print $^STDERR, "# fastslow $fastslow\n";
           $all_passed = 0;
         }
     } else {
@@ -325,29 +317,27 @@ sub check_graph_consistency {
     return $all_passed;
 }
 
-sub check_graph_vs_output {
-    my ($chart, $got) = < @_;
-    my (	$ratetext, $slowc, $fastc,
+sub check_graph_vs_output($chart, $got) {
+    my @(	$ratetext, $slowc, $fastc,
         $slowr, $slowratet, $slowslow, $slowfastt,
         $fastr, $fastratet, $fastslowt, $fastfast)
-        = $got =~ $graph_dissassembly;
+        = @: $got =~ $graph_dissassembly;
     my $all_passed
       = check_graph_consistency (        $ratetext, $slowc, $fastc,
                                  $slowr, $slowratet, $slowslow, $slowfastt,
                                  $fastr, $fastratet, $fastslowt, $fastfast);
     $all_passed
-      ^&^= is_deeply ($chart, \@(\@('', $ratetext, $slowc, $fastc),
+      &&= is_deeply ($chart, \@(\@('', $ratetext, $slowc, $fastc),
                              \@($slowr, $slowratet, $slowslow, $slowfastt),
                              \@($fastr, $fastratet, $fastslowt, $fastfast)),
                     "check the chart layout matches the formatted output");
     unless ($all_passed) {
-      print STDERR "# Something went wrong there. I got this chart:\n";
-      print STDERR "# $_\n" foreach split m/\n/, $got;
+      print $^STDERR, "# Something went wrong there. I got this chart:\n";
+      print $^STDERR, "# $_\n" foreach split m/\n/, $got;
     }
 }
 
-sub check_graph {
-    my ($title, $row1, $row2) = < @_;
+sub check_graph($title, $row1, $row2) {
     is (nelems @$title, 4, "Four entries in title row");
     is (nelems @$row1, 4, "Four entries in first row");
     is (nelems @$row2, 4, "Four entries in second row");
@@ -355,13 +345,11 @@ sub check_graph {
     check_graph_consistency (<@$title, <@$row1, <@$row2);
 }
 
-{
+do {
     $out = "";
-    select($out_fh);
     my $start = times;
-    my $chart = cmpthese( -0.1, \%( a => "++ our \$i", b => "our \$i; \$i = sqrt( \$i++)" ), "auto" ) ;
+    my $chart = do_with_out({ cmpthese( -0.1, \%( a => "++ our \$i", b => "our \$i; \$i = sqrt( \$i++)" ), "auto" )  });
     my $end = times;
-    select(STDOUT);
     ok (($end - $start) +> 0.05, "benchmarked code ran for over 0.05 seconds");
 
     $got = $out;
@@ -375,16 +363,14 @@ sub check_graph {
     like ($got, $Default_Pattern, 'should find default format somewhere');
     like ($got, $graph_dissassembly, "Should find the output graph somewhere");
     check_graph_vs_output ($chart, $got);
-}
+};
 
 # Not giving auto should suppress timethese results.
-{
+do {
     $out = "";
-    select($out_fh);
     my $start = times;
-    my $chart = cmpthese( -0.1, \%( a => "++ our \$i", b => "our \$i; \$i = sqrt(\$i++)" ) ) ;
+    my $chart = do_with_out({ cmpthese( -0.1, \%( a => "++ our \$i", b => "our \$i; \$i = sqrt(\$i++)" ) )  });
     my $end = times;
-    select(STDOUT);
     ok (($end - $start) +> 0.05, "benchmarked code ran for over 0.05 seconds");
 
     $got = $out;
@@ -398,14 +384,12 @@ sub check_graph {
     unlike ($got, $Default_Pattern, 'should not find default format somewhere');
     like ($got, $graph_dissassembly, "Should find the output graph somewhere");
     check_graph_vs_output ($chart, $got);
-}
+};
 
-{
+do {
     $foo = $bar = 0;
     $out = "";
-    select($out_fh);
-    my $chart = cmpthese( 10, $code_to_test, 'nop' ) ;
-    select(STDOUT);
+    my $chart = do_with_out({ cmpthese( 10, $code_to_test, 'nop' ) });
     ok ($foo +> 0, "Foo code was run");
     ok ($bar +> 0, "Bar code was run");
 
@@ -419,14 +403,12 @@ sub check_graph {
     like ($got, $Nop_Pattern, 'specify format as nop');
     like ($got, $graph_dissassembly, "Should find the output graph somewhere");
     check_graph_vs_output ($chart, $got);
-}
+};
 
-{
+do {
     $foo = $bar = 0;
     $out = "";
-    select($out_fh);
-    my $chart = cmpthese( 10, $code_to_test, 'none' ) ;
-    select(STDOUT);
+    my $chart = do_with_out({ cmpthese( 10, $code_to_test, 'none' ) });
     ok ($foo +> 0, "Foo code was run");
     ok ($bar +> 0, "Bar code was run");
 
@@ -440,14 +422,12 @@ sub check_graph {
     # a big clue as to why, from the previous test's diagnostic
     is (ref $chart->[0], 'ARRAY', "output should be an array of arrays");
     check_graph (<@$chart);
-}
+};
 
-{
+do {
     $foo = $bar = 0;
     $out = "";
-    select($out_fh);
-    my $chart = cmpthese( $results ) ;
-    select(STDOUT);
+    my $chart = do_with_out({ cmpthese( $results ) });
     is ($foo, 0, "Foo code was not run");
     is ($bar, 0, "Bar code was not run");
 
@@ -455,14 +435,12 @@ sub check_graph {
     ok ($got !~ m/\.\.\./s, 'check that there is no title');
     like ($got, $graph_dissassembly, "Should find the output graph somewhere");
     check_graph_vs_output ($chart, $got);
-}
+};
 
-{
+do {
     $foo = $bar = 0;
     $out = "";
-    select($out_fh);
-    my $chart = cmpthese( $results, 'none' ) ;
-    select(STDOUT);
+    my $chart = do_with_out({ cmpthese( $results, 'none' ) });
     is ($foo, 0, "Foo code was not run");
     is ($bar, 0, "Bar code was not run");
 
@@ -473,17 +451,17 @@ sub check_graph {
     # a big clue as to why, from the previous test's diagnostic
     is (ref $chart->[0], 'ARRAY', "output should be an array of arrays");
     check_graph (<@$chart);
-}
+};
 
 ###}my $out = tie *OUT, 'TieOut'; my ($got); ###
 
-{
+do {
     my $debug = "";
     open my $debug_fh, '>>', \$debug or die;
-    local *STDERR = *$debug_fh{IO};
+    local $^STDERR = *$debug_fh{IO};
 
     $bar = 0;
-    isa_ok(timeit(5, '++$bar'), 'Benchmark', "timeit eval");
+    isa_ok(timeit(5, '++$main::bar'), 'Benchmark', "timeit eval");
     is ($bar, 5, "benchmarked code was run 5 times");
     is ($debug, '', "There was no debug output");
 
@@ -491,9 +469,7 @@ sub check_graph {
 
     $bar = 0;
     $out = "";
-    select($out_fh);
-    $got = timeit(5, '++$bar');
-    select(STDOUT);
+    $got = do_with_out({ timeit(5, '++$main::bar') });
     isa_ok($got, 'Benchmark', "timeit eval");
     is ($bar, 5, "benchmarked code was run 5 times");
     is ($out, '', "There was no STDOUT output with debug enabled");
@@ -503,11 +479,11 @@ sub check_graph {
     Benchmark->debug(0);
 
     $bar = 0;
-    isa_ok(timeit(5, '++$bar'), 'Benchmark', "timeit eval");
+    isa_ok(timeit(5, '++$main::bar'), 'Benchmark', "timeit eval");
     is ($bar, 5, "benchmarked code was run 5 times");
     is ($debug, '', "There was no debug output debug disabled");
 
-}
+};
 
 # To check the cache we are poking where we don't belong, inside the namespace.
 # The way benchmark is written We can't actually check whehter the cache is
@@ -516,11 +492,11 @@ sub check_graph {
 clearallcache();
 my @before_keys =keys %Benchmark::Cache;
 $bar = 0;
-isa_ok(timeit(5, '++$bar'), 'Benchmark', "timeit eval");
+isa_ok(timeit(5, '++$main::bar'), 'Benchmark', "timeit eval");
 is ($bar, 5, "benchmarked code was run 5 times");
 my @after5_keys =keys %Benchmark::Cache;
 $bar = 0;
-isa_ok(timeit(10, '++$bar'), 'Benchmark', "timeit eval");
+isa_ok(timeit(10, '++$main::bar'), 'Benchmark', "timeit eval");
 is ($bar, 10, "benchmarked code was run 10 times");
 ok (!eq_array (\keys %Benchmark::Cache, \@after5_keys), "10 differs from 5");
 
@@ -534,7 +510,7 @@ is_deeply (\keys %Benchmark::Cache, \@before_keys,
            "back to square 1 when we clear the cache again?");
 
 
-{   # Check usage error messages
+do {   # Check usage error messages
     my %usage = %Benchmark::_Usage;
     delete %usage{runloop};  # not public, not worrying about it just now
 
@@ -544,30 +520,23 @@ is_deeply (\keys %Benchmark::Cache, \@before_keys,
                      'not result' => 'cmpthese(42)',
                      'array ref'  => 'cmpthese( 42, \@( foo => sub { 1 } ) )',
                     );
-    while( my($name, $code) = each %cmpthese ) {
+    while( my@(?$name, ?$code) =@( each %cmpthese) ) {
         eval $code;
-        is( $@->{description}, %usage{cmpthese}, "cmpthese usage: $name" );
+        is( $^EVAL_ERROR->{?description}, %usage{?cmpthese}, "cmpthese usage: $name" );
     }
 
     my %timethese = %('forgot {}'  => 'timethese( 42, foo => sub { 1 } )',
-                       'no code'    => 'timethese(42)',
                        'array ref'  => 'timethese( 42, \@( foo => sub { 1 } ) )',
                       );
 
-    while( my($name, $code) = each %timethese ) {
+    while( my@(?$name, ?$code) =@( each %timethese) ) {
         eval $code;
-        is( $@->{description}, %usage{timethese}, "timethese usage: $name" );
+        is( $^EVAL_ERROR->{?description}, %usage{?timethese}, "timethese usage: $name" );
     }
 
-
-    while( my($func, $usage) = each %usage ) {
-        next if grep $func eq $_, @takes_no_args;
-        eval "$func()";
-        is( $@->{description}, $usage, "$func usage: no args" );
-    }
 
     foreach my $func ( @takes_no_args) {
         eval "$func(42)";
-        is( $@->{description}, %usage{$func}, "$func usage: with args" );
+        is( $^EVAL_ERROR->{?description}, %usage{?$func}, "$func usage: with args" );
     }
-}
+};

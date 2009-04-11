@@ -11,62 +11,62 @@
 use TestInit;
 
 BEGIN {
-    $| = 1;
-    print "1..3\n";
+    $^OUTPUT_AUTOFLUSH = 1;
+    print $^STDOUT, "1..3\n";
 }
 
 use Pod::Man;
 use Pod::Text;
 
-print "ok 1\n";
+print $^STDOUT, "ok 1\n";
 
 my $man = Pod::Man->new or die "Cannot create parser\n";
 my $text = Pod::Text->new or die "Cannot create parser\n";
 my $n = 2;
 while ( ~< *DATA) {
     next until $_ eq "###\n";
-    open (TMP, ">", 'tmp.pod') or die "Cannot create tmp.pod: $!\n";
+    open (my $tmp, ">", 'tmp.pod') or die "Cannot create tmp.pod: $^OS_ERROR\n";
     while ( ~< *DATA) {
         last if $_ eq "###\n";
-        print TMP $_;
+        print $tmp, $_;
     }
-    close TMP;
-    open (IN, "<", 'tmp.pod') or die "Cannot open tmp.pod: $!\n";
-    open (OUT, ">", 'out.tmp') or die "Cannot create out.tmp: $!\n";
-    $man->parse_from_filehandle (\*IN, \*OUT);
-    close IN;
-    close OUT;
-    open (OUT, "<", 'out.tmp') or die "Cannot open out.tmp: $!\n";
-    while ( ~< *OUT) { last if m/^\.nh/ }
+    close $tmp;
+    open (my $in, "<", 'tmp.pod') or die "Cannot open tmp.pod: $^OS_ERROR\n";
+    open (my $out, ">", 'out.tmp') or die "Cannot create out.tmp: $^OS_ERROR\n";
+    $man->parse_from_filehandle ($in, $out);
+    close $in;
+    close $out;
+    open ($out, "<", 'out.tmp') or die "Cannot open out.tmp: $^OS_ERROR\n";
+    while ( ~< $out) { last if m/^\.nh/ }
     my $output;
-    {
-        local $/;
-        $output = ~< *OUT;
-    }
-    close OUT;
+    do {
+        local $^INPUT_RECORD_SEPARATOR = undef;
+        $output = ~< $out;
+    };
+    close $out;
     my $expected = '';
     while ( ~< *DATA) {
         last if $_ eq "###\n";
         $expected .= $_;
     }
     if ($output eq $expected) {
-        print "ok $n\n";
+        print $^STDOUT, "ok $n\n";
     } else {
-        print "not ok $n\n";
-        print "Expected\n========\n$expected\nOutput\n======\n$output\n";
+        print $^STDOUT, "not ok $n\n";
+        print $^STDOUT, "Expected\n========\n$expected\nOutput\n======\n$output\n";
     }
     $n++;
-    open (IN, "<", 'tmp.pod') or die "Cannot open tmp.pod: $!\n";
-    open (OUT, ">", 'out.tmp') or die "Cannot create out.tmp: $!\n";
-    $text->parse_from_filehandle (\*IN, \*OUT);
-    close IN;
-    close OUT;
-    open (OUT, "<", 'out.tmp') or die "Cannot open out.tmp: $!\n";
-    {
-        local $/;
-        $output = ~< *OUT;
-    }
-    close OUT;
+    open ($in, "<", 'tmp.pod') or die "Cannot open tmp.pod: $^OS_ERROR\n";
+    open ($out, ">", 'out.tmp') or die "Cannot create out.tmp: $^OS_ERROR\n";
+    $text->parse_from_filehandle ($in, $out);
+    close $in;
+    close $out;
+    open ($out, "<", 'out.tmp') or die "Cannot open out.tmp: $^OS_ERROR\n";
+    do {
+        local $^INPUT_RECORD_SEPARATOR = undef;
+        $output = ~< $out;
+    };
+    close $out;
     unlink ('tmp.pod', 'out.tmp');
     $expected = '';
     while ( ~< *DATA) {
@@ -74,10 +74,10 @@ while ( ~< *DATA) {
         $expected .= $_;
     }
     if ($output eq $expected) {
-        print "ok $n\n";
+        print $^STDOUT, "ok $n\n";
     } else {
-        print "not ok $n\n";
-        print "Expected\n========\n$expected\nOutput\n======\n$output\n";
+        print $^STDOUT, "not ok $n\n";
+        print $^STDOUT, "Expected\n========\n$expected\nOutput\n======\n$output\n";
     }
     $n++;
 }

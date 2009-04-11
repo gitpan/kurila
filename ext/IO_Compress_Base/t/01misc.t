@@ -1,14 +1,16 @@
 BEGIN {
-    if (%ENV{PERL_CORE}) {
+    if (env::var('PERL_CORE')) {
 	chdir 't' if -d 't';
-	@INC = @("../lib", "lib/compress");
+	$^INCLUDE_PATH = @("../lib", "lib/compress");
     }
 }
 
 use lib < qw(t t/compress);
-use strict;
+
 use warnings;
 use bytes;
+
+use IO::Compress::Base::Common;
 
 use Test::More ; 
 use CompTestUtils;
@@ -19,10 +21,9 @@ BEGIN {
     $extra = 1
         if try { require Test::NoWarnings ;  Test::NoWarnings->import(); 1 };
 
-    plan tests => 78 + $extra ;
+    plan tests => 77 + $extra ;
 
     use_ok('Scalar::Util');
-    use_ok('IO::Compress::Base::Common');
 }
 
 
@@ -36,54 +37,51 @@ EOM
 sub My::testParseParameters()
 {
     try { ParseParameters(1, \%(), 1) ; };
-    like $@->{description}, mkErr(': Expected even number of parameters, got 1'), 
+    like $^EVAL_ERROR->{?description}, mkErr(': Expected even number of parameters, got 1'), 
             "Trap odd number of params";
 
     try { ParseParameters(1, \%(), undef) ; };
-    like $@->{description}, mkErr(': Expected even number of parameters, got 1'), 
+    like $^EVAL_ERROR->{?description}, mkErr(': Expected even number of parameters, got 1'), 
             "Trap odd number of params";
 
     try { ParseParameters(1, \%(), \@()) ; };
-    like $@->{description}, mkErr(': Expected even number of parameters, got 1'), 
+    like $^EVAL_ERROR->{?description}, mkErr(': Expected even number of parameters, got 1'), 
             "Trap odd number of params";
 
     try { ParseParameters(1, \%('Fred' => \@(1, 1, Parse_boolean, 0)), Fred => 'joe') ; };
-    like $@->{description}, mkErr("Parameter 'Fred' must be an int, got 'joe'"), 
+    like $^EVAL_ERROR->{?description}, mkErr("Parameter 'Fred' must be an int, got 'joe'"), 
             "wanted unsigned, got undef";
 
     try { ParseParameters(1, \%('Fred' => \@(1, 1, Parse_unsigned, 0)), Fred => undef) ; };
-    like $@->{description}, mkErr("Parameter 'Fred' must be an unsigned int, got 'undef'"), 
+    like $^EVAL_ERROR->{?description}, mkErr("Parameter 'Fred' must be an unsigned int, got 'undef'"), 
             "wanted unsigned, got undef";
 
     try { ParseParameters(1, \%('Fred' => \@(1, 1, Parse_signed, 0)), Fred => undef) ; };
-    like $@->{description}, mkErr("Parameter 'Fred' must be a signed int, got 'undef'"), 
+    like $^EVAL_ERROR->{?description}, mkErr("Parameter 'Fred' must be a signed int, got 'undef'"), 
             "wanted signed, got undef";
 
     try { ParseParameters(1, \%('Fred' => \@(1, 1, Parse_signed, 0)), Fred => 'abc') ; };
-    like $@->{description}, mkErr("Parameter 'Fred' must be a signed int, got 'abc'"), 
+    like $^EVAL_ERROR->{?description}, mkErr("Parameter 'Fred' must be a signed int, got 'abc'"), 
             "wanted signed, got 'abc'";
 
 
-    SKIP:
-    {
+  SKIP:
+    do {
         use Config;
 
-        skip 'readonly + threads', 1
-            if %Config{useithreads};
-
         try { ParseParameters(1, \%('Fred' => \@(1, 1, Parse_writable_scalar, 0)), Fred => 'abc') ; };
-        like $@->{description}, mkErr("Parameter 'Fred' not writable"), 
+        like $^EVAL_ERROR->{?description}, mkErr("Parameter 'Fred' not writable"), 
                 "wanted writable, got readonly";
-    }
+    };
 
     my @xx;
     try { ParseParameters(1, \%('Fred' => \@(1, 1, Parse_writable_scalar, 0)), Fred => \@xx) ; };
-    like $@->{description}, mkErr("Parameter 'Fred' not a scalar reference"), 
+    like $^EVAL_ERROR->{?description}, mkErr("Parameter 'Fred' not a scalar reference"), 
             "wanted scalar reference";
 
     local *ABC;
     try { ParseParameters(1, \%('Fred' => \@(1, 1, Parse_writable_scalar, 0)), Fred => \*ABC) ; };
-    like $@->{description}, mkErr("Parameter 'Fred' not a scalar"), 
+    like $^EVAL_ERROR->{?description}, mkErr("Parameter 'Fred' not a scalar"), 
             "wanted scalar";
 
     #try { ParseParameters(1, \%('Fred' => \@(1, 1, Parse_any|Parse_multiple, 0)), Fred => 1, Fred => 2) ; };
@@ -125,7 +123,7 @@ undef) ;
 My::testParseParameters();
 
 
-{
+do {
     title "isaFilename" ;
     ok   isaFilename("abc"), "'abc' isaFilename";
 
@@ -133,15 +131,15 @@ My::testParseParameters();
     ok ! isaFilename(\@()),    "[] ! isaFilename";
     $main::X = 1; $main::X = $main::X ;
     ok ! isaFilename(*X),    "glob ! isaFilename";
-}
+};
 
-{
+do {
     title "whatIsInput" ;
 
     my $lex = LexFile->new( my $out_file) ;
-    open FH, ">", "$out_file" ;
-    is whatIsInput(*FH), 'handle', "Match filehandle" ;
-    close FH ;
+    open my $fh, ">", "$out_file" ;
+    is whatIsInput(*$fh), 'handle', "Match filehandle" ;
+    close $fh ;
 
     my $stdin = '-';
     is whatIsInput($stdin),       'handle',   "Match '-' as stdin";
@@ -152,15 +150,15 @@ My::testParseParameters();
     is whatIsInput(sub { 1 }, 1), 'code',     "Match code";
     is whatIsInput(sub { 1 }),    ''   ,      "Don't match code";
 
-}
+};
 
-{
+do {
     title "whatIsOutput" ;
 
     my $lex = LexFile->new( my $out_file) ;
-    open FH, ">", "$out_file" ;
-    is whatIsOutput(*FH), 'handle', "Match filehandle" ;
-    close FH ;
+    open my $fh, ">", "$out_file" ;
+    is whatIsOutput(*$fh), 'handle', "Match filehandle" ;
+    close $fh ;
 
     my $stdout = '-';
     is whatIsOutput($stdout),     'handle',   "Match '-' as stdout";
@@ -171,11 +169,11 @@ My::testParseParameters();
     is whatIsOutput(sub { 1 }, 1), 'code',     "Match code";
     is whatIsOutput(sub { 1 }),    ''   ,      "Don't match code";
 
-}
+};
 
 # U64
 
-{
+do {
     title "U64" ;
 
     my $x = U64->new();
@@ -250,4 +248,4 @@ My::testParseParameters();
     ok !$x->equal($z), "  ! equal";
 
     title "U64 - pack_V" ;
-}
+};

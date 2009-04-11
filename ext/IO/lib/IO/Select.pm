@@ -6,9 +6,8 @@
 
 package IO::Select;
 
-use     strict;
 use warnings::register;
-use     vars < qw($VERSION @ISA);
+our ($VERSION, @ISA);
 require Exporter;
 
 $VERSION = "1.17";
@@ -49,17 +48,16 @@ sub exists
  my $vec = shift;
  my $fno = $vec->_fileno(shift);
  return undef unless defined $fno;
- $vec->[$fno + FIRST_FD];
+ $vec->[?$fno + FIRST_FD];
 }
 
 
-sub _fileno
+sub _fileno($self, $f)
 {
- my($self, $f) = < @_;
  return unless defined $f;
  $f = $f->[0] if ref($f) eq 'ARRAY';
  return fileno($f) if ref $f;
- ($f =~ m/^\d+$/) ? $f : fileno($f);
+ ($f =~ m/^\d+$/) ?? $f !! fileno($f);
 }
 
 sub _update
@@ -71,29 +69,28 @@ sub _update
  $bits = '' unless defined $bits;
 
  my $count = 0;
- my $f;
- foreach $f ( @_)
+ foreach my $f ( @_)
   {
    my $fn = $vec->_fileno($f);
    next unless defined $fn;
    my $i = $fn + FIRST_FD;
    if ($add) {
-     if (defined $vec->[$i]) {
+     if (defined $vec->[?$i]) {
 	 $vec->[$i] = $f;  # if array rest might be different, so we update
 	 next;
      }
      $vec->[FD_COUNT]++;
-     vec($bits, $fn, 1) = 1;
-     $vec->[$i] = $f;
+     vec($bits, $fn, 1, 1);
+     $vec->[+$i] = $f;
    } else {      # remove
-     next unless defined $vec->[$i];
+     next unless defined $vec->[?$i];
      $vec->[FD_COUNT]--;
-     vec($bits, $fn, 1) = 0;
+     vec($bits, $fn, 1, 0);
      $vec->[$i] = undef;
    }
    $count++;
   }
- $vec->[VEC_BITS] = $vec->[FD_COUNT] ? $bits : undef;
+ $vec->[VEC_BITS] = $vec->[FD_COUNT] ?? $bits !! undef;
  $count;
 }
 
@@ -104,8 +101,8 @@ sub can_read
  my $r = $vec->[VEC_BITS];
 
  defined($r) && ((nelems @(select($r,undef,undef,$timeout))) +> 0)
-    ? handles($vec, $r)
-    : ();
+    ?? handles($vec, $r)
+    !! ();
 }
 
 sub can_write
@@ -115,26 +112,19 @@ sub can_write
  my $w = $vec->[VEC_BITS];
 
  defined($w) && (select(undef,$w,undef,$timeout) +> 0)
-    ? handles($vec, $w)
-    : ();
+    ?? handles($vec, $w)
+    !! ();
 }
 
 sub has_exception
 {
  my $vec = shift;
  my $timeout = shift;
- my $e = $vec->[VEC_BITS];
+ my $e = $vec->[?VEC_BITS];
 
  defined($e) && (select(undef,undef,$e,$timeout) +> 0)
-    ? handles($vec, $e)
-    : ();
-}
-
-sub has_error
-{
- warnings::warn("Call to deprecated method 'has_error', use 'has_exception'")
-	if warnings::enabled();
- goto &has_exception;
+    ?? handles($vec, $e)
+    !! ();
 }
 
 sub count
@@ -155,26 +145,25 @@ sub as_string  # for debugging
  my $str = ref($vec) . ": ";
  my $bits = $vec->bits;
  my $count = $vec->count;
- $str .= defined($bits) ? unpack("b*", $bits) : "undef";
+ $str .= defined($bits) ?? unpack("b*", $bits) !! "undef";
  $str .= " $count";
  my @handles = @$vec;
  splice(@handles, 0, FIRST_FD);
  for ( @handles) {
-     $str .= " " . (defined($_) ? "$_" : "-");
+     $str .= " " . (defined($_) ?? "$_" !! "-");
  }
  $str;
 }
 
-sub _max
+sub _max($a,$b,$c)
 {
- my($a,$b,$c) = < @_;
  $a +> $b
-    ? $a +> $c
-        ? $a
-        : $c
-    : $b +> $c
-        ? $b
-        : $c;
+    ?? $a +> $c
+        ?? $a
+        !! $c
+    !! $b +> $c
+        ?? $b
+        !! $c;
 }
 
 sub select
@@ -182,23 +171,23 @@ sub select
  shift
    if defined @_[0] && !ref(@_[0]);
 
- my($r,$w,$e,$t) = < @_;
+ my@($r,$w,$e,$t) =  @_;
  my @result = @( () );
 
- my $rb = defined $r ? $r->[VEC_BITS] : undef;
- my $wb = defined $w ? $w->[VEC_BITS] : undef;
- my $eb = defined $e ? $e->[VEC_BITS] : undef;
+ my $rb = defined $r ?? $r->[VEC_BITS] !! undef;
+ my $wb = defined $w ?? $w->[VEC_BITS] !! undef;
+ my $eb = defined $e ?? $e->[VEC_BITS] !! undef;
 
  if(select($rb,$wb,$eb,$t) +> 0)
   {
    my @r = @( () );
    my @w = @( () );
    my @e = @( () );
-   my $i = _max(defined $r ? scalar(nelems @$r)-1 : 0,
-                defined $w ? scalar(nelems @$w)-1 : 0,
-                defined $e ? scalar(nelems @$e)-1 : 0);
+   my $i = _max(defined $r ?? scalar(nelems @$r)-1 !! 0,
+                defined $w ?? scalar(nelems @$w)-1 !! 0,
+                defined $e ?? scalar(nelems @$e)-1 !! 0);
 
-   for( ; $i +>= FIRST_FD ; $i--)
+   while($i +>= FIRST_FD)
     {
      my $j = $i - FIRST_FD;
      push(@r, $r->[$i])
@@ -207,6 +196,7 @@ sub select
         if defined $wb && defined $w->[$i] && vec($wb, $j, 1);
      push(@e, $e->[$i])
         if defined $eb && defined $e->[$i] && vec($eb, $j, 1);
+     $i--;
     }
 
    @result = @(\@r, \@w, \@e);
@@ -220,10 +210,9 @@ sub handles
  my $vec = shift;
  my $bits = shift;
  my @h = @( () );
- my $i;
  my $max = scalar(nelems @$vec) - 1;
 
- for ($i = FIRST_FD; $i +<= $max; $i++)
+ for my $i (FIRST_FD .. $max)
   {
    next unless defined $vec->[$i];
    push(@h, $vec->[$i])
@@ -246,7 +235,7 @@ IO::Select - OO interface to the select system call
 
     $s = IO::Select->new();
 
-    $s->add(\*STDIN);
+    $s->add($^STDIN);
     $s->add($some_handle);
 
     @ready = $s->can_read($timeout);

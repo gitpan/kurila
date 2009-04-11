@@ -8,24 +8,24 @@
 
 use Config;
 use ExtUtils::MakeMaker;
-use strict;
 
-my $VERBOSE = %ENV{VERBOSE};
+
+my $VERBOSE = env::var('VERBOSE');
 my $DEFINE;
 my $LIBS = \@();
 my $XSOPT = '';
 my $SYSCALL_H;
 
-use vars < qw($self); # Used in 'sourcing' the hints.
+our ($self); # Used in 'sourcing' the hints.
 
 # TBD: Can we just use $Config(exe_ext) here instead of this complex
 #      expression?
-my $ld_exeext = ($^O eq 'cygwin' ||
-                 $^O eq 'os2' && %Config{ldflags} =~ m/-Zexe\b/) ? '.exe' :
-                (($^O eq 'vos') ? %Config{exe_ext} : '');
+my $ld_exeext = ($^OS_NAME eq 'cygwin' ||
+                 $^OS_NAME eq 'os2' && config_value("ldflags") =~ m/-Zexe\b/) ?? '.exe' !!
+                (($^OS_NAME eq 'vos') ?? config_value("exe_ext") !! '');
 
-unless(%ENV{PERL_CORE}) {
-    %ENV{PERL_CORE} = 1 if grep { $_ eq 'PERL_CORE=1' } @ARGV;
+unless(env::var('PERL_CORE')) {
+    env::var('PERL_CORE' ) = 1 if grep { $_ eq 'PERL_CORE=1' }, @ARGV;
 }
 
 use File::Spec;
@@ -38,99 +38,98 @@ use File::Spec;
 # without changing it, and then I'd always forget to change it before a
 # release. Sorry, Edward :)
 
-sub try_compile_and_link {
-    my ($c, < %args) = < @_;
+sub try_compile_and_link($c, %< %args) {
 
-    my ($ok) = 0;
-    my ($tmp) = "tmp$$";
-    local(*TMPC);
+    my $ok = 0;
+    my $tmp = "tmp$^PID";
 
-    my $obj_ext = %Config{obj_ext} || ".o";
+    my $obj_ext = config_value("obj_ext") || ".o";
     unlink("$tmp.c", "$tmp$obj_ext");
 
-    if (open(TMPC, ">", "$tmp.c")) {
-	print TMPC $c;
-	close(TMPC);
+    if (open(my $tmpc, ">", "$tmp.c")) {
+	print $tmpc, $c;
+	close($tmpc);
 
-	my $cccmd = %args{cccmd};
+	my $cccmd = %args{?cccmd};
 
 	my $errornull;
 
 	my $COREincdir;
 
-	if (%ENV{PERL_CORE}) {
+	if (env::var('PERL_CORE')) {
 	    my $updir = File::Spec->updir;
-	    $COREincdir = File::Spec->catdir(($updir) x 2);
+	    $COREincdir = File::Spec->catdir(< $: @($updir) x 2);
 	} else {
-	    $COREincdir = File::Spec->catdir(%Config{'archlibexp'}, 'CORE');
+	    $COREincdir = File::Spec->catdir(config_value('archlibexp'), 'CORE');
 	}
 
-	if (%ENV{PERL_CORE}) {
+	if (env::var('PERL_CORE')) {
 	    unless (-f File::Spec->catfile($COREincdir, "EXTERN.h")) {
 		die <<__EOD__;
-Your environment variable PERL_CORE is '%ENV{PERL_CORE}' but there
+Your environment variable PERL_CORE is '$(env::var('PERL_CORE'))' but there
 is no EXTERN.h in $COREincdir.
 Cannot continue, aborting.
 __EOD__
             }
         }
 
-	my $ccflags = %Config{'ccflags'} . ' ' . "-I$COREincdir";
+	my $ccflags = config_value('ccflags') . ' ' . "-I$COREincdir";
 
-	if ($^O eq 'VMS') {
-	    if (%ENV{PERL_CORE}) {
+	if ($^OS_NAME eq 'VMS') {
+	    if (env::var('PERL_CORE')) {
 		# Fragile if the extensions change hierarchy within
 		# the Perl core but this should do for now.
-                $cccmd = "%Config{'cc'} /include=([---]) $tmp.c";
+                $cccmd = "$(config_value('cc')) /include=([---]) $tmp.c";
 	    } else {
-		my $perl_core = %Config{'installarchlib'};
+		my $perl_core = config_value('installarchlib');
 		$perl_core =~ s/\]$/.CORE]/;
-                $cccmd = "%Config{'cc'} /include=(perl_root:[000000],$perl_core) $tmp.c";
+                $cccmd = "$(config_value('cc')) /include=(perl_root:[000000],$perl_core) $tmp.c";
 	    }
         }
 
-        if (%args{silent} || !$VERBOSE) {
+        if (%args{?silent} || !$VERBOSE) {
 	    $errornull = "2>/dev/null" unless defined $errornull;
 	} else {
 	    $errornull = '';
 	}
 
-        $cccmd = "%Config{'cc'} -o $tmp $ccflags $tmp.c {join ' ',@$LIBS} $errornull"
+        $cccmd = "$(config_value('cc')) -o $tmp $ccflags $tmp.c $(join ' ',@$LIBS) $errornull"
 	    unless defined $cccmd;
 
-       if ($^O eq 'VMS') {
-	    open( CMDFILE, ">$tmp.com" );
-	    print CMDFILE "\$ SET MESSAGE/NOFACILITY/NOSEVERITY/NOIDENT/NOTEXT\n";
-	    print CMDFILE "\$ $cccmd\n";
-	    print CMDFILE "\$ IF \$SEVERITY .NE. 1 THEN EXIT 44\n"; # escalate
-	    close CMDFILE;
+       if ($^OS_NAME eq 'VMS') {
+	    open( my $cmdfile, ">$tmp.com" );
+	    print $cmdfile, "\$ SET MESSAGE/NOFACILITY/NOSEVERITY/NOIDENT/NOTEXT\n";
+	    print $cmdfile, "\$ $cccmd\n";
+	    print $cmdfile, "\$ IF \$SEVERITY .NE. 1 THEN EXIT 44\n"; # escalate
+	    close $cmdfile;
 	    system("\@ $tmp.com");
-	    $ok = $?==0;
-	    for (@("$tmp.c", "$tmp$obj_ext", "$tmp.com", "$tmp%Config{exe_ext}")) {
+	    $ok = $^CHILD_ERROR==0;
+	    for (@: "$tmp.c", "$tmp$obj_ext", "$tmp.com",
+                 $tmp . config_value('exe_ext')) {
 		1 while unlink $_;
 	    }
         }
         else
         {
 	    my $tmp_exe = "$tmp$ld_exeext";
-	    printf "cccmd = $cccmd\n" if $VERBOSE;
+	    printf $^STDOUT, "cccmd = $cccmd\n" if $VERBOSE;
 	    my $res = system($cccmd);
 	    $ok = defined($res) && $res == 0 && -s $tmp_exe && -x _;
 
-	    if ( $ok && exists %args{run} && %args{run}) {
+	    if ( $ok && exists %args{run} && %args{?run}) {
 		my $tmp_exe =
 		    File::Spec->catfile( File::Spec->curdir, $tmp_exe);
-		printf "Running $tmp_exe..." if $VERBOSE;
+		printf $^STDOUT, "Running $tmp_exe..." if $VERBOSE;
 		if (system($tmp_exe) == 0) {
 		    $ok = 1;
 		} else {
 		    $ok = 0;
-		    my $errno = $? >> 8;
-		    local $! = $errno;
-		    printf <<EOF;
+		    my $errno = $^CHILD_ERROR >> 8;
+		    local $^OS_ERROR = $errno;
+		    printf $^STDOUT, <<EOF;
 
-*** The test run of '$tmp_exe' failed: status $?
-*** (the status means: errno = $errno or '$!')
+*** The test run of '$tmp_exe' failed: status $^CHILD_ERROR
+*** (the status means: errno = $errno or '$^OS_ERROR')
 *** DO NOT PANIC: this just means that *some* functionality will be missing.
 EOF
 		}
@@ -159,7 +158,7 @@ EOH
 
 sub has_gettimeofday {
     # confusing but true (if condition true ==> -DHAS_GETTIMEOFDAY already)
-    return 0 if %Config{d_gettimeod};
+    return 0 if config_value("d_gettimeod");
     return 1 if try_compile_and_link(<<EOM);
 $TIME_HEADERS
 static int foo()
@@ -175,8 +174,7 @@ EOM
     return 0;
 }
 
-sub has_x {
-    my ($x, < %args) = < @_;
+sub has_x($x, %< %args) {
 
     return 1 if
     try_compile_and_link(<<EOM, < %args);
@@ -205,7 +203,7 @@ EOM
 }
 
 sub has_nanosleep {
-    print "testing... ";
+    print $^STDOUT, "testing... ";
     return 1 if
     try_compile_and_link(<<EOM, run => 1);
 #include <time.h>
@@ -230,8 +228,7 @@ int main(int argc, char** argv) \{
 EOM
 }
 
-sub has_include {
-    my ($inc) = < @_;
+sub has_include($inc) {
     return 1 if
     try_compile_and_link(<<EOM);
 #include "EXTERN.h"
@@ -319,58 +316,57 @@ int main(int argc, char** argv)
 EOM
 }
 
-sub DEFINE {
-    my ($def, $val) = < @_;
-    my $define = defined $val ? "$def=$val" : $def ;
+sub DEFINE($def, ?$val) {
+    my $define = defined $val ?? "$def=$val" !! $def ;
     unless ($DEFINE =~ m/(?:^| )-D\Q$define\E(?: |$)/) {
 	$DEFINE .= " -D$define";
     }
 }
 
 sub init {
-    my $hints = File::Spec->catfile("hints", "$^O.pl");
+    my $hints = File::Spec->catfile("hints", "$^OS_NAME.pl");
     if (-f $hints) {
-	print "Using hints $hints...\n";
-	local $self;
+	print $^STDOUT, "Using hints $hints...\n";
+	local $self = undef;
 	do $hints;
 	if (exists $self->{LIBS}) {
-	    $LIBS = $self->{LIBS};
-	    print "Extra libraries: {join ' ',@$LIBS}...\n";
+	    $LIBS = $self->{?LIBS};
+	    print $^STDOUT, "Extra libraries: $(join ' ',@$LIBS)...\n";
 	}
     }
 
     $DEFINE = '';
 
-    if (%Config{d_syscall}) {
-	print "Have syscall()... looking for syscall.h... ";
+    if (config_value("d_syscall")) {
+	print $^STDOUT, "Have syscall()... looking for syscall.h... ";
 	if (has_include('syscall.h')) {
 	    $SYSCALL_H = 'syscall.h';
 	} elsif (has_include('sys/syscall.h')) {
 	    $SYSCALL_H = 'sys/syscall.h';
 	}
     } else {
-	print "No syscall()...\n";
+	print $^STDOUT, "No syscall()...\n";
     }
 
-    if (%Config{d_syscall}) {
+    if (config_value("d_syscall")) {
 	if (defined $SYSCALL_H) {
-	    print "found <$SYSCALL_H>.\n";
+	    print $^STDOUT, "found <$SYSCALL_H>.\n";
 	} else {
-	    print "NOT found.\n";
+	    print $^STDOUT, "NOT found.\n";
 	}
     }
 
-    print "Looking for gettimeofday()... ";
+    print $^STDOUT, "Looking for gettimeofday()... ";
     my $has_gettimeofday;
-    if (exists %Config{d_gettimeod}) {
-	$has_gettimeofday++ if %Config{d_gettimeod};
+    if (defined config_value("d_gettimeod")) {
+	$has_gettimeofday++ if config_value("d_gettimeod");
     } elsif (has_gettimeofday()) {
 	$DEFINE .= ' -DHAS_GETTIMEOFDAY';
 	$has_gettimeofday++;
     }
 
     if ($has_gettimeofday) {
-	print "found.\n";
+	print $^STDOUT, "found.\n";
     } else {
 	die <<EOD
 Your operating system does not seem to have the gettimeofday() function.
@@ -385,102 +381,102 @@ Aborting configuration.
 EOD
     }
 
-    print "Looking for setitimer()... ";
+    print $^STDOUT, "Looking for setitimer()... ";
     my $has_setitimer;
-    if (exists %Config{d_setitimer}) {
-        $has_setitimer++ if %Config{d_setitimer};
+    if (defined config_value("d_setitimer")) {
+        $has_setitimer++ if config_value("d_setitimer");
     } elsif (has_x("setitimer(ITIMER_REAL, 0, 0)")) {
         $has_setitimer++;
         $DEFINE .= ' -DHAS_SETITIMER';
     }
 
     if ($has_setitimer) {
-        print "found.\n";
+        print $^STDOUT, "found.\n";
     } else {
-	print "NOT found.\n";
+	print $^STDOUT, "NOT found.\n";
     }
 
-    print "Looking for getitimer()... ";
+    print $^STDOUT, "Looking for getitimer()... ";
     my $has_getitimer;
-    if (exists %Config{'d_getitimer'}) {
-        $has_getitimer++ if %Config{'d_getitimer'};
+    if (defined config_value('d_getitimer')) {
+        $has_getitimer++ if config_value('d_getitimer');
     } elsif (has_x("getitimer(ITIMER_REAL, 0)")) {
         $has_getitimer++;
         $DEFINE .= ' -DHAS_GETITIMER';
     }
 
     if ($has_getitimer) {
-        print "found.\n";
+        print $^STDOUT, "found.\n";
     } else {
-	print "NOT found.\n";
+	print $^STDOUT, "NOT found.\n";
     }
 
     if ($has_setitimer && $has_getitimer) {
-	print "You have interval timers (both setitimer and getitimer).\n";
+	print $^STDOUT, "You have interval timers (both setitimer and getitimer).\n";
     } else {
-	print "You do not have interval timers.\n";
+	print $^STDOUT, "You do not have interval timers.\n";
     }
 
-    print "Looking for ualarm()... ";
+    print $^STDOUT, "Looking for ualarm()... ";
     my $has_ualarm;
-    if (exists %Config{d_ualarm}) {
-        $has_ualarm++ if %Config{d_ualarm};
+    if (defined config_value("d_ualarm")) {
+        $has_ualarm++ if config_value("d_ualarm");
     } elsif (has_x ("ualarm (0, 0)")) {
         $has_ualarm++;
 	$DEFINE .= ' -DHAS_UALARM';
     }
 
     if ($has_ualarm) {
-        print "found.\n";
+        print $^STDOUT, "found.\n";
     } else {
-	print "NOT found.\n";
+	print $^STDOUT, "NOT found.\n";
 	if ($has_setitimer) {
-	    print "But you have setitimer().\n";
-	    print "We can make a Time::HiRes::ualarm().\n";
+	    print $^STDOUT, "But you have setitimer().\n";
+	    print $^STDOUT, "We can make a Time::HiRes::ualarm().\n";
 	}
     }
 
-    print "Looking for usleep()... ";
+    print $^STDOUT, "Looking for usleep()... ";
     my $has_usleep;
-    if (exists %Config{d_usleep}) {
-	$has_usleep++ if %Config{d_usleep};
+    if (defined config_value("d_usleep")) {
+	$has_usleep++ if config_value("d_usleep");
     } elsif (has_x ("usleep (0)")) {
 	$has_usleep++;
 	$DEFINE .= ' -DHAS_USLEEP';
     }
 
     if ($has_usleep) {
-	print "found.\n";
+	print $^STDOUT, "found.\n";
     } else {
-	print "NOT found.\n";
-        print "Let's see if you have select()... ";
-        if (%Config{'d_select'}) {
-	    print "found.\n";
-	    print "We can make a Time::HiRes::usleep().\n";
+	print $^STDOUT, "NOT found.\n";
+        print $^STDOUT, "Let's see if you have select()... ";
+        if (config_value('d_select')) {
+	    print $^STDOUT, "found.\n";
+	    print $^STDOUT, "We can make a Time::HiRes::usleep().\n";
 	} else {
-	    print "NOT found.\n";
-	    print "You won't have a Time::HiRes::usleep().\n";
+	    print $^STDOUT, "NOT found.\n";
+	    print $^STDOUT, "You won't have a Time::HiRes::usleep().\n";
 	}
     }
 
-    print "Looking for nanosleep()... ";
+    print $^STDOUT, "Looking for nanosleep()... ";
     my $has_nanosleep;
-    if (%ENV{FORCE_NANOSLEEP_SCAN}) {
-	print "forced scan... ";
+    if (env::var('FORCE_NANOSLEEP_SCAN')) {
+	print $^STDOUT, "forced scan... ";
 	if (has_nanosleep()) {
 	    $has_nanosleep++;
 	    $DEFINE .= ' -DTIME_HIRES_NANOSLEEP';
 	}
     }
-    elsif (exists %Config{d_nanosleep}) {
-	print "believing \$Config\{d_nanosleep\}... ";
-	if (%Config{d_nanosleep}) {
+    elsif (defined config_value("d_nanosleep")) {
+	print $^STDOUT, "believing \$Config\{d_nanosleep\}... ";
+	if (config_value("d_nanosleep")) {
 	    $has_nanosleep++;
 	    $DEFINE .= ' -DTIME_HIRES_NANOSLEEP';
 	}
-    } elsif ($^O =~ m/^(mpeix)$/) {
+    } elsif ($^OS_NAME =~ m/^(mpeix)$/) {
 	# MPE/iX falsely finds nanosleep from its libc equivalent.
-	print "skipping because in $^O... ";
+	print $^STDOUT, "skipping because in $^OS_NAME... ";
     } else {
 	if (has_nanosleep()) {
 	    $has_nanosleep++;
@@ -489,20 +485,20 @@ EOD
     }
 
     if ($has_nanosleep) {
-	print "found.\n";
-        print "You can mix subsecond sleeps with signals, if you want to.\n";
-        print "(It's still not portable, though.)\n";
+	print $^STDOUT, "found.\n";
+        print $^STDOUT, "You can mix subsecond sleeps with signals, if you want to.\n";
+        print $^STDOUT, "(It's still not portable, though.)\n";
     } else {
-	print "NOT found.\n";
-	my $nt = ($^O eq 'os2' ? '' : 'not');
-        print "You can$nt mix subsecond sleeps with signals.\n";
-        print "(It would not be portable anyway.)\n";
+	print $^STDOUT, "NOT found.\n";
+	my $nt = ($^OS_NAME eq 'os2' ?? '' !! 'not');
+        print $^STDOUT, "You can$nt mix subsecond sleeps with signals.\n";
+        print $^STDOUT, "(It would not be portable anyway.)\n";
     }
 
-    print "Looking for clock_gettime()... ";
+    print $^STDOUT, "Looking for clock_gettime()... ";
     my $has_clock_gettime;
-    if (exists %Config{d_clock_gettime}) {
-        $has_clock_gettime++ if %Config{d_clock_gettime}; # Unlikely...
+    if (defined config_value("d_clock_gettime")) {
+        $has_clock_gettime++ if config_value("d_clock_gettime"); # Unlikely...
     } elsif (has_clock_xxx('gettime')) {
         $has_clock_gettime++;
 	$DEFINE .= ' -DTIME_HIRES_CLOCK_GETTIME';
@@ -513,18 +509,18 @@ EOD
 
     if ($has_clock_gettime) {
         if ($DEFINE =~ m/-DTIME_HIRES_CLOCK_GETTIME_SYSCALL/) {
-	    print "found (via syscall).\n";
+	    print $^STDOUT, "found (via syscall).\n";
 	} else {
-	    print "found.\n";
+	    print $^STDOUT, "found.\n";
 	}
     } else {
-	print "NOT found.\n";
+	print $^STDOUT, "NOT found.\n";
     }
 
-    print "Looking for clock_getres()... ";
+    print $^STDOUT, "Looking for clock_getres()... ";
     my $has_clock_getres;
-    if (exists %Config{d_clock_getres}) {
-        $has_clock_getres++ if %Config{d_clock_getres}; # Unlikely...
+    if (defined config_value("d_clock_getres")) {
+        $has_clock_getres++ if config_value("d_clock_getres"); # Unlikely...
     } elsif (has_clock_xxx('getres')) {
         $has_clock_getres++;
 	$DEFINE .= ' -DTIME_HIRES_CLOCK_GETRES';
@@ -535,47 +531,47 @@ EOD
 
     if ($has_clock_getres) {
         if ($DEFINE =~ m/-DTIME_HIRES_CLOCK_GETRES_SYSCALL/) {
-	    print "found (via syscall).\n";
+	    print $^STDOUT, "found (via syscall).\n";
 	} else {
-	    print "found.\n";
+	    print $^STDOUT, "found.\n";
 	}
     } else {
-	print "NOT found.\n";
+	print $^STDOUT, "NOT found.\n";
     }
 
-    print "Looking for clock_nanosleep()... ";
+    print $^STDOUT, "Looking for clock_nanosleep()... ";
     my $has_clock_nanosleep;
-    if (exists %Config{d_clock_nanosleep}) {
-        $has_clock_nanosleep++ if %Config{d_clock_nanosleep}; # Unlikely...
+    if (defined config_value("d_clock_nanosleep")) {
+        $has_clock_nanosleep++ if config_value("d_clock_nanosleep"); # Unlikely...
     } elsif (has_clock_nanosleep()) {
         $has_clock_nanosleep++;
 	$DEFINE .= ' -DTIME_HIRES_CLOCK_NANOSLEEP';
     }
 
     if ($has_clock_nanosleep) {
-        print "found.\n";
+        print $^STDOUT, "found.\n";
     } else {
-	print "NOT found.\n";
+	print $^STDOUT, "NOT found.\n";
     }
 
-    print "Looking for clock()... ";
+    print $^STDOUT, "Looking for clock()... ";
     my $has_clock;
-    if (exists %Config{d_clock}) {
-        $has_clock++ if %Config{d_clock}; # Unlikely...
+    if (defined config_value("d_clock")) {
+        $has_clock++ if config_value("d_clock"); # Unlikely...
     } elsif (has_clock()) {
         $has_clock++;
 	$DEFINE .= ' -DTIME_HIRES_CLOCK';
     }
 
     if ($has_clock) {
-        print "found.\n";
+        print $^STDOUT, "found.\n";
     } else {
-	print "NOT found.\n";
+	print $^STDOUT, "NOT found.\n";
     }
 
-    print "Looking for stat() subsecond timestamps...\n";
+    print $^STDOUT, "Looking for stat() subsecond timestamps...\n";
 
-    print "Trying struct stat st_atimespec.tv_nsec...";
+    print $^STDOUT, "Trying struct stat st_atimespec.tv_nsec...";
     my $has_stat_st_xtimespec;
     if (try_compile_and_link(<<EOM)) {
 $TIME_HEADERS
@@ -590,12 +586,12 @@ EOM
     }
 
     if ($has_stat_st_xtimespec) {
-        print "found.\n";
+        print $^STDOUT, "found.\n";
     } else {
-	print "NOT found.\n";
+	print $^STDOUT, "NOT found.\n";
     }
 
-    print "Trying struct stat st_atimensec...";
+    print $^STDOUT, "Trying struct stat st_atimensec...";
     my $has_stat_st_xtimensec;
     if (try_compile_and_link(<<EOM)) {
 $TIME_HEADERS
@@ -610,12 +606,12 @@ EOM
     }
 
     if ($has_stat_st_xtimensec) {
-        print "found.\n";
+        print $^STDOUT, "found.\n";
     } else {
-	print "NOT found.\n";
+	print $^STDOUT, "NOT found.\n";
     }
 
-    print "Trying struct stat st_atime_n...";
+    print $^STDOUT, "Trying struct stat st_atime_n...";
     my $has_stat_st_xtime_n;
     if (try_compile_and_link(<<EOM)) {
 $TIME_HEADERS
@@ -630,12 +626,12 @@ EOM
     }
 
     if ($has_stat_st_xtime_n) {
-        print "found.\n";
+        print $^STDOUT, "found.\n";
     } else {
-	print "NOT found.\n";
+	print $^STDOUT, "NOT found.\n";
     }
 
-    print "Trying struct stat st_atim.tv_nsec...";
+    print $^STDOUT, "Trying struct stat st_atim.tv_nsec...";
     my $has_stat_st_xtim;
     if (try_compile_and_link(<<EOM)) {
 $TIME_HEADERS
@@ -650,12 +646,12 @@ EOM
     }
 
     if ($has_stat_st_xtim) {
-        print "found.\n";
+        print $^STDOUT, "found.\n";
     } else {
-	print "NOT found.\n";
+	print $^STDOUT, "NOT found.\n";
     }
 
-    print "Trying struct stat st_uatime...";
+    print $^STDOUT, "Trying struct stat st_uatime...";
     my $has_stat_st_uxtime;
     if (try_compile_and_link(<<EOM)) {
 $TIME_HEADERS
@@ -670,38 +666,38 @@ EOM
     }
 
     if ($has_stat_st_uxtime) {
-        print "found.\n";
+        print $^STDOUT, "found.\n";
     } else {
-	print "NOT found.\n";
+	print $^STDOUT, "NOT found.\n";
     }
 
    if ($DEFINE =~ m/-DTIME_HIRES_STAT=\d+/) {
-    print "You seem to have stat() subsecond timestamps.\n";
-    print "(Your struct stat has them, but the filesystems must help.)\n";
+    print $^STDOUT, "You seem to have stat() subsecond timestamps.\n";
+    print $^STDOUT, "(Your struct stat has them, but the filesystems must help.)\n";
    } else {
-    print "You do not seem to have stat subsecond timestamps.\n";
+    print $^STDOUT, "You do not seem to have stat subsecond timestamps.\n";
    }
 
     my $has_w32api_windows_h;
 
-    if ($^O eq 'cygwin') {
-        print "Looking for <w32api/windows.h>... ";
+    if ($^OS_NAME eq 'cygwin') {
+        print $^STDOUT, "Looking for <w32api/windows.h>... ";
         if (has_include('w32api/windows.h')) {
 	    $has_w32api_windows_h++;
 	    DEFINE('HAS_W32API_WINDOWS_H');
 	}
         if ($has_w32api_windows_h) {
-	    print "found.\n";
+	    print $^STDOUT, "found.\n";
 	} else {
-	    print "NOT found.\n";
+	    print $^STDOUT, "NOT found.\n";
 	}
     }
 
     if ($DEFINE) {
         $DEFINE =~ s/^\s+//;
-        if (open(XDEFINE, ">", "xdefine")) {
-	    print XDEFINE $DEFINE, "\n";
-	    close(XDEFINE);
+        if (open(my $xdefine, ">", "xdefine")) {
+	    print $xdefine, $DEFINE, "\n";
+	    close($xdefine);
         }
     }
 }
@@ -766,40 +762,39 @@ sub doConstants {
                                            PROXYSUBS => 1,
 					  );
     } else {
-        my $file;
-	foreach $file (@('const-c.inc', 'const-xs.inc')) {
+	foreach my $file (@('const-c.inc', 'const-xs.inc')) {
 	    my $fallback = File::Spec->catfile('fallback', $file);
-	    local $/;
-	    open IN, "<$fallback" or die "Can't open $fallback: $!";
-	    open OUT, ">$file" or die "Can't open $file: $!";
-	    print OUT ~< *IN or die $!;
-	    close OUT or die "Can't close $file: $!";
-	    close IN or die "Can't close $fallback: $!";
+	    local $^INPUT_RECORD_SEPARATOR = undef;
+	    open my $in, "<", "$fallback" or die "Can't open $fallback: $^OS_ERROR";
+	    open my $out, ">", "$file" or die "Can't open $file: $^OS_ERROR";
+	    print $out, ~< $in or die $^OS_ERROR;
+	    close $out or die "Can't close $file: $^OS_ERROR";
+	    close $in or die "Can't close $fallback: $^OS_ERROR";
 	}
     }
 }
 
 sub main {
-    print "Configuring Time::HiRes...\n";
+    print $^STDOUT, "Configuring Time::HiRes...\n";
 
-    if ($^O =~ m/Win32/i) {
+    if ($^OS_NAME =~ m/Win32/i) {
       DEFINE('SELECT_IS_BROKEN');
       $LIBS = \@();
-      print "System is $^O, skipping full configure...\n";
+      print $^STDOUT, "System is $^OS_NAME, skipping full configure...\n";
     } else {
       init();
     }
     doMakefile;
     doConstants;
-    my $make = %Config{'make'} || "make";
-    unless (exists %ENV{PERL_CORE} && %ENV{PERL_CORE}) {
-	print  <<EOM;
+    my $make = config_value('make') || "make";
+    unless (env::var('PERL_CORE')) {
+	print $^STDOUT,  <<EOM;
 Now you may issue '$make'.  Do not forget also '$make test'.
 EOM
-       if ((exists %ENV{LC_ALL}   && %ENV{LC_ALL}   =~ m/utf-?8/i) ||
-           (exists %ENV{LC_CTYPE} && %ENV{LC_CTYPE} =~ m/utf-?8/i) ||
-           (exists %ENV{LANG}     && %ENV{LANG}     =~ m/utf-?8/i)) {
-            print <<EOM;
+       if ((defined env::var('LC_ALL')   && env::var('LC_ALL')   =~ m/utf-?8/i) ||
+           (defined env::var('LC_CTYPE') && env::var('LC_CTYPE') =~ m/utf-?8/i) ||
+           (defined env::var('LANG')     && env::var('LANG')     =~ m/utf-?8/i)) {
+            print $^STDOUT, <<EOM;
 
 NOTE: if you get an error like this (the Makefile line number may vary):
 Makefile:91: *** missing separator
@@ -814,6 +809,6 @@ EOM
     }
 }
 
-&main;
+&main( < @_ );
 
 # EOF

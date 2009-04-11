@@ -9,8 +9,7 @@
 
 use kurila;
 
-use strict;
-my $perl = $^X;
+my $perl = $^EXECUTABLE_NAME;
 
 require 'regen_lib.pl';
 # keep warnings.pl in sync with the CPAN distribution by not requiring core
@@ -33,13 +32,13 @@ sub do_cksum {
     my $pl = shift;
     my %cksum;
     for my $f ( @{ %gen{$pl} }) {
-	local *FH;
-	if (open(FH, "<", $f)) {
-	    local $/;
-	    %cksum{$f} = unpack("\%32C*", ~< *FH);
-	    close FH;
+        my $fh;
+	if (open($fh, "<", $f)) {
+	    local $^INPUT_RECORD_SEPARATOR;
+	    %cksum{+$f} = unpack("\%32C*", ~< $fh);
+	    close $fh;
 	} else {
-	    warn "$0: $f: $!\n";
+	    warn "$^PROGRAM_NAME: $f: $^OS_ERROR\n";
 	}
     }
     return %cksum;
@@ -47,18 +46,18 @@ sub do_cksum {
 
 foreach my $pl (qw (keywords.pl opcode.pl embed.pl
 		    regcomp.pl warnings.pl autodoc.pl reentr.pl)) {
-  print "$^X $pl\n";
+  print $^STDOUT, "$^EXECUTABLE_NAME $pl\n";
   my %cksum0;
   %cksum0 = %( < do_cksum($pl) ) unless $pl eq 'warnings.pl'; # the files were removed
-  system "$^X $pl";
+  system "$^EXECUTABLE_NAME $pl";
   next if $pl eq 'warnings.pl'; # the files were removed
   my %cksum1 = %( < do_cksum($pl) );
   my @chg;
   for my $f ( @{ %gen{$pl} }) {
       push(@chg, $f)
-	  if !defined(%cksum0{$f}) ||
-	     !defined(%cksum1{$f}) ||
-	     %cksum0{$f} ne %cksum1{$f};
+	  if !defined(%cksum0{?$f}) ||
+	     !defined(%cksum1{?$f}) ||
+	     %cksum0{?$f} ne %cksum1{?$f};
   }
-  print "Changed: {join ' ',@chg}\n" if (nelems @chg);
+  print $^STDOUT, "Changed: $(join ' ',@chg)\n" if (nelems @chg);
 }

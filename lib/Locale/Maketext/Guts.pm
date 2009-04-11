@@ -4,8 +4,8 @@ BEGIN { *zorp = sub { return scalar nelems @_ } unless defined &zorp; }
  # Just so we're nice and define SOMETHING in "our" package.
 
 package Locale::Maketext;
-use strict;
-use vars < qw($USE_LITERALS $GUTSPATH);
+
+our ($USE_LITERALS, $GUTSPATH);
 
 BEGIN {
   $GUTSPATH = __FILE__;
@@ -22,10 +22,10 @@ sub _compile {
   my $target = ref(@_[0]) || @_[0];
   
   my(@code);
-  my(@c) = @(''); # "chunks" -- scratch.
+  my@(@c) =@( @('')); # "chunks" -- scratch.
   my $call_count = 0;
   my $big_pile = '';
-  {
+  do {
     my $in_group = 0; # start out outside a group
     my($m, @params); # scratch
     
@@ -44,7 +44,7 @@ sub _compile {
        $
      )>xgs
     ) {
-      print "  \"$1\"\n" if DEBUG +> 2;
+      print $^STDOUT, "  \"$1\"\n" if DEBUG +> 2;
 
       if($1 eq '[' or $1 eq '') {       # "[" or end
         # Whether this is "[" or end, force processing of any
@@ -57,7 +57,7 @@ sub _compile {
           }
         } else {
           if($1 eq '') {
-            print "   [end-string]\n" if DEBUG +> 2;
+            print $^STDOUT, "   [end-string]\n" if DEBUG +> 2;
           } else {
             $in_group = 1;
           }
@@ -67,9 +67,9 @@ sub _compile {
             $big_pile .= @c[-1];
             if($USE_LITERALS and (
               (ord('A') == 65)
-               ? @c[-1] !~ m<[^\x20-\x7E]>s
+               ?? @c[-1] !~ m<[^\x20-\x7E]>s
                   # ASCII very safe chars
-               : @c[-1] !~ m/[^ !"\#\$%&'()*+,\-.\/0-9:;<=>?\@A-Z[\\\]^_`a-z{|}~\x07]/s
+               !! @c[-1] !~ m/[^ !"\#\$%&'()*+,\-.\/0-9:;<=>?\@A-Z[\\\]^_`a-z{|}~\x07]/s
                   # EBCDIC very safe chars
             )) {
               # normal case -- all very safe chars
@@ -89,19 +89,19 @@ sub _compile {
         if($in_group) {
           $in_group = 0;
           
-          print "   --Closing group [@c[-1]]\n" if DEBUG +> 2;
+          print $^STDOUT, "   --Closing group [@c[-1]]\n" if DEBUG +> 2;
           
           # And now process the group...
           
           if(!length(@c[-1]) or @c[-1] =~ m/^\s+$/s) {
-            DEBUG +> 2 and print "   -- (Ignoring)\n";
+            DEBUG +> 2 and print $^STDOUT, "   -- (Ignoring)\n";
             @c[-1] = ''; # reset out chink
             next;
           }
           
            #$c[-1] =~ s/^\s+//s;
            #$c[-1] =~ s/\s+$//s;
-          ($m,< @params) = < split(",", @c[-1], -1);  # was /\s*,\s*/
+          @($m,@< @params) =  split(",", @c[-1], -1);  # was /\s*,\s*/
           
           # A bit of a hack -- we've turned "~,"'s into DELs, so turn
           #  'em into real commas here.
@@ -165,9 +165,9 @@ sub _compile {
               @code[-1] .= '@_[' . (0 + $1) . '], ';
             } elsif($USE_LITERALS and (
               (ord('A') == 65)
-               ? $p !~ m<[^\x20-\x7E]>s
+               ?? $p !~ m<[^\x20-\x7E]>s
                   # ASCII very safe chars
-               : $p !~ m/[^ !"\#\$%&'()*+,\-.\/0-9:;<=>?\@A-Z[\\\]^_`a-z{|}~\x07]/s
+               !! $p !~ m/[^ !"\#\$%&'()*+,\-.\/0-9:;<=>?\@A-Z[\\\]^_`a-z{|}~\x07]/s
                   # EBCDIC very safe chars            
             )) {
               # Normal case: a literal containing only safe characters
@@ -222,7 +222,7 @@ sub _compile {
         @c[-1] .= $1;
       }
     }
-  }
+  };
 
   if($call_count) {
     undef $big_pile; # Well, nevermind that.
@@ -233,19 +233,19 @@ sub _compile {
   }
 
   die "Last chunk isn't null??" if (nelems @c) and length @c[-1]; # sanity
-  print scalar(nelems @c), " chunks under closure\n" if DEBUG;
+  print $^STDOUT, scalar(nelems @c), " chunks under closure\n" if DEBUG;
   if((nelems @code) == 0) { # not possible?
-    print "Empty code\n" if DEBUG;
+    print $^STDOUT, "Empty code\n" if DEBUG;
     return \'';
   } elsif((nelems @code) +> 1) { # most cases, presumably!
     unshift @code, "join '',@(\n";
   }
-  unshift @code, "use strict; sub \{\n";
+  unshift @code, "sub \{\n";
   push @code, ")\}\n";
 
-  print < @code if DEBUG;
+  print $^STDOUT, < @code if DEBUG;
   my $sub = eval(join '', @code);
-  die "{$@->message} while evalling" . join('', @code) if $@; # Should be impossible.
+  die "$($^EVAL_ERROR->message) while evalling" . join('', @code) if $^EVAL_ERROR; # Should be impossible.
   return $sub;
 }
 
@@ -259,7 +259,7 @@ sub _die_pointing {
   my $i = index(@_[0], "\n");
 
   my $pointy;
-  my $pos = pos(@_[0]) - (defined(@_[2]) ? @_[2] : 0) - 1;
+  my $pos = pos(@_[0]) - (defined(@_[2]) ?? @_[2] !! 0) - 1;
   if($pos +< 1) {
     $pointy = "^=== near there\n";
   } else { # we need to space over

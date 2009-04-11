@@ -1,9 +1,8 @@
 package ExtUtils::CBuilder::Platform::VMS;
 
-use strict;
 use ExtUtils::CBuilder::Base;
 
-use vars < qw($VERSION @ISA);
+our ($VERSION, @ISA);
 $VERSION = '0.22';
 @ISA = qw(ExtUtils::CBuilder::Base);
 
@@ -13,15 +12,14 @@ use File::Spec::Functions < qw(catfile catdir);
 
 sub need_prelink { 0 }
 
-sub arg_defines {
-  my ($self, < %args) = < @_;
+sub arg_defines($self, %< %args) {
 
   s/"/""/g foreach values %args;
 
   my @config_defines;
 
   # VMS can only have one define qualifier; add the one from config, if any.
-  if ($self->{config}->{ccflags} =~ s{/  def[^=]+  =+  \(?  ([^\/\)]*)  } {}ix) {
+  if ($self->{config}->{+ccflags} =~ s{/  def[^=]+  =+  \(?  ([^\/\)]*)  } {}ix) {
     push @config_defines, $1;
   }
 
@@ -30,16 +28,15 @@ sub arg_defines {
   return  @('/define=(' 
           . join(',', @( 
 		 < @config_defines,
-                 < map "\"$_" . ( length(%args{$_}) ? "=%args{$_}" : '') . "\"", 
+                 < map { "\"$_" . ( length(%args{?$_}) ?? "=%args{?$_}" !! '') . "\"" }, 
                      keys %args)) 
           . ')');
 }
 
-sub arg_include_dirs {
-  my ($self, < @dirs) = < @_;
+sub arg_include_dirs($self, @< @dirs) {
 
   # VMS can only have one include list, add the one from config.
-  if ($self->{config}->{ccflags} =~ s{/inc[^=]+(?:=)+(?:\()?([^\/\)]*)} {}i) {
+  if ($self->{config}->{+ccflags} =~ s{/inc[^=]+(?:=)+(?:\()?([^\/\)]*)} {}i) {
     unshift @dirs, $1;
   }
   return unless (nelems @dirs);
@@ -47,13 +44,12 @@ sub arg_include_dirs {
   return  @('/include=(' . join(',', @dirs) . ')');
 }
 
-sub _do_link {
-  my ($self, $type, < %args) = < @_;
+sub _do_link($self, $type, %< %args) {
   
   my $objects = delete %args{objects};
   $objects = \@($objects) unless ref $objects;
   
-  if (%args{lddl}) {
+  if (%args{?lddl}) {
 
     # prelink will call Mksymlists, which creates the extension-specific
     # linker options file and populates it with the boot symbol.
@@ -72,8 +68,8 @@ sub _do_link {
 
     my $optfile = 'sys$disk:[]' . @temp_files[0];
     open my $opt_fh, '>>', $optfile 
-        or die "_do_link: Unable to open $optfile: $!";
-    for my $lib ( @optlibs) {print $opt_fh "$lib\n" if length $lib }
+        or die "_do_link: Unable to open $optfile: $^OS_ERROR";
+    for my $lib ( @optlibs) {print $opt_fh, "$lib\n" if length $lib }
     close $opt_fh;
 
     $objects->[-1] .= ',';
@@ -88,31 +84,27 @@ sub _do_link {
 
 sub arg_nolink { return; }
 
-sub arg_object_file {
-  my ($self, $file) = < @_;
+sub arg_object_file($self, $file) {
   return "/obj=$file";
 }
 
-sub arg_exec_file {
-  my ($self, $file) = < @_;
+sub arg_exec_file($self, $file) {
   return  @("/exe=$file");
 }
 
-sub arg_share_object_file {
-  my ($self, $file) = < @_;
-  return  @("$self->{config}->{lddlflags}=$file");
+sub arg_share_object_file($self, $file) {
+  return  @("$self->{config}->{?lddlflags}=$file");
 }
 
 
-sub lib_file {
-  my ($self, $dl_file) = < @_;
+sub lib_file($self, $dl_file) {
   $dl_file =~ s/\.[^.]+$//;
   $dl_file =~ s/"//g;
-  $dl_file = $dl_file .= '.' . $self->{config}->{dlext};
+  $dl_file = $dl_file .= '.' . $self->{config}->{?dlext};
 
   # Need to create with the same name as DynaLoader will load with.
   if (defined &DynaLoader::mod2fname) {
-    my ($dev,$dir,$file) = < File::Spec->splitpath($dl_file);
+    my @($dev,$dir,$file) =  File::Spec->splitpath($dl_file);
     $file = DynaLoader::mod2fname(\@($file));
     $dl_file = File::Spec->catpath($dev,$dir,$file);
   }
@@ -122,42 +114,41 @@ sub lib_file {
 # The following is reproduced almost verbatim from ExtUtils::Liblist::Kid::_vms_ext.
 # We can't just call that because it's tied up with the MakeMaker object hierarchy.
 
-sub _liblist_ext {
-  my($self, $potential_libs,$verbose,$give_libs) = < @_;
+sub _liblist_ext($self, $potential_libs,$verbose,$give_libs) {
   $verbose ||= 0;
 
   my(@crtls,$crtlstr);
-  @crtls = @( ($self->{'config'}->{'ldflags'} =~ m-/Debug-i ? $self->{'config'}->{'dbgprefix'} : '')
+  @crtls = @( ($self->{'config'}->{?'ldflags'} =~ m-/Debug-i ?? $self->{'config'}->{?'dbgprefix'} !! '')
               . 'PerlShr/Share' );
-  push(@crtls, < grep { not m/\(/ } split m/\s+/, $self->{'config'}->{'perllibs'});
-  push(@crtls, < grep { not m/\(/ } split m/\s+/, $self->{'config'}->{'libc'});
+  push(@crtls, < grep { not m/\(/ }, split m/\s+/, $self->{'config'}->{?'perllibs'});
+  push(@crtls, < grep { not m/\(/ }, split m/\s+/, $self->{'config'}->{?'libc'});
   # In general, we pass through the basic libraries from %Config unchanged.
   # The one exception is that if we're building in the Perl source tree, and
   # a library spec could be resolved via a logical name, we go to some trouble
   # to insure that the copy in the local tree is used, rather than one to
   # which a system-wide logical may point.
   if ($self->perl_src) {
-    my($lib,$locspec,$type);
-    foreach $lib ( @crtls) { 
-      if (($locspec,$type) = $lib =~ m{^([\w\$-]+)(/\w+)?} and $locspec =~ m/perl/i) {
-        if    (lc $type eq '/share')   { $locspec .= $self->{'config'}->{'exe_ext'}; }
-        elsif (lc $type eq '/library') { $locspec .= $self->{'config'}->{'lib_ext'}; }
-        else                           { $locspec .= $self->{'config'}->{'obj_ext'}; }
+    my($locspec,$type);
+    foreach my $lib ( @crtls) { 
+      if (@($locspec,$type) = $lib =~ m{^([\w\$-]+)(/\w+)?} and $locspec =~ m/perl/i) {
+        if    (lc $type eq '/share')   { $locspec .= $self->{'config'}->{?'exe_ext'}; }
+        elsif (lc $type eq '/library') { $locspec .= $self->{'config'}->{?'lib_ext'}; }
+        else                           { $locspec .= $self->{'config'}->{?'obj_ext'}; }
         $locspec = catfile( <$self->perl_src, $locspec);
         $lib = "$locspec$type" if -e $locspec;
       }
     }
   }
-  $crtlstr = (nelems @crtls) ? join(' ', @crtls) : '';
+  $crtlstr = (nelems @crtls) ?? join(' ', @crtls) !! '';
 
   unless ($potential_libs) {
     warn "Result:\n\tEXTRALIBS: \n\tLDLOADLIBS: $crtlstr\n" if $verbose;
-    return  @('', '', $crtlstr, '',  @($give_libs ? \@() : ()));
+    return  @('', '', $crtlstr, '',  @($give_libs ?? \@() !! ()));
   }
 
-  my(@dirs,@libs,$dir,$lib,%found,@fndlibs,$ldlib);
+  my(@dirs,@libs,%found,@fndlibs,$ldlib);
   my $cwd = cwd();
-  my($so,$lib_ext,$obj_ext) = < %{$self->{'config'}}{[@('so','lib_ext','obj_ext')]};
+  my@($so,$lib_ext,$obj_ext) =  %{$self->{'config'}}{[@('so','lib_ext','obj_ext')]};
   # List of common Unix library names and their VMS equivalents
   # (VMS equivalent of '' indicates that the library is automatically
   # searched by the linker, and should be skipped here.)
@@ -167,24 +158,24 @@ sub _liblist_ext {
                  'socket' => '', 'X11' => 'DECW$XLIBSHR',
                  'Xt' => 'DECW$XTSHR', 'Xm' => 'DECW$XMLIBSHR',
                  'Xmu' => 'DECW$XMULIBSHR');
-  if ($self->{'config'}->{'vms_cc_type'} ne 'decc') { %libmap{'curses'} = 'VAXCCURSE'; }
+  if ($self->{'config'}->{?'vms_cc_type'} ne 'decc') { %libmap{+'curses'} = 'VAXCCURSE'; }
 
   warn "Potential libraries are '$potential_libs'\n" if $verbose;
 
   # First, sort out directories and library names in the input
-  foreach $lib (split ' ',$potential_libs) {
+  foreach my $lib (split ' ',$potential_libs) {
     push(@dirs,$1),   next if $lib =~ m/^-L(.*)/;
     push(@dirs,$lib), next if $lib =~ m/[:>\]]$/;
     push(@dirs,$lib), next if -d $lib;
     push(@libs,$1),   next if $lib =~ m/^-l(.*)/;
     push(@libs,$lib);
   }
-  push(@dirs, <split(' ',$self->{'config'}->{'libpth'}));
+  push(@dirs, <split(' ',$self->{'config'}->{?'libpth'}));
 
   # Now make sure we've got VMS-syntax absolute directory specs
   # (We don't, however, check whether someone's hidden a relative
   # path in a logical name.)
-  foreach $dir ( @dirs) {
+  foreach my $dir ( @dirs) {
     unless (-d $dir) {
       warn "Skipping nonexistent Directory $dir\n" if $verbose +> 1;
       $dir = '';
@@ -195,32 +186,32 @@ sub _liblist_ext {
         $dir = catdir($cwd,$dir); 
     }
   }
-  @dirs = grep { length($_) } @dirs;
+  @dirs = grep { length($_) }, @dirs;
   unshift(@dirs,''); # Check each $lib without additions first
 
-  LIB: foreach $lib ( @libs) {
+  LIB: foreach my $lib ( @libs) {
     if (exists %libmap{$lib}) {
-      next unless length %libmap{$lib};
-      $lib = %libmap{$lib};
+      next unless length %libmap{?$lib};
+      $lib = %libmap{?$lib};
     }
 
-    my(@variants,$variant,$cand);
-    my($ctype) = '';
+    my(@variants,$cand);
+    my@($ctype) = '';
 
     # If we don't have a file type, consider it a possibly abbreviated name and
     # check for common variants.  We try these first to grab libraries before
     # a like-named executable image (e.g. -lperl resolves to perlshr.exe
     # before perl.exe).
     if ($lib !~ m/\.[^:>\]]*$/) {
-      push(@variants,"{$lib}shr","{$lib}rtl","{$lib}lib");
+      push(@variants,"$($lib)shr","$($lib)rtl","$($lib)lib");
       push(@variants,"lib$lib") if $lib !~ m/[:>\]]/;
     }
     push(@variants,$lib);
     warn "Looking for $lib\n" if $verbose;
-    foreach $variant ( @variants) {
+    foreach my $variant ( @variants) {
       my($fullname, $name);
 
-      foreach $dir ( @dirs) {
+      foreach my $dir ( @dirs) {
         my($type);
 
         $name = "$dir$variant";
@@ -273,7 +264,7 @@ sub _liblist_ext {
         else                      { push    @{%found{$ctype}}, $cand; }
         warn "\tFound as $cand (really $fullname), type $ctype\n" 
           if $verbose +> 1;
-	push @flibs, $name unless %libs_seen{$fullname}++;
+	push @flibs, $name unless %libs_seen{+$fullname}++;
         next LIB;
       }
     }
@@ -281,14 +272,14 @@ sub _liblist_ext {
 		 ."No library found for $lib\n";
   }
 
-  push @fndlibs, < @{%found{OBJ}}                      if exists %found{OBJ};
-  push @fndlibs, < map { "$_/Library" } @{%found{OLB}} if exists %found{OLB};
-  push @fndlibs, < map { "$_/Share"   } @{%found{SHR}} if exists %found{SHR};
-  $lib = join(' ', @fndlibs);
+  push @fndlibs, < @{%found{?OBJ}}                      if exists %found{OBJ};
+  push @fndlibs, < map { "$_/Library" }, @{%found{OLB}} if exists %found{OLB};
+  push @fndlibs, < map { "$_/Share"   }, @{%found{SHR}} if exists %found{SHR};
+  my $lib = join(' ', @fndlibs);
 
-  $ldlib = $crtlstr ? "$lib $crtlstr" : $lib;
+  $ldlib = $crtlstr ?? "$lib $crtlstr" !! $lib;
   warn "Result:\n\tEXTRALIBS: $lib\n\tLDLOADLIBS: $ldlib\n" if $verbose;
-  return @($lib, '', $ldlib, '', ($give_libs ? \@flibs : ()));
+  return @($lib, '', $ldlib, '', ($give_libs ?? \@flibs !! ()));
 }
 
 1;

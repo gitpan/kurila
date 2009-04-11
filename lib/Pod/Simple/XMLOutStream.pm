@@ -1,10 +1,10 @@
 
 package Pod::Simple::XMLOutStream;
-use strict;
+
 use utf8;
 use Carp ();
 use Pod::Simple ();
-use vars < qw( $ATTR_PAD @ISA $VERSION $SORT_ATTRS);
+our ($ATTR_PAD, @ISA, $VERSION, $SORT_ATTRS);
 $VERSION = '2.02';
 BEGIN {
   @ISA = @('Pod::Simple');
@@ -19,7 +19,7 @@ $SORT_ATTRS = 0 unless defined $SORT_ATTRS;
 sub new {
   my $self = shift;
   my $new = $self->SUPER::new(< @_);
-  $new->{'output_fh'} ||= *STDOUT{IO};
+  $new->{+'output_fh'} ||= $^STDOUT;
   #$new->accept_codes('VerbatimFormatted');
   return $new;
 }
@@ -28,37 +28,37 @@ sub new {
 
 sub _handle_element_start {
   # ($self, $element_name, $attr_hash_r)
-  my $fh = @_[0]->{'output_fh'};
-  DEBUG and print "++ @_[1]\n";
-  print $fh "<", @_[1];
+  my $fh = @_[0]->{?'output_fh'};
+  DEBUG and print $^STDOUT, "++ @_[1]\n";
+  print $fh, "<", @_[1];
   foreach my $key (sort keys %{@_[2]}) {
       unless($key =~ m/^~/s) {
-          next if $key eq 'start_line' and @_[0]->{'hide_line_numbers'};
-          my $value = @_[2]->{$key};
+          next if $key eq 'start_line' and @_[0]->{?'hide_line_numbers'};
+          my $value = @_[2]->{?$key};
           if (@_[1] eq 'L' and $key =~ m/^(?:section|to)$/) {
               $value = $value->as_string;
           }
           _xml_escape($value);
-          print $fh $ATTR_PAD, $key, '="', $value, '"';
+          print $fh, $ATTR_PAD, $key, '="', $value, '"';
       }
   }
-  print $fh ">";
+  print $fh, ">";
   return;
 }
 
 sub _handle_text {
-  DEBUG and print "== \"@_[1]\"\n";
+  DEBUG and print $^STDOUT, "== \"@_[1]\"\n";
   if(length @_[1]) {
     my $text = @_[1];
     _xml_escape($text);
-    print {@_[0]->{'output_fh'}} $text;
+    print @_[0]->{?'output_fh'} ,$text;
   }
   return;
 }
 
 sub _handle_element_end {
-  DEBUG and print "-- @_[1]\n";
-  print {@_[0]->{'output_fh'}} "</", @_[1], ">";
+  DEBUG and print $^STDOUT, "-- @_[1]\n";
+  print @_[0]->{?'output_fh'} ,"</", @_[1], ">";
   return;
 }
 
@@ -68,8 +68,7 @@ sub _handle_element_end {
 sub _xml_escape {
   foreach my $x ( @_) {
     # Escape things very cautiously:
-    $x =~ s/([^-\n\t !\#\$\%\(\)\*\+,\.\~\/\:\;=\?\@\[\\\]\^_\`\{\|\}abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789])/{'&#'.(ord($1)).';'
-}/g;
+    $x =~ s/([^-\n\t !\#\$\%\(\)\*\+,\.\~\/\:\;=\?\@\[\\\]\^_\`\{\|\}abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789])/$('&#'.(ord($1)).';')/g;
     # Yes, stipulate the list without a range, so that this can work right on
     #  all charsets that this module happens to run under.
     # Altho, hmm, what about that ord?  Presumably that won't work right

@@ -53,7 +53,7 @@ readily cut-and-pastable into this file.
 
 
 C<< -r <file> >> reads a file, as written by C<-c>, and adjusts the expected
-results accordingly.  The file is 'required', so @INC settings apply.
+results accordingly.  The file is 'required', so $^INCLUDE_PATH settings apply.
 
 If module-names are given as args, those packages are run through the
 test harness; this is handy for collecting further items to test, and
@@ -96,12 +96,8 @@ Looking at ../foo2, you'll see 34 occurrences of the following error:
 
 BEGIN {
     require Config;
-    if ((%Config::Config{'extensions'} !~ m/\bB\b/) ){
-        print "1..0 # Skip -- Perl configured without B module\n";
-        exit 0;
-    }
-    unless (%Config::Config{useperlio}) {
-        print "1..0 # Skip -- Perl configured without perlio\n";
+    unless (Config::config_value("useperlio")) {
+        print $^STDOUT, "1..0 # Skip -- Perl configured without perlio\n";
         exit 0;
     }
 }
@@ -136,11 +132,11 @@ my $testpkgs = \%(
 		  warnhook walkoptree_debug walkoptree 
 		  svref_2object sv_yes sv_undef sv_no save_BEGINs
 		  regex_padav ppname perlstring opnumber minus_c
-		  main_start main_root main_cv init_av inc_gv hash
+		  main_start main_root main_cv init_av hash
 		  end_av dowarn diehook defstash curstash
 		  cstring comppadlist check_av cchar cast_I32 bootstrap
-		  begin_av sub_generation address
-                  set_main_start set_main_root fudge unitcheck_av),
+		  sub_generation address
+                  fudge unitcheck_av),
     ),
 
     'B::Deparse' => \%( dflt => 'perl',	# 235 functions
@@ -148,21 +144,21 @@ my $testpkgs = \%(
 	XS => \qw( svref_2object perlstring opnumber main_start
 		   main_root main_cv ),
 
-	constant => \@( <qw/ ASSIGN CVf_LOCKED
-		     CVf_METHOD LIST_CONTEXT OP_CONST OP_LIST OP_RV2SV
+	constant => \qw/ ASSIGN
+		     LIST_CONTEXT OP_CONST OP_LIST OP_RV2SV
 		     OP_STRINGIFY OPf_KIDS OPf_MOD OPf_REF OPf_SPECIAL
 		     OPf_STACKED OPf_WANT OPf_WANT_LIST OPf_WANT_SCALAR
 		     OPf_WANT_VOID OPpCONST_BARE
 		     OPpENTERSUB_AMPER OPpEXISTS_SUB OPpITER_REVERSED
 		     OPpLVAL_INTRO OPpOUR_INTRO OPpSLICE OPpSORT_DESCEND
 		     OPpSORT_INTEGER OPpSORT_NUMERIC
-		     OPpSORT_REVERSE OPpTARGET_MY 
+		     OPpSORT_REVERSE OPf_TARGET_MY 
 		     PMf_CONTINUE
-		     PMf_EVAL PMf_EXTENDED PMf_FOLD PMf_GLOBAL PMf_KEEP
+		     PMf_EXTENDED PMf_FOLD PMf_GLOBAL PMf_KEEP
 		     PMf_MULTILINE PMf_SINGLELINE
 		     POSTFIX SVf_FAKE SVf_IOK SVf_NOK SVf_POK SVf_ROK
-		     SVpad_OUR SVs_RMG SVs_SMG SWAP_CHILDREN OPpPAD_STATE
-		     /, 'RXf_SKIPWHITE'),
+		     SVpad_OUR SVs_RMG SVs_SMG SWAP_CHILDREN
+		     RXf_SKIPWHITE/,
 		 ),
 
     POSIX => \%( dflt => 'constant',			# all but 252/589
@@ -254,19 +250,19 @@ if (%opts) {
 my @argpkgs = @ARGV;
 my %report;
 
-if (%opts{r}) {
-    my $refpkgs = require "%opts{r}";
-    $testpkgs->{$_} = $refpkgs->{$_} foreach keys %$refpkgs;
+if (%opts{?r}) {
+    my $refpkgs = require "%opts{?r}";
+    $testpkgs->{+$_} = $refpkgs->{?$_} foreach keys %$refpkgs;
 }
 
-unless (%opts{a}) {
+unless (%opts{?a}) {
     unless (nelems @argpkgs) {
 	foreach my $pkg (sort keys %$testpkgs) {
-	    test_pkg($pkg, $testpkgs->{$pkg});
+	    test_pkg($pkg, $testpkgs->{?$pkg});
 	}
     } else {
 	foreach my $pkg ( @argpkgs) {
-	    test_pkg($pkg, $testpkgs->{$pkg});
+	    test_pkg($pkg, $testpkgs->{?$pkg});
 	}
     }
 } else {
@@ -274,85 +270,83 @@ unless (%opts{a}) {
 }
 ############
 
-sub test_pkg {
-    my ($pkg, $fntypes) = < @_;
+sub test_pkg($pkg, ?$fntypes) {
     require_ok($pkg);
 
     # build %stash: keys are func-names, vals filled in below
-    my (%stash) = %( < map
-	( ($_ => 0), @(
-	   ( < grep exists &{*{Symbol::fetch_glob("$pkg\::$_")}}	# grab CODE symbols
-, grep !m/__ANON__/, keys %{*{Symbol::fetch_glob($pkg.'::')}}		# from symbol table
-	       ))) );
+    my %stash = %+: map
+      { %: $_ => 0 },
+        grep { exists &{*{Symbol::fetch_glob("$pkg\::$_")}}	# grab CODE symbols
+           },
+             grep { !m/__ANON__/ }, keys %{*{Symbol::fetch_glob($pkg.'::')}}		# from symbol table
+               ;
 
     for my $type (keys %matchers) {
-	foreach my $fn ( @{$fntypes->{$type}}) {
-	    carp "$fn can only be one of $type, %stash{$fn}\n"
-		if %stash{$fn};
-	    %stash{$fn} = $type;
+	foreach my $fn ( @{$fntypes->{?$type}}) {
+	    carp "$fn can only be one of $type, %stash{?$fn}\n"
+		if %stash{?$fn};
+	    %stash{+$fn} = $type;
 	}
     }
     # set default type for un-named functions
-    my $dflt = $fntypes->{dflt} || 'perl';
+    my $dflt = $fntypes->{?dflt} || 'perl';
     for my $k (keys %stash) {
-	%stash{$k} = $dflt unless %stash{$k};
+	%stash{+$k} = $dflt unless %stash{?$k};
     }
-    %stash{$_} = 'skip' foreach  @{$fntypes->{skip}};
+    %stash{+$_} = 'skip' foreach  @{$fntypes->{?skip}};
 
-    if (%opts{v}) {
+    if (%opts{?v}) {
 	diag("fntypes: " => < Dumper($fntypes));
 	diag("$pkg stash: " => < Dumper(\%stash));
     }
     foreach my $fn (reverse sort keys %stash) {
-	next if %stash{$fn} eq 'skip';
-	my $res = checkXS("{$pkg}::$fn", %stash{$fn});
+	next if %stash{?$fn} eq 'skip';
+	my $res = checkXS("$($pkg)::$fn", %stash{?$fn});
 	if ($res ne '1') {
 	    push @{%report{$pkg}->{$res}}, $fn;
 	}
     }
 }
 
-sub checkXS {
-    my ($func_name, $want) = < @_;
+sub checkXS($func_name, $want) {
 
     croak "unknown type $want: $func_name\n"
-	unless defined %matchers{$want};
+	unless defined %matchers{?$want};
 
-    my ($buf, $err) = < render($func_name);
-    my $res = like($buf, %matchers{$want}, "$want sub:\t $func_name");
+    my @($buf, $err) =  render($func_name);
+    my $res = like($buf, %matchers{?$want}, "$want sub:\t $func_name");
 
     unless ($res) {
 	# test failed. return type that would give success
 	for my $m (keys %matchers) {
-	    return $m if $buf =~ %matchers{$m};
+	    return $m if $buf =~ %matchers{?$m};
 	}
     }
     $res;
 }
 
-sub render {
-    my ($func_name) = < @_;
+sub render($func_name) {
 
     B::Concise::reset_sequence();
     B::Concise::walk_output(\my $buf);
 
     my $walker = B::Concise::compile($func_name);
     try { $walker->() };
-    diag("err: {$@->message} $buf") if $@;
-    diag("verbose: $buf") if %opts{V};
+    diag("err: $($^EVAL_ERROR->message) $buf") if $^EVAL_ERROR;
+    diag("verbose: $buf") if %opts{?V};
 
-    return  @($buf, $@);
+    return  @($buf, $^EVAL_ERROR);
 }
 
 sub corecheck {
     try { require Module::CoreList };
-    if ($@) {
-	warn "Module::CoreList not available on $^V\n";
+    if ($^EVAL_ERROR) {
+	warn "Module::CoreList not available on $^PERL_VERSION\n";
 	return;
     }
-    my $mods = %Module::CoreList::version{'5.009002'};
+    my $mods = %Module::CoreList::version{?'5.009002'};
     $mods = \ sort keys %$mods;
-    print < Dumper($mods);
+    print $^STDOUT, < Dumper($mods);
 
     foreach my $pkgnm ( @$mods) {
 	test_pkg($pkgnm);
@@ -360,14 +354,14 @@ sub corecheck {
 }
 
 END {
-    if (%opts{c}) {
+    if (%opts{?c}) {
 	$Data::Dumper::Indent = 1;
-	print "Corrections: ", < Dumper(\%report);
+	print $^STDOUT, "Corrections: ", < Dumper(\%report);
 
 	foreach my $pkg (sort keys %report) {
 	    for my $type (keys %matchers) {
-		print "$pkg: $type: {join ' ',@{%report{$pkg}->{$type}}}\n"
-		    if (nelems @{%report{$pkg}->{$type}});
+		print $^STDOUT, "$pkg: $type: $(join ' ',@{%report{$pkg}->{?$type}})\n"
+		    if (nelems @{%report{$pkg}->{?$type}});
 	    }
 	}
     }

@@ -1,7 +1,6 @@
 package ExtUtils::Constant::XS;
 
-use strict;
-use vars < qw($VERSION %XS_Constant %XS_TypeSet @ISA @EXPORT_OK);
+our ($VERSION, %XS_Constant, %XS_TypeSet, @ISA, @EXPORT_OK);
 use ExtUtils::Constant::Utils 'perl_stringify';
 require ExtUtils::Constant::Base;
 
@@ -77,8 +76,7 @@ sub header {
   return join '', @lines;
 }
 
-sub valid_type {
-  my ($self, $type) = < @_;
+sub valid_type($self, $type) {
   return exists %XS_TypeSet{$type};
 }
 
@@ -86,12 +84,12 @@ sub valid_type {
 sub assignment_clause_for_type {
   my $self = shift;
   my $args = shift;
-  my $type = $args->{type};
-  my $typeset = %XS_TypeSet{$type};
+  my $type = $args->{?type};
+  my $typeset = %XS_TypeSet{?$type};
   if (ref $typeset) {
     die "Type $type is aggregate, but only single value given"
       if (nelems @_) == 1;
-    return map {"$typeset->[$_]@_[$_];"} 0 .. ((nelems @$typeset)-1);
+    return map {"$typeset->[$_]@_[$_];"}, 0 .. ((nelems @$typeset)-1);
   } elsif (defined $typeset) {
     die "Aggregate value given for type $type"
       if (nelems @_) +> 1;
@@ -100,10 +98,9 @@ sub assignment_clause_for_type {
   return ();
 }
 
-sub return_statement_for_type {
-  my ($self, $type) = < @_;
+sub return_statement_for_type($self, $type) {
   # In the future may pass in an options hash
-  $type = $type->{type} if ref $type;
+  $type = $type->{?type} if ref $type;
   "return PERL_constant_IS$type;";
 }
 
@@ -121,16 +118,14 @@ sub default_type {
   'IV';
 }
 
-sub macro_from_name {
-  my ($self, $item) = < @_;
-  my $macro = $item->{name};
-  $macro = $item->{value} unless defined $macro;
+sub macro_from_name($self, $item) {
+  my $macro = $item->{?name};
+  $macro = $item->{?value} unless defined $macro;
   $macro;
 }
 
-sub macro_from_item {
-  my ($self, $item) = < @_;
-  my $macro = $item->{macro};
+sub macro_from_item($self, $item) {
+  my $macro = $item->{?macro};
   $macro = $self->macro_from_name($item) unless defined $macro;
   $macro;
 }
@@ -140,17 +135,16 @@ sub memEQ {
   "memEQ";
 }
 
-sub params {
-  my ($self, $what) = < @_;
+sub params($self, $what) {
   foreach (sort keys %$what) {
-    warn "ExtUtils::Constant doesn't know how to handle values of type $_" unless defined %XS_Constant{$_};
+    warn "ExtUtils::Constant doesn't know how to handle values of type $_" unless defined %XS_Constant{?$_};
   }
   my $params = \%();
-  $params->{''} = 1 if $what->{''};
-  $params->{IV} = 1 if $what->{IV} || $what->{UV} || $what->{PVN};
-  $params->{NV} = 1 if $what->{NV};
-  $params->{PV} = 1 if $what->{PV} || $what->{PVN};
-  $params->{SV} = 1 if $what->{SV};
+  $params->{+''} = 1 if $what->{?''};
+  $params->{+IV} = 1 if $what->{?IV} || $what->{?UV} || $what->{?PVN};
+  $params->{+NV} = 1 if $what->{?NV};
+  $params->{+PV} = 1 if $what->{?PV} || $what->{?PVN};
+  $params->{+SV} = 1 if $what->{?SV};
   return $params;
 }
 
@@ -167,29 +161,26 @@ sub namelen_param_definition {
   'STRLEN ' . @_[0] -> namelen_param;
 }
 
-sub C_constant_other_params_defintion {
-  my ($self, $params) = < @_;
+sub C_constant_other_params_defintion($self, $params) {
   my $body = '';
-  $body .= ", IV *iv_return" if $params->{IV};
-  $body .= ", NV *nv_return" if $params->{NV};
-  $body .= ", const char **pv_return" if $params->{PV};
-  $body .= ", SV **sv_return" if $params->{SV};
+  $body .= ", IV *iv_return" if $params->{?IV};
+  $body .= ", NV *nv_return" if $params->{?NV};
+  $body .= ", const char **pv_return" if $params->{?PV};
+  $body .= ", SV **sv_return" if $params->{?SV};
   $body;
 }
 
-sub C_constant_other_params {
-  my ($self, $params) = < @_;
+sub C_constant_other_params($self, $params) {
   my $body = '';
-  $body .= ", iv_return" if $params->{IV};
-  $body .= ", nv_return" if $params->{NV};
-  $body .= ", pv_return" if $params->{PV};
-  $body .= ", sv_return" if $params->{SV};
+  $body .= ", iv_return" if $params->{?IV};
+  $body .= ", nv_return" if $params->{?NV};
+  $body .= ", pv_return" if $params->{?PV};
+  $body .= ", sv_return" if $params->{?SV};
   $body;
 }
 
-sub dogfood {
-  my ($self, $args, < @items) = < @_;
-  my ($package, $subname, $default_type, $what, $indent, $breakout) = <
+sub dogfood($self, $args, @< @items) {
+  my @($package, $subname, $default_type, $what, $indent, $breakout) = 
     %{$args}{[qw(package subname default_type what indent breakout)]};
   my $result = <<"EOT";
   /* When generated this function returned values for the list of names given
@@ -202,7 +193,7 @@ sub dogfood {
      Regenerate these constant functions by feeding this entire source file to
      perl -x
 
-#!$^X -w
+#!$^EXECUTABLE_NAME -w
 use ExtUtils::Constant qw (constant_types C_constant XS_constant);
 
 EOT

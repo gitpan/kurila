@@ -1,19 +1,18 @@
 #!/usr/bin/perl -w
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't' if -d 't';
-        @INC = @('../lib', 'lib');
+        $^INCLUDE_PATH = @('../lib', 'lib');
     }
     else {
-        unshift @INC, 't/lib';
+        unshift $^INCLUDE_PATH, 't/lib';
     }
 }
 
-use strict;
 use Test::More;
 
-if( $^O eq 'VMS' ) {
+if( $^OS_NAME eq 'VMS' ) {
     plan skip_all => 'prefixify works differently on VMS';
 }
 else {
@@ -23,7 +22,7 @@ use ExtUtils::MakeMaker::Config;
 use File::Spec;
 use ExtUtils::MM;
 
-my $Is_Dosish = $^O =~ m/^(dos|MSWin32)$/;
+my $Is_Dosish = $^OS_NAME =~ m/^(dos|MSWin32)$/;
 
 my $mm = bless \%(), 'MM';
 
@@ -33,16 +32,16 @@ $mm->prefixify('installbin', 'wibble', 'something', $default);
 is( $mm->{INSTALLBIN}, %Config{installbin},
                                             'prefixify w/defaults');
 
-$mm->{ARGS}->{PREFIX} = 'foo';
+$mm->{ARGS}->{+PREFIX} = 'foo';
 $mm->prefixify('installbin', 'wibble', 'something', $default);
 is( $mm->{INSTALLBIN}, File::Spec->catdir('something', $default),
                                             'prefixify w/defaults and PREFIX');
 
-SKIP: {
+SKIP: do {
     skip "Test for DOSish prefixification", 1 unless $Is_Dosish;
 
     %Config{wibble} = 'C:\opt\perl\wibble';
     $mm->prefixify('wibble', 'C:\opt\perl', 'C:\yarrow');
 
     is( $mm->{WIBBLE}, 'C:\yarrow\wibble',  'prefixify Win32 paths' );
-}
+};

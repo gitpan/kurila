@@ -1,9 +1,9 @@
 #!/usr/bin/perl -w
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't';
-        @INC = @( '../lib' );
+        $^INCLUDE_PATH = @( '../lib' );
     }
 }
 
@@ -24,7 +24,7 @@ $Test->is_num('23.0', '23',     'is_num');
 $Test->is_num( $Test->current_test, 4,  'current_test() get' );
 
 my $test_num = $Test->current_test + 1;
-$Test->current_test( $test_num );
-print "ok $test_num - current_test() set\n";
+$Test->current_test = $test_num;
+print $^STDOUT, "ok $test_num - current_test() set\n";
 
 $Test->ok( 1, 'counter still good' );

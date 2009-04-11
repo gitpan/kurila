@@ -2,7 +2,7 @@
 
 BEGIN {
     unless ('PerlIO::Layer'->find('perlio')) {
-	print "1..0 # Skip: not perlio\n";
+	print $^STDOUT, "1..0 # Skip: not perlio\n";
 	exit 0;
     }
 }
@@ -13,183 +13,183 @@ BEGIN { require "./test.pl"; }
 
 plan(tests => 46);
 
-$| = 1;
+$^OUTPUT_AUTOFLUSH = 1;
 
 use bytes;
 use utf8;
 
-open(F,"+>:utf8",'a');
-print F chr(0x100)."\x[c2]\x[a3]";
-cmp_ok( tell(F), '==', 4, tell(F) );
-print F "\n";
-cmp_ok( tell(F), '+>=', 5, tell(F) );
-seek(F,0,0);
-is( getc(F), chr(0x100) );
-is( getc(F), "\x[c2]\x[a3]" );
-is( getc(F), "\n" );
-seek(F,0,0);
-binmode(F,":bytes");
+open(my $f,"+>:utf8",'a');
+print $f, chr(0x100)."\x[c2]\x[a3]";
+cmp_ok( tell($f), '==', 4, tell($f) );
+print $f, "\n";
+cmp_ok( tell($f), '+>=', 5, tell($f) );
+seek($f,0,0);
+is( getc($f), chr(0x100) );
+is( getc($f), "\x[c2]\x[a3]" );
+is( getc($f), "\n" );
+seek($f,0,0);
+binmode($f,":bytes");
 my $chr = bytes::chr(0xc4);
-is( getc(F), $chr );
+is( getc($f), $chr );
 $chr = bytes::chr(0x80);
-is( getc(F), $chr );
+is( getc($f), $chr );
 $chr = bytes::chr(0xc2);
-is( getc(F), $chr );
+is( getc($f), $chr );
 $chr = bytes::chr(0xa3);
-is( getc(F), $chr );
-is( getc(F), "\n" );
-seek(F,0,0);
-binmode(F,":utf8");
-is( scalar( ~< *F), "\x{100}\x[c2]\x[a3]\n" );
-seek(F,0,0);
+is( getc($f), $chr );
+is( getc($f), "\n" );
+seek($f,0,0);
+binmode($f,":utf8");
+is( scalar( ~< $f), "\x{100}\x[c2]\x[a3]\n" );
+seek($f,0,0);
 my $buf = chr(0x200);
-my $count = read(F,$buf,2,1);
+my $count = read($f,$buf,2,1);
 cmp_ok( $count, '==', 2 );
 is( $buf, "\x{200}\x{100}\x[c2]\x[a3]" );
-close(F);
+close($f);
 
-{
+do {
     $a = chr(300); # This *is* UTF-encoded
     $b = chr(130); # This also.
 
-    open F, ">:utf8", 'a' or die $!;
-    print F $a,"\n";
-    close F;
+    open $f, ">:utf8", 'a' or die $^OS_ERROR;
+    print $f, $a,"\n";
+    close $f;
 
-    open F, "<:utf8", 'a' or die $!;
-    my $x = ~< *F;
+    open $f, "<:utf8", 'a' or die $^OS_ERROR;
+    my $x = ~< $f;
     chomp($x);
     is( $x, chr(300) );
 
-    open F, "<", "a" or die $!; # Not UTF
-    binmode(F, ":bytes");
-    $x = ~< *F;
+    open $f, "<", "a" or die $^OS_ERROR; # Not UTF
+    binmode($f, ":bytes");
+    $x = ~< $f;
     chomp($x);
     $chr = bytes::chr(196).bytes::chr(172);
     is( $x, $chr );
-    close F;
+    close $f;
 
-    open F, ">:utf8", 'a' or die $!;
-    binmode(F);  # we write a "\n" and then tell() - avoid CRLF issues.
-    binmode(F,":utf8"); # turn UTF-8-ness back on
-    print F $a;
+    open $f, ">:utf8", 'a' or die $^OS_ERROR;
+    binmode($f);  # we write a "\n" and then tell() - avoid CRLF issues.
+    binmode($f,":utf8"); # turn UTF-8-ness back on
+    print $f, $a;
     my $y;
-    { my $x = tell(F);
-      { use bytes; $y = length($a);}
+    do { my $x = tell($f);
+      do { use bytes; $y = length($a);};
       cmp_ok( $x, '==', $y );
-  }
+  };
 
-    print F $b,"\n";
+    print $f, $b,"\n";
 
-    {
-	my $x = tell(F);
+    do {
+	my $x = tell($f);
         $y += 3;
 	cmp_ok( $x, '==', $y );
-    }
+    };
 
-    close F;
+    close $f;
 
-    open F, "<", "a" or die $!; # Not UTF
-    binmode(F, ":bytes");
-    $x = ~< *F;
+    open $f, "<", "a" or die $^OS_ERROR; # Not UT$f
+    binmode($f, ":bytes");
+    $x = ~< $f;
     chomp($x);
     $chr = chr(300).chr(130);
     is( $x, $chr, sprintf('(%vd)', $x) );
 
-    open F, "<:utf8", "a" or die $!;
-    $x = ~< *F;
+    open $f, "<:utf8", "a" or die $^OS_ERROR;
+    $x = ~< $f;
     chomp($x);
-    close F;
+    close $f;
     is( $x, chr(300).chr(130), sprintf('(%vd)', $x) );
 
-    open F, ">", "a" or die $!;
-    binmode(F, ":bytes:");
+    open $f, ">", "a" or die $^OS_ERROR;
+    binmode($f, ":bytes:");
 
     # Now let's make it suffer.
     my $w;
-    {
+    do {
 	use warnings 'utf8';
 	local $^WARN_HOOK = sub { $w = @_[0] };
-	print F $a;
-        ok( (!$@));
+	print $f, $a;
+        ok( (!$^EVAL_ERROR));
 	ok( ! $w, , "No 'Wide character in print' warning" );
-    }
-}
+    };
+};
 
 # Hm. Time to get more evil.
-open F, ">:utf8", "a" or die $!;
-print F $a;
-binmode(F, ":bytes");
-print F chr(130)."\n";
-close F;
+open $f, ">:utf8", "a" or die $^OS_ERROR;
+print $f, $a;
+binmode($f, ":bytes");
+print $f, chr(130)."\n";
+close $f;
 
-open F, "<", "a" or die $!;
-binmode(F, ":bytes");
-my $x = ~< *F; chomp $x;
+open $f, "<", "a" or die $^OS_ERROR;
+binmode($f, ":bytes");
+my $x = ~< $f; chomp $x;
 $chr = chr(130);
 is( $x, $a . $chr );
 
 # Right.
-open F, ">:utf8", "a" or die $!;
-print F $a;
-close F;
-open F, ">>", "a" or die $!;
-binmode(F, ":bytes");
-print F bytes::chr(130)."\n";
-close F;
+open $f, ">:utf8", "a" or die $^OS_ERROR;
+print $f, $a;
+close $f;
+open $f, ">>", "a" or die $^OS_ERROR;
+binmode($f, ":bytes");
+print $f, bytes::chr(130)."\n";
+close $f;
 
-open F, "<", "a" or die $!;
-binmode(F, ":bytes");
-$x = ~< *F; chomp $x;
+open $f, "<", "a" or die $^OS_ERROR;
+binmode($f, ":bytes");
+$x = ~< $f; chomp $x;
 is( $x, $a . bytes::chr(130) );
 
 # Now we have a deformed file.
 
-SKIP: {
+SKIP: do {
 	my @warnings;
-	open F, "<:utf8", "a" or die $!;
-	$x = ~< *F; chomp $x;
+	open $f, "<:utf8", "a" or die $^OS_ERROR;
+	$x = ~< $f; chomp $x;
 	local $^WARN_HOOK = sub { push @warnings, @_[0]->message; };
 	try { sprintf "\%vd\n", $x };
 	is (nelems @warnings, 1);
 	like (@warnings[0], qr/Malformed UTF-8 character \(unexpected continuation byte 0x82, with no preceding start byte/);
-}
+};
 
-close F;
+close $f;
 unlink('a');
 
-open F, ">:utf8", "a";
-my @a = map { chr(1 << ($_ << 2)) } 0..5; # 0x1, 0x10, .., 0x100000
+open $f, ">:utf8", "a";
+my @a = map { chr(1 << ($_ << 2)) }, 0..5; # 0x1, 0x10, .., 0x100000
 unshift @a, chr(0); # ... and a null byte in front just for fun
-print F < @a;
-close F;
+print $f, < @a;
+close $f;
 
 my $c;
 
 # read() should work on characters, not bytes
-open F, "<:utf8", "a";
+open $f, "<:utf8", "a";
 $a = 0;
 my $failed;
 for ( @a) {
-    unless (($c = read(F, $b, 1) == 1)  &&
+    unless (($c = read($f, $b, 1) == 1)  &&
             length($b)           == 1  &&
             ord($b)              == ord($_) &&
-            tell(F)              == ($a += bytes::length($b))) {
-        print '# ord($_)           == ', ord($_), "\n";
-        print '# ord($b)           == ', ord($b), "\n";
-        print '# length($b)        == ', length($b), "\n";
-        print '# bytes::length($b) == ', < bytes::length($b), "\n";
-        print '# tell(F)           == ', tell(F), "\n";
-        print '# $a                == ', $a, "\n";
-        print '# $c                == ', $c, "\n";
+            tell($f)              == ($a += bytes::length($b))) {
+        print $^STDOUT, '# ord($_)           == ', ord($_), "\n";
+        print $^STDOUT, '# ord($b)           == ', ord($b), "\n";
+        print $^STDOUT, '# length($b)        == ', length($b), "\n";
+        print $^STDOUT, '# bytes::length($b) == ', < bytes::length($b), "\n";
+        print $^STDOUT, '# tell($f)           == ', tell($f), "\n";
+        print $^STDOUT, '# $a                == ', $a, "\n";
+        print $^STDOUT, '# $c                == ', $c, "\n";
 	$failed++;
         last;
     }
 }
-close F;
+close $f;
 is($failed, undef);
 
-{
+do {
     my @a = @( \@( 0x007F, "bytes" ),
 	      \@( 0x0080, "bytes" ),
 	      \@( 0x0080, "utf8"  ),
@@ -198,61 +198,61 @@ is($failed, undef);
     for my $u ( @a) {
 	for my $v ( @a) {
 	    # print "# @$u - @$v\n";
-	    open F, ">", "a";
-	    binmode(F, ":" . $u->[1]);
-	    print F chr($u->[0]);
-	    close F;
+	    open $f, ">", "a";
+	    binmode($f, ":" . $u->[1]);
+	    print $f, chr($u->[0]);
+	    close $f;
 
-	    open F, "<", "a";
-	    binmode(F, ":" . $u->[1]);
+	    open $f, "<", "a";
+	    binmode($f, ":" . $u->[1]);
 
 	    my $s = chr($v->[0]);
 
-	    $s .= ~< *F;
+	    $s .= ~< $f;
 	    is( $s, chr($v->[0]) . chr($u->[0]), 'rcatline utf8' );
-	    close F;
+	    close $f;
 	    $t++;
 	}
     }
     # last test here 49
-}
+};
 
-{
+do {
     # [perl #23428] Somethings rotten in unicode semantics
-    open F, ">", "a";
-    binmode F, ":utf8";
-    syswrite(F, $a = chr(0x100));
-    close F;
+    open $f, ">", "a";
+    binmode $f, ":utf8";
+    syswrite($f, ($a = chr(0x100)));
+    close $f;
     is( ord($a), 0x100, '23428 syswrite should not downgrade scalar' );
     like( $a, qr/^\w+/, '23428 syswrite should not downgrade scalar' );
-}
+};
 
 # sysread() and syswrite() tested in lib/open.t since Fcntl is used
 
-{
+do {
     # <FH> on a :utf8 stream should complain immediately with -w
     # if it finds bad UTF-8 (:encoding(utf8) works this way)
     use warnings 'utf8';
-    undef $@;
-    local $^WARN_HOOK = sub { $@ = shift };
-    open F, ">", "a";
-    binmode F;
-    my ($chrE4, $chrF6) = ("\x[E4]", "\x[F6]");
-    print F "foo", $chrE4, "\n";
-    print F "foo", $chrF6, "\n";
-    close F;
-    open F, "<:utf8", "a";
-    undef $@;
-    my $line = ~< *F;
-    my ($chrE4, $chrF6) = ("E4", "F6");
-    like( $@->message, qr/utf8 "\\x$chrE4" does not map to Unicode .+/,
+    undef $^EVAL_ERROR;
+    local $^WARN_HOOK = sub { $^EVAL_ERROR = shift };
+    open $f, ">", "a";
+    binmode $f;
+    my @($chrE4, $chrF6) = @("\x[E4]", "\x[F6]");
+    print $f, "foo", $chrE4, "\n";
+    print $f, "foo", $chrF6, "\n";
+    close $f;
+    open $f, "<:utf8", "a";
+    undef $^EVAL_ERROR;
+    my $line = ~< $f;
+    my @($chrE4, $chrF6) = @("E4", "F6");
+    like( $^EVAL_ERROR->message, qr/utf8 "\\x$chrE4" does not map to Unicode/,
 	  "<:utf8 readline must warn about bad utf8");
-    undef $@;
-    $line .= ~< *F;
-    like( $@->message, qr/utf8 "\\x$chrF6" does not map to Unicode .+/,
+    undef $^EVAL_ERROR;
+    $line .= ~< $f;
+    like( $^EVAL_ERROR->message, qr/utf8 "\\x$chrF6" does not map to Unicode/,
 	  "<:utf8 rcatline must warn about bad utf8");
-    close F;
-}
+    close $f;
+};
 
 END {
     1 while unlink "a";

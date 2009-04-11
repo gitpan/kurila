@@ -1,8 +1,7 @@
 package TestModule;
 
-use strict;
 require Exporter;
-use vars < qw(@EXPORT @EXPORT_OK @ISA);
+our (@EXPORT, @EXPORT_OK, @ISA);
 
 @ISA = qw(Exporter);
 @EXPORT = qw(func2);

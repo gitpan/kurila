@@ -1,7 +1,7 @@
 BEGIN {
-    if(%ENV{PERL_CORE}) {
+    if(env::var('PERL_CORE')) {
         chdir 't' if -d 't';
-        @INC = @( '../lib' );
+        $^INCLUDE_PATH = @( '../lib' );
     }
 }
 
@@ -9,7 +9,7 @@ BEGIN {
 
 # Summary of, well, things.
 
-use Test;
+use Test::More;
 BEGIN {plan tests => 2};
 
 ok 1;

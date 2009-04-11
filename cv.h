@@ -16,15 +16,12 @@ typedef U16 cv_flags_t;
 	ANY	xcv_xsubany;							\
     }		xcv_start_u;					    		\
     union {									\
-	OP *	xcv_root;							\
+	ROOTOP *	xcv_root;							\
 	void	(*xcv_xsub) (pTHX_ CV*);					\
     }		xcv_root_u;							\
-    GV *	xcv_gv;								\
     AV *	xcv_padlist;							\
-    CV *	xcv_outside;							\
-    U32		xcv_outside_seq; /* the COP sequence (at the point of our	\
-				  * compilation) in the lexically enclosing	\
-				  * sub */					\
+    I32         xcv_n_minargs;	/* minium number of argument (excl. rhs) */     \
+    I32         xcv_n_maxargs;	/* maximum number of argument (-1 for no-limit) (excl. rhs) */     \
     cv_flags_t	xcv_flags
 
 struct xpvcv {
@@ -60,7 +57,6 @@ Null CV pointer.
 #define CvROOT(sv)	((XPVCV*)SvANY(sv))->xcv_root_u.xcv_root
 #define CvXSUB(sv)	((XPVCV*)SvANY(sv))->xcv_root_u.xcv_xsub
 #define CvXSUBANY(sv)	((XPVCV*)SvANY(sv))->xcv_start_u.xcv_xsubany
-#define CvGV(sv)	((XPVCV*)SvANY(sv))->xcv_gv
 #if defined(__GNUC__) && !defined(PERL_GCC_BRACE_GROUPS_FORBIDDEN)
 #  define CvDEPTH(sv) (*({const CV *_cv = (CV *)sv; \
 			  assert(SvTYPE(_cv) == SVt_PVCV);	 \
@@ -70,13 +66,11 @@ Null CV pointer.
 #  define CvDEPTH(sv)	((XPVCV*)SvANY(sv))->xiv_u.xivu_i32
 #endif
 #define CvPADLIST(sv)	((XPVCV*)SvANY(sv))->xcv_padlist
-#define CvOUTSIDE(sv)	((XPVCV*)SvANY(sv))->xcv_outside
 #define CvFLAGS(sv)	((XPVCV*)SvANY(sv))->xcv_flags
-#define CvOUTSIDE_SEQ(sv) ((XPVCV*)SvANY(sv))->xcv_outside_seq
+#define CvN_MINARGS(sv)	((XPVCV*)SvANY(sv))->xcv_n_minargs
+#define CvN_MAXARGS(sv)	((XPVCV*)SvANY(sv))->xcv_n_maxargs
 
-#define CVf_METHOD	0x0001	/* CV is explicitly marked as a method */
-#define CVf_LOCKED	0x0002	/* CV locks itself or first arg on entry */
-
+#define CVf_BLOCK	0x0001	/* CV accept one argument which is assigned to $_ */
 #define CVf_CLONE	0x0020	/* anon CV uses external lexicals */
 #define CVf_CLONED	0x0040	/* a clone of one of those */
 #define CVf_ANON	0x0080	/* CvGV() can't be trusted */
@@ -86,9 +80,10 @@ Null CV pointer.
 				   (esp. useful for special XSUBs) */
 #define CVf_CONST	0x0400  /* inlinable sub */
 #define CVf_ISXSUB	0x0800	/* CV is an XSUB, not pure perl.  */
-
-/* This symbol for optimised communication between toke.c and op.c: */
-#define CVf_BUILTIN_ATTRS	(CVf_METHOD|CVf_LOCKED)
+#define CVf_PROTO	0x1000	/* arguments are passed to prototype variables */
+#define CVf_DEFARGS	0x2000	/* arguments are passed to @_ */
+#define CVf_ASSIGNARG	0x4000	/* last argument should be the rhs of an assignment (only used in combination with CVf_PROTO */
+#define CVf_OPTASSIGNARG	0x8000	/* last argument should be the rhs of an assignment (only used in combination with CVf_PROTO */
 
 #define CvCLONE(cv)		(CvFLAGS(cv) & CVf_CLONE)
 #define CvCLONE_on(cv)		(CvFLAGS(cv) |= CVf_CLONE)
@@ -110,20 +105,13 @@ Null CV pointer.
 #define CvNODEBUG_on(cv)	(CvFLAGS(cv) |= CVf_NODEBUG)
 #define CvNODEBUG_off(cv)	(CvFLAGS(cv) &= ~CVf_NODEBUG)
 
-#define CvMETHOD(cv)		(CvFLAGS(cv) & CVf_METHOD)
-#define CvMETHOD_on(cv)		(CvFLAGS(cv) |= CVf_METHOD)
-#define CvMETHOD_off(cv)	(CvFLAGS(cv) &= ~CVf_METHOD)
-
-#define CvLOCKED(cv)		(CvFLAGS(cv) & CVf_LOCKED)
-#define CvLOCKED_on(cv)		(CvFLAGS(cv) |= CVf_LOCKED)
-#define CvLOCKED_off(cv)	(CvFLAGS(cv) &= ~CVf_LOCKED)
-
 #define CvEVAL(cv)		(CvUNIQUE(cv) && !SvFAKE(cv))
 #define CvEVAL_on(cv)		(CvUNIQUE_on(cv),SvFAKE_off(cv))
 #define CvEVAL_off(cv)		CvUNIQUE_off(cv)
 
 /* BEGIN|CHECK|INIT|UNITCHECK|END */
 static __inline__ U32 CvSPECIAL(CV *cv) { return CvUNIQUE(cv) && SvFAKE(cv); }
+
 #define CvSPECIAL_on(cv)	(CvUNIQUE_on(cv),SvFAKE_on(cv))
 #define CvSPECIAL_off(cv)	(CvUNIQUE_off(cv),SvFAKE_off(cv))
 
@@ -137,63 +125,6 @@ static __inline__ U32 CvSPECIAL(CV *cv) { return CvUNIQUE(cv) && SvFAKE(cv); }
 
 /* Flags for newXS_flags  */
 #define XS_DYNAMIC_FILENAME	0x01	/* The filename isn't static  */
-
-/*
-=head1 CV reference counts and CvOUTSIDE
-
-=for apidoc m|bool|CvWEAKOUTSIDE|CV *cv
-
-Each CV has a pointer, C<CvOUTSIDE()>, to its lexically enclosing
-CV (if any). Because pointers to anonymous sub prototypes are
-stored in C<&> pad slots, it is a possible to get a circular reference,
-with the parent pointing to the child and vice-versa. To avoid the
-ensuing memory leak, we do not increment the reference count of the CV
-pointed to by C<CvOUTSIDE> in the I<one specific instance> that the parent
-has a C<&> pad slot pointing back to us. In this case, we set the
-C<CvWEAKOUTSIDE> flag in the child. This allows us to determine under what
-circumstances we should decrement the refcount of the parent when freeing
-the child.
-
-CvWEAKOUTSIDE has been removed.
-
-There is a further complication with non-closure anonymous subs (i.e. those
-that do not refer to any lexicals outside that sub). In this case, the
-anonymous prototype is shared rather than being cloned. This has the
-consequence that the parent may be freed while there are still active
-children, eg
-
-    BEGIN { $a = sub { eval '$x' } }
-
-In this case, the BEGIN is freed immediately after execution since there
-are no active references to it: the anon sub prototype has
-C<CvWEAKOUTSIDE> set since it's not a closure, and $a points to the same
-CV, so it doesn't contribute to BEGIN's refcount either.  When $a is
-executed, the C<eval '$x'> causes the chain of C<CvOUTSIDE>s to be followed,
-and the freed BEGIN is accessed.
-
-To avoid this, whenever a CV and its associated pad is freed, any
-C<&> entries in the pad are explicitly removed from the pad, and if the
-refcount of the pointed-to anon sub is still positive, then that
-child's C<CvOUTSIDE> is set to point to its grandparent. This will only
-occur in the single specific case of a non-closure anon prototype
-having one or more active references (such as C<$a> above).
-
-One other thing to consider is that a CV may be merely undefined
-rather than freed, eg C<undef &foo>. In this case, its refcount may
-not have reached zero, but we still delete its pad and its C<CvROOT> etc.
-Since various children may still have their C<CvOUTSIDE> pointing at this
-undefined CV, we keep its own C<CvOUTSIDE> for the time being, so that
-the chain of lexical scopes is unbroken. For example, the following
-should print 123:
-
-    my $x = 123;
-    sub tmp { sub { eval '$x' } }
-    my $a = tmp();
-    undef &tmp;
-    print  $a->();
-
-=cut
-*/
 
 /*
  * Local variables:

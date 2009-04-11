@@ -1477,7 +1477,6 @@ PP(pp_sort)
     CV *cv = NULL;
     I32 gimme = GIMME_V;
     OP* const nextop = PL_op->op_next;
-    I32 overloading = 0;
     bool hasargs = FALSE;
     I32 is_xsub = 0;
     const U8 priv = PL_op->op_private;
@@ -1502,50 +1501,37 @@ PP(pp_sort)
 
     ENTER;
     SAVEVPTR(PL_sortcop);
-    if (flags & OPf_STACKED) {
-	if (flags & OPf_SPECIAL) {
-	    OP *kid = cLISTOP->op_first->op_sibling;	/* pass pushmark */
-	    kid = kUNOP->op_first;			/* pass rv2gv */
-	    kid = kUNOP->op_first;			/* pass leave */
-	    PL_sortcop = kid->op_next;
+    if (SP - MARK > 1) {
+	cv = sv_2cv(*++MARK, &gv, 0);
+	if (cv && SvPOK(cv)) {
+	    const char * const proto = SvPV_nolen_const((SV*)cv);
+	    if (proto && strEQ(proto, "$$")) {
+		hasargs = TRUE;
+	    }
 	}
-	else {
-	    cv = sv_2cv(*++MARK, &gv, 0);
-	    if (cv && SvPOK(cv)) {
-		const char * const proto = SvPV_nolen_const((SV*)cv);
-		if (proto && strEQ(proto, "$$")) {
-		    hasargs = TRUE;
-		}
+	if (!(cv && CvROOT(cv))) {
+	    if (cv && CvISXSUB(cv)) {
+		is_xsub = 1;
 	    }
-	    if (!(cv && CvROOT(cv))) {
-		if (cv && CvISXSUB(cv)) {
-		    is_xsub = 1;
-		}
-		else if (gv) {
-		    SV *tmpstr = sv_newmortal();
-		    gv_efullname3(tmpstr, gv, NULL);
-		    DIE(aTHX_ "Undefined sort subroutine \"%"SVf"\" called",
-			SVfARG(tmpstr));
-		}
-		else {
-		    DIE(aTHX_ "Undefined subroutine in sort");
-		}
+	    else {
+		DIE(aTHX_ "Undefined subroutine in sort");
 	    }
+	}
 
-	    if (is_xsub)
-		PL_sortcop = (OP*)cv;
-	    else
-		PL_sortcop = CvSTART(cv);
-	}
+	if (is_xsub)
+	    PL_sortcop = (OP*)cv;
+	else
+	    PL_sortcop = CvSTART(cv);
     }
     else {
 	PL_sortcop = NULL;
     }
 
-    av = SvAV(sv_mortalcopy(POPs));
-    if ( ! SvAVOK(av) ) {
-	Perl_croak(aTHX_ "%s expected ARRAY but got %s", OP_DESC(PL_op), Ddesc(av));
+    if ( ! SvAVOK(TOPs) ) {
+	Perl_croak(aTHX_ "%s expected ARRAY but got %s", 
+	    OP_DESC(PL_op), Ddesc(TOPs));
     }
+    av = svTav(sv_mortalcopy(POPs));
     p1 = p2 = AvARRAY(av);
     max = AvFILL(av) + 1;
 
@@ -1573,7 +1559,7 @@ PP(pp_sort)
 		else {
 		    if (!SvPOK(*p1)) {
 			(void)sv_2pv_flags(*p1, 0,
-			    SV_GMAGIC|SV_CONST_RETURN);
+			    SV_CONST_RETURN);
 		    }
 		}
 	    }
@@ -1622,12 +1608,7 @@ PP(pp_sort)
 
 		    if (hasargs) {
 			/* This is mostly copied from pp_entersub */
-			AV * const av = (AV*)PAD_SVl(0);
-
-			cx->blk_sub.savearray = GvAV(PL_defgv);
-			GvAV(PL_defgv) = (AV*)SvREFCNT_inc_simple(av);
 			CX_CURPAD_SAVE(cx->blk_sub);
-			cx->blk_sub.argarray = av;
 		    }
 
 		}
@@ -1640,7 +1621,6 @@ PP(pp_sort)
 		    sort_flags);
 
 	    if (!(flags & OPf_SPECIAL)) {
-		LEAVESUB(cv);
 		if (!is_xsub)
 		    CvDEPTH(cv)--;
 	    }
@@ -1672,7 +1652,7 @@ PP(pp_sort)
     
     LEAVE;
     PL_stack_sp = ORIGMARK;
-    *++PL_stack_sp = av;
+    *++PL_stack_sp = avTsv(av);
     return nextop;
 }
 

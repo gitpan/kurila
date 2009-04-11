@@ -3,7 +3,7 @@
 # Check that certain modules don't get loaded when other modules are used.
 #
 
-use strict;
+
 use warnings;
 
 require "./test.pl";
@@ -18,15 +18,15 @@ my @TESTS = @(
 my $count = 0;
 $count += (nelems @$_) - 1 for  @TESTS;
 
-print "1..$count\n";
+print $^STDOUT, "1..$count\n";
 
 foreach my $test ( @TESTS) {
-    my ($exclude, < @modules) = < @$test;
+    my @($exclude, @< @modules) =  @$test;
 
     foreach my $module ( @modules) {
         my $prog = <<"        --";
             use $module;
-            print exists \%INC \{'$exclude.pm'\} ? "not ok" : "ok";
+            print \$^STDOUT, exists \$^INCLUDED \{'$exclude.pm'\} ?? "not ok" !! "ok";
         --
         fresh_perl_is ($prog, "ok", "", "$module does not load $exclude");
     }

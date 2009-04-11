@@ -2,24 +2,17 @@
 #
 # regression tests for old bugs that don't fit other categories
 
-use strict;
-use Test::More tests => 3;
+
+use Test::More tests => 2;
 use Data::Dumper;
 
-{
-    sub iterate_hash {
-	my ($h) = < @_;
+do {
+    sub iterate_hash($h) {
 	my $count = 0;
 	$count++ while each %$h;
 	return $count;
     }
-
-    my $dumper = Data::Dumper->new( \@(\%ENV), \@('ENV') )->Sortkeys(1);
-    my $orig_count = iterate_hash(\%ENV);
-    $dumper->Dump;
-    my $new_count = iterate_hash(\%ENV);
-    is($new_count, $orig_count, 'correctly resets hash iterators');
-}
+};
 
 # [perl #38612] Data::Dumper core dump in 5.8.6, fixed by 5.8.7
 sub foo {
@@ -35,7 +28,7 @@ sub foo {
 foo(\%());
 ok(1, "[perl #38612]"); # Still no core dump? We are fine.
 
-{
+do {
     my %h = %(1,2,3,4);
     each %h;
 
@@ -45,4 +38,4 @@ ok(1, "[perl #38612]"); # Still no core dump? We are fine.
     my $VAR1;
     eval $txt;
     is_deeply($VAR1, \%h, '[perl #40668] Reset hash iterator');
-}
+};

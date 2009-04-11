@@ -1,22 +1,21 @@
 #!/usr/bin/perl -w
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't';
-        @INC = @( '../lib' );
+        $^INCLUDE_PATH = @( '../lib' );
     }
 }
 
 my $test_num = 1;
 # Utility testing functions.
-sub ok ($;$) {
-    my($test, $name) = < @_;
+sub ok($test, $name) {
     my $ok = '';
     $ok .= "not " unless $test;
     $ok .= "ok $test_num";
     $ok .= " - $name" if defined $name;
     $ok .= "\n";
-    print $ok;
+    print $^STDOUT, $ok;
     $test_num++;
 
     return $test;
@@ -26,13 +25,13 @@ sub ok ($;$) {
 use Test::Builder;
 my $Test = Test::Builder->new;
 
-print "1..2\n";
+print $^STDOUT, "1..2\n";
 
 try { $Test->plan(7); };
-ok( $@->{description} =~ m/^plan\(\) doesn't understand 7/, 'bad plan()' ) ||
-    print STDERR "# $@";
+ok( $^EVAL_ERROR->{?description} =~ m/^plan\(\) doesn't understand 7/, 'bad plan()' ) ||
+    print $^STDERR, "# $^EVAL_ERROR";
 
 try { $Test->plan(wibble => 7); };
-ok( $@->{description} =~ m/^plan\(\) doesn't understand wibble 7/, 'bad plan()' ) ||
-    print STDERR "# $@";
+ok( $^EVAL_ERROR->{?description} =~ m/^plan\(\) doesn't understand wibble 7/, 'bad plan()' ) ||
+    print $^STDERR, "# $^EVAL_ERROR";
 

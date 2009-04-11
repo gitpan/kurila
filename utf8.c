@@ -1670,11 +1670,6 @@ Perl_swash_init(pTHX_ const char* pkg, const char* name, SV *listsv, I32 minbits
 	errsv_save = newSVsv(ERRSV);
 	/* It is assumed that callers of this routine are not passing in any
 	   user derived data.  */
-	/* Need to do this after save_re_context() as it will set PL_tainted to
-	   1 while saving $1 etc (see the code after getrx: in Perl_magic_get).
-	   Even line to create errsv_save can turn on PL_tainted.  */
-	SAVEBOOL(PL_tainted);
-	PL_tainted = 0;
 	Perl_load_module(aTHX_ PERL_LOADMOD_NOIMPORT, newSVpvn(pkg,pkg_len),
 			 NULL);
 	if (!SvTRUE(ERRSV))
@@ -1692,10 +1687,8 @@ Perl_swash_init(pTHX_ const char* pkg, const char* name, SV *listsv, I32 minbits
     mPUSHi(none);
     PUTBACK;
     errsv_save = newSVsv(ERRSV);
-    if (call_method("SWASHNEW", G_SCALAR))
-	retval = newSVsv(*PL_stack_sp--);
-    else
-	retval = &PL_sv_undef;
+    retval = newSVsv( call_method("SWASHNEW", G_SCALAR) );
+    SPAGAIN;
     if (!SvTRUE(ERRSV))
 	sv_setsv(ERRSV, errsv_save);
     SvREFCNT_dec(errsv_save);
@@ -1731,7 +1724,7 @@ UV
 Perl_swash_fetch(pTHX_ SV *swash, const char *ptr, bool do_utf8)
 {
     dVAR;
-    HV* const hv = (HV*)SvRV(swash);
+    HV* const hv = svThv(SvRV(swash));
     U32 klen;
     U32 off;
     STRLEN slen;
@@ -1800,10 +1793,11 @@ Perl_swash_fetch(pTHX_ SV *swash, const char *ptr, bool do_utf8)
 	    if (IN_PERL_COMPILETIME)
 		CopHINTS_set(PL_curcop, PL_hints);
 
-	    svp = hv_store(hv, (const char *)ptr, klen, swatch, 0);
+	    hv_store(hv, (const char *)ptr, klen, swatch, 0);
+	    svp = &swatch;
 
-	    if (!svp || !(tmps = (const U8*)SvPV_const(*svp, slen))
-		     || (slen << 3) < needents)
+	    if (!(tmps = (const U8*)SvPV_const(*svp, slen))
+		|| (slen << 3) < needents)
 		Perl_croak(aTHX_ "panic: swash_fetch got improper swatch");
 	}
     }
@@ -1862,7 +1856,7 @@ S_swash_get(pTHX_ SV* swash, UV start, UV span)
     scur   = octets ? (span * octets) : (span + 7) / 8;
     swatch = newSV(scur);
     SvPOK_on(swatch);
-    s = SvPVX(swatch);
+    s = SvPVX_mutable(swatch);
     if (octets && none) {
 	const char* const e = s + scur;
 	while (s < e) {
@@ -1885,7 +1879,7 @@ S_swash_get(pTHX_ SV* swash, UV start, UV span)
 	(void)memzero((char*)s, scur + 1);
     }
     SvCUR_set(swatch, scur);
-    s = SvPVX(swatch);
+    s = SvPVX_mutable(swatch);
 
     /* read $swash->{LIST} */
     l = SvPV(*listsvp, lcur);
@@ -2241,7 +2235,7 @@ Perl_pv_uni_display(pTHX_ SV *dsv, const char *spv, STRLEN len, STRLEN pvlim, UV
 	      truncated++;
 	      break;
 	 }
-	 u = utf8_to_uvchr(s, 0);
+	 u = utf8n_to_uvchr(s, e-s+1, NULL, UTF8_ALLOW_ANY | UTF8_CHECK_ONLY);
 	 if (u < 256) {
 	     const unsigned char c = (unsigned char)u & 0xFF;
 	     if (flags & UNI_DISPLAY_BACKSLASH) {
@@ -2279,7 +2273,7 @@ Perl_pv_uni_display(pTHX_ SV *dsv, const char *spv, STRLEN len, STRLEN pvlim, UV
     if (truncated)
 	 sv_catpvs(dsv, "...");
     
-    return SvPVX(dsv);
+    return SvPVX_mutable(dsv);
 }
 
 /*

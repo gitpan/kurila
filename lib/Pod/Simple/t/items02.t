@@ -1,13 +1,12 @@
 #!perl
 BEGIN {
-    if(%ENV{PERL_CORE}) {
+    if(env::var('PERL_CORE')) {
         chdir 't';
-        @INC = @( '../lib' );
+        $^INCLUDE_PATH = @( '../lib' );
     }
 }
 
-use strict;
-use Test;
+use Test::More;
 BEGIN { plan tests => 4 };
 
 my $d;
@@ -17,28 +16,28 @@ ok 1;
 
 use Pod::Simple::DumpAsXML;
 use Pod::Simple::XMLOutStream;
-print "# Pod::Simple version $Pod::Simple::VERSION\n";
-sub e ($$) { Pod::Simple::DumpAsXML->_duo(< @_) }
+print $^STDOUT, "# Pod::Simple version $Pod::Simple::VERSION\n";
+sub e { Pod::Simple::DumpAsXML->_duo(< @_) }
 
 my $x = 'Pod::Simple::XMLOutStream';
 
-print "##### Tests for =item directives via class $x\n";
+print $^STDOUT, "##### Tests for =item directives via class $x\n";
 
 $Pod::Simple::XMLOutStream::ATTR_PAD   = ' ';
 $Pod::Simple::XMLOutStream::SORT_ATTRS = 1; # for predictably testable output
 
 
-print "#\n# Tests for =item [number] that are icky...\n";
-ok( $x->_out("\n=over\n\n=item 5\n\nStuff\n\n=cut\n\nCrunk\nZorp\n\n=item 4\n\nQuux\n\n=back\n\n"),
+print $^STDOUT, "#\n# Tests for =item [number] that are icky...\n";
+is( $x->_out("\n=over\n\n=item 5\n\nStuff\n\n=cut\n\nCrunk\nZorp\n\n=item 4\n\nQuux\n\n=back\n\n"),
     '<Document><over-text indent="4"><item-text>5</item-text><Para>Stuff</Para><item-text>4</item-text><Para>Quux</Para></over-text></Document>'
 );
 
-ok( $x->_out("\n=over\n\n=item 5.\n\nStuff\n\n=cut\n\nCrunk\nZorp\n\n=item 4.\n\nQuux\n\n=back\n\n"),
+is( $x->_out("\n=over\n\n=item 5.\n\nStuff\n\n=cut\n\nCrunk\nZorp\n\n=item 4.\n\nQuux\n\n=back\n\n"),
     '<Document><over-text indent="4"><item-text>5.</item-text><Para>Stuff</Para><item-text>4.</item-text><Para>Quux</Para></over-text></Document>'
 );
 
 
-print "# Wrapping up... one for the road...\n";
+print $^STDOUT, "# Wrapping up... one for the road...\n";
 ok 1;
-print "# --- Done with ", __FILE__, " --- \n";
+print $^STDOUT, "# --- Done with ", __FILE__, " --- \n";
 

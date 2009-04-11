@@ -1,12 +1,12 @@
 #!/usr/bin/perl -w
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't';
-        @INC = @('../lib', 'lib/');
+        $^INCLUDE_PATH = @('../lib', 'lib/');
     }
     else {
-        unshift @INC, 't/lib/';
+        unshift $^INCLUDE_PATH, 't/lib/';
     }
 }
 chdir 't';
@@ -15,36 +15,36 @@ use File::Spec;
 
 use Test::More tests => 3;
 
-# Having the CWD in @INC masked a bug in finding hint files
+# Having the CWD in $^INCLUDE_PATH masked a bug in finding hint files
 my $curdir = File::Spec->curdir;
-@INC = grep { $_ ne $curdir && $_ ne '.' } @INC;
+$^INCLUDE_PATH = grep { $_ ne $curdir && $_ ne '.' }, $^INCLUDE_PATH;
 
 mkdir('hints', 0777);
-(my $os = $^O) =~ s/\./_/g;
+(my $os = $^OS_NAME) =~ s/\./_/g;
 my $hint_file = File::Spec->catfile('hints', "$os.pl");
 
-open(HINT, ">", "$hint_file") || die "Can't write dummy hints file $hint_file: $!";
-print HINT <<'CLOO';
+open(my $hintfh, ">", "$hint_file") || die "Can't write dummy hints file $hint_file: $^OS_ERROR";
+print $hintfh, <<'CLOO';
 our $self;
-$self->{CCFLAGS} = 'basset hounds got long ears';
+$self->{+CCFLAGS} = 'basset hounds got long ears';
 CLOO
-close HINT;
+close $hintfh;
 
 use ExtUtils::MakeMaker;
 
 my $out;
-close STDERR;
-open STDERR, '>>', \$out or die;
+close $^STDERR;
+open $^STDERR, '>>', \$out or die;
 my $mm = bless \%(), 'ExtUtils::MakeMaker';
 $mm->check_hints;
-is( $mm->{CCFLAGS}, 'basset hounds got long ears' );
+is( $mm->{+CCFLAGS}, 'basset hounds got long ears' );
 is( $out, "Processing hints file $hint_file\n" );
 
-open(HINT, ">", "$hint_file") || die "Can't write dummy hints file $hint_file: $!";
-print HINT <<'CLOO';
+open($hintfh, ">", "$hint_file") || die "Can't write dummy hints file $hint_file: $^OS_ERROR";
+print $hintfh, <<'CLOO';
 die "Argh!\n";
 CLOO
-close HINT;
+close $hintfh;
 
 $out = '';
 $mm->check_hints;

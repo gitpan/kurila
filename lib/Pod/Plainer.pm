@@ -1,30 +1,27 @@
 package Pod::Plainer;
-use strict;
+
 use Pod::Parser;
 our @ISA = qw(Pod::Parser);
 our $VERSION = '0.01';
 
 our %E = %( < qw( < lt > gt ) );
  
-sub escape_ltgt {
-    (undef, my $text) = < @_;
-    $text =~ s/([<>])/E<%E{$1}>/g;
+sub escape_ltgt(_, my $text, _) {
+    $text =~ s/([<>])/E<%E{?$1}>/g;
     $text 
 } 
 
-sub simple_delimiters {
-    (undef, my $seq) = < @_;
+sub simple_delimiters(_, my $seq) {
     $seq -> left_delimiter( '<' ); 
     $seq -> right_delimiter( '>' );  
     $seq;
 }
 
-sub textblock {
-    my($parser,$text,$line) = < @_;
-    print {$parser->output_handle()}
-      $parser->parse_text(
-	    \%( -expand_text => q(escape_ltgt),
-	      -expand_seq => q(simple_delimiters) ),
+sub textblock($parser,$text,$line, _) {
+    print $parser->output_handle()
+      ,$parser->parse_text(
+	    \%( expand_text => q(escape_ltgt),
+	      expand_seq => q(simple_delimiters) ),
 	    $text, $line ) -> raw_text(); 
 }
 
@@ -41,7 +38,7 @@ Pod::Plainer - Perl extension for converting Pod to old style Pod.
   use Pod::Plainer;
 
   my $parser = Pod::Plainer -> new ();
-  $parser -> parse_from_filehandle(\*STDIN);
+  $parser -> parse_from_filehandle($^STDIN);
 
 =head1 DESCRIPTION
 

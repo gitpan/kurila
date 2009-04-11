@@ -1,19 +1,17 @@
 #!/usr/bin/perl -w
 
+use Test::More;
+
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
-        chdir 't' if -d 't';
-        @INC = @( '../lib' );
-    }
     use Config;
-    unless (%Config{usedl}) {
-	print "1..0 # no usedl, skipping\n";
-	exit 0;
+    unless (config_value("usedl")) {
+        plan skip_all => "no usedl";
     }
 }
 
+plan "no_plan";
+
 # use warnings;
-use strict;
 use ExtUtils::MakeMaker;
 use ExtUtils::Constant < qw (C_constant);
 use File::Spec;
@@ -21,54 +19,52 @@ use Cwd;
 
 # For debugging set this to 1.
 my $keep_files = 0;
-$| = 1;
+$^OUTPUT_AUTOFLUSH = 1;
 
 # Because were are going to be changing directory before running Makefile.PL
-my $perl = $^X;
+my $perl = $^EXECUTABLE_NAME;
 $perl = File::Spec->rel2abs ($perl);
 # ExtUtils::Constant::C_constant uses $^X inside a comment, and we want to
 # compare output to ensure that it is the same. We were probably run as ./perl
 # whereas we will run the child with the full path in $perl. So make $^X for
 # us the same as our child will see.
-$^X = $perl;
-my $lib = %ENV{PERL_CORE} ? '../../../lib' : '../../blib/lib';
+$^EXECUTABLE_NAME = $perl;
+my $lib = env::var('PERL_CORE') ?? '../../../lib' !! '../../blib/lib';
 my $runperl = "$perl \"-I$lib\"";
-print "# perl=$perl\n";
+diag "perl=$perl";
 
-my $make = %Config{make};
-$make = %ENV{MAKE} if exists %ENV{MAKE};
-if ($^O eq 'MSWin32' && $make eq 'nmake') { $make .= " -nologo"; }
+my $make = env::var('MAKE') // config_value("make");
+if ($^OS_NAME eq 'MSWin32' && $make eq 'nmake') { $make .= " -nologo"; }
 
 # VMS may be using something other than MMS/MMK
 my $mms_or_mmk = 0;
-if ($^O eq 'VMS') {
+if ($^OS_NAME eq 'VMS') {
    $mms_or_mmk = 1 if (($make eq 'MMK') || ($make eq 'MMS'));
 }
 
 # Renamed by make clean
-my $makefile = ($mms_or_mmk ? 'descrip' : 'Makefile');
-my $makefile_ext = ($mms_or_mmk ? '.mms' : '');
-my $makefile_rename = $makefile . ($mms_or_mmk ? '.mms_old' : '.old');
+my $makefile = ($mms_or_mmk ?? 'descrip' !! 'Makefile');
+my $makefile_ext = ($mms_or_mmk ?? '.mms' !! '');
+my $makefile_rename = $makefile . ($mms_or_mmk ?? '.mms_old' !! '.old');
 
 my $output = "output";
 my $package = "ExtTest";
-my $dir = "ext-$$";
+my $dir = "ext-$^PID";
 my $subdir = 0;
 # The real test counter.
-my $realtest = 1;
 
 my $orig_cwd = cwd;
 my $updir = File::Spec->updir;
-die "Can't get current directory: $!" unless defined $orig_cwd;
+die "Can't get current directory: $^OS_ERROR" unless defined $orig_cwd;
 
-print "# $dir being created...\n";
-mkdir $dir, 0777 or die "mkdir: $!\n";
+diag "$dir being created...";
+mkdir $dir, 0777 or die "mkdir: $^OS_ERROR\n";
 
 END {
   if (defined $orig_cwd and length $orig_cwd) {
-    chdir $orig_cwd or die "Can't chdir back to '$orig_cwd': $!";
+    chdir $orig_cwd or die "Can't chdir back to '$orig_cwd': $^OS_ERROR";
     use File::Path;
-    print "# $dir being removed...\n";
+    diag "$dir being removed...";
     rmtree($dir) unless $keep_files;
   } else {
     # Can't get here.
@@ -76,56 +72,44 @@ END {
   }
 }
 
-chdir $dir or die $!;
-push @INC, '../../lib', '../../../lib';
+chdir $dir or die $^OS_ERROR;
+push $^INCLUDE_PATH, '../../lib', '../../../lib';
 
 package main;
 
 sub check_for_bonus_files {
   my $dir = shift;
-  my %expect = %( < map {($^O eq 'VMS' ? lc($_) : $_), 1} @_ );
+  my %expect = %( < @+: map { @: ($^OS_NAME eq 'VMS' ?? lc($_) !! $_), 1}, @_ );
 
   my $fail;
-  opendir DIR, $dir or die "opendir '$dir': $!";
-  while (defined (my $entry = readdir DIR)) {
-    $entry =~ s/\.$// if $^O eq 'VMS';  # delete trailing dot that indicates no extension
+  opendir my $dh, $dir or die "opendir '$dir': $^OS_ERROR";
+  while (defined (my $entry = readdir $dh)) {
+    $entry =~ s/\.$// if $^OS_NAME eq 'VMS';  # delete trailing dot that indicates no extension
     next if %expect{$entry};
-    print "# Extra file '$entry'\n";
+    diag "Extra file '$entry'";
     $fail = 1;
   }
 
-  closedir DIR or warn "closedir '.': $!";
-  if ($fail) {
-    print "not ok $realtest\n";
-  } else {
-    print "ok $realtest\n";
-  }
-  $realtest++;
+  closedir $dh or warn "closedir '.': $^OS_ERROR";
+  ok( ! $fail );
 }
 
-sub build_and_run {
-  my ($tests, $expect, $files) = < @_;
-  my $core = %ENV{PERL_CORE} ? ' PERL_CORE=1' : '';
+sub build_and_run($tests, $expect, $files) {
+  my $core = env::var('PERL_CORE') ?? ' PERL_CORE=1' !! '';
   my @perlout = @( `$runperl Makefile.PL $core` );
-  if ($?) {
-    print "not ok $realtest # $runperl Makefile.PL failed: $?\n";
-    print "# $_" foreach  @perlout;
-    exit($?);
+  if ($^CHILD_ERROR) {
+      fail("$runperl Makefile.PL failed: $^CHILD_ERROR");
+      diag "$_" foreach  @perlout;
+      exit($^CHILD_ERROR);
   } else {
-    print "ok $realtest\n";
+      pass;
   }
-  $realtest++;
 
-  if (-f "$makefile$makefile_ext") {
-    print "ok $realtest\n";
-  } else {
-    print "not ok $realtest\n";
-  }
-  $realtest++;
+  ok(-f "$makefile$makefile_ext");
 
   my @makeout;
 
-  if ($^O eq 'VMS') { $make .= ' all'; }
+  if ($^OS_NAME eq 'VMS') { $make .= ' all'; }
 
   # Sometimes it seems that timestamps can get confused
 
@@ -144,127 +128,102 @@ sub build_and_run {
   my $timewarp = (-M "Makefile.PL") - (-M "$makefile$makefile_ext");
   # Convert from days to seconds
   $timewarp *= 86400;
-  print "# Makefile.PL is $timewarp second(s) older than $makefile$makefile_ext\n";
+  diag "Makefile.PL is $timewarp second(s) older than $makefile$makefile_ext";
   if ($timewarp +< 0) {
       # Sleep for a while to catch up.
       $timewarp = -$timewarp;
       $timewarp+=2;
       $timewarp = 10 if $timewarp +> 10;
-      print "# Sleeping for $timewarp second(s) to try to resolve this\n";
+      diag "Sleeping for $timewarp second(s) to try to resolve this";
       sleep $timewarp;
   }
 
-  print "# make = '$make'\n";
+  diag "make = '$make'";
   @makeout = @( `$make` );
-  if ($?) {
-    print "not ok $realtest # $make failed: $?\n";
-    print "# $_" foreach  @makeout;
-    exit($?);
+  if ($^CHILD_ERROR) {
+      fail("$make failed: $^CHILD_ERROR");
+      diag "$_" foreach  @makeout;
+      exit($^CHILD_ERROR);
   } else {
-    print "ok $realtest\n";
+      pass();
   }
-  $realtest++;
 
-  if ($^O eq 'VMS') { $make =~ s{ all}{}; }
+  if ($^OS_NAME eq 'VMS') { $make =~ s{ all}{}; }
 
-  if (%Config{usedl}) {
-    print "ok $realtest # This is dynamic linking, so no need to make perl\n";
-  } else {
-    my $makeperl = "$make perl";
-    print "# make = '$makeperl'\n";
-    @makeout = @( `$makeperl` );
-    if ($?) {
-      print "not ok $realtest # $makeperl failed: $?\n";
-      print "# $_" foreach  @makeout;
-      exit($?);
-    } else {
-      print "ok $realtest\n";
-    }
-  }
-  $realtest++;
+  ok 1, "This is dynamic linking, so no need to make perl";
 
   my $maketest = "$make test";
-  print "# make = '$maketest'\n";
+  diag "make = '$maketest'";
 
   @makeout = @( `$maketest` );
 
-  if (open OUTPUT, "<", "$output") {
-    local $/; # Slurp it - faster.
-    print ~< *OUTPUT;
-    close OUTPUT or print "# Close $output failed: $!\n";
+  if (open my $outputfh, "<", "$output") {
+    local $^INPUT_RECORD_SEPARATOR = undef; # Slurp it - faster.
+    print $^STDOUT, ~< *$outputfh;
+    close $outputfh or print $^STDOUT, "# Close $output failed: $^OS_ERROR\n";
   } else {
     # Harness will report missing test results at this point.
-    print "# Open <$output failed: $!\n";
+    print $^STDOUT, "# Open <$output failed: $^OS_ERROR\n";
   }
 
-  $realtest += $tests;
-  if ($?) {
-    print "not ok $realtest # $maketest failed: $?\n";
-    print "# $_" foreach  @makeout;
+  my $tb = Test::Builder->new();
+  $tb->current_test += $tests;
+
+  if ($^CHILD_ERROR) {
+      fail("$maketest failed: $^CHILD_ERROR");
+      diag "$_" foreach  @makeout;
   } else {
-    print "ok $realtest - maketest\n";
+      pass("maketest");
   }
-  $realtest++;
 
   if (defined $expect) {
       my $regen = `$runperl -x $package.xs`;
-      if ($?) {
-	  print "not ok $realtest # $runperl -x $package.xs failed: $?\n";
-	  } else {
-	      print "ok $realtest - regen\n";
-	  }
-      $realtest++;
-
-      if ($expect eq $regen) {
-	  print "ok $realtest - regen worked\n";
+      if ($^CHILD_ERROR) {
+	  fail("$runperl -x $package.xs failed: $^CHILD_ERROR");
       } else {
-	  print "not ok $realtest - regen worked\n";
-	  # open FOO, ">expect"; print FOO $expect;
-	  # open FOO, ">regen"; print FOO $regen; close FOO;
+          pass("regen");
       }
-      $realtest++;
+
+      is($expect eq $regen, "regen worked");
   } else {
     for (0..1) {
-      print "ok $realtest # skip no regen or expect for this set of tests\n";
-      $realtest++;
+      ok(1, "skip no regen or expect for this set of tests");
     }
   }
 
   my $makeclean = "$make clean";
-  print "# make = '$makeclean'\n";
+  diag "make = '$makeclean'";
   @makeout = @( `$makeclean` );
-  if ($?) {
-    print "not ok $realtest # $make failed: $?\n";
-    print "# $_" foreach  @makeout;
+  if ($^CHILD_ERROR) {
+      fail("$make failed: $^CHILD_ERROR");
+      diag "$_" foreach  @makeout;
   } else {
-    print "ok $realtest\n";
+      pass;
   }
-  $realtest++;
 
   check_for_bonus_files ('.', < @$files, $output, $makefile_rename, '.', '..');
 
   rename $makefile_rename, $makefile . $makefile_ext
-    or die "Can't rename '$makefile_rename' to '$makefile$makefile_ext': $!";
+    or die "Can't rename '$makefile_rename' to '$makefile$makefile_ext': $^OS_ERROR";
 
-  unlink $output or warn "Can't unlink '$output': $!";
+  unlink $output or warn "Can't unlink '$output': $^OS_ERROR";
 
   # Need to make distclean to remove ../../lib/ExtTest.pm
   my $makedistclean = "$make distclean";
-  print "# make = '$makedistclean'\n";
+  diag "make = '$makedistclean'";
   @makeout = @( `$makedistclean` );
-  if ($?) {
-    print "not ok $realtest # $make failed: $?\n";
-    print "# $_" foreach  @makeout;
+  if ($^CHILD_ERROR) {
+      fail("$make failed: $^CHILD_ERROR");
+      diag "$_" foreach  @makeout;
   } else {
-    print "ok $realtest\n";
+      pass;
   }
-  $realtest++;
 
   check_for_bonus_files ('.', < @$files, '.', '..');
 
   unless ($keep_files) {
     foreach ( @$files) {
-      unlink $_ or warn "unlink $_: $!";
+      unlink $_ or warn "unlink $_: $^OS_ERROR";
     }
   }
 
@@ -272,42 +231,41 @@ sub build_and_run {
 }
 
 sub Makefile_PL {
-  my $package = shift;
-  ################ Makefile.PL
-  # We really need a Makefile.PL because make test for a no dynamic linking perl
-  # will run Makefile.PL again as part of the "make perl" target.
-  my $makefilePL = "Makefile.PL";
-  open FH, ">", "$makefilePL" or die "open >$makefilePL: $!\n";
-  print FH <<"EOT";
+    my $package = shift;
+    ################ Makefile.PL
+    # We really need a Makefile.PL because make test for a no dynamic linking perl
+    # will run Makefile.PL again as part of the "make perl" target.
+    my $makefilePL = "Makefile.PL";
+    open my $fh, ">", "$makefilePL" or die "open >$makefilePL: $^OS_ERROR\n";
+    print $fh, <<"EOT";
 #!$perl -w
 use ExtUtils::MakeMaker;
 WriteMakefile(
               'NAME'		=> "$package",
               'VERSION_FROM'	=> "$package.pm", # finds \$VERSION
               #ABSTRACT_FROM => "$package.pm", # XXX add this
-              AUTHOR     => "$0",
+              AUTHOR     => "$^PROGRAM_NAME",
              );
 EOT
 
-  close FH or die "close $makefilePL: $!\n";
-  return $makefilePL;
+    close $fh or die "close $makefilePL: $^OS_ERROR\n";
+    return $makefilePL;
 }
 
 sub MANIFEST {
-  my (@files) = @_;
+  my @files = @_;
   ################ MANIFEST
   # We really need a MANIFEST because make distclean checks it.
   my $manifest = "MANIFEST";
   push @files, $manifest;
-  open FH, ">", "$manifest" or die "open >$manifest: $!\n";
-  print FH "$_\n" foreach  @files;
-  close FH or die "close $manifest: $!\n";
+  open my $fh, ">", "$manifest" or die "open >$manifest: $^OS_ERROR\n";
+  print $fh, "$_\n" foreach  @files;
+  close $fh or die "close $manifest: $^OS_ERROR\n";
   return @files;
 }
 
-sub write_and_run_extension {
-  my ($name, $items, $export_names, $package, $header, $testfile, $num_tests,
-      $wc_args) = < @_;
+sub write_and_run_extension($name, $items, $export_names, $package, $header, $testfile, $num_tests,
+      $wc_args) {
 
   my $c = '';
   open my $c_fh, '>>', \$c or die;
@@ -330,25 +288,25 @@ sub write_and_run_extension {
   my $expect;
   $expect = $C_code . "\n#### XS Section:\n" . $XS_code unless $wc_args;
 
-  print "# $name\n# $dir/$subdir being created...\n";
-  mkdir $subdir, 0777 or die "mkdir: $!\n";
-  chdir $subdir or die $!;
+  diag "$name\n$dir/$subdir being created...";
+  mkdir $subdir, 0777 or die "mkdir: $^OS_ERROR\n";
+  chdir $subdir or die $^OS_ERROR;
 
   my @files;
 
   ################ Header
   my $header_name = "test.h";
   push @files, $header_name;
-  open FH, ">", "$header_name" or die "open >$header_name: $!\n";
-  print FH $header or die $!;
-  close FH or die "close $header_name: $!\n";
+  open my $fh, ">", "$header_name" or die "open >$header_name: $^OS_ERROR\n";
+  print $fh, $header or die $^OS_ERROR;
+  close $fh or die "close $header_name: $^OS_ERROR\n";
 
   ################ XS
   my $xs_name = "$package.xs";
   push @files, $xs_name;
-  open FH, ">", "$xs_name" or die "open >$xs_name: $!\n";
+  open $fh, ">", "$xs_name" or die "open >$xs_name: $^OS_ERROR\n";
 
-  print FH <<"EOT";
+  print $fh, <<"EOT";
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
@@ -361,74 +319,58 @@ PROTOTYPES: ENABLE
 $XS_code;
 EOT
 
-  close FH or die "close $xs: $!\n";
+  close $fh or die "close $xs: $^OS_ERROR\n";
 
   ################ PM
   my $pm = "$package.pm";
   push @files, $pm;
-  open FH, ">", "$pm" or die "open >$pm: $!\n";
-  print FH "package $package;\n";
+  open $fh, ">", "$pm" or die "open >$pm: $^OS_ERROR\n";
+  print $fh, "package $package;\n";
 
-  print FH <<'EOT';
+  print $fh, <<'EOT';
 
-use strict;
 EOT
-  printf FH "use warnings;\n";
-  print FH <<'EOT';
-use Carp;
+  printf $fh, "use warnings;\n";
+  print $fh, <<'EOT';
 
 require Exporter;
 require DynaLoader;
-use vars < qw ($VERSION @ISA @EXPORT_OK);
+our ($VERSION, @ISA, @EXPORT_OK);
 
 $VERSION = '0.01';
 @ISA = qw(Exporter DynaLoader);
 EOT
   # Having this qw( in the here doc confuses cperl mode far too much to be
   # helpful. And I'm using cperl mode to edit this, even if you're not :-)
-  print FH "\@EXPORT_OK = qw(\n";
+  print $fh, "\@EXPORT_OK = qw(\n";
 
   # Print the names of all our autoloaded constants
-  print FH "\t$_\n" foreach @( (< @$export_names));
-  print FH ");\n";
-  print FH "$package->bootstrap(\$VERSION);\n1;\n__END__\n";
-  close FH or die "close $pm: $!\n";
+  print $fh, "\t$_\n" foreach @( (< @$export_names));
+  print $fh, ");\n";
+  print $fh, "$package->bootstrap(\$VERSION);\n1;\n__END__\n";
+  close $fh or die "close $pm: $^OS_ERROR\n";
 
   ################ test.pl
   my $testpl = "test.pl";
   push @files, $testpl;
-  open FH, ">", "$testpl" or die "open >$testpl: $!\n";
+  open $fh, ">", "$testpl" or die "open >$testpl: $^OS_ERROR\n";
   # Standard test header (need an option to suppress this?)
-  print FH <<"EOT" or die $!;
-use strict;
-use $package < qw({join ' ',@$export_names});
+  print $fh, <<"EOT" or die $^OS_ERROR;
+use $package < qw($(join ' ',@$export_names));
 
-print "1..2\n";
-if (open OUTPUT, ">", "$output") \{
-  print "ok 1\n";
-  select OUTPUT;
-\} else \{
-  print "not ok 1 # Failed to open '$output': \$!\n";
-  exit 1;
-\}
+print \$^STDOUT, "1..1\n";
+print \$^STDOUT, "ok 1\n";
+open \$^STDOUT, ">", "$output" or die "Failed to open '$output': \$^OS_ERROR";
 EOT
-  print FH $testfile or die $!;
-  print FH <<"EOT" or die $!;
-select STDOUT;
-if (close OUTPUT) \{
-  print "ok 2\n";
-\} else \{
-  print "not ok 2 # Failed to close '$output': \$!\n";
-\}
-EOT
-  close FH or die "close $testpl: $!\n";
+  print $fh, $testfile or die $^OS_ERROR;
+  close $fh or die "close $testpl: $^OS_ERROR\n";
 
   push @files, Makefile_PL($package);
   @files = MANIFEST (< @files);
 
   build_and_run ($num_tests, $expect, \@files);
 
-  chdir $updir or die "chdir '$updir': $!";
+  chdir $updir or die "chdir '$updir': $^OS_ERROR";
   ++$subdir;
 }
 
@@ -444,8 +386,7 @@ sub start_tests {
   $dummytest += $before_tests;
   $here = $dummytest;
 }
-sub end_tests {
-  my ($name, $items, $export_names, $header, $testfile, $args) = < @_;
+sub end_tests($name, $items, $export_names, $header, $testfile, ?$args) {
   push @tests, \@($name, $items, $export_names, $package, $header, $testfile,
                $dummytest - $here, $args);
   $dummytest += $after_tests;
@@ -491,7 +432,7 @@ foreach my $args ( @args)
 #define perl "rules"
 EOT
 
-  while (my ($point, $bearing) = each %compass) {
+  while (my @(?$point, ?$bearing) =@( each %compass)) {
     $header .= "#define $point $bearing\n"
   }
 
@@ -520,7 +461,7 @@ EOT
 
   # Automatically compile the list of all the macro names, and make them
   # exported constants.
-  my @export_names = map {(ref $_) ? $_->{name} : $_} @items;
+  my @export_names = map {(ref $_) ?? $_->{name} !! $_}, @items;
 
   # Exporter::Heavy (currently) isn't able to export the last 3 of these:
   push @items, < @common_items;
@@ -536,17 +477,17 @@ EOT
 # IV
 my $five = FIVE;
 if ($five == 5) {
-  print "ok $test\n";
+  print $^STDOUT, "ok $test\n";
 } else {
-  print "not ok $test # \$five\n";
+  print $^STDOUT, "not ok $test # \$five\n";
 }
 $test++;
 
 # PV
 if (OK6 eq "ok 6\n") {
-  print "ok $test\n";
+  print $^STDOUT, "ok $test\n";
 } else {
-  print "not ok $test # \$five\n";
+  print $^STDOUT, "not ok $test # \$five\n";
 }
 $test++;
 
@@ -555,23 +496,23 @@ $_ = OK7;
 s/.*\0//s;
 s/7/$test/;
 $test++;
-print;
+print $^STDOUT, $_;
 
 # NV
 my $farthing = FARTHING;
 if ($farthing == 0.25) {
-  print "ok $test\n";
+  print $^STDOUT, "ok $test\n";
 } else {
-  print "not ok $test # $farthing\n";
+  print $^STDOUT, "not ok $test # $farthing\n";
 }
 $test++;
 
 # UV
 my $not_zero = NOT_ZERO;
 if ($not_zero +> 0 && $not_zero == ^~^0) {
-  print "ok $test\n";
+  print $^STDOUT, "ok $test\n";
 } else {
-  print "not ok $test # \$not_zero=$not_zero ^~^0=" . (^~^0) . "\n";
+  print $^STDOUT, "not ok $test # \$not_zero=$not_zero ^~^0=" . (^~^0) . "\n";
 }
 $test++;
 
@@ -579,98 +520,98 @@ $test++;
 # Also tests custom cpp #if clauses
 my $close = CLOSE;
 if ($close eq '*/') {
-  print "ok $test\n";
+  print $^STDOUT, "ok $test\n";
 } else {
-  print "not ok $test # \$close='$close'\n";
+  print $^STDOUT, "not ok $test # \$close='$close'\n";
 }
 $test++;
 
 # Default values if macro not defined.
 my $answer = ANSWER;
 if ($answer == 42) {
-  print "ok $test\n";
+  print $^STDOUT, "ok $test\n";
 } else {
-  print "not ok $test # What do you get if you multiply six by nine? '$answer'\n";
+  print $^STDOUT, "not ok $test # What do you get if you multiply six by nine? '$answer'\n";
 }
 $test++;
 
 # not defined macro
 my $notdef = try { NOTDEF; };
 if (defined $notdef) {
-  print "not ok $test # \$notdef='$notdef'\n";
-} elsif ($@->{description} !~ m/Your vendor has not defined the requested ExtTest macro/) {
-  warn $@->message;
-  print "not ok $test\n";
+  print $^STDOUT, "not ok $test # \$notdef='$notdef'\n";
+} elsif ($^EVAL_ERROR->{description} !~ m/Your vendor has not defined the requested ExtTest macro/) {
+  warn $^EVAL_ERROR->message;
+  print $^STDOUT, "not ok $test\n";
 } else {
-  print "ok $test\n";
+  print $^STDOUT, "ok $test\n";
 }
 $test++;
 
 # not a macro
-my $notthere = try { &ExtTest::NOTTHERE; };
+my $notthere = try { ExtTest::NOTTHERE(); };
 if (defined $notthere) {
-  print "not ok $test # \$notthere='$notthere'\n";
-} elsif ($@->{description} !~ m/Undefined subroutine .*NOTTHERE called/) {
-  chomp $@;
-  print "not ok $test # \$@='$@'\n";
+  print $^STDOUT, "not ok $test # \$notthere='$notthere'\n";
+} elsif ($^EVAL_ERROR->{description} !~ m/Undefined subroutine .*NOTTHERE called/) {
+  chomp $^EVAL_ERROR;
+  print $^STDOUT, "not ok $test # \$^EVAL_ERROR='$^EVAL_ERROR'\n";
 } else {
-  print "ok $test\n";
+  print $^STDOUT, "ok $test\n";
 }
 $test++;
 
 # Truth
 my $yes = Yes;
 if ($yes) {
-  print "ok $test\n";
+  print $^STDOUT, "ok $test\n";
 } else {
-  print "not ok $test # $yes='\$yes'\n";
+  print $^STDOUT, "not ok $test # $yes='\$yes'\n";
 }
 $test++;
 
 # Falsehood
 my $no = No;
 if (defined $no and !$no) {
-  print "ok $test\n";
+  print $^STDOUT, "ok $test\n";
 } else {
-  print "not ok $test # \$no=" . defined ($no) ? "'$no'\n" : "undef\n";
+  print $^STDOUT, "not ok $test # \$no=" . defined ($no) ?? "'$no'\n" !! "undef\n";
 }
 $test++;
 
 # Undef
 my $undef = Undef;
 unless (defined $undef) {
-  print "ok $test\n";
+  print $^STDOUT, "ok $test\n";
 } else {
-  print "not ok $test # \$undef='$undef'\n";
+  print $^STDOUT, "not ok $test # \$undef='$undef'\n";
 }
 $test++;
 
 # invalid macro (chosen to look like a mix up between No and SW)
-$notdef = try { &ExtTest::So };
+$notdef = try { ExtTest::So() };
 if (defined $notdef) {
-  print "not ok $test # \$notdef='$notdef'\n";
-} elsif ($@->{description} !~ m/^Undefined subroutine .*So called/) {
-  print "not ok $test # \$@='$@'\n";
+  print $^STDOUT, "not ok $test # \$notdef='$notdef'\n";
+} elsif ($^EVAL_ERROR->{description} !~ m/^Undefined subroutine .*So called/) {
+  print $^STDOUT, "not ok $test # \$^EVAL_ERROR='$^EVAL_ERROR'\n";
 } else {
-  print "ok $test\n";
+  print $^STDOUT, "ok $test\n";
 }
 $test++;
 
 # invalid defined macro
-$notdef = try { &ExtTest::EW };
+$notdef = try { ExtTest::EW() };
 if (defined $notdef) {
-  print "not ok $test # \$notdef='$notdef'\n";
-} elsif ($@->{description} !~ m/^Undefined subroutine .*EW called/) {
-  print "not ok $test # \$@='$@'\n";
+  print $^STDOUT, "not ok $test # \$notdef='$notdef'\n";
+} elsif ($^EVAL_ERROR->{description} !~ m/^Undefined subroutine .*EW called/) {
+  print $^STDOUT, "not ok $test # \$^EVAL_ERROR='$^EVAL_ERROR'\n";
 } else {
-  print "ok $test\n";
+  print $^STDOUT, "ok $test\n";
 }
 $test++;
 
 my %compass = %(
 EOT
 
-while (my ($point, $bearing) = each %compass) {
+while (my @(?$point, ?$bearing) =@( each %compass)) {
   $test_body .= "'$point' => $bearing, "
 }
 
@@ -679,23 +620,23 @@ $test_body .= <<'EOT';
 );
 
 my $fail;
-while (my ($point, $bearing) = each %compass) {
+while (my @(?$point, ?$bearing) = @: each %compass) {
   my $val = eval $point;
-  if ($@) {
-    print "# $point: \$@='$@'\n";
+  if ($^EVAL_ERROR) {
+    print $^STDOUT, "# $point: \$^EVAL_ERROR='$^EVAL_ERROR'\n";
     $fail = 1;
   } elsif (!defined $bearing) {
-    print "# $point: \$val=undef\n";
+    print $^STDOUT, "# $point: \$val=undef\n";
     $fail = 1;
   } elsif ($val != $bearing) {
-    print "# $point: \$val=$val, not $bearing\n";
+    print $^STDOUT, "# $point: \$val=$val, not $bearing\n";
     $fail = 1;
   }
 }
 if ($fail) {
-  print "not ok $test\n";
+  print $^STDOUT, "not ok $test\n";
 } else {
-  print "ok $test\n";
+  print $^STDOUT, "ok $test\n";
 }
 $test++;
 
@@ -704,16 +645,16 @@ EOT
 $test_body .= <<"EOT";
 my \$rfc1149 = RFC1149;
 if (\$rfc1149 ne "$parent_rfc1149") \{
-  print "not ok \$test # '\$rfc1149' ne '$parent_rfc1149'\n";
+  print \$^STDOUT, "not ok \$test # '\$rfc1149' ne '$parent_rfc1149'\n";
 \} else \{
-  print "ok \$test\n";
+  print \$^STDOUT, "ok \$test\n";
 \}
 \$test++;
 
 if (\$rfc1149 != 1149) \{
-  printf "not ok \$test # \\\%d != 1149\n", \$rfc1149;
+  printf \$^STDOUT, "not ok \$test # \\\%d != 1149\n", \$rfc1149;
 \} else \{
-  print "ok \$test\n";
+  print \$^STDOUT, "ok \$test\n";
 \}
 \$test++;
 
@@ -723,9 +664,9 @@ $test_body .= <<'EOT';
 # test macro=>1
 my $open = OPEN;
 if ($open eq '/*') {
-  print "ok $test\n";
+  print $^STDOUT, "ok $test\n";
 } else {
-  print "not ok $test # \$open='$open'\n";
+  print $^STDOUT, "not ok $test # \$open='$open'\n";
 }
 $test++;
 EOT
@@ -736,37 +677,36 @@ $dummytest+=18;
 }
 
 # XXX I think that I should merge this into the utf8 test above.
-sub explict_call_constant {
-  my ($string, $expect) = < @_;
+sub explict_call_constant($string, $expect) {
   # This does assume simple strings suitable for ''
   my $test_body = <<"EOT";
-\{
-  my (\$error, \$got) = {$package}::constant ('$string');\n;
+do \{
+  my \@(?\$error, ?\$got) = \@: $($package)::constant ('$string');\n;
 EOT
 
   if (defined $expect) {
     # No error expected
     $test_body .= <<"EOT";
   if (\$error or \$got ne "$expect") \{
-    print "not ok $dummytest # error '\$error', expect '$expect', got '\$got'\n";
+    print $^STDOUT, "not ok $dummytest # error '\$error', expect '$expect', got '\$got'\n";
   \} else \{
-    print "ok $dummytest\n";
-    \}
+    print $^STDOUT, "ok $dummytest\n";
   \}
+\};
 EOT
   } else {
     # Error expected.
     $test_body .= <<"EOT";
   if (\$error) \{
-    print "ok $dummytest # error='\$error' (as expected)\n";
+    print \$^STDOUT, "ok $dummytest # error='\$error' (as expected)\n";
   \} else \{
-    print "not ok $dummytest # expected error, got no error and '\$got'\n";
+    print \$^STDOUT, "not ok $dummytest # expected error, got no error and '\$got'\n";
   \}
 EOT
   }
   $dummytest++;
   return $test_body . <<'EOT';
-}
+};
 EOT
 }
 
@@ -774,7 +714,7 @@ EOT
 sub simple {
   start_tests();
   # Deliberately leave $name in @_, so that it is indexed from 1.
-  my ($name, < @items) = < @_;
+  my @($name, @< @items) =  @_;
   my $test_header;
   my $test_body = "my \$value;\n";
   foreach my $counter (1 .. ((nelems @_)-1)) {
@@ -783,9 +723,9 @@ sub simple {
     $test_body .= <<"EOT";
 \$value = $thisname;
 if (\$value == $counter) \{
-  print "ok $dummytest\n";
+  print \$^STDOUT, "ok $dummytest\n";
 \} else \{
-  print "not ok $dummytest # $thisname gave \$value\n";
+  print \$^STDOUT, "not ok $dummytest # $thisname gave \$value\n";
 \}
 EOT
     ++$dummytest;
@@ -795,7 +735,7 @@ EOT
       substr ($copyname, $i, 1, 'z');
       $test_body .= explict_call_constant ($copyname,
                                            $copyname eq $thisname
-                                             ? $thisname : undef);
+                                             ?? $thisname !! undef);
     }
   }
   # Ho. This seems to be buggy in 5.005_03:
@@ -815,17 +755,12 @@ simple ("Twos and three middle", < qw(aa ae ai ea eu ie io oe era eta));
 # Given the choice go for the end, else the earliest point
 simple ("Three end and four symetry", < qw(ean ear eat barb marm tart));
 
-
-# Need this if the single test below is rolled into @tests :
-# --$dummytest;
-print "1..$dummytest\n";
-
 write_and_run_extension < @$_ foreach  @tests;
 
 # This was causing an assertion failure (a C<confess>ion)
 # Any single byte > 128 should do it.
 C_constant ($package, undef, undef, undef, undef, undef, chr 255);
-print "ok $realtest\n"; $realtest++;
+pass;
 
-print STDERR "# You were running with \$keep_files set to $keep_files\n"
+print $^STDERR, "# You were running with \$keep_files set to $keep_files\n"
   if $keep_files;

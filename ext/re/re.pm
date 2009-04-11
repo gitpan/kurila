@@ -1,30 +1,25 @@
 package re;
 
 # pragma for controlling the regex engine
-use strict;
 use warnings;
 
 our $VERSION     = "0.09";
 our @ISA         = qw(Exporter);
 my @XS_FUNCTIONS = qw(regmust);
-my %XS_FUNCTIONS = %( < map { $_ => 1 } @XS_FUNCTIONS );
+my %XS_FUNCTIONS = %( < @+: map { @: $_ => 1 }, @XS_FUNCTIONS );
 our @EXPORT_OK   = @(< @XS_FUNCTIONS, <
                     qw(is_regexp regexp_pattern
                        regname regnames regnames_count));
-our %EXPORT_OK = %( < map { $_ => 1 } @EXPORT_OK );
+our %EXPORT_OK = %( < @+: map { @: $_ => 1 }, @EXPORT_OK );
 
 # *** WARNING *** WARNING *** WARNING *** WARNING *** WARNING ***
 #
 # If you modify these values see comment below!
 
 my %bitmask = %(
-    taint   => 0x00100000, # HINT_RE_TAINT
     eval    => 0x00200000, # HINT_RE_EVAL
 );
 
-# - File::Basename contains a literal for 'taint' as a fallback.  If
-# taint is changed here, File::Basename must be updated as well.
-#
 # - ExtUtils::ParseXS uses a hardcoded 
 # BEGIN { $^H |= 0x00200000 } 
 # in it to allow re.xs to be built. So if 'eval' is changed here then
@@ -37,16 +32,15 @@ sub setcolor {
   require Term::Cap;
 
   my $terminal = Term::Cap->Tgetent(\%(OSPEED => 9600)); # Avoid warning.
-  my $props = %ENV{PERL_RE_TC} || 'md,me,so,se,us,ue';
+  my $props = env::var('PERL_RE_TC') || 'md,me,so,se,us,ue';
   my @props = split m/,/, $props;
-  my $colors = join "\t", map {$terminal->Tputs($_,1)} @props;
+  my $colors = join "\t", map {$terminal->Tputs($_,1)}, @props;
 
   $colors =~ s/\0//g;
-  %ENV{PERL_RE_COLORS} = $colors;
+  env::var('PERL_RE_COLORS' ) = $colors;
  };
- if ($@) {
-     die $@;
-    %ENV{PERL_RE_COLORS} ||= qq'\t\t> <\t> <\t\t';
+ if ($^EVAL_ERROR) {
+     die $^EVAL_ERROR;
  }
 
 }
@@ -73,12 +67,12 @@ our %flags = %(
     STACK           => 0x280000,
     BUFFERS         => 0x400000,
 );
-%flags{ALL} = -1 ^&^ ^~^(%flags{OFFSETS}^|^%flags{OFFSETSDBG}^|^%flags{BUFFERS});
-%flags{All} = %flags{all} = %flags{DUMP} ^|^ %flags{EXECUTE};
-%flags{Extra} = %flags{EXECUTE} ^|^ %flags{COMPILE};
-%flags{More} = %flags{MORE} = %flags{All} ^|^ %flags{TRIEC} ^|^ %flags{TRIEM} ^|^ %flags{STATE};
-%flags{State} = %flags{DUMP} ^|^ %flags{EXECUTE} ^|^ %flags{STATE};
-%flags{TRIE} = %flags{DUMP} ^|^ %flags{EXECUTE} ^|^ %flags{TRIEC};
+%flags{+ALL} = -1 ^&^ ^~^(%flags{?OFFSETS}^|^%flags{?OFFSETSDBG}^|^%flags{?BUFFERS});
+%flags{+All} = (%flags{+all} = %flags{?DUMP} ^|^ %flags{?EXECUTE});
+%flags{+Extra} = %flags{?EXECUTE} ^|^ %flags{?COMPILE};
+%flags{+More} = (%flags{+MORE} = %flags{?All} ^|^ %flags{?TRIEC} ^|^ %flags{?TRIEM} ^|^ %flags{?STATE});
+%flags{+State} = %flags{?DUMP} ^|^ %flags{?EXECUTE} ^|^ %flags{?STATE};
+%flags{+TRIE} = %flags{?DUMP} ^|^ %flags{?EXECUTE} ^|^ %flags{?TRIEC};
 
 my $installed;
 my $installed_error;
@@ -87,16 +81,15 @@ sub _do_install {
     if ( ! defined($installed) ) {
         require XSLoader;
         $installed = try { XSLoader::load('re', $VERSION) } || 0;
-        $installed_error = $@;
+        $installed_error = $^EVAL_ERROR;
     }
 }
 
-sub _load_unload {
-    my ($on)= < @_;
+sub _load_unload($on) {
     if ($on) {
         _do_install();        
         if ( ! $installed ) {
-            die "'re' not installed!? ($installed_error)";
+            die "'re' not installed!? ($($installed_error->message))";
 	} else {
 	    # We call install() every time, as if we didn't, we wouldn't
 	    # "see" any changes to the color environment var since
@@ -106,10 +99,10 @@ sub _load_unload {
 	    # in C resolves to a structure containing the regex
 	    # hooks. Setting it to a random integer will guarantee
 	    # segfaults.
-	    %^H{regcomp} = install();
+	    $^HINTS{+regcomp} = install();
         }
     } else {
-        delete %^H{regcomp};
+        delete $^HINTS{regcomp};
     }
 }
 
@@ -125,38 +118,38 @@ sub bits {
             setcolor() if $s =~m/color/i;
             $^RE_DEBUG_FLAGS = 0 unless defined $^RE_DEBUG_FLAGS;
             for my $idx ($idx+1..((nelems @_)-1)) {
-                if (%flags{@_[$idx]}) {
+                if (%flags{?@_[$idx]}) {
                     if ($on) {
-                        $^RE_DEBUG_FLAGS ^|^= %flags{@_[$idx]};
+                        $^RE_DEBUG_FLAGS ^|^= %flags{?@_[$idx]};
                     } else {
-                        $^RE_DEBUG_FLAGS ^&^= ^~^ %flags{@_[$idx]};
+                        $^RE_DEBUG_FLAGS ^&^= ^~^ %flags{?@_[$idx]};
                     }
                 } else {
                     warn("Unknown \"re\" Debug flag '@_[$idx]', possible flags: "
                          . join(", ",sort keys %flags ) );
                 }
             }
-            _load_unload($on ? 1 : $^RE_DEBUG_FLAGS);
+            _load_unload($on ?? 1 !! $^RE_DEBUG_FLAGS);
             last;
         } elsif ($s eq 'debug' or $s eq 'debugcolor') {
 	    setcolor() if $s =~m/color/i;
 	    _load_unload($on);
 	    last;
         } elsif (exists %bitmask{$s}) {
-	    $bits ^|^= %bitmask{$s};
-        } elsif (%XS_FUNCTIONS{$s}) {
+	    $bits ^|^= %bitmask{?$s};
+        } elsif (%XS_FUNCTIONS{?$s}) {
             _do_install();
             if (! $installed) {
                 die("\"re\" function '$s' not available");
             }
             require Exporter;
             re->export_to_level(2, 're', $s);
-	} elsif (%EXPORT_OK{$s}) {
+	} elsif (%EXPORT_OK{?$s}) {
 	    require Exporter;
 	    re->export_to_level(2, 're', $s);
 	} else {
 	    warn("Unknown \"re\" subpragma '$s' (known ones are: "
-                 . join(', ', map {qq('$_')} @( 'debug', 'debugcolor', < sort keys %bitmask))
+                 . join(', ', map {qq('$_')}, @( 'debug', 'debugcolor', < sort keys %bitmask))
                  . ")");
 	}
     }
@@ -165,12 +158,14 @@ sub bits {
 
 sub import {
     shift;
-    $^H ^|^= bits(1, < @_);
+    my $selected_bits = bits(1, < @_);
+    $^HINT_BITS ^|^= $selected_bits;
 }
 
 sub unimport {
     shift;
-    $^H ^&^= ^~^ bits(0, < @_);
+    my $selected_bits = bits(0, < @_);
+    $^HINT_BITS ^&^= ^~^ $selected_bits;
 }
 
 1;
@@ -183,17 +178,11 @@ re - Perl pragma to alter regular expression behaviour
 
 =head1 SYNOPSIS
 
-    use re 'taint';
-    ($x) = ($^X =~ /^(.*)$/s);     # $x is tainted here
-
     $pat = '(?{ $foo = 1 })';
     use re 'eval';
     /foo${pat}bar/;		   # won't fail (when not under -T switch)
 
     {
-	no re 'taint';		   # the default
-	($x) = ($^X =~ /^(.*)$/s); # $x is not tainted here
-
 	no re 'eval';		   # the default
 	/foo${pat}bar/;		   # disallowed (with or without -T switch)
     }
@@ -216,26 +205,14 @@ re - Perl pragma to alter regular expression behaviour
             scalar regexp_pattern($obj); # just as perl would stringify it
     }                                    # but no hassle with blessed re's.
 
-(We use $^X in these examples because it's tainted by default.)
-
 =head1 DESCRIPTION
-
-=head2 'taint' mode
-
-When C<use re 'taint'> is in effect, and a tainted string is the target
-of a regex, the regex memories (or values returned by the m// operator
-in list context) are tainted.  This feature is useful when regex operations
-on tainted data aren't meant to extract safe substrings, but to perform
-other transformations.
 
 =head2 'eval' mode
 
 When C<use re 'eval'> is in effect, a regex is allowed to contain
 C<(?{ ... })> zero-width assertions even if regular expression contains
 variable interpolation.  That is normally disallowed, since it is a
-potential security risk.  Note that this pragma is ignored when the regular
-expression is obtained from tainted data, i.e.  evaluation is always
-disallowed with tainted regular expressions.  See L<perlre/(?{ code })>.
+potential security risk.  See L<perlre/(?{ code })>.
 
 For the purpose of this pragma, interpolation of precompiled regular
 expressions (i.e., the result of C<qr//>) is I<not> considered variable

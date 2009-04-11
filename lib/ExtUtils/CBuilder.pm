@@ -4,7 +4,7 @@ use File::Spec ();
 use File::Path ();
 use File::Basename ();
 
-use vars < qw($VERSION @ISA);
+our ($VERSION, @ISA);
 $VERSION = '0.22_01';
 $VERSION = eval $VERSION;
 
@@ -58,26 +58,26 @@ my %OSTYPES = %( < qw(
 my $load = sub {
   my $mod = shift;
   eval "use $mod";
-  die $@ if $@;
+  die $^EVAL_ERROR if $^EVAL_ERROR;
   @ISA = @($mod);
 };
 
-{
+do {
   my @package = split m/::/, __PACKAGE__;
   
-  if (grep {-e File::Spec->catfile($_, < @package, 'Platform', $^O) . '.pm'} @INC) {
-    $load->(__PACKAGE__ . "::Platform::$^O");
+  if (grep {-e File::Spec->catfile($_, < @package, 'Platform', $^OS_NAME) . '.pm'}, $^INCLUDE_PATH) {
+    $load->(__PACKAGE__ . "::Platform::$^OS_NAME");
     
-  } elsif (exists %OSTYPES{$^O} and
-	   grep {-e File::Spec->catfile($_, < @package, 'Platform', %OSTYPES{$^O}) . '.pm'} @INC) {
-    $load->(__PACKAGE__ . "::Platform::%OSTYPES{$^O}");
+  } elsif (exists %OSTYPES{$^OS_NAME} and
+	   grep {-e File::Spec->catfile($_, < @package, 'Platform', %OSTYPES{$^OS_NAME}) . '.pm'}, $^INCLUDE_PATH) {
+    $load->(__PACKAGE__ . "::Platform::%OSTYPES{?$^OS_NAME}");
     
   } else {
     $load->(__PACKAGE__ . "::Base");
   }
-}
+};
 
-sub os_type { %OSTYPES{$^O} }
+sub os_type { %OSTYPES{?$^OS_NAME} }
 
 1;
 __END__

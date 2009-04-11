@@ -1,12 +1,12 @@
 #!/usr/bin/perl -w
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't';
-        @INC = @('../lib', 'lib/');
+        $^INCLUDE_PATH = @('../lib', 'lib/');
     }
     else {
-        unshift @INC, 't/lib/';
+        unshift $^INCLUDE_PATH, 't/lib/';
     }
 }
 chdir 't';
@@ -25,17 +25,17 @@ else {
     plan skip_all => "ExtUtils::CBuilder not installed or couldn't find a compiler";
 }
 
-my $Is_VMS = $^O eq 'VMS';
+my $Is_VMS = $^OS_NAME eq 'VMS';
 my $perl = which_perl();
 
 # GNV logical interferes with testing
-%ENV{'bin'} = '[.bin]' if $Is_VMS;
+env::var('bin' ) = '[.bin]' if $Is_VMS;
 
 chdir 't';
 
 perl_lib;
 
-$| = 1;
+$^OUTPUT_AUTOFLUSH = 1;
 
 ok( setup_xs(), 'setup' );
 END {
@@ -44,18 +44,18 @@ END {
 }
 
 ok( chdir('XS-Test'), "chdir'd to XS-Test" ) ||
-  diag("chdir failed: $!");
+  diag("chdir failed: $^OS_ERROR");
 
 my $mpl_out = run(qq{$perl Makefile.PL});
 
-cmp_ok( $?, '==', 0, 'Makefile.PL exited with zero' ) ||
+cmp_ok( $^CHILD_ERROR, '==', 0, 'Makefile.PL exited with zero' ) ||
   diag($mpl_out);
 
 my $make = make_run();
 my $make_out = run("$make");
-is( $?, 0,                                 '  make exited normally' ) || 
+is( $^CHILD_ERROR, 0,                                 '  make exited normally' ) || 
     diag $make_out;
 
 my $test_out = run("$make");
-is( $?, 0,                                 '  make test exited normally' ) || 
+is( $^CHILD_ERROR, 0,                                 '  make test exited normally' ) || 
     diag $test_out;

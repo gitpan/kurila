@@ -1,5 +1,4 @@
-use strict;
-use Test;
+use Test::More;
 use Win32;
 
 my $path = "Long Path $$";
@@ -12,7 +11,7 @@ Win32::CreateFile($path);
 ok(-f $path);
 
 my $short = Win32::GetShortPathName($path);
-ok($short, qr/^\S{1,8}(\.\S{1,3})?$/);
+like($short, qr/^\S{1,8}(\.\S{1,3})?$/);
 ok(-f $short);
 
 unlink($path);

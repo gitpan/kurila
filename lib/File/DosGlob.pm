@@ -10,7 +10,7 @@
 package File::DosGlob;
 
 our $VERSION = '1.01';
-use strict;
+
 use warnings;
 
 sub doglob {
@@ -38,12 +38,12 @@ sub doglob {
 	    substr($pat,0,2, $1 . "./");
 	}
 	if ($pat =~ m|^(.*)([\\/])([^\\/]*)\z|s) {
-	    ($head, $sepchr, $tail) = ($1,$2,$3);
+	    @($head, $sepchr, $tail) = @($1,$2,$3);
 	    #print "div: |$head|$sepchr|$tail|\n";
 	    push (@retval, $pat), next OUTER if $tail eq '';
 	    if ($head =~ m/[*?]/) {
 		@globdirs = doglob('d', $head);
-		push(@retval, < doglob($cond, < map {"$_$sepchr$tail"} @globdirs)),
+		push(@retval, < doglob($cond, < map {"$_$sepchr$tail"}, @globdirs)),
 		    next OUTER if (nelems @globdirs);
 	    }
 	    $head .= $sepchr if $head eq '' or $head =~ m/^[A-Za-z]:\z/s;
@@ -59,9 +59,9 @@ sub doglob {
 	    else              { push(@retval,$head) if -e $head }
 	    next OUTER;
 	}
-	opendir(D, $head) or next OUTER;
-	my @leaves = @( readdir D );
-	closedir D;
+	opendir(my $d, $head) or next OUTER;
+	my @leaves = @( readdir $d );
+	closedir $d;
 	$head = '' if $head eq '.';
 	$head .= $sepchr unless $head eq '' or substr($head,-1) eq $sepchr;
 
@@ -125,7 +125,7 @@ sub doglob_Mac {
 
 	if (m|^(.*?)(:+)([^:]*)\z|s) { # note: $1 is not greedy
 	    my $tail;
-	    ($head, $sepchr, $tail) = ($1,$2,$3);
+	    @($head, $sepchr, $tail) = @($1,$2,$3);
 	    #print "div: |$head|$sepchr|$tail|\n";
 	    push (@retval, $_), next OUTER if $tail eq '';		
 		#
@@ -135,11 +135,11 @@ sub doglob_Mac {
 		# if a '*' or '?' is preceded by an odd count of '\', temporary delete 
 		# it (and its preceding backslashes), i.e. don't treat '\*' and '\?' as 
 		# wildcards
-		$tmp_head =~ s/(\\*)([*?])/{$2 x ((length($1) + 1) % 2)}/g;
+		$tmp_head =~ s/(\\*)([*?])/$($2 x ((length($1) + 1) % 2))/g;
 	
 		if ($tmp_head =~ m/[*?]/) { # if there are wildcards ...	
 		@globdirs = doglob_Mac('d', $head);
-		push(@retval, < doglob_Mac($cond, < map {"$_$sepchr$tail"} @globdirs)),
+		push(@retval, < doglob_Mac($cond, < map {"$_$sepchr$tail"}, @globdirs)),
 		    next OUTER if (nelems @globdirs);
 	    }
 		
@@ -156,7 +156,7 @@ sub doglob_Mac {
 	# if a '*' or '?' is preceded by an odd count of '\', temporary delete 
 	# it (and its preceding backslashes), i.e. don't treat '\*' and '\?' as 
 	# wildcards
-	$tmp_tail =~ s/(\\*)([*?])/{$2 x ((length($1) + 1) % 2)}/g;
+	$tmp_tail =~ s/(\\*)([*?])/$($2 x ((length($1) + 1) % 2))/g;
 	
 	unless ($tmp_tail =~ m/[*?]/) { # if there are wildcards ...
 	    $not_esc_head = $head = '' if $head eq ':';
@@ -170,27 +170,27 @@ sub doglob_Mac {
 	    next OUTER;
 	}
 	#print "opendir($not_esc_head)\n";
-	opendir(D, $not_esc_head) or next OUTER;
-	my @leaves = @( readdir D );
-	closedir D;
+	opendir(my $d, $not_esc_head) or next OUTER;
+	my @leaves = @( readdir $d );
+	closedir $d;
 
 	# escape regex metachars but not '\' and glob chars '*', '?'
 	$_ =~ s:([].+^\-\${}[|]):\\$1:g;
 	# and convert DOS-style wildcards to regex,
 	# but only if they are not escaped
-	$_ =~ s/(\\*)([*?])/{$1 . ('.' x ((length($1) + 1) % 2)) . $2}/g;
+	$_ =~ s/(\\*)([*?])/$($1 . ('.' x ((length($1) + 1) % 2)) . $2)/g;
 
 	#print "regex: '$_', head: '$head', unescaped head: '$not_esc_head'\n";
 	my $matchsub = eval 'sub { $_[0] =~ m|^' . $_ . '\z|ios }';
-	warn($@), next OUTER if $@;
+	warn($^EVAL_ERROR), next OUTER if $^EVAL_ERROR;
       INNER:
 	for my $e ( @leaves) {
 	    next INNER if $e eq '.' or $e eq '..';
 	    next INNER if $cond eq 'd' and ! -d "$not_esc_head$e";
 		
 		if (&$matchsub($e)) {
-			my $leave = (($not_esc_head eq ':') && (-f "$not_esc_head$e")) ? 
-		            	"$e" : "$not_esc_head$e";
+			my $leave = (($not_esc_head eq ':') && (-f "$not_esc_head$e")) ?? 
+		            	"$e" !! "$not_esc_head$e";
 			#
 			# On Mac OS, the two glob metachars '*' and '?' and the escape 
 			# char '\' are valid characters for file and directory names. 
@@ -241,7 +241,7 @@ sub _expand_volume {
 			$vol_pat =~ s:([].+^\-\${}[|]):\\$1:g;
 			# and convert DOS-style wildcards to regex,
 			# but only if they are not escaped
-			$vol_pat =~ s/(\\*)([*?])/{$1 . ('.' x ((length($1) + 1) % 2)) . $2}/g;
+			$vol_pat =~ s/(\\*)([*?])/$($1 . ('.' x ((length($1) + 1) % 2)) . $2)/g;
 			#print "volume regex: '$vol_pat' \n";
 				
 			foreach my $volume ( @mounted_volumes) {
@@ -273,7 +273,7 @@ sub _preprocess_pattern {
 	foreach my $p ( @pat) {
 		my $proceed;
 		# resolve any updirs, e.g. "*HD:t?p::a*" -> "*HD:a*"
-		do {
+		{
 			$proceed = ($p =~ s/^(.*):[^:]+::(.*?)\z/$1:$2/);  
 		} while ($proceed);
 		# remove a single trailing colon, e.g. ":*:" -> ":*"
@@ -305,8 +305,7 @@ sub _un_escape {
 my %iter;
 my %entries;
 
-sub glob {
-    my($pat,$cxix) = < @_;
+sub glob($pat,$cxix) {
     my @pat;
 
     # glob without args defaults to $_
@@ -325,12 +324,12 @@ sub glob {
     #   abc3 will be the original {3} (and drop the {}).
     #   abc1 abc2 will be put in @appendpat.
     # This was just the esiest way, not nearly the best.
-    REHASH: {
+    REHASH: do {
 	my @appendpat = @( () );
 	for ( @pat) {
 	    # There must be a "," I.E. abc{efg} is not what we want.
 	    while ( m/^(.*)(?<!\\)\{(.*?)(?<!\\)\,.*?(?<!\\)\}(.*)$/ ) {
-		my ($start, $match, $end) = ($1, $2, $3);
+		my @($start, $match, $end) = @($1, $2, $3);
 		#print "Got: \n\t$start\n\t$match\n\t$end\n";
 		my $tmp = "$start$match$end";
 		while ( $tmp =~ s/^(.*?)(?<!\\)\{(?:.*(?<!\\)\,)?(.*\Q$match\E.*?)(?:(?<!\\)\,.*)?(?<!\\)\}(.*)$/$1$2$3/ ) {
@@ -357,9 +356,9 @@ sub glob {
 	    for (  @appendpat ) {
 	        push @pat, $_;
 	    }
-	    goto REHASH;
+	    redo REHASH;
 	}
-    }
+    };
     for (  @pat ) {
 	s/\\{/\{/g;
 	s/\\}/\}/g;
@@ -369,18 +368,18 @@ sub glob {
  
     # assume global context if not provided one
     $cxix = '_G_' unless defined $cxix;
-    %iter{$cxix} = 0 unless exists %iter{$cxix};
+    %iter{+$cxix} = 0 unless exists %iter{$cxix};
 
     # if we're just beginning, do it all first
-    if (%iter{$cxix} == 0) {
-	if ($^O eq 'MacOS') {
+    if (%iter{?$cxix} == 0) {
+	if ($^OS_NAME eq 'MacOS') {
 		# first, take care of updirs and trailing colons
 		@pat = _preprocess_pattern(< @pat);
 		# expand volume names
 		@pat = _expand_volume(< @pat);
-		%entries{$cxix} = (nelems @pat) ? \_un_escape( < doglob_Mac(1,< @pat) ) : \@();
+		%entries{+$cxix} = (nelems @pat) ?? \_un_escape( < doglob_Mac(1,< @pat) ) !! \@();
 	} else {
-		%entries{$cxix} = \doglob(1,< @pat);
+		%entries{+$cxix} = \doglob(1,< @pat);
     }
 	}
 
@@ -389,17 +388,15 @@ sub glob {
     return @{delete %entries{$cxix}};
 }
 
-{
-    no strict 'refs';
-
+do {
     sub import {
     my $pkg = shift;
     return unless (nelems @_);
     my $sym = shift;
-    my $callpkg = ($sym =~ s/^GLOBAL_//s ? 'CORE::GLOBAL' : caller(0));
+    my $callpkg = ($sym =~ s/^GLOBAL_//s ?? 'CORE::GLOBAL' !! caller(0));
     *{Symbol::fetch_glob($callpkg.'::'.$sym)} = \&{*{Symbol::fetch_glob($pkg.'::'.$sym)}} if $sym eq 'glob';
     }
-}
+};
 1;
 
 __END__

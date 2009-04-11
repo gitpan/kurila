@@ -6,7 +6,7 @@ use Getopt::Long < qw(GetOptions);
 use Pod::Usage < qw(pod2usage);
 use Cwd < qw(cwd);
 use File::Spec;
-use strict;
+
 
 my %opt = %(
   frames  => 3,
@@ -29,28 +29,28 @@ GetOptions(\%opt, < qw(
 
 # Setup the directory to process
 if (exists %opt{dir}) {
-  %opt{dir} = File::Spec->canonpath(%opt{dir});
+  %opt{+dir} = File::Spec->canonpath(%opt{dir});
 }
 else {
   # Check if we're in 't'
-  %opt{dir} = cwd =~ m/\/t$/ ? '..' : '.';
+  %opt{+dir} = cwd =~ m/\/t$/ ?? '..' !! '.';
 
   # Check if we're in the right directory
-  -d "%opt{dir}/$_" or die "$0: must be run from the perl source directory"
+  -d "%opt{?dir}/$_" or die "$0: must be run from the perl source directory"
                          . " when --dir is not given\n"
       for qw(t lib ext);
 }
 
 # Assemble regex for functions whose leaks should be hidden
 # (no, a hash won't be significantly faster)
-my $hidden = do { local $"='|'; %opt{hide} ? qr/^(?:{join ' ', <@{%opt{hide}}})$/o : '' };
+my $hidden = do { local $"='|'; %opt{?hide} ?? qr/^(?:{join ' ', <@{%opt{?hide}}})$/o !! '' };
 
 # Setup our output file handle
 # (do it early, as it may fail)
 my $fh = \*STDOUT;
 if (exists %opt{'output-file'}) {
   $fh = IO::File->new( ">%opt{'output-file'}")
-        or die "$0: cannot open %opt{'output-file'} ($!)\n";
+        or die "$0: cannot open %opt{?'output-file'} ($^OS_ERROR)\n";
 }
 
 # These hashes will receive the error and leak summary data:
@@ -73,7 +73,7 @@ if (exists %opt{'output-file'}) {
 my(%error, %leak);
 
 # Collect summary data
-find(\%(wanted => \&filter, no_chdir => 1), %opt{dir});
+find(\%(wanted => \&filter, no_chdir => 1), %opt{?dir});
 
 # Format the output nicely
 $Text::Wrap::columns = 80;
@@ -85,55 +85,55 @@ summary($fh, \%error, \%leak);
 exit 0;
 
 sub summary {
-  my($fh, $error, $leak) = < @_;
+  my@($fh, $error, $leak) =  @_;
   my(%ne, %nl, %top);
 
   # Prepare the data
 
   for my $e (keys %$error) {
-    for my $f (keys %{$error->{$e}}) {
-      my($func, $file, $line) = < split m/:/, $f;
-      my $nf = %opt{lines} ? "$func ($file:$line)" : "$func ($file)";
-      %ne{$e}->{$nf}->{count}++;
-      while (my($k,$v) = each %{$error->{$e}->{$f}}) {
-        %ne{$e}->{$nf}->{tests}->{$k} += $v;
-        %top{$k}->{error}++;
+    for my $f (keys %{$error->{?$e}}) {
+      my@($func, $file, $line) =  split m/:/, $f;
+      my $nf = %opt{?lines} ?? "$func ($file:$line)" !! "$func ($file)";
+      %ne{$e}->{$nf}->{+count}++;
+      while (my@($k,$v) =@( each %{$error->{$e}->{$f}})) {
+        %ne{$e}->{$nf}->{tests}->{+$k} += $v;
+        %top{$k}->{+error}++;
       }
     }
   }
 
   for my $l (keys %$leak) {
-    for my $s (keys %{$leak->{$l}}) {
+    for my $s (keys %{$leak->{?$l}}) {
       my $ns = join '<', map {
-                 my($func, $file, $line) = < split m/:/;
-                 m/:/ ? %opt{lines}
-                       ? "$func ($file:$line)" : "$func ($file)"
-                     : $_
+                 my@($func, $file, $line) =  split m/:/;
+                 m/:/ ?? %opt{?lines}
+                       ?? "$func ($file:$line)" !! "$func ($file)"
+                     !! $_
                } split m/</, $s;
-      %nl{$l}->{$ns}->{count}++;
-      while (my($k,$v) = each %{$leak->{$l}->{$s}}) {
-        %nl{$l}->{$ns}->{tests}->{$k} += $v;
-        %top{$k}->{leak}++;
+      %nl{$l}->{$ns}->{+count}++;
+      while (my@($k,$v) =@( each %{$leak->{$l}->{$s}})) {
+        %nl{$l}->{$ns}->{tests}->{+$k} += $v;
+        %top{$k}->{+leak}++;
       }
     }
   }
 
   # Print the Top N
 
-  if (%opt{top}) {
+  if (%opt{?top}) {
     for my $what (qw(error leak)) {
-      my @t = sort { %top{$b}->{$what} <+> %top{$a}->{$what} or $a cmp $b }
- grep %top{$_}->{$what}, keys %top;
-      (nelems @t) +> %opt{top} and splice @t, %opt{top};
+      my @t = sort { %top{$b}->{?$what} <+> %top{$a}->{?$what} or $a cmp $b }
+ grep %top{$_}->{?$what}, keys %top;
+      (nelems @t) +> %opt{?top} and splice @t, %opt{?top};
       my $n = (nelems @t);
-      my $s = $n +> 1 ? 's' : '';
+      my $s = $n +> 1 ?? 's' !! '';
       my $prev = 0;
-      print $fh "Top $n test scripts for {$what}s:\n\n";
+      print $fh "Top $n test scripts for $($what)s:\n\n";
       for my $i (1 .. $n) {
-        $n = %top{@t[$i-1]}->{$what};
-        $s = $n +> 1 ? 's' : '';
+        $n = %top{@t[$i-1]}->{?$what};
+        $s = $n +> 1 ?? 's' !! '';
         printf $fh "    \%3s \%-40s \%3d $what$s\n",
-                   $n != $prev ? "$i." : '', @t[$i-1], $n;
+                   $n != $prev ?? "$i." !! '', @t[$i-1], $n;
         $prev = $n;
       }
       print $fh "\n";
@@ -146,11 +146,11 @@ sub summary {
 
   for my $e (sort keys %ne) {
     print $fh qq("$e"\n);
-    for my $frame (sort keys %{%ne{$e}}) {
-      my $data = %ne{$e}->{$frame};
-      my $count = $data->{count} +> 1 ? " [$data->{count} paths]" : '';
+    for my $frame (sort keys %{%ne{?$e}}) {
+      my $data = %ne{$e}->{?$frame};
+      my $count = $data->{?count} +> 1 ?? " [$data->{?count} paths]" !! '';
       print $fh ' 'x4, "$frame$count\n", <
-                format_tests($data->{tests}), "\n";
+                format_tests($data->{?tests}), "\n";
     }
     print $fh "\n";
   }
@@ -159,12 +159,12 @@ sub summary {
  
   for my $l (sort keys %nl) {
     print $fh qq("$l"\n);
-    for my $frames (sort keys %{%nl{$l}}) {
-      my $data = %nl{$l}->{$frames};
+    for my $frames (sort keys %{%nl{?$l}}) {
+      my $data = %nl{$l}->{?$frames};
       my @stack = split m/</, $frames;
-      $data->{count} +> 1 and @stack[-1] .= " [$data->{count} paths]";
+      $data->{?count} +> 1 and @stack[-1] .= " [$data->{?count} paths]";
       print $fh join('', map { ' 'x4 . "$_:@stack[$_]\n" } 0 ..( (nelems @stack)-1) ), <
-                format_tests($data->{tests}), "\n\n";
+                format_tests($data->{?tests}), "\n\n";
     }
   }
 }
@@ -173,12 +173,12 @@ sub format_tests {
   my $tests = shift;
   my $indent = ' 'x8;
 
-  if (%opt{tests}) {
+  if (%opt{?tests}) {
     return wrap($indent, $indent, join ', ', sort keys %$tests);
   }
   else {
     my $count = keys %$tests;
-    my $s = $count +> 1 ? 's' : '';
+    my $s = $count +> 1 ?? 's' !! '';
     return $indent . "triggered by $count test$s";
   }
 }
@@ -191,13 +191,13 @@ sub filter {
 
   # Strip all unnecessary stuff from the test name
   my $test = $1;
-  $test =~ s/^(?:(?:\Q%opt{dir}\E|[.t])\/)+//;
+  $test =~ s/^(?:(?:\Q%opt{?dir}\E|[.t])\/)+//;
 
   debug(1, "processing $test ($_)\n");
 
   # Get all the valgrind output lines
   my @l = @( do {
-    my $fh = IO::File->new( $_) or die "$0: cannot open $_ ($!)\n";
+    my $fh = IO::File->new( $_) or die "$0: cannot open $_ ($^OS_ERROR)\n";
     # Process outputs can interrupt each other, so sort by pid first
     my %pid; local $_;
     while ( ~< $fh) {
@@ -227,7 +227,7 @@ sub filter {
       my @stack;           # Call stack
 
       while (@l[$j++] =~ m/^\s+(?:at|by) $hexaddr:\s+(\w+)\s+\((?:([^:]+):(\d+)|[^)]+)\)/o) {
-        my($func, $file, $lineno) = ($1, $2, $3);
+        my@($func, $file, $lineno) = @($1, $2, $3);
 
         # If the stack frame is inside perl => increment $inperl
         # If we've already been inside perl, but are no longer => leave
@@ -237,14 +237,14 @@ sub filter {
         $hidden && $func =~ $hidden and @stack = @( () ), last;
 
         # Add stack frame if it's within our threshold
-        if ($inperl +<= %opt{frames}) {
-          push @stack, $inperl ? "$func:$file:$lineno" : $func;
+        if ($inperl +<= %opt{?frames}) {
+          push @stack, $inperl ?? "$func:$file:$lineno" !! $func;
         }
       }
 
       # If there's something on the stack and we've seen perl code,
       # add this memory leak to the summary data
-      (nelems @stack) and $inperl and %leak{$type}->{join '<', @stack}->{$test}++;
+      (nelems @stack) and $inperl and %leak{$type}->{join '<', @stack}->{+$test}++;
     } else {
       debug(1, "ERROR: $line\n");
 
@@ -252,7 +252,7 @@ sub filter {
       # the perl source code
       while (@l[$j++] =~ m/^\s+(?:at|by) $hexaddr:\s+(?:(\w+)\s+\(([^:]+):(\d+)\))?/o) {
         if (defined $1) {
-          %error{$line}->{"$1:$2:$3"}->{$test}++;
+          %error{$line}->{"$1:$2:$3"}->{+$test}++;
           last;
         }
       }
@@ -262,7 +262,7 @@ sub filter {
 
 sub debug {
   my $level = shift;
-  %opt{verbose} +>= $level and print STDERR < @_;
+  %opt{?verbose} +>= $level and print STDERR < @_;
 }
 
 __END__

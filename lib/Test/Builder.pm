@@ -1,7 +1,7 @@
 package Test::Builder;
 
 use kurila;
-use strict;
+
 
 our $VERSION = '0.78_01';
 $VERSION = try { $VERSION }; # make the alpha version come out as a number
@@ -9,17 +9,8 @@ $VERSION = try { $VERSION }; # make the alpha version come out as a number
 # Make Test::Builder thread-safe for ithreads.
 BEGIN {
     use Config;
-    # Load threads::shared when threads are turned on.
-    # 5.8.0's threads are so busted we no longer support them.
-    if(%Config{useithreads} && %INC{'threads.pm'}) {
-        require threads::shared;
-    }
-    # 5.8.0's threads::shared is busted when threads are off
-    # and earlier Perls just don't have that module at all.
-    else {
-        *share = sub { return @_[0] };
-        *lock  = sub { 0 };
-    }
+    *share = sub { return @_[0] };
+    *lock  = sub { 0 };
 }
 
 
@@ -73,7 +64,7 @@ singleton, use C<create>.
 
 my $Test = Test::Builder->new;
 sub new {
-    my($class) = shift;
+    my@($class) =@( shift);
     $Test ||= $class->create;
     return $Test;
 }
@@ -112,36 +103,35 @@ test might be run multiple times in the same process.
 
 =cut
 
-use vars < qw($Level);
+our ($Level);
 
-sub reset {
-    my ($self) = < @_;
+sub reset($self) {
 
     # We leave this a global because it has to be localized and localizing
     # hash keys is just asking for pain.  Also, it was documented.
     $Level = 1;
 
-    $self->{Have_Plan}    = 0;
-    $self->{No_Plan}      = 0;
-    $self->{Original_Pid} = $$;
+    $self->{+Have_Plan}    = 0;
+    $self->{+No_Plan}      = 0;
+    $self->{+Original_Pid} = $^PID;
 
-    share($self->{Curr_Test});
-    $self->{Curr_Test}    = 0;
-    $self->{Test_Results} = &share(\@());
+    share($self->{?Curr_Test});
+    $self->{+Curr_Test}    = 0;
+    $self->{+Test_Results} = &share(\@());
 
-    $self->{Exported_To}    = undef;
-    $self->{Expected_Tests} = 0;
+    $self->{+Exported_To}    = undef;
+    $self->{+Expected_Tests} = 0;
 
-    $self->{Skip_All}   = 0;
+    $self->{+Skip_All}   = 0;
 
-    $self->{Use_Nums}   = 1;
+    $self->{+Use_Nums}   = 1;
 
-    $self->{No_Header}  = 0;
-    $self->{No_Ending}  = 0;
+    $self->{+No_Header}  = 0;
+    $self->{+No_Ending}  = 0;
 
-    $self->{TODO}       = undef;
+    $self->{+TODO}       = undef;
 
-    $self->_dup_stdhandles unless $^C;
+    $self->_dup_stdhandles unless $^COMPILING;
 
     return;
 }
@@ -168,14 +158,11 @@ If you call plan(), don't call any of the other methods below.
 
 =cut
 
-sub plan {
-    my($self, $cmd, $arg) = < @_;
-
-    return unless $cmd;
+sub plan($self, $cmd, ?$arg) {
 
     local $Level = $Level + 1;
 
-    if( $self->{Have_Plan} ) {
+    if( $self->{?Have_Plan} ) {
         die("You tried to plan twice");
     }
 
@@ -198,8 +185,8 @@ sub plan {
         }
     }
     else {
-        my @args = grep { defined } @( ($cmd, $arg));
-        die("plan() doesn't understand {join ' ',@args}");
+        my @args = grep { defined }, @( ($cmd, $arg));
+        die("plan() doesn't understand $(join ' ',@args)");
     }
 
     return 1;
@@ -217,18 +204,18 @@ the appropriate headers.
 
 sub expected_tests {
     my $self = shift;
-    my($max) = < @_;
+    my @(?$max) =  @_;
 
     if( (nelems @_) ) {
         die("Number of tests must be a positive integer.  You gave it '$max'")
           unless $max =~ m/^\+?\d+$/ and $max +> 0;
 
-        $self->{Expected_Tests} = $max;
-        $self->{Have_Plan}      = 1;
+        $self->{+Expected_Tests} = $max;
+        $self->{+Have_Plan}      = 1;
 
         $self->_print("1..$max\n") unless $self->no_header;
     }
-    return $self->{Expected_Tests};
+    return $self->{?Expected_Tests};
 }
 
 
@@ -243,8 +230,8 @@ Declares that this test will run an indeterminate # of tests.
 sub no_plan {
     my $self = shift;
 
-    $self->{No_Plan}   = 1;
-    $self->{Have_Plan} = 1;
+    $self->{+No_Plan}   = 1;
+    $self->{+Have_Plan} = 1;
 }
 
 =item B<has_plan>
@@ -258,8 +245,8 @@ Find out whether a plan has been defined. $plan is either C<undef> (no plan has 
 sub has_plan {
     my $self = shift;
 
-    return $self->{Expected_Tests} if $self->{Expected_Tests};
-    return 'no_plan' if $self->{No_Plan};
+    return $self->{?Expected_Tests} if $self->{?Expected_Tests};
+    return 'no_plan' if $self->{?No_Plan};
     return undef;
 };
 
@@ -273,14 +260,13 @@ Skips all the tests, using the given $reason.  Exits immediately with 0.
 
 =cut
 
-sub skip_all {
-    my($self, $reason) = < @_;
+sub skip_all($self, $reason) {
 
     my $out = "1..0";
     $out .= " # Skip $reason" if $reason;
     $out .= "\n";
 
-    $self->{Skip_All} = 1;
+    $self->{+Skip_All} = 1;
 
     $self->_print($out) unless $self->no_header;
     exit(0);
@@ -300,13 +286,12 @@ the last one will be honored.
 
 =cut
 
-sub exported_to {
-    my($self, $pack) = < @_;
+sub exported_to($self, ?$pack) {
 
     if( defined $pack ) {
-        $self->{Exported_To} = $pack;
+        $self->{+Exported_To} = $pack;
     }
-    return $self->{Exported_To};
+    return $self->{?Exported_To};
 }
 
 =back
@@ -330,17 +315,16 @@ like Test::Simple's ok().
 
 =cut
 
-sub ok {
-    my($self, $test, $name) = < @_;
+sub ok($self, $test, ?$name) {
 
     # $test might contain an object which we don't want to accidentally
     # store, so we turn it into a boolean.
-    $test = $test ? 1 : 0;
+    $test = $test ?? 1 !! 0;
 
     $self->_plan_check;
 
-    lock $self->{Curr_Test};
-    $self->{Curr_Test}++;
+    lock $self->{?Curr_Test};
+    $self->{+Curr_Test}++;
 
     $self->diag(<<ERR) if defined $name and $name =~ m/^[\d\s]+$/;
     You named your test '$name'.  You shouldn't use numbers for your test names.
@@ -351,51 +335,51 @@ ERR
     
     # Capture the value of $TODO for the rest of this ok() call
     # so it can more easily be found by other routines.
-    local $self->{TODO} = $todo;
+    local $self->{+TODO} = $todo;
 
     my $out;
     my $result = &share(\%());
 
     unless( $test ) {
         $out .= "not ";
- <        %$result{[@('ok', 'actual_ok') ]} = ( ( $todo ? 1 : 0 ), 0 );
+         %$result{[@('ok', 'actual_ok') ]} = @( ( $todo ?? 1 !! 0 ), 0 );
     }
-    else { <
-        %$result{[@('ok', 'actual_ok') ]} = ( 1, $test );
+    else { 
+        %$result{[@('ok', 'actual_ok') ]} = @( 1, $test );
     }
 
     $out .= "ok";
-    $out .= " $self->{Curr_Test}" if $self->use_numbers;
+    $out .= " $self->{?Curr_Test}" if $self->use_numbers;
 
     if( defined $name ) {
         $name =~ s|#|\\#|g;     # # in a name can confuse Test::Harness.
         $out   .= " - $name";
-        $result->{name} = $name;
+        $result->{+name} = $name;
     }
     else {
-        $result->{name} = '';
+        $result->{+name} = '';
     }
 
     if( $todo ) {
         $out   .= " # TODO $todo";
-        $result->{reason} = $todo;
-        $result->{type}   = 'todo';
+        $result->{+reason} = $todo;
+        $result->{+type}   = 'todo';
     }
     else {
-        $result->{reason} = '';
-        $result->{type}   = '';
+        $result->{+reason} = '';
+        $result->{+type}   = '';
     }
 
-    $self->{Test_Results}->[$self->{Curr_Test}-1] = $result;
+    $self->{Test_Results}->[+$self->{?Curr_Test}-1] = $result;
     $out .= "\n";
 
     $self->_print($out);
 
     unless( $test ) {
-        my $msg = $todo ? "Failed (TODO)" : "Failed";
-        $self->_print_diag("\n") if %ENV{HARNESS_ACTIVE};
+        my $msg = $todo ?? "Failed (TODO)" !! "Failed";
+        $self->_print_diag("\n") if env::var('HARNESS_ACTIVE');
 
-    my(undef, $file, $line) = < $self->caller;
+    my@(_, $file, $line, ...) =  $self->caller;
         if( defined $name ) {
             $self->diag(qq[  $msg test '$name'\n]);
             $self->diag(qq[  at $file line $line.\n]);
@@ -405,21 +389,19 @@ ERR
         }
     } 
 
-    return $test ? 1 : 0;
+    return $test ?? 1 !! 0;
 }
 
-sub _is_object {
-    my($self, $thing) = < @_;
+sub _is_object($self, $thing) {
 
-    return $self->_try(sub { ref $thing && $thing->isa('UNIVERSAL') }) ? 1 : 0;
+    return $self->_try(sub { ref $thing && $thing->isa('UNIVERSAL') }) ?? 1 !! 0;
 }
 
 
 # This is a hack to detect a dualvar such as $!
-sub _is_dualvar {
-    my($self, $val) = < @_;
+sub _is_dualvar($self, $val) {
 
-    local $^W = 0;
+    local $^WARNING = 0;
     my $numval = $val+0;
     return 1 if $numval != 0 and $numval ne $val;
 }
@@ -442,8 +424,7 @@ numeric version.
 
 =cut
 
-sub is_eq {
-    my($self, $got, $expect, $name) = < @_;
+sub is_eq($self, $got, $expect, ?$name) {
     local $Level = $Level + 1;
 
     if( !defined $got || !defined $expect ) {
@@ -466,8 +447,7 @@ sub is_eq {
     return $self->cmp_ok($got, 'eq', $expect, $name);
 }
 
-sub is_num {
-    my($self, $got, $expect, $name) = < @_;
+sub is_num($self, $got, $expect, ?$name) {
     local $Level = $Level + 1;
 
     if( !defined $got || !defined $expect ) {
@@ -482,23 +462,10 @@ sub is_num {
     return $self->cmp_ok($got, '==', $expect, $name);
 }
 
-sub _is_diag {
-    my($self, $got, $type, $expect) = < @_;
-
-    foreach my $val (@(\$got, \$expect)) {
-        if( defined $$val ) {
-            if( $type eq 'eq' ) {
-                # quote and force string context
-                $$val = dump::view($$val);
-            }
-        }
-        else {
-            $$val = 'undef';
-        }
-    }
+sub _is_diag($self, $got, $type, $expect) {
 
     local $Level = $Level + 1;
-    return $self->diag(sprintf <<DIAGNOSTIC, $got, $expect);
+    return $self->diag(sprintf <<DIAGNOSTIC, dump::view($got), dump::view($expect));
          got: \%s
     expected: \%s
 DIAGNOSTIC
@@ -521,8 +488,7 @@ the numeric version.
 
 =cut
 
-sub isnt_eq {
-    my($self, $got, $dont_expect, $name) = < @_;
+sub isnt_eq($self, $got, $dont_expect, ?$name) {
     local $Level = $Level + 1;
 
     if( !defined $got || !defined $dont_expect ) {
@@ -545,8 +511,7 @@ sub isnt_eq {
     return $self->cmp_ok($got, 'ne', $dont_expect, $name);
 }
 
-sub isnt_num {
-    my($self, $got, $dont_expect, $name) = < @_;
+sub isnt_num($self, $got, $dont_expect, $name) {
     local $Level = $Level + 1;
 
     if( !defined $got || !defined $dont_expect ) {
@@ -581,15 +546,13 @@ given $regex.
 
 =cut
 
-sub like {
-    my($self, $this, $regex, $name) = < @_;
+sub like($self, $this, $regex, ?$name) {
 
     local $Level = $Level + 1;
     $self->_regex_ok($this, $regex, '=~', $name);
 }
 
-sub unlike {
-    my($self, $this, $regex, $name) = < @_;
+sub unlike($self, $this, $regex, ?$name) {
 
     local $Level = $Level + 1;
     $self->_regex_ok($this, $regex, '!~', $name);
@@ -607,15 +570,14 @@ Works just like Test::More's cmp_ok().
 =cut
 
 
-my %numeric_cmps = %( < map { ($_, 1) } 
+my %numeric_cmps = %( < @+: map { @($_, 1) }, 
  @(                       ("<",  "<=", ">",  ">=", "==", "!=", "<=>")) );
 
-sub cmp_ok {
-    my($self, $got, $type, $expect, $name) = < @_;
+sub cmp_ok($self, $got, $type, $expect, ?$name) {
 
     my $test;
-    {
-        local($@,$!);  # isolate eval
+    do {
+        local($^EVAL_ERROR,$^OS_ERROR);  # isolate eval
 
         my $code = $self->_caller_context;
 
@@ -625,7 +587,7 @@ sub cmp_ok {
         $test = eval "
 $code" . "\$got $type \$expect;";
 
-    }
+    };
     local $Level = $Level + 1;
     my $ok = $self->ok($test, $name);
 
@@ -640,8 +602,7 @@ $code" . "\$got $type \$expect;";
     return $ok;
 }
 
-sub _cmp_diag {
-    my($self, $got, $type, $expect) = < @_;
+sub _cmp_diag($self, $got, $type, $expect) {
     
     $got    = dump::view($got);
     $expect = dump::view($expect);
@@ -658,7 +619,7 @@ DIAGNOSTIC
 sub _caller_context {
     my $self = shift;
 
-    my($pack, $file, $line) = < $self->caller(1);
+    my @(?$pack, ?$file, ?$line, ...) =  $self->caller(1);
 
     my $code = '';
     $code .= "#line $line $file\n" if defined $file and defined $line;
@@ -687,10 +648,9 @@ It will exit with 255.
 
 =cut
 
-sub BAIL_OUT {
-    my($self, $reason) = < @_;
+sub BAIL_OUT($self, $reason) {
 
-    $self->{Bailed_Out} = 1;
+    $self->{+Bailed_Out} = 1;
     $self->_print("Bail out!  $reason");
     exit 255;
 }
@@ -712,16 +672,15 @@ Skips the current test, reporting $why.
 
 =cut
 
-sub skip {
-    my($self, $why) = < @_;
+sub skip($self, $why) {
     $why ||= '';
 
     $self->_plan_check;
 
-    lock($self->{Curr_Test});
-    $self->{Curr_Test}++;
+    lock($self->{?Curr_Test});
+    $self->{+Curr_Test}++;
 
-    $self->{Test_Results}->[$self->{Curr_Test}-1] = &share(\%(
+    $self->{Test_Results}->[+$self->{?Curr_Test}-1] = &share(\%(
         'ok'      => 1,
         actual_ok => 1,
         name      => '',
@@ -730,7 +689,7 @@ sub skip {
     ));
 
     my $out = "ok";
-    $out   .= " $self->{Curr_Test}" if $self->use_numbers;
+    $out   .= " $self->{?Curr_Test}" if $self->use_numbers;
     $out   .= " # skip";
     $out   .= " $why"       if length $why;
     $out   .= "\n";
@@ -753,16 +712,15 @@ to
 
 =cut
 
-sub todo_skip {
-    my($self, $why) = < @_;
+sub todo_skip($self, $why) {
     $why ||= '';
 
     $self->_plan_check;
 
-    lock($self->{Curr_Test});
-    $self->{Curr_Test}++;
+    lock($self->{?Curr_Test});
+    $self->{+Curr_Test}++;
 
-    $self->{Test_Results}->[$self->{Curr_Test}-1] = &share(\%(
+    $self->{Test_Results}->[+$self->{?Curr_Test}-1] = &share(\%(
         'ok'      => 1,
         actual_ok => 0,
         name      => '',
@@ -771,7 +729,7 @@ sub todo_skip {
     ));
 
     my $out = "not ok";
-    $out   .= " $self->{Curr_Test}" if $self->use_numbers;
+    $out   .= " $self->{?Curr_Test}" if $self->use_numbers;
     $out   .= " # TODO & SKIP $why\n";
 
     $self->_print($out);
@@ -832,8 +790,7 @@ could be written as:
 =cut
 
 
-sub maybe_regex {
-    my ($self, $regex) = < @_;
+sub maybe_regex($self, $regex) {
     my $usable_regex = undef;
 
     return $usable_regex unless defined $regex;
@@ -846,11 +803,11 @@ sub maybe_regex {
         $usable_regex = $regex;
     }
     # Check for '/foo/' or 'm,foo,'
-    elsif( ($re, $opts)        = $regex =~ m{^ /(.*)/ (\w*) $ }sx           or
-           (undef, $re, $opts) = $regex =~ m,^ m([^\w\s]) (.+) \1 (\w*) $,sx
+    elsif( @(?$re, ?$opts)        = @($regex =~ m{^ /(.*)/ (\w*) $ }sx)           or
+           @(?_, ?$re, ?$opts) = @: $regex =~ m,^ m([^\w\s]) (.+) \1 (\w*) $,sx
          )
     {
-        $usable_regex = length $opts ? "(?$opts)$re" : $re;
+        $usable_regex = length $opts ?? "(?$opts)$re" !! $re;
     }
 
     return $usable_regex;
@@ -867,8 +824,7 @@ sub _is_qr {
 }
 
 
-sub _regex_ok {
-    my($self, $this, $regex, $cmp, $name) = < @_;
+sub _regex_ok($self, $this, $regex, $cmp, $name) {
 
     my $ok = 0;
     my $usable_regex = $self->maybe_regex($regex);
@@ -878,27 +834,18 @@ sub _regex_ok {
         return $ok;
     }
 
-    {
-        my $test;
-        my $code = $self->_caller_context;
-
-        local($@, $!); # isolate eval
-
-        # Yes, it has to look like this or 5.4.5 won't see the #line 
-        # directive.
-        # Don't ask me, man, I just work here.
-        $test = eval "
-$code" . q{$test = $this =~ m/$usable_regex/ ? 1 : 0};
+    do {
+        my $test = $this =~ m/$usable_regex/ ?? 1 !! 0;
 
         $test = !$test if $cmp eq '!~';
 
         local $Level = $Level + 1;
         $ok = $self->ok( $test, $name );
-    }
+    };
 
     unless( $ok ) {
         $this = dump::view($this);
-        my $match = $cmp eq '=~' ? "doesn't match" : "matches";
+        my $match = $cmp eq '=~' ?? "doesn't match" !! "matches";
 
         local $Level = $Level + 1;
         $self->diag(sprintf <<DIAGNOSTIC, $this, $match, $regex);
@@ -927,11 +874,10 @@ It is suggested you use this in place of eval BLOCK.
 
 =cut
 
-sub _try {
-    my($self, $code) = < @_;
+sub _try($self, $code) {
     
-    local $!;               # eval can mess up $!
-    local $@;               # don't set $@ in the test
+    local $^OS_ERROR = undef;               # eval can mess up $!
+    local $^EVAL_ERROR = undef;               # don't set $@ in the test
     my $return = try { $code->() };
     
     return $return;
@@ -993,8 +939,7 @@ To be polite to other functions wrapping your own you usually want to increment 
 
 =cut
 
-sub level {
-    my($self, $level) = < @_;
+sub level($self, ?$level) {
 
     if( defined $level ) {
         $Level = $level;
@@ -1026,13 +971,12 @@ Defaults to on.
 
 =cut
 
-sub use_numbers {
-    my($self, $use_nums) = < @_;
+sub use_numbers($self, ?$use_nums) {
 
     if( defined $use_nums ) {
-        $self->{Use_Nums} = $use_nums;
+        $self->{+Use_Nums} = $use_nums;
     }
-    return $self->{Use_Nums};
+    return $self->{?Use_Nums};
 }
 
 
@@ -1064,12 +1008,12 @@ foreach my $attribute (qw(No_Header No_Ending No_Diag)) {
     my $method = lc $attribute;
 
     my $code = sub {
-        my($self, $no) = < @_;
+        my@($self, ?$no) =  @_;
 
         if( defined $no ) {
-            $self->{$attribute} = $no;
+            $self->{+$attribute} = $no;
         }
-        return $self->{$attribute};
+        return $self->{?$attribute};
     };
 
     *{Symbol::fetch_glob(__PACKAGE__.'::'.$method)} = $code;
@@ -1113,18 +1057,17 @@ Mark Fowler <mark@twoshortplanks.com>
 
 =cut
 
-sub diag {
-    my($self, < @msgs) = < @_;
+sub diag($self, @< @msgs) {
 
     return if $self->no_diag;
     return unless (nelems @msgs);
 
     # Prevent printing headers when compiling (i.e. -c)
-    return if $^C;
+    return if $^COMPILING;
 
     # Smash args together like print does.
     # Convert undef to 'undef' so its readable.
-    my $msg = join '', map { defined($_) ? $_ : 'undef' } @msgs;
+    my $msg = join '', map { defined($_) ?? $_ !! 'undef' }, @msgs;
 
     # Escape each line with a #.
     $msg =~ s/^/# /gm;
@@ -1134,6 +1077,38 @@ sub diag {
 
     local $Level = $Level + 1;
     $self->_print_diag($msg);
+
+    return 0;
+}
+
+=item B<info>
+
+    $Test->info(@msgs);
+
+Prints out the given @msgs.  Like C<print>, arguments are simply
+appended together.
+
+=cut
+
+sub info($self, @< @msgs) {
+
+    return unless (nelems @msgs);
+
+    # Prevent printing headers when compiling (i.e. -c)
+    return if $^COMPILING;
+
+    # Smash args together like print does.
+    # Convert undef to 'undef' so its readable.
+    my $msg = join '', map { defined($_) ?? $_ !! 'undef' }, @msgs;
+
+    # Escape each line with a #.
+    $msg =~ s/^/# /gm;
+
+    # Stick a newline on the end if it needs it.
+    $msg .= "\n" unless $msg =~ m/\n\Z/;
+
+    local $Level = $Level + 1;
+    $self->_print($msg);
 
     return 0;
 }
@@ -1150,16 +1125,15 @@ Prints to the output() filehandle.
 
 =cut
 
-sub _print {
-    my($self, < @msgs) = < @_;
+sub _print($self, @< @msgs) {
 
     # Prevent printing headers when only compiling.  Mostly for when
     # tests are deparsed with B::Deparse
-    return if $^C;
+    return if $^COMPILING;
 
     my $msg = join '', @msgs;
 
-    local($\, $", $,) = (undef, ' ', '');
+    local @($^OUTPUT_RECORD_SEPARATOR, $^OUTPUT_FIELD_SEPARATOR) = @(undef, '');
     my $fh = $self->output;
 
     # Escape each line after the first with a # so we don't
@@ -1169,7 +1143,7 @@ sub _print {
     # Stick a newline on the end if it needs it.
     $msg .= "\n" unless $msg =~ m/\n\Z/;
 
-    print $fh $msg;
+    print $fh, $msg;
 }
 
 =begin private
@@ -1187,9 +1161,9 @@ Like _print, but prints to the current diagnostic filehandle.
 sub _print_diag {
     my $self = shift;
 
-    local($\, $", $,) = (undef, ' ', '');
-    my $fh = $self->todo ? $self->todo_output : $self->failure_output;
-    print $fh < @_;
+    local@($^OUTPUT_RECORD_SEPARATOR, $^OUTPUT_FIELD_SEPARATOR) = @(undef, '');
+    my $fh = $self->todo ?? $self->todo_output !! $self->failure_output;
+    print $fh, < @_;
 }    
 
 =item B<output>
@@ -1221,37 +1195,34 @@ Defaults to STDOUT.
 
 =cut
 
-sub output {
-    my($self, $fh) = < @_;
+sub output($self, ?$fh) {
 
     if( defined $fh ) {
-        $self->{Out_FH} = $self->_new_fh($fh);
+        $self->{+Out_FH} = $self->_new_fh($fh);
     }
-    return $self->{Out_FH};
+    return $self->{?Out_FH};
 }
 
-sub failure_output {
-    my($self, $fh) = < @_;
+sub failure_output($self, ?$fh) {
 
     if( defined $fh ) {
-        $self->{Fail_FH} = $self->_new_fh($fh);
+        $self->{+Fail_FH} = $self->_new_fh($fh);
     }
-    return $self->{Fail_FH};
+    return $self->{?Fail_FH};
 }
 
-sub todo_output {
-    my($self, $fh) = < @_;
+sub todo_output($self, ?$fh) {
 
     if( defined $fh ) {
-        $self->{Todo_FH} = $self->_new_fh($fh);
+        $self->{+Todo_FH} = $self->_new_fh($fh);
     }
-    return $self->{Todo_FH};
+    return $self->{?Todo_FH};
 }
 
 
 sub _new_fh {
     my $self = shift;
-    my($file_or_fh) = shift;
+    my@($file_or_fh) =@( shift);
 
     my $fh;
     if( $self->is_fh($file_or_fh) ) {
@@ -1259,7 +1230,7 @@ sub _new_fh {
     }
     else {
         open $fh, ">", $file_or_fh or
-            die("Can't open test output log $file_or_fh: $!");
+            die("Can't open test output log $file_or_fh: $^OS_ERROR");
         _autoflush($fh);
     }
 
@@ -1267,11 +1238,9 @@ sub _new_fh {
 }
 
 
-sub _autoflush {
-    my($fh) = shift;
-    my $old_fh = select $fh;
-    $| = 1;
-    select $old_fh;
+sub _autoflush($fh) {
+    iohandle::output_autoflush($fh, 1);
+    return;
 }
 
 
@@ -1284,9 +1253,9 @@ sub _dup_stdhandles {
     # Set everything to unbuffered else plain prints to STDOUT will
     # come out in the wrong order from our own prints.
     _autoflush($Testout);
-    _autoflush(\*STDOUT);
+    _autoflush($^STDOUT);
     _autoflush($Testerr);
-    _autoflush(\*STDERR);
+    _autoflush($^STDERR);
 
     $self->output        ($Testout);
     $self->failure_output($Testerr);
@@ -1302,28 +1271,27 @@ sub _open_testhandles {
     
     # We dup STDOUT and STDERR so people can change them in their
     # test suites while still getting normal test output.
-    open($Testout, ">&", \*STDOUT) or die "Can't dup STDOUT:  $!";
-    open($Testerr, ">&", \*STDERR) or die "Can't dup STDERR:  $!";
+    open($Testout, ">&", $^STDOUT) or die "Can't dup STDOUT:  $^OS_ERROR";
+    open($Testerr, ">&", $^STDERR) or die "Can't dup STDERR:  $^OS_ERROR";
 
     $Opened_Testhandles = 1;
 }
 
 
-sub _copy_io_layers {
-    my($self, $src, $dest) = < @_;
+sub _copy_io_layers($self, $src, $dest) {
     
     $self->_try(sub {
         require PerlIO;
         my @layers = PerlIO::get_layers($src);
         
-        binmode $dest, join " ", map ":$_", @layers if (nelems @layers);
+        binmode $dest, join " ", map { ":$_" }, @layers if (nelems @layers);
     });
 }
 
 sub _plan_check {
     my $self = shift;
 
-    unless( $self->{Have_Plan} ) {
+    unless( $self->{?Have_Plan} ) {
         local $Level = $Level + 2;
         die("You tried to run a test without a plan");
     }
@@ -1350,23 +1318,22 @@ can erase history if you really want to.
 
 =cut
 
-sub current_test {
-    my($self, $num) = < @_;
+sub current_test($self ?= $num) {
 
-    lock($self->{Curr_Test});
-    if( defined $num ) {
-        unless( $self->{Have_Plan} ) {
+    lock($self->{?Curr_Test});
+    if( $^is_assignment ) {
+        unless( $self->{?Have_Plan} ) {
             die("Can't change the current test number without a plan!");
         }
 
-        $self->{Curr_Test} = $num;
+        $self->{+Curr_Test} = $num;
 
         # If the test counter is being pushed forward fill in the details.
-        my $test_results = $self->{Test_Results};
+        my $test_results = $self->{?Test_Results};
         if( $num +> nelems @$test_results ) {
-            my $start = (nelems @$test_results) ? (nelems @$test_results) : 0;
+            my $start = (nelems @$test_results) ?? (nelems @$test_results) !! 0;
             for ($start..$num-1) {
-                $test_results->[$_] = &share(\%(
+                $test_results->[+$_] = &share(\%(
                     'ok'      => 1, 
                     actual_ok => undef, 
                     reason    => 'incrementing test number', 
@@ -1380,7 +1347,7 @@ sub current_test {
             splice @{$test_results}, $num;
         }
     }
-    return $self->{Curr_Test};
+    return $self->{?Curr_Test};
 }
 
 
@@ -1396,9 +1363,9 @@ Of course, test #1 is $tests[0], etc...
 =cut
 
 sub summary {
-    my($self) = shift;
+    my@($self) =@( shift);
 
-    return map { $_->{'ok'} } @{ $self->{Test_Results} };
+    return map { $_->{?'ok'} }, @{ $self->{Test_Results} };
 }
 
 =item B<details>
@@ -1452,7 +1419,7 @@ result in this structure:
 
 sub details {
     my $self = shift;
-    return @{ $self->{Test_Results} };
+    return @{ $self->{?Test_Results} };
 }
 
 =item B<todo>
@@ -1476,16 +1443,15 @@ what $pack to use.
 
 =cut
 
-sub todo {
-    my($self, $pack) = < @_;
+sub todo($self, ?$package) {
 
-    return $self->{TODO} if defined $self->{TODO};
+    return $self->{?TODO} if defined $self->{?TODO};
 
-    $pack = $pack || $self->caller(1)[0] || $self->exported_to;
-    return 0 unless $pack;
+    $package = $package || $self->caller(1)[?0] || $self->exported_to;
+    return 0 unless $package;
 
-    return defined ${*{Symbol::fetch_glob($pack.'::TODO')}} ? ${*{Symbol::fetch_glob($pack.'::TODO')}}
-                                     : 0;
+    return defined ${*{Symbol::fetch_glob($package.'::TODO')}} ?? ${*{Symbol::fetch_glob($package.'::TODO')}}
+                                     !! 0;
 }
 
 =item B<caller>
@@ -1500,8 +1466,7 @@ C<$height> will be added to the level().
 
 =cut
 
-sub caller {
-    my($self, $height) = < @_;
+sub caller($self, ?$height) {
     $height ||= 0;
 
     my @caller = @( CORE::caller($self->level + $height + 1) );
@@ -1530,10 +1495,10 @@ error message.
 sub _sanity_check {
     my $self = shift;
 
-    $self->_whoa($self->{Curr_Test} +< 0,  'Says here you ran a negative number of tests!');
-    $self->_whoa(!$self->{Have_Plan} and $self->{Curr_Test}, 
+    $self->_whoa($self->{?Curr_Test} +< 0,  'Says here you ran a negative number of tests!');
+    $self->_whoa((!$self->{?Have_Plan} and $self->{?Curr_Test}),
           'Somehow your tests ran without a plan!');
-    $self->_whoa($self->{Curr_Test} != nelems @{ $self->{Test_Results} },
+    $self->_whoa($self->{?Curr_Test} != nelems @{ $self->{?Test_Results} },
           'Somehow you got a different number of results than tests ran!');
 }
 
@@ -1547,8 +1512,7 @@ a note to contact the author.
 
 =cut
 
-sub _whoa {
-    my($self, $check, $desc) = < @_;
+sub _whoa($self, $check, $desc) {
     if( $check ) {
         local $Level = $Level + 1;
         die(<<"WHOA");
@@ -1570,7 +1534,7 @@ doesn't actually exit, that's your job.
 =cut
 
 sub _my_exit {
-    $? ||= @_[0];
+    $^CHILD_ERROR ||= @_[0];
 
     return 1;
 }
@@ -1585,67 +1549,67 @@ sub _my_exit {
 sub _ending {
     my $self = shift;
 
-    my $real_exit_code = $?;
+    my $real_exit_code = $^CHILD_ERROR;
     $self->_sanity_check();
 
     # Don't bother with an ending if this is a forked copy.  Only the parent
     # should do the ending.
-    if( $self->{Original_Pid} != $$ ) {
+    if( $self->{?Original_Pid} != $^PID ) {
         return;
     }
     
     # Exit if plan() was never called.  This is so "require Test::Simple" 
     # doesn't puke.
-    if( !$self->{Have_Plan} ) {
+    if( !$self->{?Have_Plan} ) {
         return;
     }
 
     # Don't do an ending if we bailed out.
-    if( $self->{Bailed_Out} ) {
+    if( $self->{?Bailed_Out} ) {
         return;
     }
 
     # Figure out if we passed or failed and print helpful messages.
-    my $test_results = $self->{Test_Results};
+    my $test_results = $self->{?Test_Results};
     if( (nelems @$test_results) ) {
         # The plan?  We have no plan.
-        if( $self->{No_Plan} ) {
-            $self->_print("1..$self->{Curr_Test}\n") unless $self->no_header;
-            $self->{Expected_Tests} = $self->{Curr_Test};
+        if( $self->{?No_Plan} ) {
+            $self->_print("1..$self->{?Curr_Test}\n") unless $self->no_header;
+            $self->{+Expected_Tests} = $self->{?Curr_Test};
         }
 
         # Auto-extended arrays and elements which aren't explicitly
         # filled in with a shared reference will puke under 5.8.0
         # ithreads.  So we have to fill them in by hand. :(
         my $empty_result = &share(\%());
-        for my $idx ( 0..$self->{Expected_Tests}-1 ) {
-            $test_results->[$idx] = $empty_result
-              unless defined $test_results->[$idx];
+        for my $idx ( 0..$self->{?Expected_Tests}-1 ) {
+            $test_results->[+$idx] = $empty_result
+              unless defined $test_results->[?$idx];
         }
 
-        my $num_failed = nelems( grep !$_->{'ok'},
-            @{$test_results}[[0..$self->{Curr_Test}-1]] );
+        my $num_failed = nelems( grep { !$_->{?'ok'} },
+            @{$test_results}[[0..$self->{?Curr_Test}-1]] );
 
-        my $num_extra = $self->{Curr_Test} - $self->{Expected_Tests};
+        my $num_extra = $self->{?Curr_Test} - $self->{?Expected_Tests};
 
         if( $num_extra +< 0 ) {
-            my $s = $self->{Expected_Tests} == 1 ? '' : 's';
+            my $s = $self->{?Expected_Tests} == 1 ?? '' !! 's';
             $self->diag(<<"FAIL");
-Looks like you planned $self->{Expected_Tests} test$s but only ran $self->{Curr_Test}.
+Looks like you planned $self->{?Expected_Tests} test$s but only ran $self->{?Curr_Test}.
 FAIL
         }
         elsif( $num_extra +> 0 ) {
-            my $s = $self->{Expected_Tests} == 1 ? '' : 's';
+            my $s = $self->{?Expected_Tests} == 1 ?? '' !! 's';
             $self->diag(<<"FAIL");
-Looks like you planned $self->{Expected_Tests} test$s but ran $num_extra extra.
+Looks like you planned $self->{?Expected_Tests} test$s but ran $num_extra extra.
 FAIL
         }
 
         if ( $num_failed ) {
-            my $num_tests = $self->{Curr_Test};
-            my $s = $num_failed == 1 ? '' : 's';
+            my $num_tests = $self->{?Curr_Test};
+            my $s = $num_failed == 1 ?? '' !! 's';
 
-            my $qualifier = $num_extra == 0 ? '' : ' run';
+            my $qualifier = $num_extra == 0 ?? '' !! ' run';
 
             $self->diag(<<"FAIL");
 Looks like you failed $num_failed test$s of $num_tests$qualifier.
@@ -1654,7 +1618,7 @@ FAIL
 
         if( $real_exit_code ) {
             $self->diag(<<"FAIL");
-Looks like your test died just after $self->{Curr_Test}.
+Looks like your test died just after $self->{?Curr_Test}.
 FAIL
 
             _my_exit( 255 ) && return;
@@ -1662,7 +1626,7 @@ FAIL
 
         my $exit_code;
         if( $num_failed ) {
-            $exit_code = $num_failed +<= 254 ? $num_failed : 254;
+            $exit_code = $num_failed +<= 254 ?? $num_failed !! 254;
         }
         elsif( $num_extra != 0 ) {
             $exit_code = 255;
@@ -1673,7 +1637,7 @@ FAIL
 
         _my_exit( $exit_code ) && return;
     }
-    elsif ( $self->{Skip_All} ) {
+    elsif ( $self->{?Skip_All} ) {
         _my_exit( 0 ) && return;
     }
     elsif ( $real_exit_code ) {

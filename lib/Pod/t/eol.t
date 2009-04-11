@@ -2,8 +2,8 @@
 
 use Test::More tests => 3;
 
-open(POD, ">", "$$.pod") or die "$$.pod: $!";
-print POD <<__EOF__;
+open(my $pod, ">", "$^PID.pod") or die "$^PID.pod: $^OS_ERROR";
+print $pod ,<<__EOF__;
 =pod
 
 =head1 NAME
@@ -28,68 +28,69 @@ crlf crlf crlf crlf crlf crlf crlf crlf crlf crlf crlf crlf crlf crlf crlf
 
 =cut
 __EOF__
-close(POD);
+close($pod);
 
 use Pod::Html;
 
 # --- CR ---
 
-open(POD, "<", "$$.pod") or die "$$.pod: $!";
-open(IN, ">",  "$$.in")  or die "$$.in: $!";
-while ( ~< *POD) {
+my $in;
+open($pod, "<", "$^PID.pod") or die "$^PID.pod: $^OS_ERROR";
+open($in, ">",  "$^PID.in")  or die "$^PID.in: $^OS_ERROR";
+while ( ~< $pod) {
   s/[\r\n]+/\r/g;
-  print IN $_;
+  print $in, $_;
 }
-close(POD);
-close(IN);
+close($pod);
+close($in);
 
-pod2html("--title=eol", "--infile=$$.in", "--outfile=$$.o1");
+pod2html("--title=eol", "--infile=$^PID.in", "--outfile=$^PID.o1");
 
 # --- LF ---
 
-open(POD, "<", "$$.pod") or die "$$.pod: $!";
-open(IN, ">",  "$$.in")  or die "$$.in: $!";
-while ( ~< *POD) {
+open($pod, "<", "$^PID.pod") or die "$^PID.pod: $^OS_ERROR";
+open($in, ">",  "$^PID.in")  or die "$^PID.in: $^OS_ERROR";
+while ( ~< $pod) {
   s/[\r\n]+/\n/g;
-  print IN $_;
+  print $in, $_;
 }
-close(POD);
-close(IN);
+close($pod);
+close($in);
 
-pod2html("--title=eol", "--infile=$$.in", "--outfile=$$.o2");
+pod2html("--title=eol", "--infile=$^PID.in", "--outfile=$^PID.o2");
 
 # --- CRLF ---
 
-open(POD, "<", "$$.pod") or die "$$.pod: $!";
-open(IN, ">",  "$$.in")  or die "$$.in: $!";
-while ( ~< *POD) {
+open($pod, "<", "$^PID.pod") or die "$^PID.pod: $^OS_ERROR";
+open($in, ">",  "$^PID.in")  or die "$^PID.in: $^OS_ERROR";
+while ( ~< $pod) {
   s/[\r\n]+/\r\n/g;
-  print IN $_;
+  print $in, $_;
 }
-close(POD);
-close(IN);
+close($pod);
+close($in);
 
-pod2html("--title=eol", "--infile=$$.in", "--outfile=$$.o3");
+pod2html("--title=eol", "--infile=$^PID.in", "--outfile=$^PID.o3");
 
 # --- now test ---
 
-local $/;
+local $^INPUT_RECORD_SEPARATOR = undef;
 
-open(IN, "<", "$$.o1") or die "$$.o1: $!";
-my $cksum1 = unpack("\%32C*", ~< *IN);
+open($in, "<", "$^PID.o1") or die "$^PID.o1: $^OS_ERROR";
+my $cksum1 = unpack("\%32C*", ~< $in);
 
-open(IN, "<", "$$.o2") or die "$$.o2: $!";
-my $cksum2 = unpack("\%32C*", ~< *IN);
+open($in, "<", "$^PID.o2") or die "$^PID.o2: $^OS_ERROR";
+my $cksum2 = unpack("\%32C*", ~< $in);
 
-open(IN, "<", "$$.o3") or die "$$.o3: $!";
-my $cksum3 = unpack("\%32C*", ~< *IN);
+open($in, "<", "$^PID.o3") or die "$^PID.o3: $^OS_ERROR";
+my $cksum3 = unpack("\%32C*", ~< $in);
 
 ok($cksum1 == $cksum2, "CR vs LF");
 ok($cksum1 == $cksum3, "CR vs CRLF");
 ok($cksum2 == $cksum3, "LF vs CRLF");
-close IN;
+close $in;
 
 END {
-  1 while unlink("$$.pod", "$$.in", "$$.o1", "$$.o2", "$$.o3",
+  1 while unlink("$^PID.pod", "$^PID.in", "$^PID.o1", "$^PID.o2", "$^PID.o3",
                  "pod2htmd.x~~", "pod2htmi.x~~");
 }

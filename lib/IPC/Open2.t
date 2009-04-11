@@ -1,38 +1,36 @@
 #!./perl -w
 
+use Config;
+
 BEGIN {
-    our %Config;
-    require Config; Config->import;
-    if (!%Config{'d_fork'}
+    if (!config_value('d_fork')
        # open2/3 supported on win32 (but not Borland due to CRT bugs)
-       && (($^O ne 'MSWin32' && $^O ne 'NetWare') || %Config{'cc'} =~ m/^bcc/i))
+       && (($^OS_NAME ne 'MSWin32' && $^OS_NAME ne 'NetWare') || config_value('cc') =~ m/^bcc/i))
     {
-	print "1..0\n";
+	print $^STDOUT, "1..0\n";
 	exit 0;
     }
     # make warnings fatal
     $^WARN_HOOK = sub { die < @_ };
 }
 
-use strict;
 use IO::Handle;
 use IPC::Open2;
 
 my $perl = './perl';
 
-sub ok {
-    my ($n, $result, $info) = < @_;
+sub ok($n, $result, ?$info) {
     if ($result) {
-	print "ok $n\n";
+	print $^STDOUT, "ok $n\n";
     }
     else {
-	print "not ok $n\n";
-	print "# $info\n" if $info;
+	print $^STDOUT, "not ok $n\n";
+	print $^STDOUT, "# $info\n" if $info;
     }
 }
 
 sub cmd_line {
-	if ($^O eq 'MSWin32' || $^O eq 'NetWare') {
+	if ($^OS_NAME eq 'MSWin32' || $^OS_NAME eq 'NetWare') {
 		return qq/"@_[0]"/;
 	}
 	else {
@@ -41,17 +39,17 @@ sub cmd_line {
 }
 
 my ($pid, $reaped_pid);
-(\*STDOUT)->autoflush;
-(\*STDERR)->autoflush;
+($^STDOUT)->autoflush;
+($^STDERR)->autoflush;
 
-print "1..7\n";
+print $^STDOUT, "1..7\n";
 
-ok 1, $pid = open2 'READ', 'WRITE', $perl, '-e',
-	cmd_line('print scalar ~< *STDIN');
-ok 2, print WRITE "hi kid\n";
+ok 1, ($pid = open2 \*READ, \*WRITE, $perl, '-e',
+	cmd_line('print $^STDOUT, scalar ~< $^STDIN'));
+ok 2, print \*WRITE, "hi kid\n";
 ok 3, (~< *READ) =~ m/^hi kid\r?\n$/;
-ok 4, close(WRITE), $!;
-ok 5, close(READ), $!;
+ok 4, close(\*WRITE), $^OS_ERROR;
+ok 5, close(\*READ), $^OS_ERROR;
 $reaped_pid = waitpid $pid, 0;
 ok 6, $reaped_pid == $pid, $reaped_pid;
-ok 7, $? == 0, $?;
+ok 7, $^CHILD_ERROR == 0, $^CHILD_ERROR;

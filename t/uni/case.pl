@@ -4,45 +4,45 @@ require "./test.pl";
 
 require bytes;
 use utf8;
-use strict;
+
 
 sub unidump {
-    join " ", map { sprintf "\%04X", $_ } @( unpack "U*", @_[0]);
+    join " ", map { sprintf "\%04X", $_ }, @( unpack "U*", @_[0]);
 }
 
 sub casetest {
-    my ($base, $spec, < @funcs) = < @_;
+    my @($base, $spec, @< @funcs) =  @_;
     # For each provided function run it, and run a version with some extra
     # characters afterwards. Use a recycling symbol, as it doesn't change case.
     my $ballast = chr (0x2672) x 3;
-    @funcs = map {my $f = $_;
-		  ($f,
+    @funcs = @+: map {my $f = $_;
+		  @($f,
 		   sub {my $r = $f->(@_[0] . $ballast); # Add it before
 			$r =~ s/$ballast\z//so # Remove it afterwards
 			    or die "'@_[0]' to '$r' mangled";
 			$r; # Result with $ballast removed.
 		    },
-		   )} @funcs;
+		   )}, @funcs;
 
     my $file = 'File::Spec'->catfile('File::Spec'->catdir('File::Spec'->updir,
 						      "lib", "unicore", "To"),
 				   "$base.pl");
-    my $simple = do $file or die $@;
+    my $simple = do $file or die $^EVAL_ERROR;
     my %simple;
     for my $i (split(m/\n/, $simple)) {
-	my ($k, $v) = < split(' ', $i);
-	%simple{$k} = $v;
+	my @($k, $v) =  split(' ', $i);
+	%simple{+$k} = $v;
     }
     my %seen;
 
     for my $i (sort keys %simple) {
-	%seen{$i}++;
+	%seen{+$i}++;
     }
 
     my $both;
 
     for my $i (sort keys %$spec) {
-	if (++%seen{$i} == 2) {
+	if (++%seen{+$i} == 2) {
 	    warn sprintf "$base: $i seen twice\n";
 	    $both++;
 	}
@@ -50,34 +50,34 @@ sub casetest {
     exit(1) if $both;
 
     my %none;
-    for my $i ( map { ord } split m//,
+    for my $i ( map { ord }, split m//,
 	       "\e !\"#\$\%&'()+,-./0123456789:;<=>?\@[\\]^_\{|\}~\b") {
 	next if pack("U0U", $i) =~ m/\w/;
-	%none{$i}++ unless %seen{$i};
+	%none{+$i}++ unless %seen{?$i};
     }
 
     my $tests = 
 	( (nelems(%simple)/2) +
           (nelems(%$spec)/2) +
           (nelems(%none)/2) ) * nelems @funcs;
-    print "1..$tests\n";
+    print $^STDOUT, "1..$tests\n";
 
     my $test = 1;
 
     for my $i (sort keys %simple) {
-	my $w = %simple{$i};
+	my $w = %simple{?$i};
 	my $c = pack "U0U", hex $i;
 	foreach my $func ( @funcs) {
 	    my $d = $func->($c);
 	    my $e = unidump($d);
-	    print $d eq pack("U0U", hex %simple{$i}) ?
-		"ok $test # $i -> $w\n" : "not ok $test # $i -> $e ($w)" . sprintf('%x', ord($d)) . "\n";
+	    print $^STDOUT, $d eq pack("U0U", hex %simple{?$i}) ??
+		"ok $test # $i -> $w\n" !! "not ok $test # $i -> $e ($w)" . sprintf('%x', ord($d)) . "\n";
 		$test++;
 	}
     }
 
     for my $i (sort keys %$spec) {
-	my $w = unidump($spec->{$i});
+	my $w = unidump($spec->{?$i});
         #my $c = substr $i, 0, 1;
 	my $h = unidump($i);
 	foreach my $func ( @funcs) {
@@ -131,20 +131,20 @@ sub casetest {
 		# pack/unpack U has been EBCDICified, too, it would
 		# just undo our remapping.
 	    }
-	    print $w eq $e ?
-		"ok $test # $i -> $w\n" : "not ok $test # $h -> $e ($w)\n";
+	    print $^STDOUT, $w eq $e ??
+		"ok $test # $i -> $w\n" !! "not ok $test # $h -> $e ($w)\n";
 		$test++;
 	}
     }
 
-    for my $i (sort { $a <+> $b } keys %none) {
+    for my $i (sort { $a <+> $b }, keys %none) {
 	my $w = $i = sprintf "\%04X", $i;
 	my $c = pack "U0U", hex $i;
 	foreach my $func ( @funcs) {
 	    my $d = $func->($c);
 	    my $e = unidump($d);
-	    print $d eq $c ?
-		"ok $test # $i -> $w\n" : "not ok $test # $i -> $e ($w)\n";
+	    print $^STDOUT, $d eq $c ??
+		"ok $test # $i -> $w\n" !! "not ok $test # $i -> $e ($w)\n";
 		$test++;
 	}
     }

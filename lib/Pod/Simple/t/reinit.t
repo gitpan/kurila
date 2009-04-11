@@ -1,11 +1,10 @@
 
-use strict;
 use Test::More;
 plan tests => 5;
 
 sub source_path {
     my $file = shift;
-    if (%ENV{PERL_CORE}) {
+    if (env::var('PERL_CORE')) {
         require File::Spec;
         my $updir = File::Spec->updir;
         my $dir = File::Spec->catdir ($updir, 'lib', 'Pod', 'Simple', 't');
@@ -30,7 +29,7 @@ foreach my $file (@(
 
   unless(-e source_path($file)) {
     ok 0;
-    print "# But $file doesn't exist!!\n";
+    print $^STDOUT, "# But $file doesn't exist!!\n";
     next;
   }
 
@@ -41,12 +40,12 @@ foreach my $file (@(
     $parser->output_string(\$strings[0]);
     $parser->parse_file( source_path($file));
 
-    open(IN, "<", $precooked) or die "Can't read-open $precooked: $!";
-    {
-      local $/;
-      $strings[1] = ~< *IN;
-    }
-    close(IN);
+    open(my $in, "<", $precooked) or die "Can't read-open $precooked: $^OS_ERROR";
+    do {
+      local $^INPUT_RECORD_SEPARATOR = undef;
+      $strings[1] = ~< *$in;
+    };
+    close($in);
 
     for ($strings) { s/\s+/ /g; s/^\s+//s; s/\s+$//s; }
 
@@ -57,7 +56,7 @@ foreach my $file (@(
       for ($strings) { s/[ ]//g; };
       $strings[0] eq $strings[1];
     }){
-      print "# Differ only in whitespace.\n";
+      print $^STDOUT, "# Differ only in whitespace.\n";
       ok 1;
       next;
     } else {
@@ -65,18 +64,18 @@ foreach my $file (@(
       my $x = $strings[0] ^^^ $strings[1];
       $x =~ m/^(\x00*)/s or die;
       my $at = length($1);
-      print "# Difference at byte $at...\n";
+      print $^STDOUT, "# Difference at byte $at...\n";
       if($at +> 10) {
         $at -= 5;
       }
-      {
-        print "# ", substr($strings[0],$at,20), "\n";
-        print "# ", substr($strings[1],$at,20), "\n";
-        print "#      ^...";
-      }
+      do {
+        print $^STDOUT, "# ", substr($strings[0],$at,20), "\n";
+        print $^STDOUT, "# ", substr($strings[1],$at,20), "\n";
+        print $^STDOUT, "#      ^...";
+      };
     
       ok 0;
-      printf "# Unequal lengths \%s and \%s\n", length($strings[0]), length($strings[1]);
+      printf $^STDOUT, "# Unequal lengths \%s and \%s\n", length($strings[0]), length($strings[1]);
       next;
     }
   }

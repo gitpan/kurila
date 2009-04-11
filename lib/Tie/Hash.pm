@@ -196,8 +196,8 @@ sub new {
 
 sub TIEHASH {
     my $pkg = shift;
-    if (defined &{Symbol::fetch_glob("{$pkg}::new")}) {
-	warnings::warnif("WARNING: calling {$pkg}->new since {$pkg}->TIEHASH is missing");
+    if (defined &{Symbol::fetch_glob("$($pkg)::new")}) {
+	warnings::warnif("WARNING: calling $($pkg)->new since $($pkg)->TIEHASH is missing");
 	$pkg->new(< @_);
     }
     else {
@@ -219,7 +219,7 @@ sub CLEAR {
 	push @keys, $key;
 	$key = $self->NEXTKEY(< @_, $key);
     }
-    foreach $key ( @keys) {
+    foreach my $key ( @keys) {
 	$self->DELETE(< @_, $key);
     }
 }
@@ -232,8 +232,8 @@ package Tie::StdHash;
 # @ISA = qw(Tie::Hash);		# would inherit new() only
 
 sub TIEHASH  { bless \%(), @_[0] }
-sub STORE    { @_[0]->{@_[1]} = @_[2] }
-sub FETCH    { @_[0]->{@_[1]} }
+sub STORE    { @_[0]->{+@_[1]} = @_[2] }
+sub FETCH    { @_[0]->{?@_[1]} }
 sub FIRSTKEY { my $a = nelems( keys %{@_[0]}); each %{@_[0]} }
 sub NEXTKEY  { each %{@_[0]} }
 sub EXISTS   { exists @_[0]->{@_[1]} }
@@ -244,8 +244,8 @@ sub SCALAR   { scalar %{@_[0]} }
 package Tie::ExtraHash;
 
 sub TIEHASH  { my $p = shift; bless \@(\%(), < @_), $p }
-sub STORE    { @_[0]->[0]->{@_[1]} = @_[2] }
-sub FETCH    { @_[0]->[0]->{@_[1]} }
+sub STORE    { @_[0]->[0]->{+@_[1]} = @_[2] }
+sub FETCH    { @_[0]->[0]->{?@_[1]} }
 sub FIRSTKEY { my $a = scalar keys %{@_[0]->[0]}; each %{@_[0]->[0]} }
 sub NEXTKEY  { each %{@_[0]->[0]} }
 sub EXISTS   { exists @_[0]->[0]->{@_[1]} }

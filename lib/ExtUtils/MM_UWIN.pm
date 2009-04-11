@@ -1,6 +1,5 @@
 package ExtUtils::MM_UWIN;
 
-use strict;
 our $VERSION = 6.44;
 
 require ExtUtils::MM_Unix;
@@ -42,8 +41,7 @@ sub os_flavor {
 
 =cut
 
-sub replace_manpage_separator {
-    my($self, $man) = < @_;
+sub replace_manpage_separator($self, $man) {
 
     $man =~ s,/+,.,g;
     return $man;

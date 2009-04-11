@@ -5,7 +5,6 @@ use Symbol;
 use Test::Builder;
 use Test::Builder::Tester;
 
-use strict;
 
 # argh! now we need to test the thing we're testing.  Basically we need
 # to pretty much reimplement the whole code again.  This is very
@@ -32,14 +31,14 @@ sub start_testing
     $original_output_handle  = $t->output();
     $original_failure_handle = $t->failure_output();
     $original_todo_handle    = $t->todo_output();
-    $original_harness_env    = %ENV{HARNESS_ACTIVE};
+    $original_harness_env    = env::var('HARNESS_ACTIVE');
 
     # switch out to our own handles
     $t->output($out->handle);
     $t->failure_output($err->handle);
     $t->todo_output($err->handle);
 
-    %ENV{HARNESS_ACTIVE} = 0;
+    env::var('HARNESS_ACTIVE' ) = 0;
 
     # clear the expected list
     $out->reset();
@@ -47,7 +46,7 @@ sub start_testing
 
     # remeber that we're testing
     $testing_num = $t->current_test;
-    $t->current_test(0);
+    $t->current_test = 0;
 }
 
 # each test test is actually two tests.  This is bad and wrong
@@ -57,16 +56,16 @@ sub start_testing
 sub my_test_test
 {
   my $text = shift;
-  local $^W = 0;
+  local $^WARNING = 0;
 
   # reset the outputs 
   $t->output($original_output_handle);
   $t->failure_output($original_failure_handle);
   $t->todo_output($original_todo_handle);
-  %ENV{HARNESS_ACTIVE} = $original_harness_env;
+  env::var('HARNESS_ACTIVE' ) = $original_harness_env;
 
   # reset the number of tests
-  $t->current_test($testing_num);
+  $t->current_test = $testing_num;
 
   # check we got the same values
   my $got;
@@ -93,7 +92,7 @@ my_test_test("basic meta meta test");
 
 start_testing();
 $out->expect("not ok 1 - foo");
-$err->expect("#     Failed test ($0 at line ".line_num(+1).")");
+$err->expect("#     Failed test ($^PROGRAM_NAME at line ".line_num(1).")");
 fail("foo");
 my_test_test("basic meta meta test 2");
 
@@ -107,7 +106,7 @@ my_test_test("meta meta test with tbt");
 start_testing();
 $out->expect("ok 1 - bar");
 test_out("not ok 1 - foo");
-test_err("#     Failed test ($0 at line ".line_num(+1).")");
+test_err("#     Failed test ($^PROGRAM_NAME at line ".line_num(1).")");
 fail("foo");
 test_test("bar");
 my_test_test("meta meta test with tbt2 ");
@@ -176,7 +175,7 @@ $out->expect("ok 1 - bar");
 
 # set up what the inner wrapper expects
 test_out("not ok 1 - foo this is wrong");
-test_fail(+3);
+test_fail(3);
 
 # the actual test function that we are testing
 ok("0","foo");

@@ -1,0 +1,96 @@
+=head1 NAME
+
+kurila115delta - what is new for Perl Kurila 1.15
+
+=head1 DESCRIPTION
+
+This document describes differences between Perl Kurila 1.14 and Perl Kurila 1.15
+
+=head1 Highlights In Perl Kurila 1.15
+
+Lots of bug fixes and minor changes.
+
+=head1 Core Enhancements
+
+=head2 blocks must be executed with C<do>
+
+A block by itself is no longer allowed, C<do> can be used to make a block
+by itself.
+
+=head3 Rationale
+
+For the next release C<{...}> is reserved to always make a coderef.
+
+=head2 Lexical scoped C<$_> in C<for> and C<< while(~<$fh) >> blocks
+
+A C<for> loop without a loop variable or a C<< while(~<$fh) >>,
+introduces a lexical C<$_>, which is used as the loop variable.
+
+=head3 Rationale
+
+Less global C<$_> problems.
+
+=head2 C<pos> and C<vec> use have an additional argument instead of use of lvalue.
+
+C<pos> and C<vec> can not be used a lvalue, instead they accept an
+additional parameter.
+
+=head3 Rationale
+
+As part of changing the assignment logic, all magic lvalues are to be removed.
+
+=head2 Minor changes
+
+=over 2
+
+=item C<for> loops can only be used with arrays, not as a C-style for loop.
+
+=item No calling implicit passing of @_ when calling a sub with C<&>.
+
+=item C<do> can only be used to execute a block or a file, not to call a sub.
+
+=item Code execution inside a string using C<{}> has been removed.
+
+=item C<goto> can only be used to goto subroutines, not to go to a label.
+
+=item The subroutine argument variable C<@_>, is now a lexical variable.
+
+=back
+
+=head2 Lots of bugfixes
+
+The are lots of minor internal bugs fixed.
+
+=head1 KNOWN BUGS
+
+=head2 Documentation
+
+Documentation has not been updated for many of the changes for kurila.
+
+=head2 Self referential assignment problems
+
+Assigning some value to a part of itself behaves unexpected.
+
+=head2 Tied hashes with complex data
+
+Tied hashes do not work correctly with complex data
+structures. Assigning arrays or hashes to a value of tied hash might
+behave strange.
+
+=head2 Limited platform support
+
+Perl Kurila has only been tested/build for x86_64-linux-gnu-thread-multi platform.
+
+=head1 SEE ALSO
+
+The F<INSTALL> file for how to build Perl Kurila.
+
+The F<README> file for general stuff.
+
+The F<Artistic> and F<Copying> files for copyright information.
+
+=head1 HISTORY
+
+Written by Gerard Goossen <F<gerard@tty.nl>>.
+
+=cut

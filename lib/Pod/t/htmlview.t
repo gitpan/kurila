@@ -1,11 +1,10 @@
 #!/usr/bin/perl -w                                         # -*- perl -*-
 
 BEGIN {
-   unshift @INC, '../lib/Pod/t';
+   unshift $^INCLUDE_PATH, '../lib/Pod/t';
    require "pod2html-lib.pl";
 }
 
-use strict;
 use Test::More tests => 1;
 
 convert_n_test("htmlview", "html rendering");

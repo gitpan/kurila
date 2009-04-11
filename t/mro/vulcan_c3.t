@@ -1,6 +1,6 @@
 #!./perl
 
-use strict;
+
 use warnings;
 
 require q(./test.pl); plan(tests => 1);
@@ -31,9 +31,10 @@ example taken from: L<http://gauss.gwydiondylan.org/books/drm/drm_50.html>
 
 =cut
 
-{
+do {
     package Object;    
     use mro 'c3';
+    our @ISA = @();
     
     package LifeForm;
     use mro 'c3';
@@ -58,7 +59,7 @@ example taken from: L<http://gauss.gwydiondylan.org/books/drm/drm_50.html>
     package Vulcan;
     use mro 'c3';    
     use base ('Intelligent', 'Humanoid');
-}
+};
 
 ok(eq_array(
     mro::get_linear_isa('Vulcan'),

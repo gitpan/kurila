@@ -3,17 +3,17 @@
 # Test ExtUtils::Install.
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
-        @INC = @('../../lib', '../lib', 'lib');
+    if( env::var('PERL_CORE') ) {
+        $^INCLUDE_PATH = @('../../lib', '../lib', 'lib');
     }
     else {
-        unshift @INC, 't/lib';
+        unshift $^INCLUDE_PATH, 't/lib';
     }
 }
 
-use strict;
 use File::Path;
 use File::Spec;
+use env;
 
 use Test::More tests => 69;
 
@@ -33,14 +33,14 @@ END {
     ok( teardown_recurs(), 'teardown' );
 }
 # ensure the env doesnt pollute our tests
-local %ENV{EU_INSTALL_ALWAYS_COPY};
-local %ENV{EU_ALWAYS_COPY};    
+local env::var('EU_INSTALL_ALWAYS_COPY') = undef;
+local env::var('EU_ALWAYS_COPY') = undef;
 
 chdir 'Big-Dummy';
 
 my $stdout = '';
-close STDOUT;
-open STDOUT, '>>', \$stdout or die;
+close $^STDOUT;
+open $^STDOUT, '>>', \$stdout or die;
 pm_to_blib( \%( 'lib/Big/Dummy.pm' => 'blib/lib/Big/Dummy.pm' ),
             'blib/lib/auto'
           );
@@ -82,7 +82,7 @@ ok(!-r 'install-test/lib/perl/Big/Dummy.SKIP',  '  ignored .SKIP file' );
 ok( -r 'install-test/packlist',                 '  packlist exists' );
 
 open(my $packlist, '<', 'install-test/packlist' ) or die;
-my %packlist = %( < map { chomp;  ($_ => 1) } @( ~< $packlist) );
+my %packlist = %( < @+: map { chomp;  @($_ => 1) }, @( ~< $packlist) );
 close $packlist or die;
 
 # On case-insensitive filesystems (ie. VMS), the keys of the packlist might
@@ -103,18 +103,18 @@ ok( -r 'install-test/packlist',              '  packlist exists' );
 ok( -r 'install-test/lib/perl/Big/Dummy.pm', '  UNINST=1 preserved same' );
 
 
-chmod 0644, 'blib/lib/Big/Dummy.pm' or die $!;
-open(DUMMY, ">>", "blib/lib/Big/Dummy.pm") or die $!;
-print DUMMY "Extra stuff\n";
-close DUMMY;
+chmod 0644, 'blib/lib/Big/Dummy.pm' or die $^OS_ERROR;
+open(my $dummy, ">>", "blib/lib/Big/Dummy.pm") or die $^OS_ERROR;
+print $dummy, "Extra stuff\n";
+close $dummy;
 
 
 # Test UNINST=0 does not remove other versions in other dirs.
-{
+do {
   ok( -r 'install-test/lib/perl/Big/Dummy.pm', 'different install exists' );
 
-  local @INC = @('install-test/lib/perl');
-  local %ENV{PERL5LIB} = '';
+  local $^INCLUDE_PATH = @('install-test/lib/perl');
+  local env::var('PERL5LIB' ) = '';
   install(\@(from_to=> \%( 'blib/lib' => 'install-test/other_lib/perl',
            read   => 'install-test/packlist',
            write  => 'install-test/packlist'
@@ -124,17 +124,17 @@ close DUMMY;
   ok( -r 'install-test/packlist',              '  packlist exists' );
   ok( -r 'install-test/lib/perl/Big/Dummy.pm',
                                              '  UNINST=0 left different' );
-}
+};
 
 # Test UNINST=1 only warning when failing to remove an irrelevent shadow file
-{
+do {
   my $tfile='install-test/lib/perl/Big/Dummy.pm';
   local $ExtUtils::Install::Testing = $tfile; 
-  local @INC = @('install-test/other_lib/perl','install-test/lib/perl');
-  local %ENV{PERL5LIB} = '';
+  local $^INCLUDE_PATH = @('install-test/other_lib/perl','install-test/lib/perl');
+  local env::var('PERL5LIB' ) = '';
   ok( -r $tfile, 'different install exists' );
   my @warn;
-  local $^WARN_HOOK=sub { push @warn, @_[0]->message; return };
+  local $^WARN_HOOK =sub { push @warn, @_[0]->message; return };
   install(\@(from_to=> \%( 'blib/lib' => 'install-test/other_lib/perl',
                            read   => 'install-test/packlist',
                            write  => 'install-test/packlist'
@@ -146,17 +146,17 @@ close DUMMY;
   ok( -r 'install-test/packlist',              '  packlist exists' );
   ok( -r $tfile, '  UNINST=1 failed to remove different' );
   
-}
+};
 
 # Test UNINST=1 dieing when failing to remove an relevent shadow file
-{
+do {
   my $tfile='install-test/lib/perl/Big/Dummy.pm';
   local $ExtUtils::Install::Testing = $tfile;
-  local @INC = @('install-test/lib/perl','install-test/other_lib/perl');
-  local %ENV{PERL5LIB} = '';
+  local $^INCLUDE_PATH = @('install-test/lib/perl','install-test/other_lib/perl');
+  local env::var('PERL5LIB' ) = '';
   ok( -r $tfile, 'different install exists' );
   my @warn;
-  local %SIG{__WARN__}=sub { push @warn,< @_; return };
+  local $^WARN_HOOK = sub { push @warn,< @_; return };
   my $ok=try {
     install(\@(from_to=> \%( 'blib/lib' => 'install-test/other_lib/perl',
            read   => 'install-test/packlist',
@@ -170,12 +170,12 @@ close DUMMY;
   ok( -r 'install-test/other_lib/perl/Big/Dummy.pm', '  .pm file installed' );
   ok( -r 'install-test/packlist',              '  packlist exists' );
   ok( -r $tfile,'  UNINST=1 failed to remove different' );
-}
+};
 
 # Test UNINST=1 removing other versions in other dirs.
-{
-  local @INC = @('install-test/lib/perl');
-  local %ENV{PERL5LIB} = '';
+do {
+  local $^INCLUDE_PATH = @('install-test/lib/perl');
+  local env::var('PERL5LIB' ) = '';
   ok( -r 'install-test/lib/perl/Big/Dummy.pm','different install exists' );
   install(\@(from_to=>\%( 'blib/lib' => 'install-test/other_lib/perl',
            read   => 'install-test/packlist',
@@ -186,18 +186,18 @@ close DUMMY;
   ok( -r 'install-test/packlist',              '  packlist exists' );
   ok( !-r 'install-test/lib/perl/Big/Dummy.pm',
                                              '  UNINST=1 removed different' );
-}
+};
 
 # Test EU_ALWAYS_COPY triggers copy.
-{
-  local @INC = @('install-test/lib/perl');
-  local %ENV{PERL5LIB} = '';
-  local %ENV{EU_INSTALL_ALWAYS_COPY}=1;
+do {
+  local $^INCLUDE_PATH = @('install-test/lib/perl');
+  local env::var('PERL5LIB' ) = '';
+  local env::var('EU_INSTALL_ALWAYS_COPY') =1;
   my $tfile='install-test/other_lib/perl/Big/Dummy.pm';
   my $sfile='blib/lib/Big/Dummy.pm';
   ok(-r $tfile,"install file already exists");
   ok(-r $sfile,"source file already exists");
-  utime time-600, time-600, $sfile or die "utime '$sfile' failed:$!";   
+  utime time-600, time-600, $sfile or die "utime '$sfile' failed:$^OS_ERROR";   
   ok( @(stat $tfile)[9]!=@(stat $sfile)[9],'  Times are different');
   install(\@(from_to=>\%( 'blib/lib' => 'install-test/other_lib/perl',
            read   => 'install-test/packlist',
@@ -207,18 +207,18 @@ close DUMMY;
   ok( -r 'install-test/other_lib/perl/Big/Dummy.pm', '  .pm file installed' );
   ok( -r 'install-test/packlist',              '  packlist exists' );
   ok( @(stat $tfile)[9]==@(stat$sfile)[9],'  Times are same');
-  ok( !%result{install_unchanged},'  $result{install_unchanged} should be empty');
-}
+  ok( !%result{?install_unchanged},'  $result{install_unchanged} should be empty');
+};
 # Test nothing is copied.
-{
-  local @INC = @('install-test/lib/perl');
-  local %ENV{PERL5LIB} = '';
-  local %ENV{EU_INSTALL_ALWAYS_COPY}=0;
+do {
+  local $^INCLUDE_PATH = @('install-test/lib/perl');
+  local env::var('PERL5LIB' ) = '';
+  local env::var('EU_INSTALL_ALWAYS_COPY') =0;
   my $tfile='install-test/other_lib/perl/Big/Dummy.pm';
   my $sfile='blib/lib/Big/Dummy.pm';
   ok(-r $tfile,"install file already exists");
   ok(-r $sfile,"source file already exists");
-  utime time-1200, time-1200, $sfile or die "utime '$sfile' failed:$!";   
+  utime time-1200, time-1200, $sfile or die "utime '$sfile' failed:$^OS_ERROR";   
   ok( @(stat $tfile)[9]!=@(stat $sfile)[9],'  Times are different');
   install(\@(from_to=>\%( 'blib/lib' => 'install-test/other_lib/perl',
            read   => 'install-test/packlist',
@@ -228,6 +228,6 @@ close DUMMY;
   ok( -r 'install-test/other_lib/perl/Big/Dummy.pm', '  .pm file installed' );
   ok( -r 'install-test/packlist',              '  packlist exists' );
   ok( @(stat $tfile)[9]!=@(stat$sfile)[9],'  Times are different');
-  ok( !%result{install},'  nothing should have been installed');
+  ok( !%result{?install},'  nothing should have been installed');
   ok( %result{install_unchanged},'  install_unchanged should be populated');
-}
+};

@@ -1,6 +1,5 @@
 package ExtUtils::MM_Any;
 
-use strict;
 our $VERSION = '6.44';
 
 use File::Spec;
@@ -102,8 +101,8 @@ This is useful for code like:
 
 sub os_flavor_is {
     my $self = shift;
-    my %flavors = %( < map { ($_ => 1) } $self->os_flavor );
-    return (grep { %flavors{$_} } @_) ? 1 : 0;
+    my %flavors = %( < @+: map { @($_ => 1) }, $self->os_flavor );
+    return (grep { %flavors{?$_} }, @_) ?? 1 !! 0;
 }
 
 
@@ -133,8 +132,7 @@ pairs of arguments.  This makes things like this safe:
 
 =cut
 
-sub split_command {
-    my($self, $cmd, < @args) = < @_;
+sub split_command($self, $cmd, @< @args) {
 
     my @cmds = @( () );
     return @cmds unless (nelems @args);
@@ -147,7 +145,7 @@ sub split_command {
     my $len_left = int($self->max_exec_len * 0.70);
     $len_left -= length $self->_expand_macros($cmd);
 
-    do {
+    {
         my $arg_str = '';
         my @next_args;
         while( @next_args = @( splice(@args, 0, 2) ) ) {
@@ -174,12 +172,11 @@ sub split_command {
 }
 
 
-sub _expand_macros {
-    my($self, $cmd) = < @_;
+sub _expand_macros($self, $cmd) {
 
-    $cmd =~ s{\$\((\w+)\)}{{
-        defined $self->{$1} ? $self->{$1} : "\$($1)"
-    }};
+    $cmd =~ s{\$\((\w+)\)}{$(
+        defined $self->{?$1} ?? $self->{?$1} !! "\$($1)"
+    )};
     return $cmd;
 }
 
@@ -199,14 +196,13 @@ overwritten.
 
 =cut
 
-sub echo {
-    my($self, $text, $file, $appending) = < @_;
+sub echo($self, $text, $file, ?$appending) {
     $appending ||= 0;
 
-    my @cmds = map { '$(NOECHO) $(ECHO) '.$self->quote_literal($_) } 
+    my @cmds = map { '$(NOECHO) $(ECHO) '.$self->quote_literal($_) }, 
                split m/\n/, $text;
     if( $file ) {
-        my $redirect = $appending ? '>>' : '>';
+        my $redirect = $appending ?? '>>' !! '>';
         @cmds[0] .= " $redirect $file";
         $_ .= " >> $file" foreach @cmds[[1..((nelems @cmds)-1)]];
     }
@@ -353,7 +349,7 @@ to do some normalization on the information from %Config or the user.
 sub make {
     my $self = shift;
 
-    my $make = lc $self->{MAKE};
+    my $make = lc $self->{?MAKE};
 
     # Truncate anything like foomake6 to just foomake.
     $make =~ s/^(\w+make).*/$1/;
@@ -402,13 +398,13 @@ The blibdirs.ts target is deprecated.  Depend on blibdirs instead.
 sub blibdirs_target {
     my $self = shift;
 
-    my @dirs = map { uc "\$(INST_$_)" } qw(libdir archlib
+    my @dirs = map { uc "\$(INST_$_)" }, qw(libdir archlib
                                            autodir archautodir
                                            bin script
                                            man1dir man3dir
                                           );
 
-    my @exists = map { $_.'$(DFSEP).exists' } @dirs;
+    my @exists = map { $_.'$(DFSEP).exists' }, @dirs;
 
     my $make = sprintf <<'MAKE', join(' ', @exists);
 blibdirs : %s
@@ -432,10 +428,7 @@ Defines the clean target.
 
 =cut
 
-sub clean {
-# --- Cleanup and Distribution Sections ---
-
-    my($self, < %attribs) = < @_;
+sub clean($self, %< %attribs) {
     my @m;
     push(@m, q|
 # Delete temporary files but do not touch installed files. We don't delete
@@ -461,11 +454,11 @@ clean :: clean_subdirs
 #                 );
                   
 
-    if( %attribs{FILES} ) {
+    if( %attribs{?FILES} ) {
         # Use @dirs because we don't know what's in here.
-        push @dirs, ref %attribs{FILES}                ?
-                        < @{%attribs{FILES}}             : <
-                        split m/\s+/, %attribs{FILES}   ;
+        push @dirs, ref %attribs{?FILES}                ??
+                        < @{%attribs{?FILES}}             !! <
+                        split m/\s+/, %attribs{?FILES}   ;
     }
 
     push(@files, < qw[$(MAKE_APERL_FILE) 
@@ -482,25 +475,25 @@ clean :: clean_subdirs
 
     # core files
     push(@files, < qw[core core.*perl.*.? *perl.core]);
-    push(@files, < map { "core." . "[0-9]"x$_ } @( ( <1..5)));
+    push(@files, < map { "core." . "[0-9]"x$_ }, @( ( <1..5)));
 
     # OS specific things to clean up.  Use @dirs since we don't know
     # what might be in here.
     push @dirs, < $self->extra_clean_files;
 
     # Occasionally files are repeated several times from different sources
-    { my(%f) = %( < map { ($_ => 1) } grep { defined $_ } @files ); @files = keys %f; }
-    { my(%d) = %( < map { ($_ => 1) } grep { defined $_ } @dirs );  @dirs  = keys %d; }
+    do { my@(%f) =@( %( < @+: map { @($_ => 1) }, grep { defined $_ }, @files )); @files = keys %f; };
+    do { my@(%d) =@( %( < @+: map { @($_ => 1) }, grep { defined $_ }, @dirs ));  @dirs  = keys %d; };
 
-    push @m, < map "\t$_\n", $self->split_command('- $(RM_F)',  < @files);
-    push @m, < map "\t$_\n", $self->split_command('- $(RM_RF)', < @dirs);
+    push @m, < map { "\t$_\n" }, $self->split_command('- $(RM_F)',  < @files);
+    push @m, < map { "\t$_\n" }, $self->split_command('- $(RM_RF)', < @dirs);
 
     # Leave Makefile.old around for realclean
     push @m, <<'MAKE';
 	- $(MV) $(FIRST_MAKEFILE) $(MAKEFILE_OLD) $(DEV_NULL)
 MAKE
 
-    push(@m, "\t%attribs{POSTOP}\n")   if %attribs{POSTOP};
+    push(@m, "\t%attribs{?POSTOP}\n")   if %attribs{?POSTOP};
 
     join("", @m);
 }
@@ -516,10 +509,10 @@ call clean on any subdirectories which contain Makefiles.
 =cut
 
 sub clean_subdirs_target {
-    my($self) = shift;
+    my@($self) =@( shift);
 
     # No subdirectories, no cleaning.
-    return <<'NOOP_FRAG' unless (nelems @{$self->{DIR}});
+    return <<'NOOP_FRAG' unless (nelems @{$self->{?DIR}});
 clean_subdirs :
 	$(NOECHO) $(NOOP)
 NOOP_FRAG
@@ -556,12 +549,11 @@ than a '/' to seperate the directory from the file.
 
 =cut
 
-sub dir_target {
-    my($self, < @dirs) = < @_;
+sub dir_target($self, @< @dirs) {
 
     my $make = '';
     foreach my $dir ( @dirs) {
-        $make .= sprintf <<'MAKE', ($dir) x 7;
+        $make .= sprintf <<'MAKE', < (@($dir) x 7);
 %s$(DFSEP).exists :: Makefile.PL
 	$(NOECHO) $(MKPATH) %s
 	$(NOECHO) $(CHMOD) 755 %s
@@ -582,11 +574,10 @@ before tar-ing (or shar-ing).
 
 =cut
 
-sub distdir {
-    my($self) = shift;
+sub distdir($self) {
 
-    my $meta_target = $self->{NO_META} ? '' : 'distmeta';
-    my $sign_target = !$self->{SIGN}   ? '' : 'distsignature';
+    my $meta_target = $self->{?NO_META} ?? '' !! 'distmeta';
+    my $sign_target = !$self->{?SIGN}   ?? '' !! 'distsignature';
 
     return sprintf <<'MAKE_FRAG', $meta_target, $sign_target;
 create_distdir :
@@ -611,9 +602,9 @@ subdirectory.
 =cut
 
 sub dist_test {
-    my($self) = shift;
+    my@($self) =@( shift);
 
-    my $mpl_args = join " ", map qq["$_"], @ARGV;
+    my $mpl_args = join " ", map { qq["$_"] }, @ARGV;
 
     my $test = $self->cd('$(DISTVNAME)',
                          '$(ABSPERLRUN) Makefile.PL '.$mpl_args,
@@ -640,7 +631,7 @@ Defines the dynamic target.
 sub dynamic {
 # --- Dynamic Loading Sections ---
 
-    my($self) = shift;
+    my@($self) =@( shift);
     '
 dynamic :: $(FIRST_MAKEFILE) $(INST_DYNAMIC) $(INST_BOOT)
 	$(NOECHO) $(NOOP)
@@ -678,14 +669,14 @@ all POD files in MAN1PODS and MAN3PODS.
 =cut
 
 sub manifypods_target {
-    my($self) = shift;
+    my@($self) =@( shift);
 
     my $man1pods      = '';
     my $man3pods      = '';
     my $dependencies  = '';
 
     # populate manXpods & dependencies:
-    foreach my $name (@( <keys %{$self->{MAN1PODS} || \%()}, < keys %{$self->{MAN3PODS} || \%()})) {
+    foreach my $name (@( <keys %{$self->{?MAN1PODS} || \%()}, < keys %{$self->{?MAN3PODS} || \%()})) {
         $dependencies .= " \\\n\t$name";
     }
 
@@ -695,14 +686,14 @@ END
 
     my @man_cmds;
     foreach my $section (qw(1 3)) {
-        my $pods = $self->{"MAN{$section}PODS"};
+        my $pods = $self->{?"MAN$($section)PODS"};
         push @man_cmds, < $self->split_command(<<CMD, < %$pods);
 	\$(NOECHO) \$(POD2MAN) --section=$section --perm_rw=\$(PERM_RW)
 CMD
     }
 
     $manify .= "\t\$(NOECHO) \$(NOOP)\n" unless (nelems @man_cmds);
-    $manify .= join '', map { "$_\n" } @man_cmds;
+    $manify .= join '', map { "$_\n" }, @man_cmds;
 
     return $manify;
 }
@@ -720,40 +711,39 @@ possible.
 
 =cut
 
-sub metafile_target {
-    my $self = shift;
+sub metafile_target($self) {
 
-    return <<'MAKE_FRAG' if $self->{NO_META};
+    return <<'MAKE_FRAG' if $self->{?NO_META};
 metafile :
 	$(NOECHO) $(NOOP)
 MAKE_FRAG
 
     my $prereq_pm = '';
-    foreach my $mod ( sort { lc $a cmp lc $b } keys %{$self->{PREREQ_PM} || \%()} ) {
-        my $ver = $self->{PREREQ_PM}->{$mod};
+    foreach my $mod ( sort { lc $a cmp lc $b }, keys %{$self->{?PREREQ_PM} || \%()} ) {
+        my $ver = $self->{PREREQ_PM}->{?$mod};
         $prereq_pm .= sprintf "\n    \%-30s \%s", "$mod:", $ver;
     }
 
-    my $author_value = defined $self->{AUTHOR}
-        ? "\n    - $self->{AUTHOR}"
-        : undef;
+    my $author_value = defined $self->{?AUTHOR}
+        ?? "\n    - $self->{?AUTHOR}"
+        !! undef;
 
     # Use a list to preserve order.
     my @meta_to_mm = @(
-        name         => $self->{DISTNAME},
-        version      => $self->{VERSION},
-        abstract     => $self->{ABSTRACT},
-        license      => $self->{LICENSE},
+        name         => $self->{?DISTNAME},
+        version      => $self->{?VERSION},
+        abstract     => $self->{?ABSTRACT},
+        license      => $self->{?LICENSE},
         author       => $author_value,
         generated_by => 
                 "ExtUtils::MakeMaker version $ExtUtils::MakeMaker::VERSION",
-        distribution_type => $self->{PM} ? 'module' : 'script',
+        distribution_type => $self->{?PM} ?? 'module' !! 'script',
     );
 
     my $meta = "--- #YAML:1.0\n";
 
     while( (nelems @meta_to_mm) ) {
-        my($key, $val) = splice @meta_to_mm, 0, 2;
+        my@($key, $val) =@( splice @meta_to_mm, 0, 2);
 
         $val = '~' unless defined $val;
 
@@ -767,7 +757,7 @@ meta-spec:
     version: 1.3
 YAML
 
-    $meta .= $self->{EXTRA_META} if $self->{EXTRA_META};
+    $meta .= $self->{?EXTRA_META} if $self->{?EXTRA_META};
 
     my @write_meta = $self->echo($meta, 'META_new.yml');
 
@@ -795,7 +785,7 @@ sub distmeta_target {
 
     my $add_meta = $self->oneliner(<<'CODE', \@('-MExtUtils::Manifest=maniadd'));
 try { maniadd(\%(q{META.yml} => q{Module meta-data (added by MakeMaker)})) } 
-    or print "Could not add META.yml to MANIFEST: $${'@'}\n"
+    or print $$^STDOUT, "Could not add META.yml to MANIFEST: $${'@'}\n"
 CODE
 
     my $add_meta_to_distdir = $self->cd('$(DISTVNAME)', $add_meta);
@@ -815,15 +805,14 @@ Defines the realclean target.
 
 =cut
 
-sub realclean {
-    my($self, < %attribs) = < @_;
+sub realclean($self, %< %attribs) {
 
     my @dirs  = qw($(DISTVNAME));
     my @files = qw($(FIRST_MAKEFILE) $(MAKEFILE_OLD));
 
     # Special exception for the perl core where INST_* is not in blib.
     # This cleans up the files built from the ext/ directory (all XS).
-    if( $self->{PERL_CORE} ) {
+    if( $self->{?PERL_CORE} ) {
 	push @dirs, < qw($(INST_AUTODIR) $(INST_ARCHAUTODIR));
         push @files, < values %{$self->{PM}};
     }
@@ -832,22 +821,22 @@ sub realclean {
         push @files, < qw($(OBJECT));
     }
 
-    if( %attribs{FILES} ) {
-        if( ref %attribs{FILES} ) {
-            push @dirs, < @{ %attribs{FILES} };
+    if( %attribs{?FILES} ) {
+        if( ref %attribs{?FILES} ) {
+            push @dirs, < @{ %attribs{?FILES} };
         }
         else {
-            push @dirs, < split m/\s+/, %attribs{FILES};
+            push @dirs, < split m/\s+/, %attribs{?FILES};
         }
     }
 
     # Occasionally files are repeated several times from different sources
-    { my(%f) = %( < map { ($_ => 1) } @files );  @files = keys %f; }
-    { my(%d) = %( < map { ($_ => 1) } @dirs );   @dirs  = keys %d; }
+    do { my@(%f) =@( %( < @+: map { @($_ => 1) }, @files ));  @files = keys %f; };
+    do { my@(%d) =@( %( < @+: map { @($_ => 1) }, @dirs ));   @dirs  = keys %d; };
 
-    my $rm_cmd  = join "\n\t", map { "$_" } 
+    my $rm_cmd  = join "\n\t", map { "$_" }, 
                     $self->split_command('- $(RM_F)',  < @files);
-    my $rmf_cmd = join "\n\t", map { "$_" } 
+    my $rmf_cmd = join "\n\t", map { "$_" }, 
                     $self->split_command('- $(RM_RF)', < @dirs);
 
     my $m = sprintf <<'MAKE', $rm_cmd, $rmf_cmd;
@@ -857,7 +846,7 @@ realclean purge ::  clean realclean_subdirs
 	%s
 MAKE
 
-    $m .= "\t%attribs{POSTOP}\n" if %attribs{POSTOP};
+    $m .= "\t%attribs{?POSTOP}\n" if %attribs{?POSTOP};
 
     return $m;
 }
@@ -875,7 +864,7 @@ target to call realclean on any subdirectories which contain Makefiles.
 sub realclean_subdirs_target {
     my $self = shift;
 
-    return <<'NOOP_FRAG' unless (nelems @{$self->{DIR}});
+    return <<'NOOP_FRAG' unless (nelems @{$self->{?DIR}});
 realclean_subdirs :
 	$(NOECHO) $(NOOP)
 NOOP_FRAG
@@ -884,7 +873,7 @@ NOOP_FRAG
 
     foreach my $dir ( @{$self->{DIR}}) {
         foreach my $makefile (@('$(MAKEFILE_OLD)', '$(FIRST_MAKEFILE)') ) {
-            my $subrclean .= $self->oneliner(sprintf <<'CODE', $dir, ($makefile) x 2);
+            my $subrclean .= $self->oneliner(sprintf <<'CODE', $dir, < (@($makefile) x 2));
 chdir '%s';  system '$(MAKE) $(USEMAKEFILE) %s realclean' if -f '%s';
 CODE
 
@@ -934,7 +923,7 @@ sub distsignature_target {
 
     my $add_sign = $self->oneliner(<<'CODE', \@('-MExtUtils::Manifest=maniadd'));
 try { maniadd(\%(q{SIGNATURE} => q{Public-key signature (added by MakeMaker)})) } 
-    or print "Could not add SIGNATURE to MANIFEST: $${'@'}\n"
+    or print $$^STDOUT, "Could not add SIGNATURE to MANIFEST: $${'@'}\n"
 CODE
 
     my $sign_dist        = $self->cd('$(DISTVNAME)' => 'cpansign -s');
@@ -972,7 +961,7 @@ sub special_targets {
 
 MAKE_FRAG
 
-    $make_frag .= <<'MAKE_FRAG' if %ENV{CLEARCASE_ROOT};
+    $make_frag .= <<'MAKE_FRAG' if env::var('CLEARCASE_ROOT');
 .NO_CONFIG_REC: Makefile
 
 MAKE_FRAG
@@ -997,16 +986,16 @@ Methods which help initialize the MakeMaker object and macros.
 sub init_ABSTRACT {
     my $self = shift;
 
-    if( $self->{ABSTRACT_FROM} and $self->{ABSTRACT} ) {
+    if( $self->{?ABSTRACT_FROM} and $self->{?ABSTRACT} ) {
         warn "Both ABSTRACT_FROM and ABSTRACT are set.  ".
              "Ignoring ABSTRACT_FROM.\n";
         return;
     }
 
-    if ($self->{ABSTRACT_FROM}){
-        $self->{ABSTRACT} = $self->parse_abstract($self->{ABSTRACT_FROM}) or
+    if ($self->{?ABSTRACT_FROM}){
+        $self->{+ABSTRACT} = $self->parse_abstract($self->{ABSTRACT_FROM}) or
             warn "WARNING: Setting ABSTRACT via file ".
-                 "'$self->{ABSTRACT_FROM}' failed\n";
+                 "'$self->{?ABSTRACT_FROM}' failed\n";
     }
 }
 
@@ -1020,41 +1009,41 @@ to XS code.  Those are handled in init_xs.
 =cut
 
 sub init_INST {
-    my($self) = shift;
+    my@($self) =@( shift);
 
-    $self->{INST_ARCHLIB} ||= $self->catdir($Curdir,"blib","arch");
-    $self->{INST_BIN}     ||= $self->catdir($Curdir,'blib','bin');
+    $self->{+INST_ARCHLIB} ||= $self->catdir($Curdir,"blib","arch");
+    $self->{+INST_BIN}     ||= $self->catdir($Curdir,'blib','bin');
 
     # INST_LIB typically pre-set if building an extension after
     # perl has been built and installed. Setting INST_LIB allows
     # you to build directly into, say $Config{privlibexp}.
-    unless ($self->{INST_LIB}){
-	if ($self->{PERL_CORE}) {
+    unless ($self->{?INST_LIB}){
+	if ($self->{?PERL_CORE}) {
             if (defined $Cross::platform) {
-                $self->{INST_LIB} = $self->{INST_ARCHLIB} = 
-                  $self->catdir($self->{PERL_LIB},"..","xlib",
+                $self->{+INST_LIB} = $self->{+INST_ARCHLIB} = 
+                  $self->catdir($self->{?PERL_LIB},"..","xlib",
                                      $Cross::platform);
             }
             else {
-                $self->{INST_LIB} = $self->{INST_ARCHLIB} = $self->{PERL_LIB};
+                $self->{+INST_LIB} = $self->{+INST_ARCHLIB} = $self->{?PERL_LIB};
             }
 	} else {
-	    $self->{INST_LIB} = $self->catdir($Curdir,"blib","lib");
+	    $self->{+INST_LIB} = $self->catdir($Curdir,"blib","lib");
 	}
     }
 
-    my @parentdir = split(m/::/, $self->{PARENT_NAME});
-    $self->{INST_LIBDIR}      = $self->catdir('$(INST_LIB)',     < @parentdir);
-    $self->{INST_ARCHLIBDIR}  = $self->catdir('$(INST_ARCHLIB)', < @parentdir);
-    $self->{INST_AUTODIR}     = $self->catdir('$(INST_LIB)', 'auto', 
+    my @parentdir = split(m/::/, $self->{?PARENT_NAME});
+    $self->{+INST_LIBDIR}      = $self->catdir('$(INST_LIB)',     < @parentdir);
+    $self->{+INST_ARCHLIBDIR}  = $self->catdir('$(INST_ARCHLIB)', < @parentdir);
+    $self->{+INST_AUTODIR}     = $self->catdir('$(INST_LIB)', 'auto', 
                                               '$(FULLEXT)');
-    $self->{INST_ARCHAUTODIR} = $self->catdir('$(INST_ARCHLIB)', 'auto',
+    $self->{+INST_ARCHAUTODIR} = $self->catdir('$(INST_ARCHLIB)', 'auto',
                                               '$(FULLEXT)');
 
-    $self->{INST_SCRIPT}  ||= $self->catdir($Curdir,'blib','script');
+    $self->{+INST_SCRIPT}  ||= $self->catdir($Curdir,'blib','script');
 
-    $self->{INST_MAN1DIR} ||= $self->catdir($Curdir,'blib','man1');
-    $self->{INST_MAN3DIR} ||= $self->catdir($Curdir,'blib','man3');
+    $self->{+INST_MAN1DIR} ||= $self->catdir($Curdir,'blib','man1');
+    $self->{+INST_MAN3DIR} ||= $self->catdir($Curdir,'blib','man3');
 
     return 1;
 }
@@ -1070,13 +1059,13 @@ INSTALLDIRS) and *PREFIX.
 =cut
 
 sub init_INSTALL {
-    my($self) = shift;
+    my@($self) =@( shift);
 
-    if( $self->{ARGS}->{INSTALL_BASE} and $self->{ARGS}->{PREFIX} ) {
+    if( $self->{ARGS}->{?INSTALL_BASE} and $self->{ARGS}->{?PREFIX} ) {
         die "Only one of PREFIX or INSTALL_BASE can be given.  Not both.\n";
     }
 
-    if( $self->{ARGS}->{INSTALL_BASE} ) {
+    if( $self->{ARGS}->{?INSTALL_BASE} ) {
         $self->init_INSTALL_from_INSTALL_BASE;
     }
     else {
@@ -1101,79 +1090,79 @@ sub init_INSTALL_from_PREFIX {
     foreach my $num (@(1, 3)) {
         my $k = 'installsiteman'.$num.'dir';
 
-        $self->{uc $k} ||= uc "\$(installman{$num}dir)"
-          unless %Config{$k};
+        $self->{+uc $k} ||= uc "\$(installman$($num)dir)"
+          unless %Config{?$k};
     }
 
     foreach my $num (@(1, 3)) {
         my $k = 'installvendorman'.$num.'dir';
 
-        unless( %Config{$k} ) {
-            $self->{uc $k}  ||= %Config{usevendorprefix}
-                              ? uc "\$(installman{$num}dir)"
-                              : '';
+        unless( %Config{?$k} ) {
+            $self->{+uc $k}  ||= %Config{?usevendorprefix}
+                              ?? uc "\$(installman$($num)dir)"
+                              !! '';
         }
     }
 
-    $self->{INSTALLSITEBIN} ||= '$(INSTALLBIN)'
-      unless %Config{installsitebin};
-    $self->{INSTALLSITESCRIPT} ||= '$(INSTALLSCRIPT)'
-      unless %Config{installsitescript};
+    $self->{+INSTALLSITEBIN} ||= '$(INSTALLBIN)'
+      unless %Config{?installsitebin};
+    $self->{+INSTALLSITESCRIPT} ||= '$(INSTALLSCRIPT)'
+      unless %Config{?installsitescript};
 
-    unless( %Config{installvendorbin} ) {
-        $self->{INSTALLVENDORBIN} ||= %Config{usevendorprefix} 
-                                    ? %Config{installbin}
-                                    : '';
+    unless( %Config{?installvendorbin} ) {
+        $self->{+INSTALLVENDORBIN} ||= %Config{?usevendorprefix} 
+                                    ?? %Config{?installbin}
+                                    !! '';
     }
-    unless( %Config{installvendorscript} ) {
-        $self->{INSTALLVENDORSCRIPT} ||= %Config{usevendorprefix}
-                                       ? %Config{installscript}
-                                       : '';
+    unless( %Config{?installvendorscript} ) {
+        $self->{+INSTALLVENDORSCRIPT} ||= %Config{?usevendorprefix}
+                                       ?? %Config{?installscript}
+                                       !! '';
     }
 
 
-    my $iprefix = %Config{installprefixexp} || %Config{installprefix} || 
-                  %Config{prefixexp}        || %Config{prefix} || '';
-    my $vprefix = %Config{usevendorprefix}  ? %Config{vendorprefixexp} : '';
-    my $sprefix = %Config{siteprefixexp}    || '';
+    my $iprefix = %Config{?installprefixexp} || %Config{?installprefix} || 
+                  %Config{?prefixexp}        || %Config{?prefix} || '';
+    my $vprefix = %Config{?usevendorprefix}  ?? %Config{?vendorprefixexp} !! '';
+    my $sprefix = %Config{?siteprefixexp}    || '';
 
     # 5.005_03 doesn't have a siteprefix.
     $sprefix = $iprefix unless $sprefix;
 
 
-    $self->{PREFIX}       ||= '';
+    $self->{+PREFIX}       ||= '';
 
-    if( $self->{PREFIX} ) { <
+    if( $self->{?PREFIX} ) { 
         %{$self}{[qw(PERLPREFIX SITEPREFIX VENDORPREFIX)]} =
-          ('$(PREFIX)') x 3;
+          @('$(PREFIX)') x 3;
     }
     else {
-        $self->{PERLPREFIX}   ||= $iprefix;
-        $self->{SITEPREFIX}   ||= $sprefix;
-        $self->{VENDORPREFIX} ||= $vprefix;
+        $self->{+PERLPREFIX}   ||= $iprefix;
+        $self->{+SITEPREFIX}   ||= $sprefix;
+        $self->{+VENDORPREFIX} ||= $vprefix;
 
         # Lots of MM extension authors like to use $(PREFIX) so we
         # put something sensible in there no matter what.
-        $self->{PREFIX} = '$('.uc $self->{INSTALLDIRS}.'PREFIX)';
+        $self->{+PREFIX} = '$('.uc $self->{?INSTALLDIRS}.'PREFIX)';
     }
 
-    my $arch    = %Config{archname};
-    my $version = %Config{version};
+    my $arch    = %Config{?archname};
+    my $version = %Config{?version};
 
     # default style
-    my $libstyle = %Config{installstyle} || 'lib/perl5';
+    my $libstyle = %Config{?installstyle} || 'lib/perl5';
     my $manstyle = '';
 
-    if( $self->{LIBSTYLE} ) {
-        $libstyle = $self->{LIBSTYLE};
-        $manstyle = $self->{LIBSTYLE} eq 'lib/perl5' ? 'lib/perl5' : '';
+    if( $self->{?LIBSTYLE} ) {
+        $libstyle = $self->{?LIBSTYLE};
+        $manstyle = $self->{?LIBSTYLE} eq 'lib/perl5' ?? 'lib/perl5' !! '';
     }
 
     # Some systems, like VOS, set installman*dir to '' if they can't
     # read man pages.
     for my $num (@(1, 3)) {
-        $self->{'INSTALLMAN'.$num.'DIR'} ||= 'none'
-          unless %Config{'installman'.$num.'dir'};
+        $self->{+'INSTALLMAN'.$num.'DIR'} ||= 'none'
+          unless %Config{?'installman'.$num.'dir'};
     }
 
     my %bin_layouts = 
@@ -1258,16 +1247,16 @@ sub init_INSTALL_from_PREFIX {
 
 
     # Special case for LIB.
-    if( $self->{LIB} ) {
+    if( $self->{?LIB} ) {
         foreach my $var (keys %lib_layouts) {
             my $Installvar = uc "install$var";
 
             if( $var =~ m/arch/ ) {
-                $self->{$Installvar} ||= 
-                  $self->catdir($self->{LIB}, %Config{archname});
+                $self->{+$Installvar} ||= 
+                  $self->catdir($self->{?LIB}, %Config{archname});
             }
             else {
-                $self->{$Installvar} ||= $self->{LIB};
+                $self->{+$Installvar} ||= $self->{?LIB};
             }
         }
     }
@@ -1278,26 +1267,26 @@ sub init_INSTALL_from_PREFIX {
                       );
 
     my %layouts = %(< %bin_layouts, < %man_layouts, < %lib_layouts);
-    while( my($var, $layout) = each(%layouts) ) {
-        my($s, $t, $d, $style) = < %{$layout}{[qw(s t d style)]};
-        my $r = '$('.%type2prefix{$t}.')';
+    while( my @(?$var, ?$layout) = @: each(%layouts) ) {
+        my@($s, $t, $d, $style) =  %{$layout}{[qw(s t d style)]};
+        my $r = '$('.%type2prefix{?$t}.')';
 
-        print STDERR "Prefixing $var\n" if $Verbose +>= 2;
+        print $^STDERR, "Prefixing $var\n" if $Verbose +>= 2;
 
         my $installvar = "install$var";
         my $Installvar = uc $installvar;
-        next if $self->{$Installvar};
+        next if $self->{?$Installvar};
 
         $d = "$style/$d" if $style;
         $self->prefixify($installvar, $s, $r, $d);
 
-        print STDERR "  $Installvar == $self->{$Installvar}\n" 
+        print $^STDERR, "  $Installvar == $self->{?$Installvar}\n" 
           if $Verbose +>= 2;
     }
 
     # Generate these if they weren't figured out.
-    $self->{VENDORARCHEXP} ||= $self->{INSTALLVENDORARCH};
-    $self->{VENDORLIBEXP}  ||= $self->{INSTALLVENDORLIB};
+    $self->{+VENDORARCHEXP} ||= $self->{?INSTALLVENDORARCH};
+    $self->{+VENDORLIBEXP}  ||= $self->{?INSTALLVENDORLIB};
 
     return 1;
 }
@@ -1311,17 +1300,17 @@ sub init_INSTALL_from_PREFIX {
 
 my %map = %(
            lib      => \qw(lib perl5),
-           arch     => \@('lib', 'perl5', %Config{archname}),
+           arch     => \@('lib', 'perl5', %Config{?archname}),
            bin      => \qw(bin),
            man1dir  => \qw(man man1),
            man3dir  => \qw(man man3),
           );
-%map{script} = %map{bin};
+%map{+script} = %map{?bin};
 
 sub init_INSTALL_from_INSTALL_BASE {
     my $self = shift;
- <
-    %{$self}{[qw(PREFIX VENDORPREFIX SITEPREFIX PERLPREFIX)]} = 
+ 
+    %{$self}{[qw(PREFIX VENDORPREFIX SITEPREFIX PERLPREFIX)]} = @:
                                                          '$(INSTALL_BASE)';
 
     my %install;
@@ -1330,17 +1319,17 @@ sub init_INSTALL_from_INSTALL_BASE {
             my $uc_thing = uc $thing;
             my $key = "INSTALL".$dir.$uc_thing;
 
-            %install{$key} ||= 
+            %install{+$key} ||= 
               $self->catdir('$(INSTALL_BASE)', < @{%map{$thing}});
         }
     }
 
     # Adjust for variable quirks.
-    %install{INSTALLARCHLIB} ||= delete %install{INSTALLARCH};
-    %install{INSTALLPRIVLIB} ||= delete %install{INSTALLLIB};
+    %install{+INSTALLARCHLIB} ||= delete %install{INSTALLARCH};
+    %install{+INSTALLPRIVLIB} ||= delete %install{INSTALLLIB};
 
     foreach my $key (keys %install) {
-        $self->{$key} ||= %install{$key};
+        $self->{+$key} ||= %install{?$key};
     }
 
     return 1;
@@ -1379,47 +1368,47 @@ Called by init_main.
 =cut
 
 sub init_VERSION {
-    my($self) = shift;
+    my@($self) =@( shift);
 
-    $self->{MAKEMAKER}  = $ExtUtils::MakeMaker::Filename;
-    $self->{MM_VERSION} = $ExtUtils::MakeMaker::VERSION;
-    $self->{MM_REVISION}= $ExtUtils::MakeMaker::Revision;
-    $self->{VERSION_FROM} ||= '';
+    $self->{+MAKEMAKER}  = $ExtUtils::MakeMaker::Filename;
+    $self->{+MM_VERSION} = $ExtUtils::MakeMaker::VERSION;
+    $self->{+MM_REVISION}= $ExtUtils::MakeMaker::Revision;
+    $self->{+VERSION_FROM} ||= '';
 
-    if ($self->{VERSION_FROM}){
-        $self->{VERSION} = $self->parse_version($self->{VERSION_FROM});
-        if( $self->{VERSION} eq 'undef' ) {
+    if ($self->{?VERSION_FROM}){
+        $self->{+VERSION} = $self->parse_version($self->{VERSION_FROM});
+        if( $self->{?VERSION} eq 'undef' ) {
             warn("WARNING: Setting VERSION via file ".
-                 "'$self->{VERSION_FROM}' failed\n");
+                 "'$self->{?VERSION_FROM}' failed\n");
         }
     }
 
     # strip blanks
-    if (defined $self->{VERSION}) {
-        if (ref $self->{VERSION} and $self->{VERSION}->isa('version')) {
-            $self->{VERSION} = $self->{VERSION}->stringify;
+    if (defined $self->{?VERSION}) {
+        if (ref $self->{?VERSION} and $self->{?VERSION}->isa('version')) {
+            $self->{+VERSION} = $self->{VERSION}->stringify;
         }
-        $self->{VERSION} =~ s/^\s+//;
-        $self->{VERSION} =~ s/\s+$//;
+        $self->{+VERSION} =~ s/^\s+//;
+        $self->{+VERSION} =~ s/\s+$//;
     }
     else {
-        $self->{VERSION} = '';
+        $self->{+VERSION} = '';
     }
 
 
-    $self->{VERSION_MACRO}  = 'VERSION';
-    ($self->{VERSION_SYM} = $self->{VERSION}) =~ s/\W/_/g;
-    $self->{DEFINE_VERSION} = '-D$(VERSION_MACRO)=\"$(VERSION)\"';
+    $self->{+VERSION_MACRO}  = 'VERSION';
+    ($self->{+VERSION_SYM} = $self->{?VERSION}) =~ s/\W/_/g;
+    $self->{+DEFINE_VERSION} = '-D$(VERSION_MACRO)=\"$(VERSION)\"';
 
 
     # Graham Barr and Paul Marquess had some ideas how to ensure
     # version compatibility between the *.pm file and the
     # corresponding *.xs file. The bottomline was, that we need an
     # XS_VERSION macro that defaults to VERSION:
-    $self->{XS_VERSION} ||= $self->{VERSION};
+    $self->{+XS_VERSION} ||= $self->{?VERSION};
 
-    $self->{XS_VERSION_MACRO}  = 'XS_VERSION';
-    $self->{XS_DEFINE_VERSION} = '-D$(XS_VERSION_MACRO)=\"$(XS_VERSION)\"';
+    $self->{+XS_VERSION_MACRO}  = 'XS_VERSION';
+    $self->{+XS_DEFINE_VERSION} = '-D$(XS_VERSION_MACRO)=\"$(XS_VERSION)\"';
 
 }
 
@@ -1530,7 +1519,7 @@ Initialize MAKE from either a MAKE environment variable or $Config{make}.
 sub init_MAKE {
     my $self = shift;
 
-    $self->{MAKE} ||= %ENV{MAKE} || %Config{make};
+    $self->{+MAKE} ||= env::var('MAKE') || %Config{?make};
 }
 
 
@@ -1601,8 +1590,7 @@ Used on the t/*.t files.
 
 =cut
 
-sub test_via_harness {
-    my($self, $perl, $tests) = < @_;
+sub test_via_harness($self, $perl, $tests) {
 
     return qq{\t$perl "-MExtUtils::Command::MM" }.
            qq{"-e" "test_harness(\$(TEST_VERBOSE), '\$(INST_LIB)', '\$(INST_ARCHLIB)')" $tests\n};
@@ -1621,8 +1609,7 @@ formatting.
 
 =cut
 
-sub test_via_script {
-    my($self, $perl, $script) = < @_;
+sub test_via_script($self, $perl, $script) {
     return qq{\t$perl "-I\$(INST_LIB)" "-I\$(INST_ARCHLIB)" $script\n};
 }
 
@@ -1663,8 +1650,8 @@ tests in t/*.t.
 =cut
 
 sub find_tests {
-    my($self) = shift;
-    return -d 't' ? 't/*.t' : '';
+    my@($self) =@( shift);
+    return -d 't' ?? 't/*.t' !! '';
 }
 
 
@@ -1716,10 +1703,9 @@ installation.
 
 =cut
 
-sub libscan {
-    my($self,$path) = < @_;
-    my($dirs,$file) = < ($self->splitpath($path))[[1..2]];
-    return '' if grep m/^(?:RCS|CVS|SCCS|\.svn|_darcs)$/, @( < 
+sub libscan($self,$path) {
+    my@($dirs,$file) =  ($self->splitpath($path))[[1..2]];
+    return '' if grep { m/^(?:RCS|CVS|SCCS|\.svn|_darcs)$/ }, @( < 
                      $self->splitdir($dirs), $file);
 
     return $path;

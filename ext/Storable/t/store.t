@@ -15,7 +15,7 @@ plan tests => 19;
 $a = 'toto';
 $b = \$a;
 my $c = bless \%(), 'CLASS';
-$c->{attribute} = 'attrval';
+$c->{+attribute} = 'attrval';
 my %a = %('key', 'value', 1, 0, $a, $b, 'cvar', \$c);
 my @a = @('first', undef, 3, -4, -3.14159, 456, 4.5,
 	$b, \$a, $a, $c, \$c, \%a);
@@ -33,7 +33,7 @@ package FOO; our @ISA = qw(Storable);
 
 sub make {
 	my $self = bless \%();
-	$self->{key} = \%main::a;
+	$self->{+key} = \%main::a;
 	return $self;
 };
 
@@ -42,36 +42,36 @@ package main;
 my $foo = FOO->make;
 ok($foo->store('store'));
 
-ok(open(OUT, ">>", 'store'));
-binmode OUT;
+ok(open(my $outfh, ">>", 'store'));
+binmode $outfh;
 
-ok(defined store_fd(\@a, \*OUT));
-ok(defined nstore_fd($foo, \*OUT));
-ok(defined nstore_fd(\%a, \*OUT));
+ok(defined store_fd(\@a, \*$outfh));
+ok(defined nstore_fd($foo, \*$outfh));
+ok(defined nstore_fd(\%a, \*$outfh));
 
-ok(close(OUT));
+ok(close($outfh));
 
-ok(open(OUT, "<", 'store'));
-binmode OUT;
+ok(open($outfh, "<", 'store'));
+binmode $outfh;
 
-my $r = fd_retrieve(\*OUT);
+my $r = fd_retrieve(\*$outfh);
 ok(defined $r);
 is_deeply($foo, $r);
 
-$r = fd_retrieve(\*OUT);
+$r = fd_retrieve(\*$outfh);
 ok(defined $r);
 is_deeply(\@a, $r);
 
-$r = fd_retrieve(\*OUT);
+$r = fd_retrieve(\*$outfh);
 ok(defined $r);
 is_deeply($foo, $r);
 
-$r = fd_retrieve(\*OUT);
+$r = fd_retrieve(\*$outfh);
 ok(defined $r);
 is_deeply(\%a, $r);
 
-try { $r = fd_retrieve(\*OUT); };
-ok($@);
+try { $r = fd_retrieve(\*$outfh); };
+ok($^EVAL_ERROR);
 
-close OUT or die "Could not close: $!";
+close $outfh or die "Could not close: $^OS_ERROR";
 END { 1 while unlink 'store' }

@@ -1,7 +1,5 @@
 package IPC::Open3;
 
-use strict;
-no strict 'refs'; # because users pass me bareword filehandles
 our ($VERSION, @ISA, @EXPORT);
 
 require Exporter;
@@ -147,12 +145,12 @@ our $Me = 'open3 (bug)';	# you should never see this, it's always localized
 
 sub xfork {
     my $pid = fork;
-    defined $pid or die "$Me: fork failed: $!";
+    defined $pid or die "$Me: fork failed: $^OS_ERROR";
     return $pid;
 }
 
 sub xpipe {
-    pipe @_[0], @_[1] or die "$Me: pipe(" . Symbol::glob_name(@_[0]) . ", " . Symbol::glob_name(@_[1]) . ") failed: $!";
+    pipe @_[0], @_[1] or die "$Me: pipe(" . Symbol::glob_name(@_[0]) . ", " . Symbol::glob_name(@_[1]) . ") failed: $^OS_ERROR";
 }
 
 # I tried using a * prototype character for the filehandle but it still
@@ -163,7 +161,7 @@ sub xopen {
 }
 
 sub xclose {
-    close @_[0] or die "$Me: close(*" . Symbol::glob_name(@_[0]->*) . ") failed: $!";
+    close @_[0] or die "$Me: close(*" . Symbol::glob_name(@_[0]->*) . ") failed: $^OS_ERROR";
 }
 
 sub fh_is_fd {
@@ -175,11 +173,11 @@ sub xfileno {
     return fileno @_[0];
 }
 
-my $do_spawn = $^O eq 'os2' || $^O eq 'MSWin32';
+my $do_spawn = $^OS_NAME eq 'os2' || $^OS_NAME eq 'MSWin32';
 
 sub _open3 {
     local $Me = shift;
-    my($package, $dad_wtr, $dad_rdr, $dad_err, < @cmd) = < @_;
+    my@($package, $dad_wtr, $dad_rdr, $dad_err, @< @cmd) =  @_;
     my($dup_wtr, $dup_rdr, $dup_err, $kidpid);
 
     if ((nelems @cmd) +> 1 and @cmd[0] eq '-') {
@@ -196,16 +194,28 @@ sub _open3 {
 	1; }) 
     {
 	# must strip crud for die to add back, or looks ugly
-	$@ =~ s/(?<=value attempted) at .*//s;
-	die "$Me: $@";
+	$^EVAL_ERROR =~ s/(?<=value attempted) at .*//s;
+	die "$Me: $^EVAL_ERROR";
     } 
 
     $dad_err ||= $dad_rdr;
 
 
-    $dup_wtr = (ref \$dad_wtr eq "SCALAR" and $dad_wtr =~ s/^[<>]&//);
-    $dup_rdr = (ref \$dad_rdr eq "SCALAR" and $dad_rdr =~ s/^[<>]&//);
-    $dup_err = (ref \$dad_err eq "SCALAR" and $dad_err =~ s/^[<>]&//);
+    $dup_wtr = (ref \$dad_wtr eq "ARRAY" and $dad_wtr[0] =~ s/^[<>]&//);
+    if ($dup_wtr) {
+        $dad_wtr = $dad_wtr[1];
+    }
+    ref::svtype($dad_wtr) eq "PLAINVALUE" and die "PLAINVALUE can not be used as a filehandle";
+    $dup_rdr = (ref \$dad_rdr eq "ARRAY" and $dad_rdr[0] =~ s/^[<>]&//);
+    if ($dup_rdr) {
+        $dad_rdr = $dad_rdr[1];
+    }
+    ref::svtype($dad_rdr) eq "PLAINVALUE" and die "PLAINVALUE can not be used as a filehandle";
+    $dup_err = (ref \$dad_err eq "ARRAY" and $dad_err[0] =~ s/^[<>]&//);
+    if ($dup_err) {
+        $dad_err = $dad_err[1];
+    }
+    ref::svtype($dad_err) eq "PLAINVALUE" and die "PLAINVALUE can not be used as a filehandle";
 
     # force unqualified filehandles into caller's package
     $dad_wtr = \*{Symbol::fetch_glob(qualify $dad_wtr, $package)} unless ref \$dad_wtr ne "SCALAR" or fh_is_fd($dad_wtr);
@@ -218,52 +228,48 @@ sub _open3 {
 
     xpipe $kid_rdr, $dad_wtr if !$dup_wtr;
     xpipe $dad_rdr, $kid_wtr if !$dup_rdr;
-    xpipe $dad_err, $kid_err if !$dup_err && Symbol::glob_name(*$dad_err) ne Symbol::glob_name(*$dad_rdr);
+    xpipe $dad_err, $kid_err if !$dup_err && ($dad_err \!= $dad_rdr);
 
-    $kidpid = $do_spawn ? -1 : xfork;
+    $kidpid = $do_spawn ?? -1 !! xfork;
     if ($kidpid == 0) {		# Kid
-	# A tie in the parent should not be allowed to cause problems.
-	untie *STDIN;
-	untie *STDOUT;
 	# If she wants to dup the kid's stderr onto her stdout I need to
 	# save a copy of her stdout before I put something else there.
-	if (Symbol::glob_name($dad_rdr->*) ne Symbol::glob_name($dad_err->*) && $dup_err
-		&& xfileno($dad_err) == fileno(STDOUT)) {
+	if (($dad_rdr \!= $dad_err) && $dup_err
+		&& xfileno($dad_err) == fileno($^STDOUT)) {
 	    my $tmp = gensym;
 	    xopen($tmp, ">&", $dad_err);
 	    $dad_err = $tmp;
 	}
 
 	if ($dup_wtr) {
-	    xopen \*STDIN,  "<&", $dad_wtr if fileno(\*STDIN) != xfileno($dad_wtr);
+	    xopen $^STDIN,  "<&", $dad_wtr if fileno($^STDIN) != xfileno($dad_wtr);
 	} else {
 	    xclose $dad_wtr;
-	    xopen \*STDIN,  "<&=", fileno $kid_rdr;
+	    xopen $^STDIN,  "<&=", fileno $kid_rdr;
 	}
 	if ($dup_rdr) {
-	    xopen \*STDOUT, ">&", $dad_rdr if fileno(\*STDOUT) != xfileno($dad_rdr);
+	    xopen $^STDOUT, ">&", $dad_rdr if fileno($^STDOUT) != xfileno($dad_rdr);
 	} else {
 	    xclose $dad_rdr;
-	    xopen \*STDOUT, ">&=", $kid_wtr;
+	    xopen $^STDOUT, ">&=", $kid_wtr;
 	}
-	if (Symbol::glob_name($dad_rdr->*) ne Symbol::glob_name($dad_err->*)) {
+	if ($dad_rdr \!= $dad_err) {
 	    if ($dup_err) {
 		# I have to use a fileno here because in this one case
 		# I'm doing a dup but the filehandle might be a reference
 		# (from the special case above).
-		xopen \*STDERR, ">&", xfileno($dad_err)
-		    if fileno(STDERR) != xfileno($dad_err);
+		xopen $^STDERR, ">&", xfileno($dad_err)
+		    if fileno($^STDERR) != xfileno($dad_err);
 	    } else {
 		xclose $dad_err;
-		xopen \*STDERR, ">&=", fileno $kid_err;
+		xopen $^STDERR, ">&=", fileno $kid_err;
 	    }
 	} else {
-	    xopen \*STDERR, ">&", \*STDOUT if fileno(STDERR) != fileno(STDOUT);
+	    xopen $^STDERR, ">&", $^STDOUT if fileno($^STDERR) != fileno($^STDOUT);
 	}
 	return 0 if (@cmd[0] eq '-');
-	local($")=(" ");
 	exec < @cmd or do {
-	    warn "$Me: exec of {join ' ',@cmd} failed";
+	    warn "$Me: exec of $(join ' ',@cmd) failed";
 	    try { require POSIX; POSIX::_exit(255); };
 	    exit 255;
 	};
@@ -298,33 +304,32 @@ sub _open3 {
 	$kidpid = try {
 	    spawn_with_handles( \@( \%( mode => 'r',
 				    open_as => $kid_rdr,
-				    handle => \*STDIN ),
+				    handle => $^STDIN ),
 				  \%( mode => 'w',
 				    open_as => $kid_wtr,
-				    handle => \*STDOUT ),
+				    handle => $^STDOUT ),
 				  \%( mode => 'w',
 				    open_as => $kid_err,
-				    handle => \*STDERR ),
+				    handle => $^STDERR ),
 				), \@close, < @cmd);
 	};
-	die "$Me: $@" if $@;
+	die "$Me: $^EVAL_ERROR" if $^EVAL_ERROR;
     }
 
     xclose $kid_rdr if !$dup_wtr;
     xclose $kid_wtr if !$dup_rdr;
-    xclose $kid_err if !$dup_err && Symbol::glob_name($dad_rdr->*) ne Symbol::glob_name($dad_err->*);
+    xclose $kid_err if !$dup_err && $dad_rdr \!= $dad_err;
     # If the write handle is a dup give it away entirely, close my copy
     # of it.
     xclose $dad_wtr if $dup_wtr;
 
-    select(@(select($dad_wtr), $| = 1)[0]); # unbuffer pipe
+    iohandle::output_autoflush($dad_wtr, 1); # unbuffer pipe
     $kidpid;
 }
 
 sub open3 {
     if ((nelems @_) +< 4) {
-	local $" = ', ';
-	die "open3({join ' ',@_}): not enough arguments";
+	die "open3($(join ', ',@_)): not enough arguments";
     }
     return _open3 'open3', scalar caller, < @_
 }
@@ -332,37 +337,37 @@ sub open3 {
 sub spawn_with_handles {
     my $fds = shift;		# Fields: handle, mode, open_as
     my $close_in_child = shift;
-    my ($fd, $pid, @saved_fh, $saved, %saved, @errs);
+    my ($pid, @saved_fh, $saved, %saved, @errs);
     require Fcntl;
 
-    foreach $fd ( @$fds) {
-	$fd->{tmp_copy} = IO::Handle->new_from_fd($fd->{handle}, $fd->{mode});
-	%saved{fileno $fd->{handle}} = $fd->{tmp_copy};
+    foreach my $fd ( @$fds) {
+	$fd->{+tmp_copy} = IO::Handle->new_from_fd($fd->{?handle}, $fd->{mode});
+	%saved{+fileno $fd->{?handle}} = $fd->{?tmp_copy};
     }
-    foreach $fd ( @$fds) {
-	bless $fd->{handle}, 'IO::Handle'
-	    unless try { $fd->{handle}->isa('IO::Handle') } ;
+    foreach my $fd ( @$fds) {
+	bless $fd->{?handle}, 'IO::Handle'
+	    unless try { $fd->{?handle}->isa('IO::Handle') } ;
 	# If some of handles to redirect-to coincide with handles to
 	# redirect, we need to use saved variants:
-	$fd->{handle}->fdopen(%saved{fileno $fd->{open_as}} || $fd->{open_as},
+	$fd->{?handle}->fdopen(%saved{?fileno $fd->{?open_as}} || $fd->{?open_as},
 			      $fd->{mode});
     }
-    unless ($^O eq 'MSWin32') {
+    unless ($^OS_NAME eq 'MSWin32') {
 	# Stderr may be redirected below, so we save the err text:
-	foreach $fd ( @$close_in_child) {
-	    fcntl($fd, Fcntl::F_SETFD(), 1) or push @errs, "fcntl $fd: $!"
-		unless %saved{fileno $fd}; # Do not close what we redirect!
+	foreach my $fd ( @$close_in_child) {
+	    fcntl($fd, Fcntl::F_SETFD(), 1) or push @errs, "fcntl $fd: $^OS_ERROR"
+		unless %saved{?fileno $fd}; # Do not close what we redirect!
 	}
     }
 
     unless (nelems @errs) {
 	$pid = try { system 1, < @_ }; # 1 == P_NOWAIT
-	push @errs, "IO::Pipe: Can't spawn-NOWAIT: $!" if !$pid || $pid +< 0;
+	push @errs, "IO::Pipe: Can't spawn-NOWAIT: $^OS_ERROR" if !$pid || $pid +< 0;
     }
 
-    foreach $fd ( @$fds) {
-	$fd->{handle}->fdopen($fd->{tmp_copy}, $fd->{mode});
-	$fd->{tmp_copy}->close or die "Can't close: $!";
+    foreach my $fd ( @$fds) {
+	$fd->{?handle}->fdopen($fd->{?tmp_copy}, $fd->{mode});
+	$fd->{tmp_copy}->close or die "Can't close: $^OS_ERROR";
     }
     die join "\n", @errs if (nelems @errs);
     return $pid;

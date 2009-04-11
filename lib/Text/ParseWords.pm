@@ -1,7 +1,6 @@
 package Text::ParseWords;
 
-use strict;
-use vars < qw($VERSION @ISA @EXPORT @EXPORT_OK $PERL_SINGLE_QUOTE);
+our ($VERSION, @ISA, @EXPORT, @EXPORT_OK, $PERL_SINGLE_QUOTE);
 $VERSION = "3.26"
 ;
 
@@ -27,11 +26,10 @@ sub shellwords {
 
 
 
-sub quotewords {
-    my($delim, $keep, < @lines) = < @_;
-    my($line, @words, @allwords);
+sub quotewords($delim, $keep, @< @lines) {
+    my(@words, @allwords);
 
-    foreach $line ( @lines) {
+    foreach my $line ( @lines) {
 	@words = parse_line($delim, $keep, $line);
 	return() unless ((nelems @words) || !length($line));
 	push(@allwords, < @words);
@@ -41,12 +39,11 @@ sub quotewords {
 
 
 
-sub nested_quotewords {
-    my($delim, $keep, < @lines) = < @_;
-    my($i, @allwords);
+sub nested_quotewords($delim, $keep, @< @lines) {
+    my(@allwords);
 
-    for ($i = 0; $i +< nelems @lines; $i++) {
-	@{@allwords[$i]} = parse_line($delim, $keep, @lines[$i]);
+    for my $i (0 .. nelems(@lines) -1) {
+	@{@allwords[+$i]} = parse_line($delim, $keep, @lines[$i]);
 	return() unless ((nelems @{@allwords[$i]}) || !length(@lines[$i]));
     }
     return @allwords;
@@ -54,8 +51,7 @@ sub nested_quotewords {
 
 
 
-sub parse_line {
-    my($delimiter, $keep, $line) = < @_;
+sub parse_line($delimiter, $keep, $line) {
     my($word, @pieces);
 
     no warnings 'uninitialized';	# we will be testing undef strings
@@ -87,7 +83,7 @@ sub parse_line {
                             (?!^)(?=["'])               # a quote
                         )
 		    )//xs or return @();		# extended layout
-        my ($quote, $quoted, $unquoted, $delim) = (($1 ? ($1,$2) : ($3,$4)), $5, $6);
+        my @($quote, $quoted, $unquoted, $delim) = @(($1 ?? ($1,$2) !! ($3,$4)), $5, $6);
 
 
 	return @() unless( defined($quote) || length($unquoted) || length($delim));
@@ -102,7 +98,7 @@ sub parse_line {
             }
 	}
         $word .= substr($line, 0, 0);	# leave results tainted
-        $word .= defined $quote ? $quoted : $unquoted;
+        $word .= defined $quote ?? $quoted !! $unquoted;
 
         if (length($delim)) {
             push(@pieces, $word);
@@ -129,13 +125,13 @@ sub old_shellwords {
     #	@words = old_shellwords();	# defaults to $_ (and clobbers it)
 
     no warnings 'uninitialized';	# we will be testing undef strings
-    local *_ = \join('', @_) if (nelems @_);
+    my $_ = join('', @_) if (nelems @_);
     my (@words, $snippet);
 
     s/\A\s+//;
     while ($_ ne '') {
 	my $field = substr($_, 0, 0);	# leave results tainted
-	for (;;) {
+	while (1) {
 	    if (s/\A"(([^"\\]|\\.)*)"//s) {
 		($snippet = $1) =~ s#\\(.)#$1#sg;
 	    }

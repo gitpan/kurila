@@ -1,10 +1,9 @@
 package Module::Loaded;
 
-use strict;
 use Carp < qw[carp];
 
 BEGIN { use base 'Exporter';
-        use vars < qw[@EXPORT $VERSION];
+        our (@EXPORT, $VERSION);
         
         $VERSION = '0.01';
         @EXPORT  = qw[mark_as_loaded mark_as_unloaded is_loaded];
@@ -24,13 +23,13 @@ Module::Loaded - mark modules as loaded or unloaded
     eval "require 'Foo'";            # is now a no-op
 
     $bool = mark_as_unloaded('Foo'); # Foo.pm no longer marked as loaded
-    eval "require 'Foo'";            # Will try to find Foo.pm in @INC
+    eval "require 'Foo'";            # Will try to find Foo.pm in $^INCLUDE_PATH
 
 =head1 DESCRIPTION
 
 When testing applications, often you find yourself needing to provide
 functionality in your test environment that would usually be provided
-by external modules. Rather than munging the C<%INC> by hand to mark
+by external modules. Rather than munging the C<$^INCLUDED> by hand to mark
 these external modules as loaded, so they are not attempted to be loaded
 by perl, this module offers you a very simple way to mark modules as
 loaded and/or unloaded.
@@ -47,8 +46,7 @@ this and tell you from where the C<PACKAGE> has been loaded already.
 
 =cut
 
-sub mark_as_loaded (*) {
-    my $pm      = shift;
+sub mark_as_loaded ($pm) {
     my $file    = __PACKAGE__->_pm_to_file( $pm ) or return;
     my $who     = @(caller)[1];
     
@@ -57,7 +55,7 @@ sub mark_as_loaded (*) {
         carp "'$pm' already marked as loaded ('$where')";
     
     } else {
-        %INC{$file} = $who;
+        $^INCLUDED{+$file} = $who;
     }
     
     return 1;
@@ -73,15 +71,14 @@ this and tell you the C<PACKAGE> has been unloaded already.
 
 =cut
 
-sub mark_as_unloaded (*) { 
-    my $pm      = shift;
+sub mark_as_unloaded ($pm) {
     my $file    = __PACKAGE__->_pm_to_file( $pm ) or return;
 
     unless( defined is_loaded( $pm ) ) {
         carp "'$pm' already marked as unloaded";
 
     } else {
-        delete %INC{ $file };
+        delete $^INCLUDED{ $file };
     }
     
     return 1;
@@ -97,11 +94,10 @@ from where it is said to be loaded on success.
 
 =cut
 
-sub is_loaded (*) { 
-    my $pm      = shift;
+sub is_loaded ($pm) { 
     my $file    = __PACKAGE__->_pm_to_file( $pm ) or return;
 
-    return %INC{$file} if exists %INC{$file};
+    return $^INCLUDED{?$file} if exists $^INCLUDED{$file};
     
     return;
 }

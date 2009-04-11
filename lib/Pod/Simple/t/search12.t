@@ -1,16 +1,15 @@
 BEGIN {
-    if(%ENV{PERL_CORE}) {
+    if(env::var('PERL_CORE')) {
         chdir 't';
-        @INC = @( '../lib' );
+        $^INCLUDE_PATH = @( '../lib' );
     }
 }
 
-use strict;
 use Pod::Simple::Search;
-use Test;
+use Test::More;
 BEGIN { plan tests => 7 }
 
-print "# ", __FILE__,
+print $^STDOUT, "# ", __FILE__,
  ": Testing the surveying of the current directory...\n";
 
 my $x = Pod::Simple::Search->new;
@@ -21,11 +20,11 @@ $x->inc(0);
 use File::Spec;
 use Cwd;
 my $cwd = cwd();
-print "# CWD: $cwd\n";
+print $^STDOUT, "# CWD: $cwd\n";
 
 sub source_path {
     my $file = shift;
-    if (%ENV{PERL_CORE}) {
+    if (env::var('PERL_CORE')) {
         require File::Spec;
         my $updir = File::Spec->updir;
         my $dir = File::Spec->catdir($updir, 'lib', 'Pod', 'Simple', 't');
@@ -43,35 +42,35 @@ if(     -e ($here = source_path('testlib1'))) {
 } else {
   die "Can't find the test corpus";
 }
-print "# OK, found the test corpus as $here\n";
+print $^STDOUT, "# OK, found the test corpus as $here\n";
 ok 1;
 
-print $x->_state_as_string;
+print $^STDOUT, $x->_state_as_string;
 #$x->verbose(12);
 
 use Pod::Simple;
 *pretty = \&Pod::Simple::BlackBox::pretty;
 
-my($name2where, $where2name) = ($x->survey('.'), $x->path2name);
+my@($name2where, $where2name) = @($x->survey('.'), $x->path2name);
 
 my $p = pretty( $where2name, $name2where )."\n";
 $p =~ s/, +/,\n/g;
 $p =~ s/^/#  /mg;
-print $p;
+print $^STDOUT, $p;
 
-{
+do {
 my $names = join "|", sort values %$where2name;
-ok $names, "Blorm|Zonk::Pronk|hinkhonk::Glunk|hinkhonk::Vliff|perlflif|perlthng|squaa|squaa::Glunk|squaa::Vliff|zikzik";
-}
+is $names, "Blorm|Zonk::Pronk|hinkhonk::Glunk|hinkhonk::Vliff|perlflif|perlthng|squaa|squaa::Glunk|squaa::Vliff|zikzik";
+};
 
-{
+do {
 my $names = join "|", sort keys %$name2where;
-ok $names, "Blorm|Zonk::Pronk|hinkhonk::Glunk|hinkhonk::Vliff|perlflif|perlthng|squaa|squaa::Glunk|squaa::Vliff|zikzik";
-}
+is $names, "Blorm|Zonk::Pronk|hinkhonk::Glunk|hinkhonk::Vliff|perlflif|perlthng|squaa|squaa::Glunk|squaa::Vliff|zikzik";
+};
 
-ok( ($name2where->{'squaa'} || 'huh???'), '/squaa\.pm$/');
+like( ($name2where->{?'squaa'} || 'huh???'), '/squaa\.pm$/');
 
-ok nelems( grep( m/squaa\.pm/, keys %$where2name) ), 1;
+is nelems( grep( { m/squaa\.pm/ }, keys %$where2name) ), 1;
 
 ok 1;
 

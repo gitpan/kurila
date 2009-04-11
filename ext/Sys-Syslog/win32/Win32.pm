@@ -1,5 +1,4 @@
 package Sys::Syslog::Win32;
-use strict;
 use warnings;
 use Carp;
 use File::Spec;
@@ -182,7 +181,7 @@ sub _install {
     {
 
         # find the resource DLL, which should be along Syslog.dll
-        my ($file) = grep { -e $_ }  map { ("$_/$dll" => "$_/auto/$dll") }  @INC;
+        my ($file) = grep { -e $_ }  map { ("$_/$dll" => "$_/auto/$dll") }  $^INCLUDE_PATH;
         $dll = $file if $file;
 
         # on Cygwin, convert the Unix path into absolute Windows path

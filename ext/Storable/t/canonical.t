@@ -8,14 +8,13 @@
 
 
 use Storable < qw(freeze thaw dclone);
-use vars < qw($debugging $verbose);
+our ($debugging, $verbose);
 
-print "1..8\n";
+print $^STDOUT, "1..8\n";
 
-sub ok {
-    my($testno, $ok) = < @_;
-    print "not " unless $ok;
-    print "ok $testno\n";
+sub ok($testno, $ok) {
+    print $^STDOUT, "not " unless $ok;
+    print $^STDOUT, "ok $testno\n";
 }
 
 
@@ -32,13 +31,13 @@ our $maxarraysize = 100;
 # Use MD5 if its available to make random string keys
 
 try { require "MD5.pm" };
-our $gotmd5 = !$@;
+our $gotmd5 = !$^EVAL_ERROR;
 
 # Use Data::Dumper if debugging and it is available to create an ASCII dump
 
 if ($debugging) {
     try { require "Data/Dumper.pm" };
-    our $gotdd  = !$@;
+    our $gotdd  = !$^EVAL_ERROR;
 }
 
 our @fixed_strings = @("January", "February", "March", "April", "May", "June",
@@ -48,43 +47,43 @@ our @fixed_strings = @("January", "February", "March", "April", "May", "June",
 # (deeper levels contain scalars, references to hashes or references to arrays);
 
 our (%a1, %a2);
-for (my $i = 0; $i +< $hashsize; $i++) {
-	my($k) = int(rand(1_000_000));
+for my $i (0 .. $hashsize -1) {
+	my $k = int(rand(1_000_000));
 	$k = MD5->hexhash($k) if $gotmd5 and int(rand(2));
-	%a1{$k} = \%( key => "$k", "value" => $i );
+	%a1{+$k} = \%( key => "$k", "value" => $i );
 
 	# A third of the elements are references to further hashes
 
 	if (int(rand(1.5))) {
-		my($hash2) = \%();
-		my($hash2size) = int(rand($maxhash2size));
+		my $hash2 = \%();
+		my $hash2size = int(rand($maxhash2size));
 		while ($hash2size--) {
-			my($k2) = $k . $i . int(rand(100));
-			$hash2->{$k2} = @fixed_strings[rand(int(nelems @fixed_strings))];
+			my $k2 = $k . $i . int(rand(100));
+			$hash2->{+$k2} = @fixed_strings[rand(int(nelems @fixed_strings))];
 		}
-		%a1{$k}->{value} = $hash2;
+		%a1{$k}->{+value} = $hash2;
 	}
 
 	# A further third are references to arrays
 
 	elsif (int(rand(2))) {
-		my($arr_ref) = \@();
-		my($arraysize) = int(rand($maxarraysize));
+		my $arr_ref = \@();
+		my $arraysize = int(rand($maxarraysize));
 		while ($arraysize--) {
 			push(@$arr_ref, @fixed_strings[rand(int(nelems @fixed_strings))]);
 		}
-		%a1{$k}->{value} = $arr_ref;
+		%a1{$k}->{+value} = $arr_ref;
 	}	
 }
 
 
-print STDERR < Data::Dumper::Dumper(\%a1) if ($verbose and $gotdd);
+print $^STDERR, < Data::Dumper::Dumper(\%a1) if ($verbose and $gotdd);
 
 
 # Copy the hash, element by element in order of the keys
 
 foreach my $k (sort keys %a1) {
-    %a2{$k} = \%( key => "$k", "value" => %a1{$k}->{value} );
+    %a2{+$k} = \%( key => "$k", "value" => %a1{$k}->{?value} );
 }
 
 # Deep clone the hash
@@ -128,11 +127,11 @@ ok 5, ($x1 ne $x2) || ($x1 ne $x3);
 # Same test as in t/dclone.t to ensure the "canonical" code is also correct
 
 my $hash;
-push @{%$hash{''}}, \%$hash{a};
-ok 6, %$hash{''}->[0] \== \%$hash{a};
+push @{%$hash{+''}}, \%$hash{+a};
+ok 6, %$hash{''}->[0] \== \%$hash{+a};
 
 my $cloned = dclone(dclone($hash));
-ok 7, %$cloned{''}->[0] \== \%$cloned{a};
+ok 7, %$cloned{''}->[0] \== \%$cloned{+a};
 
-%$cloned{a} = "blah";
-ok 8, %$cloned{''}->[0] \== \%$cloned{a};
+%$cloned{+a} = "blah";
+ok 8, %$cloned{''}->[0] \== \%$cloned{+a};

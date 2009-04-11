@@ -1395,7 +1395,7 @@ S_unpack_rec(pTHX_ tempsym_t* symptr, const char *s, const char *strbeg, const c
 
 	    sv = sv_2mortal(newSV(len ? len : 1));
 	    SvPOK_on(sv);
-	    str = SvPVX(sv);
+	    str = SvPVX_mutable(sv);
 	    if (datumtype == 'b') {
 		U8 bits = 0;
 		const I32 ai32 = len;
@@ -1432,7 +1432,7 @@ S_unpack_rec(pTHX_ tempsym_t* symptr, const char *s, const char *strbeg, const c
 		len = (strend - s) * 2;
 	    sv = sv_2mortal(newSV(len ? len : 1));
 	    SvPOK_on(sv);
-	    str = SvPVX(sv);
+	    str = SvPVX_mutable(sv);
 	    if (datumtype == 'h') {
 		U8 bits = 0;
 		I32 ai32 = len;
@@ -2189,7 +2189,7 @@ S_sv_exp_grow(pTHX_ SV *sv, STRLEN needed) {
 
     PERL_ARGS_ASSERT_SV_EXP_GROW;
 
-    if (len - cur > needed) return SvPVX(sv);
+    if (len - cur > needed) return SvPVX_mutable(sv);
     extend = needed > len ? needed : len;
     return SvGROW(sv, len+extend+1);
 }
@@ -2216,7 +2216,7 @@ S_pack_rec(pTHX_ SV *cat, tempsym_t* symptr, SV **beglist, SV **endlist )
 	SV *lengthcode = NULL;
         I32 datumtype = symptr->code;
         howlen_t howlen = symptr->howlen;
-	char *start = SvPVX(cat);
+	char *start = SvPVX_mutable(cat);
 	char *cur   = start + SvCUR(cat);
 
 #define NEXTFROM (lengthcode ? lengthcode : items-- > 0 ? *beglist++ : &PL_sv_no)
@@ -2252,14 +2252,6 @@ S_pack_rec(pTHX_ SV *cat, tempsym_t* symptr, SV **beglist, SV **endlist )
 		if (lookahead.howlen == e_number) count = lookahead.length;
 		else {
 		    if (items > 0) {
-			if (SvGMAGICAL(*beglist)) {
-			    /* Avoid reading the active data more than once
-			       by copying it to a temporary.  */
-			    STRLEN len;
-			    const char *const pv = SvPV_const(*beglist, len);
-			    SV *const temp = newSVpvn_flags(pv, len, SVs_TEMP);
-			    *beglist = temp;
-			}
 			count = sv_len(*beglist);
 		    }
 		    else count = 0;
@@ -3058,7 +3050,6 @@ extern const double _double_constants[];
 		const char *aptr;
 
 		fromstr = NEXTFROM;
-		SvGETMAGIC(fromstr);
 		if (!SvOK(fromstr)) aptr = NULL;
 		else {
 		    /* XXX better yet, could spirit away the string to
@@ -3072,7 +3063,7 @@ extern const double _double_constants[];
 				    "Attempt to pack pointer to temporary value");
 		    }
 		    if (SvPOK(fromstr) || SvNIOK(fromstr))
-			aptr = SvPV_nomg_const_nolen(fromstr);
+			aptr = SvPV_nolen_const(fromstr);
 		    else
 			aptr = SvPV_force_flags_nolen(fromstr, 0);
 		}

@@ -7,19 +7,18 @@
 #	-- Robin Barker <rmb@cise.npl.co.uk>
 #
 
-use strict;
+
 
 $_ = '';	# to avoid undef warning on m// etc.
 
-sub ok {
-    my($test,$ok) = < @_;
-    print "not " unless $ok;
-    print "ok $test\n";
+sub ok($test,$ok) {
+    print $^STDOUT, "not " unless $ok;
+    print $^STDOUT, "ok $test\n";
 }
 
 $^WARN_HOOK = sub { 1; }; # avoid some spurious warnings
 
-print "1..24\n";
+print $^STDOUT, "1..9\n";
 
 ok 1, (eval "package ABC; sub zyx \{1\}; 1;" and
 	eval "ABC::zyx" and
@@ -53,7 +52,7 @@ ok 6, (eval "package qq; sub zyx \{1\}; 1;" and
 
 ok 7, (eval "package qw; sub zyx \{1\}; 1;" and
 	not eval "qw::zyx" and
-	eval "qw:: eq qw||" and
+	eval "nelems(qw::) == nelems(qw||)" and
 	not eval "qw::: +>= 0");
 
 ok 8, (eval "package qx; sub zyx \{1\}; 1;" and
@@ -65,55 +64,3 @@ ok 9, (eval "package s; sub zyx \{1\}; 1;" and
 	not eval "s::zyx" and
 	not eval "s:: eq s||" and
 	eval "s::: +>= 0");
-
-ok 10, 1;
-
-ok 11, 1;
-
-ok 12, (eval "ABC:1" and
-	not eval "ABC:echo: eq ABC|echo|" and
-	not eval "ABC:echo:ohce: +>= 0");
-
-ok 13, (eval "LABEL:1" and
-	not eval "LABEL:echo: eq LABEL|echo|" and
-	not eval "LABEL:echo:ohce: +>= 0");
-
-ok 14, (eval "XYZZY:1" and
-	not eval "XYZZY:echo: eq XYZZY|echo|" and
-	not eval "XYZZY:echo:ohce: +>= 0");
-
-ok 15, (not eval "m:1" and
-	eval "m:echo: eq m|echo|" and
-	not eval "m:echo:ohce: +>= 0");
-
-ok 16, (not eval "q:1" and
-	eval "q:echo: eq q|echo|" and
-	not eval "q:echo:ohce: +>= 0");
-
-ok 17, (not eval "qq:1" and
-	eval "qq:echo: eq qq|echo|" and
-	not eval "qq:echo:ohce: +>= 0");
-
-ok 18, (not eval "qw:1" and
-	eval "qw:echo:[0] eq qw|echo|[0]" and
-	not eval "qw:echo:ohce: +>= 0");
-
-ok 19, (not eval "qx:1" and
-	eval "qx:echo 1: eq qx|echo 1|" and	# echo without args may warn
-	not eval "qx:echo:ohce: +>= 0");
-
-ok 20, (not eval "s:1" and
-	not eval "s:echo: eq s|echo|" and
-	eval "s:echo:ohce: +>= 0");
-
-ok 21, 1;
-
-ok 22, 1;
-
-ok 23, (eval "and:1" and
-	not eval "and:echo: eq and|echo|" and
-	not eval "and:echo:ohce: +>= 0");
-
-ok 24, (eval "alarm:1" and
-	not eval "alarm:echo: eq alarm|echo|" and
-	not eval "alarm:echo:ohce: +>= 0");

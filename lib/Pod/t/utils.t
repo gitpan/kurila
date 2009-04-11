@@ -1,9 +1,9 @@
 
 # Test hyperlinks et al from Pod::ParseUtils
 
+use warnings;
 use Test::More tests => 21;
 
-use strict;
 use Pod::ParseUtils;
 
 # First test the hyperlinks
@@ -35,16 +35,16 @@ my @results = @(
 	      );
 
 for my $i( 0..nelems @links ) {
-  my $link = Pod::Hyperlink->new( @links[$i]);
-  is($link->markup, @results[$i]);
+  my $link = Pod::Hyperlink->new( @links[?$i]);
+  is($link->markup, @results[?$i]);
 }
 
 # Now test lists
 # This test needs to be better
-my $list = Pod::List->new( -indent => 4,
-			  -start  => 52,
-			  -file   => "itemtest.t",
-			  -type   => "OL",);
+my $list = Pod::List->new( indent => 4,
+                           start  => 52,
+                           file   => "itemtest.t",
+                           type   => "OL",);
 
 ok($list);
 
@@ -61,9 +61,9 @@ my $cache = Pod::Cache->new();
 
 # Store it in the cache
 $cache->item(
-	     -page => "Pod::ParseUtils",
-	     -description => "A description",
-	     -file => "file.t",
+	     page => "Pod::ParseUtils",
+	     description => "A description",
+	     file => "file.t",
  );
 
 # Now look for an item of this name

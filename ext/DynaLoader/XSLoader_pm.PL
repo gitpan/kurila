@@ -1,32 +1,29 @@
-use strict;
+
 use Config;
 
-sub to_string {
-    my ($value) = < @_;
+sub to_string($value) {
     $value =~ s/\\/\\\\/g;
     $value =~ s/'/\\'/g;
     return "'$value'";
 }
 
 1 while unlink "XSLoader.pm";
-open OUT, ">", "XSLoader.pm" or die $!;
-print OUT <<'EOT';
-# Generated from XSLoader.pm.PL (resolved %Config::Config value)
+open my $out, ">", "XSLoader.pm" or die $^OS_ERROR;
+print $out, <<'EOT';
+# Generated from XSLoader.pm.PL (resolved config_value() value)
 
 package XSLoader;
 
 our $VERSION = "0.08";
-
-#use strict;
 
 # enable debug/trace messages from DynaLoader perl code
 # $dl_debug = %ENV{PERL_DL_DEBUG} || 0 unless defined $dl_debug;
 
 EOT
 
-print OUT '  my $dl_dlext = ', to_string(%Config::Config{'dlext'}), ";\n" ;
+print $out, '  my $dl_dlext = ', to_string(Config::config_value('dlext')), ";\n" ;
 
-print OUT <<'EOT';
+print $out, <<'EOT';
 
 package DynaLoader;
 
@@ -44,17 +41,21 @@ sub load {
     my($module) = @_[0];
 
     # work with static linking too
-    my $b = "$module\::bootstrap";
-    goto &$b if defined &$b;
+    my $b = Symbol::fetch_glob("$module\::bootstrap");
+    return $b->*->(< @_) if defined &{*{$b}};
 
-    goto retry unless $module and defined &dl_load_file;
+    unless ($module and defined &dl_load_file) {
+        my $bootstrap_inherit = DynaLoader->can('bootstrap_inherit') || 
+                                XSLoader->can('bootstrap_inherit');
+        return $bootstrap_inherit->(< @_);
+    }
 
     my @modparts = split(m/::/,$module);
     my $modfname = @modparts[-1];
 
 EOT
 
-print OUT <<'EOT' if defined &DynaLoader::mod2fname;
+print $out, <<'EOT' if defined &DynaLoader::mod2fname;
     # Some systems have restrictions on files names for DLL's etc.
     # mod2fname returns appropriate file base name (typically truncated)
     # It may also edit @modparts if required.
@@ -62,14 +63,14 @@ print OUT <<'EOT' if defined &DynaLoader::mod2fname;
 
 EOT
 
-print OUT <<'EOT' if $^O eq 'os2';
+print $out, <<'EOT' if $^OS_NAME eq 'os2';
 
     # os2 static build can dynaload, but cannot dynaload Perl modules...
     die 'Dynaloaded Perl modules are not available in this build of Perl' if $OS2::is_static;
 
 EOT
 
-print OUT <<'EOT';
+print $out, <<'EOT';
     my $modpname = join('/', @modparts);
     my $modlibname = @(caller())[1];
     my $c = nelems @modparts;
@@ -81,7 +82,11 @@ print OUT <<'EOT';
     my $bs = $file;
     $bs =~ s/(\.\w+)?(;\d*)?$/\.bs/; # look for .bs 'beside' the library
 
-    goto retry if not -f $file or -s $bs;
+    if (not -f $file or -s $bs) {
+        my $bootstrap_inherit = DynaLoader->can('bootstrap_inherit') || 
+                                XSLoader->can('bootstrap_inherit');
+        return $bootstrap_inherit->(< @_);
+    }
 
     my $bootname = "boot_$module";
     $bootname =~ s/\W/_/g;
@@ -91,15 +96,15 @@ print OUT <<'EOT';
 
 EOT
 
-    if ($^O eq 'darwin') {
-print OUT <<'EOT';
+    if ($^OS_NAME eq 'darwin') {
+print $out, <<'EOT';
         if ($boot_symbol_ref = dl_find_symbol(0, $bootname)) {
             goto boot; #extension library has already been loaded, e.g. darwin
         }
 EOT
     }
 
-print OUT <<'EOT';
+print $out, <<'EOT';
     # Many dynamic extension loading problems will appear to come from
     # this section of code: XYZ failed at line 123 of DynaLoader.pm.
     # Often these errors are actually occurring in the initialisation
@@ -121,17 +126,11 @@ print OUT <<'EOT';
 
     push(@DynaLoader::dl_modules, $module); # record loaded module
 
-  boot:
-    my $xs = dl_install_xsub("{$module}::bootstrap", $boot_symbol_ref, $file);
+    my $xs = dl_install_xsub("$($module)::bootstrap", $boot_symbol_ref, $file);
 
     # See comment block above
     push(@DynaLoader::dl_shared_objects, $file); # record files loaded
     return &$xs(<@_);
-
-  retry:
-    my $bootstrap_inherit = DynaLoader->can('bootstrap_inherit') || 
-                            XSLoader->can('bootstrap_inherit');
-    goto &$bootstrap_inherit;
 }
 
 sub bootstrap_inherit {
@@ -195,12 +194,7 @@ forget to quote the name of your package on the C<XSLoader::load> line,
 and add comma (C<,>) before the arguments (C<$VERSION> above).
 
 Of course, if C<@ISA> contained only C<DynaLoader>, there is no need to have
-the C<@ISA> assignment at all; moreover, if instead of C<our> one uses the
-more backward-compatible
-
-    use vars qw($VERSION @ISA);
-
-one can remove this reference to C<@ISA> together with the C<@ISA> assignment.
+the C<@ISA> assignment at all.
 
 If no C<$VERSION> was specified on the C<bootstrap> line, the last line becomes
 
@@ -212,10 +206,9 @@ If you want to have your cake and eat it too, you need a more complicated
 boilerplate.
 
     package YourPackage;
-    use vars qw($VERSION @ISA);
 
-    @ISA = qw( OnePackage OtherPackage );
-    $VERSION = '0.01';
+    our @ISA = qw( OnePackage OtherPackage );
+    our $VERSION = '0.01';
     try {
        require XSLoader;
        XSLoader::load('YourPackage', $VERSION);
@@ -277,11 +270,10 @@ boilerplate as
 
     package YourPackage;
     use XSLoader;
-    use vars qw($VERSION @ISA);
 
     BEGIN {
-       @ISA = qw( OnePackage OtherPackage );
-       $VERSION = '0.01';
+       our @ISA = qw( OnePackage OtherPackage );
+       our $VERSION = '0.01';
 
        # Put Perl code used in the BOOT: section here
 
@@ -300,11 +292,10 @@ this:
 
     package YourPackage;
     use XSLoader;
-    use vars qw($VERSION @ISA);
 
     BEGIN {
-       @ISA = qw( OnePackage OtherPackage );
-       $VERSION = '0.01';
+       our @ISA = qw( OnePackage OtherPackage );
+       our $VERSION = '0.01';
        XSLoader::load 'YourPackage', $VERSION;
     }
 
@@ -348,9 +339,9 @@ a module name, and optionally its version.
 To reduce the overhead as much as possible, only one possible location
 is checked to find the extension DLL (this location is where C<make install>
 would put the DLL).  If not found, the search for the DLL is transparently
-delegated to C<DynaLoader>, which looks for the DLL along the C<@INC> list.
+delegated to C<DynaLoader>, which looks for the DLL along the C<$^INCLUDE_PATH> list.
 
-In particular, this is applicable to the structure of C<@INC> used for testing
+In particular, this is applicable to the structure of C<$^INCLUDE_PATH> used for testing
 not-yet-installed extensions.  This means that running uninstalled extensions
 may have much more overhead than running the same extensions after
 C<make install>.
@@ -384,4 +375,4 @@ it under the same terms as Perl itself.
 =cut
 EOT
 
-close OUT or die $!;
+close $out or die $^OS_ERROR;

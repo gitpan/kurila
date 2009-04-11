@@ -1,6 +1,5 @@
 package ExtUtils::MM_Win95;
 
-use strict;
 
 our $VERSION = '6.44';
 
@@ -38,7 +37,7 @@ The && problem.
 =cut
 
 sub xs_c {
-    my($self) = shift;
+    my@($self) =@( shift);
     return '' unless $self->needs_linking();
     '
 .xs.c:
@@ -54,7 +53,7 @@ The && problem
 =cut
 
 sub xs_cpp {
-    my($self) = shift;
+    my@($self) =@( shift);
     return '' unless $self->needs_linking();
     '
 .xs.cpp:
@@ -69,7 +68,7 @@ The && problem.
 =cut
 
 sub xs_o {
-    my($self) = shift;
+    my@($self) =@( shift);
     return '' unless $self->needs_linking();
     '
 .xs$(OBJ_EXT):
@@ -89,7 +88,7 @@ of 2K.  So we go for a more conservative value of 1K.
 sub max_exec_len {
     my $self = shift;
 
-    return $self->{_MAX_EXEC_LEN} ||= 1024;
+    return ($self->{+_MAX_EXEC_LEN} ||= 1024);
 }
 
 

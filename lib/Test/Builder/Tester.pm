@@ -1,6 +1,5 @@
 package Test::Builder::Tester;
 
-use strict;
 our $VERSION = "1.13";
 
 use Test::Builder;
@@ -66,7 +65,7 @@ sub _export_to_level
 {
       my $pkg = shift;
       my $level = shift;
-      (undef) = shift;                  # XXX redundant arg
+      shift;                  # XXX redundant arg
       my $callpkg = caller($level);
       $pkg->export($callpkg, < @_);
 }
@@ -78,7 +77,9 @@ sub import {
     my $caller = caller;
 
     $t->exported_to($caller);
-    $t->plan(< @plan);
+    if (@plan) {
+        $t->plan(< @plan);
+    }
 
     my @imports = @( () );
     foreach my $idx (0..((nelems @plan)-1)) {
@@ -121,8 +122,8 @@ sub _start_testing
 {
     # even if we're running under Test::Harness pretend we're not
     # for now.  This needed so Test::Builder doesn't add extra spaces
-    $original_harness_env = %ENV{HARNESS_ACTIVE} || 0;
-    %ENV{HARNESS_ACTIVE} = 0;
+    $original_harness_env = env::var('HARNESS_ACTIVE') || 0;
+    env::var('HARNESS_ACTIVE' ) = 0;
 
     # remember what the handles were set to
     $original_output_handle  = $t->output();
@@ -141,7 +142,7 @@ sub _start_testing
     # remeber that we're testing
     $testing = 1;
     $testing_num = $t->current_test;
-    $t->current_test(0);
+    $t->current_test = 0;
 
     # look, we shouldn't do the ending stuff
     $t->no_ending(1);
@@ -229,11 +230,11 @@ sub test_fail
     _start_testing() unless $testing;
 
     # work out what line we should be on
-    my ($package, $filename, $line) = caller;
+    my @($package, $filename, $line, ...) = @: caller;
     $line = $line + (shift() || 0); # prevent warnings
 
     # expect that on stderr
-    $err->expect("#     Failed test ($0 at line $line)");
+    $err->expect("#     Failed test ($^PROGRAM_NAME at line $line)");
 }
 
 =item test_diag
@@ -272,8 +273,8 @@ sub test_diag
     _start_testing() unless $testing;
 
     # expect the same thing, but prepended with "#     "
-    local $_;
-    $err->expect(< map {"# $_"} @_)
+    local $_ = undef;
+    $err->expect(< map {"# $_"}, @_)
 }
 
 =item test_test
@@ -325,9 +326,9 @@ sub test_test
    else
    {
      %args = %( < @_ );
-     $mess = %args{name} if exists(%args{name});
-     $mess = %args{title} if exists(%args{title});
-     $mess = %args{label} if exists(%args{label});
+     $mess = %args{?name} if exists(%args{name});
+     $mess = %args{?title} if exists(%args{title});
+     $mess = %args{?label} if exists(%args{label});
    }
 
     # er, are we testing?
@@ -340,27 +341,27 @@ sub test_test
     $t->todo_output($original_todo_handle);
 
     # restore the test no, etc, back to the original point
-    $t->current_test($testing_num);
+    $t->current_test = $testing_num;
     $testing = 0;
 
     # re-enable the original setting of the harness
-    %ENV{HARNESS_ACTIVE} = $original_harness_env;
+    env::var('HARNESS_ACTIVE' ) = $original_harness_env;
 
     # check the output we've stashed
-    unless ($t->ok(    (%args{skip_out} || $out->check)
-                    && (%args{skip_err} || $err->check),
+    unless ($t->ok(    (%args{?skip_out} || $out->check)
+                    && (%args{?skip_err} || $err->check),
                    $mess))
     {
       # print out the diagnostic information about why this
       # test failed
 
-      local $_;
+      local $_ = undef;
 
-      $t->diag(< map {"$_\n"} @( $out->complaint))
-	unless %args{skip_out} || $out->check;
+      $t->diag(< map {"$_\n"}, @( $out->complaint))
+	unless %args{?skip_out} || $out->check;
 
-      $t->diag(< map {"$_\n"} @( $err->complaint))
-	unless %args{skip_err} || $err->check;
+      $t->diag(< map {"$_\n"}, @( $err->complaint))
+	unless %args{?skip_err} || $err->check;
     }
 }
 
@@ -378,7 +379,7 @@ C<line_num(+3)> idiom is arguably nicer.
 
 sub line_num
 {
-    my ($package, $filename, $line) = caller;
+    my @($package, $filename, $line, ...) = @: caller;
     return $line + (shift() || 0); # prevent warnings
 }
 
@@ -483,18 +484,17 @@ package Test::Builder::Tester::Tie;
 ##
 # add line(s) to be expected
 
-sub new {
-    my ($class, $type) = < @_;
+sub new($class, $type) {
 
     my $self = bless \%( got => '', type => $type ), $class;
-    open my $fh, '>', \$self->{'got'} or die "$!";
-    $self->{'filehandle'} = $fh;
+    open my $fh, '>', \$self->{+'got'} or die "$^OS_ERROR";
+    $self->{+'filehandle'} = $fh;
     return $self;
 }
 
 sub handle {
     my $self = shift;
-    return $self->{'filehandle'};
+    return $self->{?'filehandle'};
 }
 
 sub expect
@@ -504,14 +504,13 @@ sub expect
     my @checks = @_;
     foreach my $check ( @checks) {
         $check = $self->_translate_Failed_check($check);
-        push @{$self->{wanted}}, ref $check ? $check : "$check\n";
+        push @{$self->{wanted}}, ref $check ?? $check !! "$check\n";
     }
 }
 
 
-sub _translate_Failed_check
+sub _translate_Failed_check($self, $check)
 {
-    my($self, $check) = < @_;
 
     if( $check =~ m/\A(.*)#     (Failed .*test) \((.*?) at line (\d+)\)\Z(?!\n)/ ) {
         $check = "/\Q$1\E#\\s+\Q$2\E.*?\\n?.*?\Qat $3\E line \Q$4\E.*\\n?/";
@@ -529,10 +528,10 @@ sub check
     my $self = shift;
 
     # turn off warnings as these might be undef
-    local $^W = 0;
+    local $^WARNING = 0;
 
-    my @checks = @{$self->{wanted}};
-    my $got = $self->{got};
+    my @checks = @{$self->{?wanted}};
+    my $got = $self->{?got};
     foreach my $check ( @checks) {
         $check = "\Q$check\E" unless ($check =~ s,^/(.*)/$,$1, or ref $check);
         return 0 unless $got =~ s/^$check//;
@@ -557,7 +556,7 @@ sub complaint
     {
       # get color
       try { require Term::ANSIColor };
-      unless ($@)
+      unless ($^EVAL_ERROR)
       {
         # colours
 
@@ -599,28 +598,28 @@ sub complaint
 sub reset
 {
     my $self = shift;
-    seek $self->{'filehandle'}, 0, 0;
-    $self->{'got'} = '';
-    $self->{'wanted'} = \@();
+    seek $self->{?'filehandle'}, 0, 0;
+    $self->{+'got'} = '';
+    $self->{+'wanted'} = \@();
 }
 
 
 sub got
 {
     my $self = shift;
-    return $self->{got};
+    return $self->{?got};
 }
 
 sub wanted
 {
     my $self = shift;
-    return $self->{wanted};
+    return $self->{?wanted};
 }
 
 sub type
 {
     my $self = shift;
-    return $self->{type};
+    return $self->{?type};
 }
 
 1;

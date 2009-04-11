@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-use strict;
+
 use kurila;
 
 BEGIN {
@@ -11,7 +11,6 @@ my $opcode_new = 'opcode.h-new';
 my $opname_new = 'opnames.h-new';
 my $oc = safer_open($opcode_new);
 my $on = safer_open($opname_new);
-select $oc;
 
 # Read data.
 
@@ -22,21 +21,21 @@ while ( ~< *DATA) {
     chop;
     next unless $_;
     next if m/^#/;
-    my ($key, $desc, $check, $flags, $args) = < split(m/\t+/, $_, 5);
+    my @($key, $desc, $check, $flags, ? $args) =  split(m/\t+/, $_, 5);
     $args = '' unless defined $args;
 
-    warn qq[Description "$desc" duplicates %seen{$desc}\n] if %seen{$desc};
-    die qq[Opcode "$key" duplicates %seen{$key}\n] if %seen{$key};
-    %seen{$desc} = qq[description of opcode "$key"];
-    %seen{$key} = qq[opcode "$key"];
+    warn qq[Description "$desc" duplicates %seen{?$desc}\n] if %seen{?$desc};
+    die qq[Opcode "$key" duplicates %seen{?$key}\n] if %seen{?$key};
+    %seen{+$desc} = qq[description of opcode "$key"];
+    %seen{+$key} = qq[opcode "$key"];
 
     push(@ops, $key);
-    %opnum{$key} =( (nelems @ops)-1);
-    %desc{$key} = $desc;
-    %check{$key} = $check;
-    %ckname{$check}++;
-    %flags{$key} = $flags;
-    %args{$key} = $args;
+    %opnum{+$key} =( (nelems @ops)-1);
+    %desc{+$key} = $desc;
+    %check{+$key} = $check;
+    %ckname{+$check}++;
+    %flags{+$key} = $flags;
+    %args{+$key} = $args;
 }
 
 # Set up aliases
@@ -46,11 +45,10 @@ my %alias;
 # Format is "this function" => "does these op names"
 my @raw_alias = @(
 		 Perl_do_kv => \qw( keys values ),
-		 Perl_unimplemented_op => \qw(padany mapstart custom),
+		 Perl_unimplemented_op => \qw(mapstart custom root),
 		 # All the ops with a body of { return NORMAL; }
 		 Perl_pp_null => \qw(scalar regcmaybe lineseq scope),
 
-		 Perl_pp_goto => \@('dump'),
 		 Perl_pp_require => \@('dofile'),
 		 Perl_pp_sysread => \qw(read recv),
 		 Perl_pp_sysseek => \@('seek'),
@@ -91,13 +89,14 @@ my @raw_alias = @(
 		 Perl_pp_rv2sv => \@('rv2av rv2hv'),
 		);
 
-while (my ($func, $names) = splice @raw_alias, 0, 2) {
-    %alias{$_} = $func for  @$names;
+while (@raw_alias) {
+    my @($func, $names) = @: splice @raw_alias, 0, 2;
+    %alias{+$_} = $func for  @$names;
 }
 
 # Emit defines.
 
-print <<"END";
+print $oc, <<"END";
 /* -*- buffer-read-only: t -*-
  *
  *    opcode.h
@@ -124,7 +123,7 @@ PERL_PPDEF(Perl_unimplemented_op)
 
 END
 
-print $on <<"END";
+print $on, <<"END";
 /* -*- buffer-read-only: t -*-
  *
  *    opnames.h
@@ -146,23 +145,24 @@ END
 
 my $i = 0;
 for ( @ops) {
-    # print $on "\t", &tab(3,"OP_\U$_,"), "/* ", $i++, " */\n";
-      print $on "\t", &tab(3,"OP_\U$_"), " = ", $i++, ",\n";
+    # print $on, "\t", &tab(3,"OP_\U$_,"), "/* ", $i++, " */\n";
+      print $on, "\t", &tab(3,"OP_\U$_"), " = ", $i++, ",\n";
 }
-print $on "\t", &tab(3,"OP_max"), "\n";
-print $on "\} opcode;\n";
-print $on "\n#define MAXO ", scalar nelems @ops, "\n";
-print $on "#define OP_phoney_INPUT_ONLY -1\n";
-print $on "#define OP_phoney_OUTPUT_ONLY -2\n\n";
+print $on, "\t", &tab(3,"OP_max"), "\n";
+print $on, "\} opcode;\n";
+print $on, "\n#define MAXO ", scalar nelems @ops, "\n";
+print $on, "#define OP_phoney_INPUT_ONLY -1\n";
+print $on, "#define OP_phoney_OUTPUT_ONLY -2\n\n";
 
 # Emit op names and descriptions.
 
-print <<END;
+print $oc, <<END;
 START_EXTERN_C
 
 #define OP_NAME(o) ((o)->op_type == OP_CUSTOM ? custom_op_name(o) : \\
                     PL_op_name[(o)->op_type])
-#define OP_DESC(o) ((o)->op_type == OP_CUSTOM ? custom_op_desc(o) : \\
+#define OP_DESC(o) ( ! (o) ? "???" : \\
+                    (o)->op_type == OP_CUSTOM ? custom_op_desc(o) : \\
                     PL_op_desc[(o)->op_type])
 
 #ifndef DOINIT
@@ -172,17 +172,17 @@ EXTCONST char* const PL_op_name[] = \{
 END
 
 for ( @ops) {
-    print qq(\t"$_",\n);
+    print $oc, qq(\t"$_",\n);
 }
 
-print <<END;
+print $oc, <<END;
 \tNULL,\n
 \};
 #endif
 
 END
 
-print <<END;
+print $oc, <<END;
 #ifndef DOINIT
 EXTCONST char* const PL_op_desc[];
 #else
@@ -190,15 +190,15 @@ EXTCONST char* const PL_op_desc[] = \{
 END
 
 for ( @ops) {
-    my($safe_desc) = %desc{$_};
+    my $safe_desc = %desc{?$_};
 
     # Have to escape double quotes and escape characters.
     $safe_desc =~ s/(^|[^\\])([\\"])/$1\\$2/g;
 
-    print qq(\t"$safe_desc",\n);
+    print $oc, qq(\t"$safe_desc",\n);
 }
 
-print <<END;
+print $oc, <<END;
 \};
 #endif
 
@@ -221,7 +221,7 @@ END
 
 # Emit ppcode switch array.
 
-print <<END;
+print $oc, <<END;
 
 START_EXTERN_C
 
@@ -240,15 +240,15 @@ EXT Perl_ppaddr_t PL_ppaddr[] /* or perlvars.h */
 END
 
 for ( @ops) {
-    if (my $name = %alias{$_}) {
-	print "\tMEMBER_TO_FPTR($name),\t/* Perl_pp_$_ */\n";
+    if (my $name = %alias{?$_}) {
+	print $oc, "\tMEMBER_TO_FPTR($name),\t/* Perl_pp_$_ */\n";
     }
     else {
-	print "\tMEMBER_TO_FPTR(Perl_pp_$_),\n";
+	print $oc, "\tMEMBER_TO_FPTR(Perl_pp_$_),\n";
     }
 }
 
-print <<END;
+print $oc, <<END;
 \}
 #endif
 #ifdef PERL_PPADDR_INITED
@@ -259,7 +259,7 @@ END
 
 # Emit check routines.
 
-print <<END;
+print $oc, <<END;
 #ifdef PERL_GLOBAL_STRUCT_INIT
 #  define PERL_CHECK_INITED
 static const Perl_check_t Gcheck[]
@@ -275,10 +275,10 @@ EXT Perl_check_t PL_check[] /* or perlvars.h */
 END
 
 for ( @ops) {
-    print "\t", tab(3, "MEMBER_TO_FPTR(Perl_%check{$_}),"), "\t/* $_ */\n";
+    print $oc, "\t", tab(3, "MEMBER_TO_FPTR(Perl_%check{?$_}),"), "\t/* $_ */\n";
 }
 
-print <<END;
+print $oc, <<END;
 \}
 #endif
 #ifdef PERL_CHECK_INITED
@@ -291,7 +291,7 @@ END
 
 my $ARGBITS = 32;
 
-print <<END;
+print $oc, <<END;
 #ifndef PERL_GLOBAL_STRUCT_INIT
 
 #ifndef DOINIT
@@ -324,6 +324,7 @@ my %opclass = %(
     '%',  11,		# baseop_or_unop
     '-',  12,		# filestatop
     '}',  13,		# loopexop
+    '!',  14,		# rootop
 );
 
 my %opflags = %(
@@ -346,29 +347,29 @@ my $OASHIFT = 13;
 
 for my $op ( @ops) {
     my $argsum = 0;
-    my $flags = %flags{$op};
+    my $flags = %flags{?$op};
     for my $flag (keys %opflags) {
 	if ($flags =~ s/$flag//) {
-	    die "Flag collision for '$op' (%flags{$op}, $flag)"
-		if $argsum ^&^ %opflags{$flag};
-	    $argsum ^|^= %opflags{$flag};
+	    die "Flag collision for '$op' (%flags{?$op}, $flag)"
+		if $argsum ^&^ %opflags{?$flag};
+	    $argsum ^|^= %opflags{?$flag};
 	}
     }
-    die qq[Opcode '$op' has no class indicator (%flags{$op} => $flags)\n]
+    die qq[Opcode '$op' has no class indicator (%flags{?$op} => $flags)\n]
 	unless exists %opclass{$flags};
-    $argsum ^|^= %opclass{$flags} << $OCSHIFT;
+    $argsum ^|^= %opclass{?$flags} << $OCSHIFT;
     my $argshift = $OASHIFT;
-    for my $arg (split(' ',%args{$op})) {
+    for my $arg (split(' ',%args{?$op})) {
 	if ($arg =~ m/^F/) {
 	    # record opnums of these opnames
-	    %OP_IS_SOCKET{$op}   = %opnum{$op} if $arg =~ s/s//;
-	    %OP_IS_FILETEST{$op} = %opnum{$op} if $arg =~ s/-//;
-	    %OP_IS_FT_ACCESS{$op} = %opnum{$op} if $arg =~ s/\+//;
+	    %OP_IS_SOCKET{+$op}   = %opnum{?$op} if $arg =~ s/s//;
+	    %OP_IS_FILETEST{+$op} = %opnum{?$op} if $arg =~ s/-//;
+	    %OP_IS_FT_ACCESS{+$op} = %opnum{?$op} if $arg =~ s/\+//;
         }
-	my $argnum = ($arg =~ s/\?//) ? 8 : 0;
+	my $argnum = ($arg =~ s/\?//) ?? 8 !! 0;
         die "op = $op, arg = $arg\n"
 	    unless exists %argnum{$arg};
-	$argnum += %argnum{$arg};
+	$argnum += %argnum{?$arg};
 	die "Argument overflow for '$op'\n"
 	    if $argshift +>= $ARGBITS ||
 	       $argnum +> ((1 << ($ARGBITS - $argshift)) - 1);
@@ -376,10 +377,10 @@ for my $op ( @ops) {
 	$argshift += 4;
     }
     $argsum = sprintf("0x\%08x", $argsum);
-    print "\t",  tab(3, "$argsum,"), "/* $op */\n";
+    print $oc, "\t",  tab(3, "$argsum,"), "/* $op */\n";
 }
 
-print <<END;
+print $oc, <<END;
 \};
 #endif
 
@@ -391,7 +392,7 @@ END
 
 # Emit OP_IS_* macros
 
-print $on <<EO_OP_IS_COMMENT;
+print $on, <<EO_OP_IS_COMMENT;
 
 /* the OP_IS_(SOCKET|FILETEST) macros are optimized to a simple range
     check because all the member OPs are contiguous in opcode.pl
@@ -403,37 +404,36 @@ gen_op_is_macro( \%OP_IS_SOCKET, 'OP_IS_SOCKET');
 gen_op_is_macro( \%OP_IS_FILETEST, 'OP_IS_FILETEST');
 gen_op_is_macro( \%OP_IS_FT_ACCESS, 'OP_IS_FILETEST_ACCESS');
 
-sub gen_op_is_macro {
-    my ($op_is, $macname) = < @_;
+sub gen_op_is_macro($op_is, $macname) {
     if (%$op_is) {
 	
 	# get opnames whose numbers are lowest and highest
-	my ($first, < @rest) = < sort {
-	    $op_is->{$a} <+> $op_is->{$b}
-	} keys %$op_is;
+	my @($first, @< @rest) =  sort {
+	    $op_is->{?$a} <+> $op_is->{?$b}
+	}, keys %$op_is;
 	
 	my $last = pop @rest;	# @rest slurped, get its last
 	die "Invalid range of ops: $first .. $last\n" unless $last;
 
-	print $on "#define $macname(op)	\\\n\t(";
+	print $on, "#define $macname(op)	\\\n\t(";
 
 	# verify that op-ct matches 1st..last range (and fencepost)
 	# (we know there are no dups)
-	if ( $op_is->{$last} - $op_is->{$first} == scalar (nelems @rest) + 1) {
+	if ( $op_is->{?$last} - $op_is->{?$first} == scalar (nelems @rest) + 1) {
 	    
 	    # contiguous ops -> optimized version
-	    print $on "(op) >= OP_" . uc($first) . " && (op) <= OP_" . uc($last);
-	    print $on ")\n\n";
+	    print $on, "(op) >= OP_" . uc($first) . " && (op) <= OP_" . uc($last);
+	    print $on, ")\n\n";
 	}
 	else {
-	    print $on join(" || \\\n\t ", map { "(op) == OP_" . uc() } sort keys %$op_is);
-	    print $on ")\n\n";
+	    print $on, join(" || \\\n\t ", map { "(op) == OP_" . uc() }, sort keys %$op_is);
+	    print $on, ")\n\n";
 	}
     }
 }
 
-print $oc "/* ex: set ro: */\n";
-print $on "/* ex: set ro: */\n";
+print $oc, "/* ex: set ro: */\n";
+print $on, "/* ex: set ro: */\n";
 
 safer_close($oc);
 safer_close($on);
@@ -447,7 +447,7 @@ my $pp_sym_new  = 'pp.sym-new';
 my $pp = safer_open($pp_proto_new);
 my $ppsym = safer_open($pp_sym_new);
 
-print $pp <<"END";
+print $pp, <<"END";
 /* -*- buffer-read-only: t -*-
    !!!!!!!   DO NOT EDIT THIS FILE   !!!!!!!
    This file is built by opcode.pl from its data.  Any changes made here
@@ -456,7 +456,7 @@ print $pp <<"END";
 
 END
 
-print $ppsym <<"END";
+print $ppsym, <<"END";
 # -*- buffer-read-only: t -*-
 #
 # !!!!!!!   DO NOT EDIT THIS FILE   !!!!!!!
@@ -468,21 +468,21 @@ END
 
 
 for (sort keys %ckname) {
-    print $pp "PERL_CKDEF(Perl_$_)\n";
-    print $ppsym "Perl_$_\n";
+    print $pp, "PERL_CKDEF(Perl_$_)\n";
+    print $ppsym, "Perl_$_\n";
 #OP *\t", &tab(3,$_),"(OP* o);\n";
 }
 
-print $pp "\n\n";
+print $pp, "\n\n";
 
 for ( @ops) {
     next if m/^i_(pre|post)(inc|dec)$/;
     next if m/^custom$/;
-    print $pp "PERL_PPDEF(Perl_pp_$_)\n";
-    print $ppsym "Perl_pp_$_\n";
+    print $pp, "PERL_PPDEF(Perl_pp_$_)\n";
+    print $ppsym, "Perl_pp_$_\n";
 }
-print $pp "\n/* ex: set ro: */\n";
-print $ppsym "\n# ex: set ro:\n";
+print $pp, "\n/* ex: set ro: */\n";
+print $ppsym, "\n# ex: set ro:\n";
 
 safer_close($pp);
 safer_close($ppsym);
@@ -497,8 +497,7 @@ END {
 }
 
 ###########################################################################
-sub tab {
-    my ($l, $t) = < @_;
+sub tab($l, $t) {
     $t .= "\t" x ($l - (length($t) + 1) / 8);
     $t;
 }
@@ -606,7 +605,8 @@ scalar		scalar			ck_fun		s%	S
 # Pushy stuff.
 
 pushmark	pushmark		ck_null		s0	
-wantarray	wantarray		ck_null		is0	
+
+logassign_assign		assignment part of a logical assignment	ck_null		0	
 
 const		constant item		ck_svconst	s$	
 
@@ -614,7 +614,7 @@ gvsv		scalar variable		ck_null		ds$
 gv		glob value		ck_null		ds$	
 gelem		glob elem		ck_null		d2	S S
 padsv		private variable	ck_null		ds0
-padany		private value		ck_null		d0
+magicsv		magic variable	ck_null		ds0
 
 pushre		push regexp		ck_null		d/
 
@@ -628,7 +628,7 @@ prototype	subroutine prototype	ck_null		s%	S
 srefgen		single ref constructor	ck_null		fs1	S
 ref		reference-type operator	ck_fun		stu%	S?
 bless		bless			ck_fun		s@	S S?
-anonscalar	anonymous scalar ($())	ck_fun		$	S
+anonscalar	anonymous scalar ($())	ck_fun		s1	S
 
 # Pushy I/O.
 
@@ -651,17 +651,16 @@ substcont	substitution iterator	ck_null		dis|
 # Lvalue operators.
 # sassign is special-cased for op class
 
-sassign		scalar assignment	ck_sassign	s0
-aassign		list assignment		ck_null		t2	L L
+sassign		assignment	ck_sassign	s0
+dotdotdot		dotdotdot (...)	ck_dotdotdot	0
+placeholder		placeholder (_)	ck_null	0
 
-chop		chop			ck_spair	mts%	L
-schop		scalar chop		ck_null		stu%	S?
-chomp		chomp			ck_spair	mTs%	L
-schomp		scalar chomp		ck_null		sTu%	S?
+chop		chop		ck_lfun		stu%	S?
+chomp		chomp		ck_lfun		sTu%	S?
 defined		defined operator	ck_defined	isu%	S?
 undef		undef operator		ck_lfun		s%	S?
 study		study			ck_fun		su%	S?
-pos		match position		ck_lfun		stu%	S?
+pos		match position		ck_fun		stu%	S? S?
 
 preinc		preincrement (++)		ck_lfun		dIs1	S
 i_preinc	integer preincrement (++)	ck_lfun		dis1	S
@@ -725,8 +724,6 @@ i_negate	integer negation (-)	ck_null		ifsT1	S
 not		not			ck_null		ifs1	S
 complement	1's complement (^~^)	ck_bitop	fst1	S
 
-smartmatch	smart match		ck_smartmatch	s2
-
 # High falutin' math.
 
 atan2		atan2			ck_fun		fsT@	S S
@@ -749,7 +746,7 @@ abs		abs			ck_fun		fsTu%	S?
 
 length		length			ck_fun		ifsTu%	S?
 substr		substr			ck_substr	st@	S S S? S?
-vec		vec			ck_fun		ist@	S S S
+vec		vec			ck_fun		ist@	S S S S?
 
 index		index			ck_index	isT@	S S S?
 rindex		rindex			ck_index	isT@	S S S?
@@ -769,7 +766,7 @@ quotemeta	quotemeta		ck_fun		stu%	S?
 rv2av		array dereference	ck_rvconst	dt1	
 aelemfast	constant array element	ck_null		s$	A S
 aelem		array element		ck_null		s2	A S
-aslice		array slice		ck_null		m@	A L
+aslice		array slice		ck_null		@	A S
 
 # Hashes.
 
@@ -781,45 +778,54 @@ delete		delete			ck_delete	%	S
 exists		exists			ck_exists	is%	S
 rv2hv		hash dereference	ck_rvconst	dt1	
 helem		hash element		ck_null		s2	H S
-hslice		hash slice		ck_null		m@	H L
+hslice		hash slice		ck_null		@	H A
 
 # Explosives and implosives.
 
 unpack		unpack			ck_unpack	@	S S?
 pack		pack			ck_fun		mst@	S L
-split		split			ck_split	t@	S S S
+split		split			ck_split	@	S S S
 join		join or string		ck_fun		mst@	S L
 
 # List operators.
 
 list		list			ck_null		m@	L
 lslice		list slice		ck_null		2	H L L
-anonlist	anonymous list (@())	ck_fun		m@	L
-anonhash	anonymous hash (%())	ck_fun		m@	L
+enter_anonarray_assign	anonymous array assignment (@())	ck_null	0	
+enter_anonhash_assign	anonymous hash assignment (%())	ck_null	0	
+anonarray	anonymous array (@())	ck_anonarray	ms@	L
+anonhash	anonymous hash (%())	ck_fun		ms@	L
 listlast	listlast		ck_null		ms@	L
+listfirst	listfirst		ck_null		ms@	L
 
 expand		expand			ck_fun		1	S
-nelems		numer of elements	ck_fun		t1	S
+arrayexpand	array expand			ck_fun		1	S
+enter_arrayexpand_assign	array expand assignment			ck_null		0	
+hashexpand	hash expand			ck_fun		1	S
+enter_hashexpand_assign	hash expand assignment			ck_null		0	
+nelems		numer of elements	ck_fun		ts1	S
 
 splice		splice			ck_fun		m@	A S? S? L
-push		push			ck_fun		imsT@	A L
-pop		pop			ck_shift	s%	A?
-shift		shift			ck_shift	s%	A?
-unshift		unshift			ck_fun		imsT@	A L
+push		push			ck_lfun		ims@	S L
+pop		pop			ck_shift	s%	S?
+shift		shift			ck_shift	s%	S?
+unshift		unshift			ck_lfun		ims@	S L
 sort		sort			ck_sort		dm@	C? L
-reverse		reverse			ck_fun		mt@	L
+reverse		reverse			ck_fun		ts@	S
+arrayjoin	array join (@+:)	ck_fun		ts@	S
+hashjoin	hash join (%+:)		ck_fun		ts@	S
+arrayconcat	array concat (+@+)	ck_null		ts@	S S
+hashconcat	hash concat (+%+)	ck_null		ts@	S S
 
-grepstart	grep			ck_grep		dm@	C L
+grepstart	grep			ck_grep		dms@	C L
 grepwhile	grep iterator		ck_null		dt|	
 
-mapstart	map			ck_grep		dm@	C L
+mapstart	map			ck_grep		dms@	C L
 mapwhile	map iterator		ck_null		dt|
 
 # Range stuff.
 
-range		flipflop		ck_null		|	S S
-flip		range (or flip)		ck_null		1	S S
-flop		range (or flop)		ck_null		1
+range		range		ck_null		2	S S
 
 # Control.
 
@@ -834,10 +840,13 @@ dorassign	defined or assignment (//=)	ck_null		s|
 
 method		method lookup		ck_method	d1
 entersub	subroutine entry	ck_subr		dmt1	L
+entersub_targargs	subroutine entry using saved args	ck_null		d%	L
+entersub_save	subroutine entry saving value	ck_null		d1	L
 leavesub	subroutine exit		ck_null		1	
 caller		caller			ck_fun		t%	S?
 warn		warn			ck_fun		imst@	L
 die		die			ck_die		dimst@	L
+dynascope		dynamic scope			ck_null		s0	
 
 lineseq		line sequence		ck_null		@	
 nextstate	next statement		ck_null		s;	
@@ -850,37 +859,30 @@ enteriter	foreach loop entry	ck_null		d{
 iter		foreach loop iterator	ck_null		0	
 enterloop	loop entry		ck_null		d{	
 leaveloop	loop exit		ck_null		2	
-return		return			ck_return	dm@	S?
+return		return			ck_null		d%	S?
 last		last			ck_null		ds}	
 next		next			ck_null		ds}	
 redo		redo			ck_null		ds}	
-dump		dump			ck_null		ds}	
-goto		goto			ck_null		ds}	
 exit		exit			ck_exit		ds%	S?
 method_named	method with known name	ck_null		d$
 
 # I/O.
 
 open		open			ck_open		ismt@	F S? L
-close		close			ck_fun		is%	F?
+close		close			ck_fun		is%	F
 pipe_op		pipe			ck_fun		is@	F F
 
 fileno		fileno			ck_fun		ist%	F
 umask		umask			ck_fun		ist%	S?
 binmode		binmode			ck_fun		s@	F S?
 
-tie		tie			ck_fun		idms@	R S L
-untie		untie			ck_fun		is%	R
-tied		tied			ck_fun		s%	R
+select		select system call	ck_fun	t@	S S S S
 
-sselect		select system call	ck_select	t@	S S S S
-select		select			ck_select	st@	F?
-
-getc		getc			ck_eof		st%	F?
+getc		getc			ck_eof		st%	F
 read		read			ck_fun		imst@	F R S S?
 
-prtf		printf			ck_listiob	ims@	F? L
-print		print			ck_listiob	ims@	F? L
+prtf		printf			ck_fun	ims@	F L
+print		print			ck_fun	ims@	F L
 
 sysopen		sysopen			ck_fun		s@	F S S S?
 sysseek		sysseek			ck_fun		s@	F S S
@@ -1078,3 +1080,4 @@ lock		lock			ck_rfun		s%	R
 compsub		compsub			ck_compsub		s%	S
 
 custom		unknown custom operator		ck_null		0
+root		refcounted root op		ck_null		!	

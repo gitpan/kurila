@@ -12,9 +12,9 @@ sub mk {
     $r=~m/^(.*)\/[^\/]*?$/;
     mk($1);
   }
-  print STDERR "..\\miniperl.exe -MCross comp.pl --do cemkdir [p]\\lib\\$r\n";
+  print $^STDERR, "..\\miniperl.exe -MCross comp.pl --do cemkdir [p]\\lib\\$r\n";
   system("..\\miniperl.exe -I..\\lib -MCross comp.pl --do cemkdir [p]\\lib\\$r");
-  %dirs{$r}++;
+  %dirs{+$r}++;
 }
 for ( @files) {
   if (m/\//) {

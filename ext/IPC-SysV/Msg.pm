@@ -7,14 +7,14 @@
 package IPC::Msg;
 
 use IPC::SysV < qw(IPC_STAT IPC_SET IPC_RMID);
-use strict;
-use vars < qw($VERSION);
+
+our ($VERSION);
 use Carp;
 
 $VERSION = "1.02";
 $VERSION = eval $VERSION;
 
-{
+do {
     package IPC::Msg::stat;
 
     use Class::Struct < qw(struct);
@@ -33,7 +33,7 @@ $VERSION = eval $VERSION;
 	rtime	=> '$',
 	ctime	=> '$',
     );
-}
+};
 
 sub new {
     (nelems @_) == 3 || croak 'new IPC::Msg ( KEY , FLAGS )';
@@ -42,8 +42,8 @@ sub new {
     my $id = msgget(@_[0],@_[1]);
 
     defined($id)
-	? bless \$id, $class
-	: undef;
+	?? bless \$id, $class
+	!! undef;
 }
 
 sub id {
@@ -73,7 +73,7 @@ sub set {
 		or return undef;
 	my($key,$val);
 	$ds->?$key($val)
-	    while(($key,$val) = each %arg);
+	    while(@($key,$val) =@( each %arg));
     }
 
     msgctl($$self,IPC_SET,$ds->pack);
@@ -91,7 +91,7 @@ sub rcv {
     msgrcv($$self,$buf,@_[1],@_[2] || 0, @_[3] || 0) or
 	return;
     my $type;
-    ($type,@_[0]) = unpack("l! a*",$buf);
+    @($type,@_[0]) = @: unpack("l! a*",$buf);
     $type;
 }
 

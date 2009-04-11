@@ -1,12 +1,14 @@
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't';
-        @INC = @('../lib', 'lib');
+        $^INCLUDE_PATH = @('../lib', 'lib');
     }
     else {
-        unshift @INC, 't/lib';
+        unshift $^INCLUDE_PATH, 't/lib';
     }
 }
+
+use env;
 
 # Can't use Test.pm, that's a 5.005 thing.
 package My::Test;
@@ -25,8 +27,8 @@ package main;
 require Test::Simple;
 
 require Test::Simple::Catch;
-my($out, $err) = < Test::Simple::Catch::caught();
-local %ENV{HARNESS_ACTIVE} = 0;
+my@($out, $err) =  Test::Simple::Catch::caught();
+local env::var('HARNESS_ACTIVE' ) = 0;
 
 Test::Simple->import(tests => 5);
 
@@ -43,7 +45,7 @@ OUT
 
     My::Test::is($$err, <<ERR);
 #   Failed test 'Bar'
-#   at $0 line 31.
+#   at $^PROGRAM_NAME line 31.
 # Looks like you planned 5 tests but only ran 2.
 # Looks like you failed 1 test of 2 run.
 ERR

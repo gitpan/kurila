@@ -1,10 +1,10 @@
 #!/usr/bin/perl -w
 
-use strict;
+
 use File::Spec;
 use lib File::Spec->catfile('t', 'lib');
 use Test::More;
-local $|=1;
+local $^OUTPUT_AUTOFLUSH =1;
 
 my @platforms = qw(Cygwin Epoc Mac OS2 Unix VMS Win32);
 my $tests_per_platform = 10;
@@ -30,23 +30,22 @@ foreach my $platform ( @platforms) {
   my $module = "File::Spec::$platform";
   
  SKIP:
-  {
+  do {
     eval "require $module; 1";
 
     skip "Can't load $module", $tests_per_platform
-      if $@;
+      if $^EVAL_ERROR;
     
-    my $v = %volumes{$platform} || '';
-    my $other_v = %other_vols{$platform} || '';
+    my $v = %volumes{?$platform} || '';
+    my $other_v = %other_vols{?$platform} || '';
     
     # Fake out the environment on MacOS and Win32
-    no strict 'refs';
-    my $save_w = $^W;
-    $^W = 0;
+    my $save_w = $^WARNING;
+    $^WARNING = 0;
     local *{Symbol::fetch_glob("File::Spec::Mac::rootdir")} = sub { "Macintosh HD:" };
     local *{Symbol::fetch_glob("File::Spec::Win32::_cwd")}  = sub { "C:\\foo" };
-    $^W = $save_w;
-    use strict 'refs';
+    $^WARNING = $save_w;
+    
 
 
     my ($file, $base, $result);
@@ -76,35 +75,34 @@ foreach my $platform ( @platforms) {
     
     # abs2rel('A:/foo/bar', 'B:/foo')    ->  'A:/foo/bar'
     $base = $module->catpath($other_v, $module->catdir($module->rootdir, 'foo'), '');
-    $result = volumes_differ($module, $file, $base) ? $file : $module->catfile('bar', 'file');
+    $result = volumes_differ($module, $file, $base) ?? $file !! $module->catfile('bar', 'file');
     is $module->abs2rel($file, $base), $result, "$platform->abs2rel($file, $base)";
 
     # abs2rel('A:/foo/bar', '/foo')      ->  'A:/foo/bar'
     $base = $module->catpath('', $module->catdir($module->rootdir, 'foo'), '');
-    $result = volumes_differ($module, $file, $base) ? $file : $module->catfile('bar', 'file');
+    $result = volumes_differ($module, $file, $base) ?? $file !! $module->catfile('bar', 'file');
     is $module->abs2rel($file, $base), $result, "$platform->abs2rel($file, $base)";
 
     # abs2rel('/foo/bar/file', 'A:/foo')    ->  '/foo/bar'
     $file = $module->catpath('', $module->catdir($module->rootdir, 'foo', 'bar'), 'file');
     $base = $module->catpath($v, $module->catdir($module->rootdir, 'foo'), '');
-    $result = volumes_differ($module, $file, $base) ? $module->rel2abs($file) : $module->catfile('bar', 'file');
+    $result = volumes_differ($module, $file, $base) ?? $module->rel2abs($file) !! $module->catfile('bar', 'file');
     is $module->abs2rel($file, $base), $result, "$platform->abs2rel($file, $base)";
     
     # abs2rel('/foo/bar', 'B:/foo')    ->  '/foo/bar'
     $base = $module->catpath($other_v, $module->catdir($module->rootdir, 'foo'), '');
-    $result = volumes_differ($module, $file, $base) ? $module->rel2abs($file) : $module->catfile('bar', 'file');
+    $result = volumes_differ($module, $file, $base) ?? $module->rel2abs($file) !! $module->catfile('bar', 'file');
     is $module->abs2rel($file, $base), $result, "$platform->abs2rel($file, $base)";
     
     # abs2rel('/foo/bar', '/foo')      ->  'bar'
     $base = $module->catpath('', $module->catdir($module->rootdir, 'foo'), '');
     $result = $module->catfile('bar', 'file');
     is $module->abs2rel($file, $base), $result, "$platform->abs2rel($file, $base)";
-  }
+  };
 }
 
-sub volumes_differ {
-  my ($module, $one, $two) = < @_;
-  my ($one_v) = < $module->splitpath( $module->rel2abs($one) );
-  my ($two_v) = < $module->splitpath( $module->rel2abs($two) );
+sub volumes_differ($module, $one, $two) {
+  my @($one_v, ...) =  $module->splitpath( $module->rel2abs($one) );
+  my @($two_v, ...) =  $module->splitpath( $module->rel2abs($two) );
   return $one_v ne $two_v;
 }

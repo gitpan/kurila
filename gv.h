@@ -25,24 +25,24 @@ struct gp {
 #if defined (DEBUGGING) && defined(__GNUC__) && !defined(PERL_GCC_BRACE_GROUPS_FORBIDDEN) && !defined(__INTEL_COMPILER)
 #  define GvGP(gv)							\
 	(*({GV *const shplep = (GV *) (gv);				\
-	    assert(SvTYPE(shplep) == SVt_PVGV || SvTYPE(shplep) == SVt_PVLV); \
+	    assert(SvTYPE(shplep) == SVt_PVGV); \
 	    assert(isGV_with_GP(shplep));				\
 	    &((shplep)->sv_u.svu_gp);}))
 #  define GvFLAGS(gv)							\
 	(*({GV *const yaah  = (GV *) (gv);				\
-	    assert(SvTYPE(yaah) == SVt_PVGV || SvTYPE(yaah) == SVt_PVLV); \
+	    assert(SvTYPE(yaah) == SVt_PVGV); \
 	    assert(isGV_with_GP(yaah));					\
 	    &(GvXPVGV(yaah)->xpv_cur);}))
 #  define GvSTASH(gv)							\
 	(*({ GV * const _gv = (GV *) (gv);				\
 	    assert(isGV_with_GP(_gv));					\
-	    assert(SvTYPE(_gv) == SVt_PVGV || SvTYPE(_gv) >= SVt_PVLV);	\
+	    assert(SvTYPE(_gv) >= SVt_PVGV);	\
 	    &(GvXPVGV(_gv)->xnv_u.xgv_stash);				\
 	 }))
 #  define GvNAME_HEK(gv)						\
 	(*({ GV * const zzzz = (GV *) (gv);				\
 	   assert(isGV_with_GP(zzzz));					\
-	   assert(SvTYPE(zzzz) == SVt_PVGV || SvTYPE(zzzz) >= SVt_PVLV); \
+	   assert(SvTYPE(zzzz) >= SVt_PVGV); \
 	   assert(!SvVALID(zzzz));					\
 	   &(GvXPVGV(zzzz)->xiv_u.xivu_namehek);			\
 	 }))
@@ -90,9 +90,6 @@ Return the SV from the GV.
 #define GvIOn(gv)	(GvIO(gv) ? GvIOp(gv) : GvIOp(gv_IOadd(gv)))
 
 #define GvAV(gv)	(GvGP(gv)->gp_av)
-
-/* This macro is deprecated.  Do not use! */
-#define GvREFCNT_inc(gv) ((GV*)SvREFCNT_inc(gv))	/* DO NOT USE */
 
 #define INLINE1(ret, name, arg1) static __inline__ ret ii##name(pTHX_ arg1)
 INLINE1(AV*, GvAVn, GV *gv) {
@@ -169,11 +166,7 @@ INLINE1(AV*, GvAVn, GV *gv) {
 #define GvUNIQUE_on(gv)         NOOP
 #define GvUNIQUE_off(gv)        NOOP
 
-#ifdef USE_ITHREADS
-#define GV_UNIQUE_CHECK
-#else
 #undef  GV_UNIQUE_CHECK
-#endif
 
 #ifndef PERL_CORE
 #  define Nullgv Null(GV*)

@@ -6,14 +6,14 @@
 
 BEGIN { require "./test.pl"; }
 
-plan(tests => 64);
+plan(tests => 60);
 
 use Config;
 
 # due to a bug in VMS's piping which makes it impossible for runperl()
 # to emulate echo -n (ie. stdin always winds up with a newline), these 
 # tests almost totally fail.
-our $TODO = "runperl() unable to emulate echo -n due to pipe bug" if $^O eq 'VMS';
+our $TODO = "runperl() unable to emulate echo -n due to pipe bug" if $^OS_NAME eq 'VMS';
 
 my $r;
 my @tmpfiles = @( () );
@@ -22,7 +22,7 @@ END { unlink < @tmpfiles }
 $r = runperl(
     switches	=> \@(),
     stdin	=> 'foo\nbar\nbaz\n',
-    prog	=> 'print qq(<$_>) while ~< *ARGV',
+    prog	=> 'print $^STDOUT, qq(<$_>) while ~< *ARGV',
 );
 is( $r, "<foo\n><bar\n><baz\n>", "no switches" );
 
@@ -31,7 +31,7 @@ is( $r, "<foo\n><bar\n><baz\n>", "no switches" );
 $r = runperl(
     switches	=> \@( '-0', ),
     stdin	=> 'foo\0bar\0baz\0',
-    prog	=> 'print qq(<$_>) while ~< *ARGV',
+    prog	=> 'print $^STDOUT, qq(<$_>) while ~< *ARGV',
 );
 is( $r, "<foo\0><bar\0><baz\0>", "-0" );
 
@@ -52,7 +52,7 @@ is( $r, "foo\0bar\0baz\0", "-0 before a -l" );
 $r = runperl(
     switches	=> \@( sprintf('-0%o', ord 'x') ),
     stdin	=> 'fooxbarxbazx',
-    prog	=> 'print qq(<$_>) while ~< *ARGV',
+    prog	=> 'print $^STDOUT, qq(<$_>) while ~< *ARGV',
 );
 is( $r, "<foox><barx><bazx>", "-0 with octal number" );
 
@@ -72,25 +72,25 @@ is( $r, 'abc-def--ghi-jkl-mno--pq-/', '-0777 (slurp mode)' );
 
 $r = runperl(
     switches	=> \@( '-066' ),
-    prog	=> 'BEGIN { print qq{($/)} } print qq{[$/]}',
+    prog	=> 'BEGIN { print $^STDOUT, qq{($^INPUT_RECORD_SEPARATOR)} } print $^STDOUT, qq{[$^INPUT_RECORD_SEPARATOR]}',
 );
 is( $r, "(\066)[\066]", '$/ set at compile-time' );
 
 # Tests for -c
 
 my $filename = 'swctest.tmp';
-SKIP: {
+SKIP: do {
     local $TODO = '';   # this one works on VMS
 
-    open my $f, ">", "$filename" or skip( "Can't write temp file $filename: $!" );
-    print $f <<'SWTEST';
-BEGIN { print "block 1\n"; }
-CHECK { print "block 2\n"; }
-INIT  { print "block 3\n"; }
-	print "block 4\n";
-END   { print "block 5\n"; }
+    open my $f, ">", "$filename" or skip( "Can't write temp file $filename: $^OS_ERROR" );
+    print $f, <<'SWTEST';
+BEGIN { print $^STDOUT, "block 1\n"; }
+CHECK { print $^STDOUT, "block 2\n"; }
+INIT  { print $^STDOUT, "block 3\n"; }
+	print $^STDOUT, "block 4\n";
+END   { print $^STDOUT, "block 5\n"; }
 SWTEST
-    close $f or die "Could not close: $!";
+    close $f or die "Could not close: $^OS_ERROR";
     $r = runperl(
 	switches	=> \@( '-c' ),
 	progfile	=> $filename,
@@ -108,27 +108,27 @@ SWTEST
 	'-c'
     );
     push @tmpfiles, $filename;
-}
+};
 
 # Tests for -l
 
 $r = runperl(
     switches	=> \@( sprintf('-l%o', ord 'x') ),
-    prog	=> 'print for qw/foo bar/'
+    prog	=> 'print $^STDOUT, $_ for qw/foo bar/'
 );
 is( $r, 'fooxbarx', '-l with octal number' );
 
 # Tests for -m and -M
 
 $filename = 'swtest.pm';
-SKIP: {
-    open my $f, ">", "$filename" or skip( "Can't write temp file $filename: $!",4 );
-    print $f <<'SWTESTPM';
+SKIP: do {
+    open my $f, ">", "$filename" or skip( "Can't write temp file $filename: $^OS_ERROR",4 );
+    print $f, <<'SWTESTPM';
 package swtest;
-sub import { print < map "<$_>", @_ }
+sub import { print $^STDOUT, < map { "<$_>" }, @_ }
 1;
 SWTESTPM
-    close $f or die "Could not close: $!";
+    close $f or die "Could not close: $^OS_ERROR";
     $r = runperl(
 	switches    => \@( '-Mswtest' ),
 	prog	    => '1',
@@ -144,10 +144,10 @@ SWTESTPM
 	prog	    => '1',
     );
 
-    {
+    do {
         local $TODO = '';  # this one works on VMS
         is( $r, '', '-m' );
-    }
+    };
     $r = runperl(
 	switches    => \@( '-mswtest=foo,bar' ),
 	prog	    => '1',
@@ -182,11 +182,11 @@ SWTESTPM
 		   prog => 'die "oops"' ),
 	  qr/Module name required with -M option\b/,
   	  "-M- not allowed" );
-}
+};
 
 # Tests for -V
 
-{
+do {
     local $TODO = '';   # these ones should work on VMS
 
     # basic perl -V should generate significant output.
@@ -200,12 +200,7 @@ SWTESTPM
 
     # lookup a known config var
     chomp( $r=runperl( switches => \@('-V:osname') ) );
-    is( $r, "osname='$^O';", 'perl -V:osname');
-
-    # lookup a nonexistent var
-    chomp( $r=runperl( switches => \@('-V:this_var_makes_switches_test_fail') ) );
-    is( $r, "this_var_makes_switches_test_fail='UNKNOWN';",
-        'perl -V:unknown var');
+    is( $r, "osname='$^OS_NAME';", 'perl -V:osname');
 
     # regexp lookup
     # platforms that don't like this quoting can either skip this test
@@ -215,31 +210,36 @@ SWTESTPM
     like( $r, qr/^(?!.*(not found|UNKNOWN))./, 'perl -V:re got a result' );
 
     # make sure each line we got matches the re
-    ok( !( grep !m/^i\D+size=/, split m/^/, $r ), '-V:re correct' );
-}
+    ok( !( grep { !m/^i\D+size=/ }, split qr/^/, $r ), '-V:re correct' );
+};
 
 # Tests for -v
 
-{
+do {
     local $TODO = '';   # these ones should work on VMS
 
-    my (undef, $v) = < split m/-/, $^V;
+    my @(_, $v) =  split m/-/, $^PERL_VERSION;
+    my $archname = config_value('archname');
     like( runperl( switches => \@('-v') ),
-	  qr/This is kurila, v$v (?:DEVEL\w+ )?built for \Q%Config{archname}\E.+Copyright.+Gerard Goossen.+Artistic License.+GNU General Public License/s,
+	  qr/This[ ]is[ ]kurila,[  ]v$v [ ] (?:DEVEL\w+[ ])? built[ ]for[ ]
+             \Q$archname\E .+
+             Copyright .+
+             Gerard[ ]Goossen.+Artistic[ ]License .+
+             GNU[ ]General[ ]Public[ ]License/xs,
           '-v looks okay' );
 
-}
+};
 
 # Tests for -h
 
-{
+do {
     local $TODO = '';   # these ones should work on VMS
 
     like( runperl( switches => \@('-h') ),
-	  qr/Usage: .+(?i:perl(?:%Config{_exe})?).+switches.+programfile.+arguments/,
+	  qr/Usage: .+(?i:perl(?:$(config_value('_exe')))?).+switches.+programfile.+arguments/,
           '-h looks okay' );
 
-}
+};
 
 # Tests for switches which do not exist
 
@@ -253,46 +253,3 @@ foreach my $switch (split m//, "ABbGgHJjKkLNOoPQqRrYyZz123456789_")
           "-$switch correctly unknown" );
 
 }
-
-# Tests for -i
-
-{
-    local $TODO = '';   # these ones should work on VMS
-
-    sub do_i_unlink { 1 while unlink("file", "file.bak") }
-
-    open(FILE, ">", "file") or die "$0: Failed to create 'file': $!";
-    print FILE <<__EOF__;
-foo yada dada
-bada foo bing
-king kong foo
-__EOF__
-    close FILE;
-
-    END { do_i_unlink() }
-
-    runperl( switches => \@('-pi.bak'), prog => 's/foo/bar/', args => \@('file') );
-
-    open(FILE, "<", "file") or die "$0: Failed to open 'file': $!";
-    chomp(my @file = @( ~< *FILE ));
-    close FILE;
-
-    open(BAK, "<", "file.bak") or die "$0: Failed to open 'file': $!";
-    chomp(my @bak = @( ~< *BAK ));
-    close BAK;
-
-    is(join(":", @file),
-       "bar yada dada:bada bar bing:king kong bar",
-       "-i new file");
-    is(join(":", @bak),
-       "foo yada dada:bada foo bing:king kong foo",
-       "-i backup file");
-}
-
-# Tests for -E
-
-$r = runperl(
-    switches	=> \@( '-E', '"undef ~~ undef and print qq(Hello, world!\n)"')
-);
-is( $r, "Hello, world!\n", "-E ~~" );
-

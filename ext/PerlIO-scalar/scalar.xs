@@ -31,9 +31,8 @@ PerlIOScalar_pushed(pTHX_ PerlIO * f, const char *mode, SV * arg,
 		return -1;
 	    }
 	    s->var = SvREFCNT_inc(SvRV(arg));
-	    SvGETMAGIC(s->var);
 	    if (!SvPOK(s->var) && SvOK(s->var))
-		(void)SvPV_nomg_const_nolen(s->var);
+		(void)SvPV_nolen_const(s->var);
 	}
 	else {
 	    s->var =
@@ -106,10 +105,10 @@ PerlIOScalar_seek(pTHX_ PerlIO * f, Off_t offset, int whence)
     newlen = (STRLEN) s->posn;
     if (newlen > oldcur) {
 	(void) SvGROW(s->var, newlen);
-	Zero(SvPVX(s->var) + oldcur, newlen - oldcur, char);
+	Zero(SvPVX_mutable(s->var) + oldcur, newlen - oldcur, char);
 	/* No SvCUR_set(), though.  This is just a seek, not a write. */
     }
-    else if (!SvPVX(s->var)) {
+    else if (!SvPVX_const(s->var)) {
 	/* ensure there's always a character buffer */
 	(void)SvGROW(s->var,1);
     }
@@ -231,7 +230,7 @@ PerlIOScalar_set_ptrcnt(pTHX_ PerlIO * f, STDCHAR * ptr, SSize_t cnt)
 PerlIO *
 PerlIOScalar_open(pTHX_ PerlIO_funcs * self, PerlIO_list_t * layers, IV n,
 		  const char *mode, int fd, int imode, int perm,
-		  PerlIO * f, int narg, SV ** args)
+		  PerlIO * f, int narg, SV *const* args)
 {
     SV *arg = (narg > 0) ? *args : PerlIOArg;
     if (SvROK(arg) || SvPOK(arg)) {

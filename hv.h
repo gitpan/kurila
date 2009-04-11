@@ -274,6 +274,10 @@ C<SV*>.
 #define HvREHASH_on(hv)		(SvFLAGS(hv) |= SVphv_REHASH)
 #define HvREHASH_off(hv)	(SvFLAGS(hv) &= ~SVphv_REHASH)
 
+#define HvRESTRICTED(hv)		(SvFLAGS(hv) & SVphv_RESTRICTED)
+#define HvRESTRICTED_on(hv)	(SvFLAGS(hv) |= SVphv_RESTRICTED)
+#define HvRESTRICTED_off(hv)	(SvFLAGS(hv) &= ~SVphv_RESTRICTED)
+
 #ifndef PERL_CORE
 #  define Nullhe Null(HE*)
 #endif
@@ -352,10 +356,6 @@ C<SV*>.
 	->shared_he_he.he_valu.hent_refcount),				\
      hek)
 
-#define hv_store_ent(zlonk, awk, touche, zgruppp)			\
-    ((HE *) hv_common((zlonk), (awk), NULL, 0, 0, HV_FETCH_ISSTORE,	\
-		      (touche), (zgruppp)))
-
 #define hv_exists_ent(zlonk, awk, zgruppp)				\
     (hv_common((zlonk), (awk), NULL, 0, 0, HV_FETCH_ISEXISTS, 0, (zgruppp))\
      ? TRUE : FALSE)
@@ -365,16 +365,6 @@ C<SV*>.
 #define hv_delete_ent(zlonk, awk, touche, zgruppp)			\
     ((SV *) hv_common((zlonk), (awk), NULL, 0, 0, (touche) | HV_DELETE,	\
 		      NULL, (zgruppp)))
-
-#define hv_store_flags(urkk, zamm, clunk, thwape, sploosh, eee_yow)	\
-    ((SV**) hv_common((urkk), NULL, (zamm), (clunk), (eee_yow),		\
-		      (HV_FETCH_ISSTORE|HV_FETCH_JUST_SV), (thwape),	\
-		      (sploosh)))
-
-#define hv_store(urkk, zamm, clunk, thwape, sploosh)			\
-    ((SV**) hv_common_key_len((urkk), (zamm), (clunk),			\
-			      (HV_FETCH_ISSTORE|HV_FETCH_JUST_SV),	\
-			      (thwape), (sploosh)))
 
 #define hv_exists(urkk, zamm, clunk)					\
     (hv_common_key_len((urkk), (zamm), (clunk), HV_FETCH_ISEXISTS, NULL, 0) \
@@ -389,21 +379,11 @@ C<SV*>.
     ((SV*) hv_common_key_len((urkk), (zamm), (clunk),			\
 			     (pam) | HV_DELETE, NULL, 0))
 
-#  ifdef USE_ITHREADS
-#    define HINTS_REFCNT_LOCK          MUTEX_LOCK(&PL_hints_mutex)
-#    define HINTS_REFCNT_UNLOCK                MUTEX_UNLOCK(&PL_hints_mutex)
-#  else
 #    define HINTS_REFCNT_LOCK          NOOP
 #    define HINTS_REFCNT_UNLOCK                NOOP
-#  endif
 
-#ifdef USE_ITHREADS
-#  define HINTS_REFCNT_INIT		MUTEX_INIT(&PL_hints_mutex)
-#  define HINTS_REFCNT_TERM		MUTEX_DESTROY(&PL_hints_mutex)
-#else
 #  define HINTS_REFCNT_INIT		NOOP
 #  define HINTS_REFCNT_TERM		NOOP
-#endif
 
 /* Hash actions
  * Passed in PERL_MAGIC_uvar calls

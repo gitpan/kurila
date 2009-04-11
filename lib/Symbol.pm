@@ -31,7 +31,6 @@ Symbol - manipulate Perl symbols and their names
     print qualify(\*x), "\n";              # returns \*x
     print qualify(\*x, "FOO"), "\n";       # returns \*x
 
-    use strict refs;
     print { qualify_to_ref $fh } "foo!\n";
     $ref = qualify_to_ref $name, $pkg;
 
@@ -92,7 +91,6 @@ you reload the C<Foo> module afterwards.
 
 =cut
 
-use strict;
 
 require Exporter;
 our @ISA = qw(Exporter);
@@ -104,7 +102,7 @@ our $VERSION = '1.06';
 my $genpkg = "Symbol";
 my $genseq = 0;
 
-my %global = %( < map {$_ => 1} qw(ARGV ARGVOUT ENV INC SIG STDERR STDIN STDOUT) );
+my %global = %+: map { %: $_ => 1 }, qw(ARGV ARGVOUT ENV INC SIG STDERR STDIN STDOUT) ;
 
 #
 # Note that we never _copy_ the glob; we just make a ref to it.
@@ -113,7 +111,6 @@ my %global = %( < map {$_ => 1} qw(ARGV ARGVOUT ENV INC SIG STDERR STDIN STDOUT)
 #
 sub gensym () {
     my $name = "GEN" . $genseq++;
-    no strict 'refs';
     my $ref = \*{Symbol::qualify_to_ref($genpkg . "::" . $name)};
     $ref = \*{Symbol::qualify_to_ref($genpkg . "::" . $name)};  # second time to supress only-used once warning.
     delete %{Symbol::stash($genpkg)}{$name};
@@ -123,38 +120,35 @@ sub gensym () {
 sub geniosym () {
     my $sym = gensym();
     # force the IO slot to be filled
-    select(select $sym);
+    open $sym;
     *$sym{IO};
 }
 
-sub ungensym ($) {}
+sub ungensym(_) {}
 
-sub qualify ($;$) {
-    my ($name) = < @_;
+sub qualify($name, ? $pkg) {
     ref \$name eq "GLOB" and Carp::confess("glob..." . ref $name);
     if (!ref($name) && index($name, '::') == -1 && index($name, "'") == -1) {
-	my $pkg;
 	# Global names: special character, "^xyz", or other. 
-	if ($name =~ m/^(([^a-z])|(\^[a-z_]+))\z/i || %global{$name}) {
+	if ($name =~ m/^(([^a-z])|(\^[a-z_]+))\z/i || %global{?$name}) {
 	    $pkg = "";
 	}
 	else {
-	    $pkg = ((nelems @_) +> 1) ? @_[1] : caller;
+	    $pkg //= caller;
 	}
 	$name = $pkg . "::" . $name;
     }
     $name;
 }
 
-sub qualify_to_ref ($) {
-    return \*{ Symbol::fetch_glob( qualify @_[0], (nelems @_) +> 1 ? @_[1] : caller ) };
+sub qualify_to_ref($name, ?$package) {
+    return \*{ Symbol::fetch_glob( qualify $name, (defined $package) ?? $package !! scalar(caller) ) };
 }
 
 #
 # of Safe.pm lineage
 #
-sub delete_package ($) {
-    my $pkg = shift;
+sub delete_package($pkg) {
 
     # expand to full symbol table name if needed
 
@@ -163,14 +157,14 @@ sub delete_package ($) {
         $pkg .= '::'		unless	$pkg =~ m/::$/;
     }
 
-    my($stem, $leaf) = $pkg =~ m/(.*)::(\w+::)$/;
+    my@($stem, $leaf) = $pkg =~ m/(.*)::(\w+::)$/;
     my $stem_symtab = Symbol::stash($stem);
     return unless defined $stem_symtab and exists $stem_symtab->{$leaf};
 
 
     # free all the symbols in the package
 
-    my $leaf_symtab = *{$stem_symtab->{$leaf}}{HASH};
+    my $leaf_symtab = *{$stem_symtab->{?$leaf}}{HASH};
     foreach my $name (keys %$leaf_symtab) {
         undef *{Symbol::qualify_to_ref($pkg . $name)};
     }

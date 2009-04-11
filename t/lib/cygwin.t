@@ -1,8 +1,8 @@
 #!perl
 
 BEGIN {
-    unless ($^O eq "cygwin") {
-	print "1..0 # skipped: cygwin specific test\n";
+    unless ($^OS_NAME eq "cygwin") {
+	print $^STDOUT, "1..0 # skipped: cygwin specific test\n";
 	exit 0;
     }
 }

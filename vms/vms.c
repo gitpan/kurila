@@ -1321,10 +1321,6 @@ prime_env_iter(void)
 #if defined(PERL_IMPLICIT_CONTEXT)
   pTHX;
 #endif
-#if defined(USE_ITHREADS)
-  static perl_mutex primenv_mutex;
-  MUTEX_INIT(&primenv_mutex);
-#endif
 
 #if defined(PERL_IMPLICIT_CONTEXT)
     /* We jump through these hoops because we can be called at */
@@ -1338,10 +1334,10 @@ prime_env_iter(void)
     }
 #endif
 
-  if (primed || !PL_envgv) return;
+  if (primed || !PL_envhv) return;
   MUTEX_LOCK(&primenv_mutex);
   if (primed) { MUTEX_UNLOCK(&primenv_mutex); return; }
-  envhv = GvHVn(PL_envgv);
+  envhv = PL_envhv;
   /* Perform a dummy fetch as an lval to insure that the hash table is
    * set up.  Otherwise, the hv_store() will turn into a nullop. */
   (void) hv_fetch(envhv,"DEFAULT",7,TRUE);
@@ -1370,7 +1366,6 @@ prime_env_iter(void)
         else {
           start++;
           sv = newSVpv(start,0);
-          SvTAINTED_on(sv);
           (void) hv_store(envhv,environ[j],start - environ[j] - 1,sv,0);
         }
       }
@@ -1476,7 +1471,6 @@ prime_env_iter(void)
         sv = newSVpvn(cp2,cp1 - cp2 + 1);
       }
 
-      SvTAINTED_on(sv);
       hv_store(envhv,key,keylen,sv,hash);
       hv_store(seenhv,key,keylen,&PL_sv_yes,hash);
     }
@@ -1488,7 +1482,6 @@ prime_env_iter(void)
       for (i = 0; ppfs[i]; i++) {
         trnlen = vmstrnenv(ppfs[i],eqv,0,fildev,0);
         sv = newSVpv(eqv,trnlen);
-        SvTAINTED_on(sv);
         hv_store(envhv,ppfs[i],strlen(ppfs[i]),sv,0);
       }
     }
@@ -2881,9 +2874,6 @@ pipe_exit_routine(pTHX)
     while (info) {
         if (info->fp) {
            if (!info->useFILE
-#if defined(USE_ITHREADS)
-             && my_perl
-#endif
              && PL_perlio_fd_refcnt) 
                PerlIO_flush(info->fp);
            else 
@@ -3614,7 +3604,7 @@ store_pipelocs(pTHX)
 #ifdef PERL_IMPLICIT_CONTEXT
     if (aTHX)
 #endif
-    if (PL_incgv) av = GvAVn(PL_incgv);
+    av = PL_includepathav;
 
     for (i = 0; av && i <= AvFILL(av); i++) {
         dirsv = *av_fetch(av,i,TRUE);
@@ -4431,8 +4421,6 @@ PerlIO *
 Perl_my_popen(pTHX_ const char *cmd, const char *mode)
 {
     int sts;
-    TAINT_ENV();
-    TAINT_PROPER("popen");
     PERL_FLUSHALL_FOR_CHILD;
     return safe_popen(aTHX_ cmd,mode,&sts);
 }
@@ -4465,9 +4453,6 @@ I32 Perl_my_pclose(pTHX_ PerlIO *fp)
      */
      if (info->fp) {
         if (!info->useFILE
-#if defined(USE_ITHREADS)
-          && my_perl
-#endif
           && PL_perlio_fd_refcnt) 
             PerlIO_flush(info->fp);
         else 
@@ -4492,9 +4477,6 @@ I32 Perl_my_pclose(pTHX_ PerlIO *fp)
     _ckvmssts(sys$setast(1));
     if (info->fp) {
      if (!info->useFILE
-#if defined(USE_ITHREADS)
-         && my_perl
-#endif
          && PL_perlio_fd_refcnt) 
         PerlIO_close(info->fp);
      else 
@@ -9118,12 +9100,6 @@ vms_image_init(int *argcp, char ***argvp)
   if (tabidx) { tabvec[tabidx] = NULL; env_tables = tabvec; }
 
   getredirection(argcp,argvp);
-#if defined(USE_ITHREADS) && ( defined(__DECC) || defined(__DECCXX) )
-  {
-# include <reentrancy.h>
-  decc$set_reentrancy(C$C_MULTITHREAD);
-  }
-#endif
   return;
 }
 /*}}}*/
@@ -9449,12 +9425,7 @@ Perl_opendir(pTHX_ const char *name)
     dd->pat.dsc$w_length = strlen(dd->pattern);
     dd->pat.dsc$b_dtype = DSC$K_DTYPE_T;
     dd->pat.dsc$b_class = DSC$K_CLASS_S;
-#if defined(USE_ITHREADS)
-    Newx(dd->mutex,1,perl_mutex);
-    MUTEX_INIT( (perl_mutex *) dd->mutex );
-#else
     dd->mutex = NULL;
-#endif
 
     return dd;
 }  /* end of opendir() */
@@ -9485,10 +9456,6 @@ Perl_closedir(DIR *dd)
 
     sts = lib$find_file_end(&dd->context);
     Safefree(dd->pattern);
-#if defined(USE_ITHREADS)
-    MUTEX_DESTROY( (perl_mutex *) dd->mutex );
-    Safefree(dd->mutex);
-#endif
     Safefree(dd);
 }
 /*}}}*/
@@ -10179,8 +10146,6 @@ Perl_vms_do_exec(pTHX_ const char *cmd)
   {                               /* no vfork - act VMSish */
     unsigned long int retsts;
 
-    TAINT_ENV();
-    TAINT_PROPER("exec");
     if ((retsts = setup_cmddsc(aTHX_ cmd,1,0,&vmscmd)) & 1)
       retsts = lib$do_command(vmscmd);
 
@@ -10280,8 +10245,6 @@ do_spawn2(pTHX_ const char *cmd, int flags)
   /* The caller of this routine expects to Safefree(PL_Cmd) */
   Newx(PL_Cmd,10,char);
 
-  TAINT_ENV();
-  TAINT_PROPER("spawn");
   if (!cmd || !*cmd) {
     sts = lib$spawn(0,0,0,&flags,0,0,&substs,0,0,0,0,0,0);
     if (!(sts & 1)) {
@@ -12913,7 +12876,6 @@ Perl_vms_start_glob
 	    PerlIO_rewind(tmpfp);
 	    IoTYPE(io) = IoTYPE_RDONLY;
 	    IoIFP(io) = fp = tmpfp;
-	    IoFLAGS(io) &= ~IOf_UNTAINT;  /* maybe redundant */
 	}
     }
     Safefree(vmsspec);
@@ -13004,19 +12966,6 @@ case_tolerant_process_fromperl(pTHX_ CV *cv)
   ST(0) = boolSV(do_vms_case_tolerant());
   XSRETURN(1);
 }
-
-#ifdef USE_ITHREADS
-
-void  
-Perl_sys_intern_dup(pTHX_ struct interp_intern *src, 
-                          struct interp_intern *dst)
-{
-    PERL_ARGS_ASSERT_SYS_INTERN_DUP;
-
-    memcpy(dst,src,sizeof(struct interp_intern));
-}
-
-#endif
 
 void  
 Perl_sys_intern_clear(pTHX)

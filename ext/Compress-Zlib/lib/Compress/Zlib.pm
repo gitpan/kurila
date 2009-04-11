@@ -10,8 +10,7 @@ use IO::Compress::Base::Common v2.006 ;
 use Compress::Raw::Zlib v2.006 ;
 use IO::Compress::Gzip v2.006 ;
 use IO::Uncompress::Gunzip v2.006 ;
-
-use strict ;
+ 
 use warnings ;
 use bytes ;
 our ($VERSION, $XS_VERSION, @ISA, @EXPORT);
@@ -41,7 +40,7 @@ BEGIN
 
 # typeglob constants.
 for my $name (@( <qw|DEF_WBITS MAX_MEM_LEVEL MAX_WBITS OS_CODE|,
-              < grep { m/^Z_/ } @Compress::Raw::Zlib::EXPORT)) {
+              < grep { m/^Z_/ }, @Compress::Raw::Zlib::EXPORT)) {
     Symbol::fetch_glob($name)->* = \&{*{Symbol::fetch_glob("Compress::Raw::Zlib::$name")}};
 }
 
@@ -73,7 +72,7 @@ sub _set_gzerr
         $Compress::Zlib::gzerrno = 0 ;
     }
     elsif ($value == Z_ERRNO() || $value +> 2) {
-        $Compress::Zlib::gzerrno = $! ;
+        $Compress::Zlib::gzerrno = $^OS_ERROR ;
     }
     else {
         $Compress::Zlib::gzerrno = dualvar($value+0, @my_z_errmsg[2 - $value]);
@@ -98,9 +97,8 @@ sub _save_gzerr
     _set_gzerr($value) ;
 }
 
-sub gzopen($$)
-{
-    my ($file, $mode) = < @_ ;
+sub gzopen($file, $mode)
+{ 
 
     my $gz ;
     my %defOpts = %(Level    => Z_DEFAULT_COMPRESSION(),
@@ -111,16 +109,16 @@ sub gzopen($$)
     $writing = ! ($mode =~ m/r/i) ;
     $writing = ($mode =~ m/[wa]/i) ;
 
-    %defOpts{Level}    = $1               if $mode =~ m/(\d)/;
-    %defOpts{Strategy} = Z_FILTERED()     if $mode =~ m/f/i;
-    %defOpts{Strategy} = Z_HUFFMAN_ONLY() if $mode =~ m/h/i;
-    %defOpts{Append}   = 1                if $mode =~ m/a/i;
+    %defOpts{+Level}    = $1               if $mode =~ m/(\d)/;
+    %defOpts{+Strategy} = Z_FILTERED()     if $mode =~ m/f/i;
+    %defOpts{+Strategy} = Z_HUFFMAN_ONLY() if $mode =~ m/h/i;
+    %defOpts{+Append}   = 1                if $mode =~ m/a/i;
 
-    my $infDef = $writing ? 'deflate' : 'inflate';
+    my $infDef = $writing ?? 'deflate' !! 'inflate';
     my @params = @( () ) ;
 
     croak "gzopen: file parameter is not a filehandle or filename"
-        unless isaFilehandle $file || isaFilename $file  || 
+        unless isaFilehandle($file) || isaFilename($file)  || 
                (ref $file && ref $file eq 'SCALAR');
 
     croak "gzopen: invalid mode"
@@ -156,7 +154,7 @@ sub Compress::Zlib::gzFile::gzread
     return _set_gzerr(Z_STREAM_ERROR())
         if $self->[1] ne 'inflate';
 
-    my $len = defined @_[1] ? @_[1] : 4096 ; 
+    my $len = defined @_[?1] ?? @_[1] !! 4096 ; 
 
     my $gz = $self->[0] ;
     my $status = $gz->read(@_[0], $len) ; 
@@ -169,14 +167,14 @@ sub Compress::Zlib::gzFile::gzreadline
     my $self = shift ;
 
     my $gz = $self->[0] ;
-    {
+    do {
         # Maintain backward compatibility with 1.x behaviour
         # It didn't support $/, so this can't either.
-        local $/ = "\n" ;
+        local $^INPUT_RECORD_SEPARATOR = "\n" ;
         @_[0] = $gz->getline() ; 
-    }
+    };
     _save_gzerr($gz, 1);
-    return defined @_[0] ? length @_[0] : 0 ;
+    return defined @_[0] ?? length @_[0] !! 0 ;
 }
 
 sub Compress::Zlib::gzFile::gzwrite
@@ -222,7 +220,7 @@ sub Compress::Zlib::gzFile::gzflush
     my $gz = $self->[0] ;
     my $status = $gz->flush($f) ;
     my $err = _save_gzerr($gz);
-    return $status ? 0 : $err;
+    return $status ?? 0 !! $err;
 }
 
 sub Compress::Zlib::gzFile::gzclose
@@ -232,7 +230,7 @@ sub Compress::Zlib::gzFile::gzclose
 
     my $status = $gz->close() ;
     my $err = _save_gzerr($gz);
-    return $status ? 0 : $err;
+    return $status ?? 0 !! $err;
 }
 
 sub Compress::Zlib::gzFile::gzsetparams
@@ -248,8 +246,8 @@ sub Compress::Zlib::gzFile::gzsetparams
     return _set_gzerr(Z_STREAM_ERROR())
         if $self->[1] ne 'deflate';
  
-    my $status = *$gz->{Compress}->deflateParams(-Level   => $level, 
-                                                -Strategy => $strategy);
+    my $status = *$gz->{?Compress}->deflateParams(Level   => $level, 
+                                                Strategy => $strategy);
     _save_gzerr($gz);
     return $status ;
 }
@@ -263,9 +261,9 @@ sub Compress::Zlib::gzFile::gzerror
 }
 
 
-sub compress($;$)
+sub compress
 {
-    my ($x, $output, $err, $in) =('', '', '', '') ;
+    my @($x, $output, $err, $in) =@('', '', '', '') ;
 
     if (ref @_[0] ) {
         $in = @_[0] ;
@@ -275,9 +273,9 @@ sub compress($;$)
         $in = \@_[0] ;
     }
 
-    my $level = ((nelems @_) == 2 ? @_[1] : Z_DEFAULT_COMPRESSION() );
+    my $level = ((nelems @_) == 2 ?? @_[1] !! Z_DEFAULT_COMPRESSION() );
 
-    ($x) = < Compress::Raw::Zlib::Deflate->new( -AppendOutput => 1, -Level => $level);
+    @($x, ...) = Compress::Raw::Zlib::Deflate->new( AppendOutput => 1, Level => $level);
     $x or return undef ;
 
     $err = $x->deflate($in, $output) ;
@@ -290,9 +288,9 @@ sub compress($;$)
 
 }
 
-sub uncompress($)
+sub uncompress
 {
-    my ($x, $output, $err, $in) =('', '', '', '') ;
+    my @($x, $output, $err, $in) =@('', '', '', '') ;
 
     if (ref @_[0] ) {
         $in = @_[0] ;
@@ -302,7 +300,7 @@ sub uncompress($)
         $in = \@_[0] ;
     }
 
-    ($x) = < Compress::Raw::Zlib::Inflate->new( -ConsumeInput => 0);
+    @($x, ...) = Compress::Raw::Zlib::Inflate->new( ConsumeInput => 0);
     $x or return undef ;
  
     $err = $x->inflate($in, $output) ;
@@ -312,7 +310,7 @@ sub uncompress($)
 }
 
 
-sub deflateInit(@)
+sub deflateInit
 {
     my $got = ParseParameters(0,
                 \%(
@@ -332,7 +330,7 @@ sub deflateInit(@)
     my $obj ;
 
     my $status = 0 ;
-    ($obj, $status) = < 
+    @($obj, $status) =  
       Compress::Raw::Zlib::_deflateInit(0,
                 $got->value('Level'), 
                 $got->value('Method'), 
@@ -342,11 +340,11 @@ sub deflateInit(@)
                 $got->value('Bufsize'),
                 $got->value('Dictionary')) ;
 
-    my $x = ($status == Z_OK() ? bless $obj, "Zlib::OldDeflate"  : undef) ;
+    my $x = ($status == Z_OK() ?? bless $obj, "Zlib::OldDeflate"  !! undef) ;
     return $x;
 }
 
-sub inflateInit(@)
+sub inflateInit
 {
     my $got = ParseParameters(0,
                 \%(
@@ -362,12 +360,12 @@ sub inflateInit(@)
 
     my $status = 0 ;
     my $obj ;
-    ($obj, $status) = < Compress::Raw::Zlib::_inflateInit(FLAG_CONSUME_INPUT,
+    @($obj, $status) =  Compress::Raw::Zlib::_inflateInit(FLAG_CONSUME_INPUT,
                                 $got->value('WindowBits'), 
                                 $got->value('Bufsize'), 
                                 $got->value('Dictionary')) ;
 
-    my $x = ($status == Z_OK() ? bless $obj, "Zlib::OldInflate"  : undef) ;
+    my $x = ($status == Z_OK() ?? bless $obj, "Zlib::OldInflate"  !! undef) ;
 
     return $x;
 }
@@ -414,12 +412,12 @@ package Compress::Zlib ;
 
 use IO::Compress::Gzip::Constants v2.006 ;
 
-sub memGzip($)
+sub memGzip
 {
   my $out;
 
   # if the deflation buffer isn't a reference, make it one
-  my $string = (ref @_[0] ? @_[0] : \@_[0]) ;
+  my $string = (ref @_[0] ?? @_[0] !! \@_[0]) ;
 
   IO::Compress::Gzip::gzip($string, \$out, Minimal => 1)
       or return undef ;
@@ -428,15 +426,13 @@ sub memGzip($)
 }
 
 
-sub _removeGzipHeader($)
+sub _removeGzipHeader($string)
 {
-    my $string = shift ;
-
     return Z_DATA_ERROR() 
         if length($$string) +< GZIP_MIN_HEADER_SIZE ;
 
-    my ($magic1, $magic2, $method, $flags, $time, $xflags, $oscode) = 
-        unpack ('CCCCVCC', $$string);
+    my @($magic1, $magic2, $method, $flags, $time, $xflags, $oscode) = 
+        @: unpack ('CCCCVCC', $$string);
 
     return Z_DATA_ERROR()
         unless $magic1 == GZIP_ID1 and $magic2 == GZIP_ID2 and
@@ -449,7 +445,7 @@ sub _removeGzipHeader($)
         return Z_DATA_ERROR()
             if length($$string) +< GZIP_FEXTRA_HEADER_SIZE ;
 
-        my ($extra_len) = unpack ('v', $$string);
+        my @($extra_len) = @: unpack('v', $$string);
         $extra_len += GZIP_FEXTRA_HEADER_SIZE;
         return Z_DATA_ERROR()
             if length($$string) +< $extra_len ;
@@ -487,17 +483,17 @@ sub _removeGzipHeader($)
 }
 
 
-sub memGunzip($)
+sub memGunzip
 {
     # if the buffer isn't a reference, make it one
-    my $string = (ref @_[0] ? @_[0] : \@_[0]);
+    my $string = (ref @_[0] ?? @_[0] !! \@_[0]);
  
     _removeGzipHeader($string) == Z_OK() 
         or return undef;
      
-    my $bufsize = length $$string +> 4096 ? length $$string : 4096 ;
-    my ($x) = < Compress::Raw::Zlib::Inflate->new(\%(-WindowBits => - MAX_WBITS(),
-                         -Bufsize => $bufsize));
+    my $bufsize = length $$string +> 4096 ?? length $$string !! 4096 ;
+    my @($x, ...) =  Compress::Raw::Zlib::Inflate->new(\%(WindowBits => - MAX_WBITS(),
+                         Bufsize => $bufsize));
     $x or return undef;
 
     my $output = "" ;
@@ -507,7 +503,7 @@ sub memGunzip($)
 
     if (length $$string +>= 8)
     {
-        my ($crc, $len) = unpack ("VV", substr($$string, 0, 8));
+        my @($crc, $len) = @: unpack("VV", substr($$string, 0, 8));
         substr($$string, 0, 8, '');
         return undef 
             unless $len == length($output) and
@@ -636,8 +632,8 @@ enhancements/changes have been made to the C<gzopen> interface:
 =item 1
 
 If you want to to open either STDIN or STDOUT with C<gzopen>, you can now
-optionally use the special filename "C<->" as a synonym for C<\*STDIN> and
-C<\*STDOUT>.
+optionally use the special filename "C<->" as a synonym for C<$^STDIN> and
+C<$^STDOUT>.
 
 =item 2 
 
@@ -852,7 +848,6 @@ be used safely.
 Here is an example script which uses the interface. It implements a
 I<gzcat> function.
 
-    use strict ;
     use warnings ;
     
     use Compress::Zlib ;
@@ -877,7 +872,6 @@ I<gzcat> function.
 Below is a script which makes use of C<gzreadline>. It implements a
 very simple I<grep> like script.
 
-    use strict ;
     use warnings ;
     
     use Compress::Zlib ;
@@ -908,14 +902,13 @@ This script, I<gzstream>, does the opposite of the I<gzcat> script
 above. It reads from standard input and writes a gzip data stream to
 standard output.
 
-    use strict ;
     use warnings ;
     
     use Compress::Zlib ;
     
     binmode STDOUT;  # gzopen only sets it on the fd
     
-    my $gz = gzopen(\*STDOUT, "wb")
+    my $gz = gzopen($^STDOUT, "wb")
           or die "Cannot open stdout: $gzerrno\n" ;
     
     while (<>) {
@@ -1037,37 +1030,37 @@ C<Z_DEFAULT_COMPRESSION>.
 
 The default is Z_DEFAULT_COMPRESSION.
 
-=item B<-Method>
+=item B<Method>
 
 Defines the compression method. The only valid value at present (and
 the default) is Z_DEFLATED.
 
-=item B<-WindowBits>
+=item B<WindowBits>
 
 To create an RFC 1950 data stream, set C<WindowBits> to a positive number.
 
-To create an RFC 1951 data stream, set C<WindowBits> to C<-MAX_WBITS>.
+To create an RFC 1951 data stream, set C<WindowBits> to C<MAX_WBITS>.
 
 For a full definition of the meaning and valid values for C<WindowBits> refer
 to the I<zlib> documentation for I<deflateInit2>.
 
 Defaults to MAX_WBITS.
 
-=item B<-MemLevel>
+=item B<MemLevel>
 
 For a definition of the meaning and valid values for C<MemLevel>
 refer to the I<zlib> documentation for I<deflateInit2>.
 
 Defaults to MAX_MEM_LEVEL.
 
-=item B<-Strategy>
+=item B<Strategy>
 
 Defines the strategy used to tune the compression. The valid values are
 C<Z_DEFAULT_STRATEGY>, C<Z_FILTERED> and C<Z_HUFFMAN_ONLY>. 
 
 The default is Z_DEFAULT_STRATEGY.
 
-=item B<-Dictionary>
+=item B<Dictionary>
 
 When a dictionary is specified I<Compress::Zlib> will automatically
 call C<deflateSetDictionary> directly after calling C<deflateInit>. The
@@ -1076,7 +1069,7 @@ C<$d->dict_adler()>.
 
 The default is no dictionary.
 
-=item B<-Bufsize>
+=item B<Bufsize>
 
 Sets the initial size for the deflation buffer. If the buffer has to be
 reallocated to increase the size, it will grow in increments of
@@ -1090,8 +1083,8 @@ Here is an example of using the C<deflateInit> optional parameter list
 to override the default buffer size and compression level. All other
 options will take their default values.
 
-    deflateInit( -Bufsize => 300, 
-                 -Level => Z_BEST_SPEED  ) ;
+    deflateInit( Bufsize => 300, 
+                 Level => Z_BEST_SPEED  ) ;
 
 
 =head2 B<($out, $status) = $d-E<gt>deflate($buffer)>
@@ -1140,13 +1133,13 @@ will remain unchanged.
 
 =over 5
 
-=item B<-Level>
+=item B<Level>
 
 Defines the compression level. Valid values are 0 through 9,
 C<Z_NO_COMPRESSION>, C<Z_BEST_SPEED>, C<Z_BEST_COMPRESSION>, and
 C<Z_DEFAULT_COMPRESSION>.
 
-=item B<-Strategy>
+=item B<Strategy>
 
 Defines the strategy used to tune the compression. The valid values are
 C<Z_DEFAULT_STRATEGY>, C<Z_FILTERED> and C<Z_HUFFMAN_ONLY>. 
@@ -1175,7 +1168,6 @@ Returns the total number of compressed bytes output from deflate.
 Here is a trivial example of using C<deflate>. It simply reads standard
 input, deflates it and writes it to standard output.
 
-    use strict ;
     use warnings ;
 
     use Compress::Zlib ;
@@ -1239,7 +1231,7 @@ Here is a list of the valid options:
 
 =over 5
 
-=item B<-WindowBits>
+=item B<WindowBits>
 
 To uncompress an RFC 1950 data stream, set C<WindowBits> to a positive number.
 
@@ -1250,7 +1242,7 @@ to the I<zlib> documentation for I<inflateInit2>.
 
 Defaults to MAX_WBITS.
 
-=item B<-Bufsize>
+=item B<Bufsize>
 
 Sets the initial size for the inflation buffer. If the buffer has to be
 reallocated to increase the size, it will grow in increments of
@@ -1258,7 +1250,7 @@ C<Bufsize>.
 
 Default is 4096.
 
-=item B<-Dictionary>
+=item B<Dictionary>
 
 The default is no dictionary.
 
@@ -1267,7 +1259,7 @@ The default is no dictionary.
 Here is an example of using the C<inflateInit> optional parameter to
 override the default buffer size.
 
-    inflateInit( -Bufsize => 300 ) ;
+    inflateInit( Bufsize => 300 ) ;
 
 =head2 B<($out, $status) = $i-E<gt>inflate($buffer)>
 
@@ -1323,7 +1315,6 @@ Returns the total number of uncompressed bytes output from inflate.
 
 Here is an example of using C<inflate>.
 
-    use strict ;
     use warnings ;
     
     use Compress::Zlib ;

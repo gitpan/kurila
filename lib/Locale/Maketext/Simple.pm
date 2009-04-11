@@ -1,7 +1,6 @@
 package Locale::Maketext::Simple;
 $Locale::Maketext::Simple::VERSION = '0.18';
 
-use strict;
 
 =head1 NAME
 
@@ -103,20 +102,18 @@ locale setting is used.  Implies a true value for C<Decode>.
 
 =cut
 
-sub import {
-    my ($class, < %args) = < @_;
+sub import($class, %< %args) {
 
-    %args{Class}    ||= caller;
-    %args{Style}    ||= 'maketext';
-    %args{Export}   ||= 'loc';
-    %args{Subclass} ||= 'I18N';
+    %args{+Class}    ||= caller;
+    %args{+Style}    ||= 'maketext';
+    %args{+Export}   ||= 'loc';
+    %args{+Subclass} ||= 'I18N';
 
-    my ($loc, $loc_lang) = < $class->load_loc(< %args);
+    my @(?$loc, ?$loc_lang) =  $class->load_loc(< %args) || @();
     $loc ||= $class->default_loc(< %args);
 
-    no strict 'refs';
-    *{Symbol::fetch_glob(caller(0) . "::%args{Export}")} = $loc if %args{Export};
-    *{Symbol::fetch_glob(caller(0) . "::%args{Export}_lang")} = $loc_lang || sub { 1 };
+    *{Symbol::fetch_glob(caller(0) . "::%args{?Export}")} = $loc if %args{?Export};
+    *{Symbol::fetch_glob(caller(0) . "::%args{?Export}_lang")} = $loc_lang || sub { 1 };
 }
 
 my %Loc;
@@ -124,19 +121,19 @@ my %Loc;
 sub reload_loc { %Loc = %( () ) }
 
 sub load_loc {
-    my ($class, < %args) = < @_;
+    my @($class, %< %args) =  @_;
 
-    my $pkg = join('::', grep { defined and length } @( %args{Class}, %args{Subclass}));
-    return %Loc{$pkg} if exists %Loc{$pkg};
+    my $pkg = join('::', grep { defined and length }, @( %args{?Class}, %args{?Subclass}));
+    return %Loc{?$pkg} if exists %Loc{$pkg};
 
     try { require Locale::Maketext::Lexicon; 1 }   or return;
     $Locale::Maketext::Lexicon::VERSION +> 0.20	    or return;
     try { require File::Spec; 1 }		    or return;
 
-    my $path = %args{Path} || $class->auto_path(%args{Class}) or return;
+    my $path = %args{?Path} || $class->auto_path(%args{Class}) or return;
     my $pattern = File::Spec->catfile($path, '*.[pm]o');
-    my $decode = %args{Decode} || 0;
-    my $encoding = %args{Encoding} || undef;
+    my $decode = %args{?Decode} || 0;
+    my $encoding = %args{?Encoding} || undef;
 
     $decode = 1 if $encoding;
 
@@ -145,7 +142,7 @@ sub load_loc {
     eval "
 	package $pkg;
 	use base 'Locale::Maketext';
-        \%{$pkg}::Lexicon = ( '_AUTO' => 1 );
+        \%$($pkg)::Lexicon = ( '_AUTO' => 1 );
 	Locale::Maketext::Lexicon->import(\{
 	    'i-default' => [ 'Auto' ],
 	    '*'	=> [ Gettext => \$pattern ],
@@ -156,17 +153,17 @@ sub load_loc {
 	    unless defined &tense;
 
 	1;
-    " or die $@;
+    " or die $^EVAL_ERROR;
     
     my $lh = try { $pkg->get_handle } or return;
-    my $style = lc(%args{Style});
+    my $style = lc(%args{?Style});
     if ($style eq 'maketext') {
-	%Loc{$pkg} = sub {
+	%Loc{+$pkg} = sub {
 	    $lh->maketext(< @_)
 	};
     }
     elsif ($style eq 'gettext') {
-	%Loc{$pkg} = sub {
+	%Loc{+$pkg} = sub {
 	    my $str = shift;
             $str =~ s{([\~\[\]])}{~$1}g;
             $str =~ s{
@@ -178,11 +175,11 @@ sub load_loc {
                     |
                         ([1-9]\d*|\*)           # 4 - variable
                     )
-            }{{
-                $1 ? $1
-                   : $2 ? "\[$2,"._unescape($3)."]"
-                        : "[_$4]"
-            }}gx;
+            }{$(
+                $1 ?? $1
+                   !! $2 ?? "\[$2,"._unescape($3)."]"
+                        !! "[_$4]"
+            )}gx;
 	    return $lh->maketext($str, < @_);
 	};
     }
@@ -190,22 +187,22 @@ sub load_loc {
 	die "Unknown Style: $style";
     }
 
-    return @(%Loc{$pkg}, sub {
+    return @(%Loc{?$pkg}, sub {
 	$lh = $pkg->get_handle(< @_);
 	$lh = $pkg->get_handle(< @_);
     });
 }
 
 sub default_loc {
-    my ($self, < %args) = < @_;
-    my $style = lc(%args{Style});
+    my @($self, %< %args) =  @_;
+    my $style = lc(%args{?Style});
     if ($style eq 'maketext') {
 	return sub {
 	    my $str = shift;
             $str =~ s{((?<!~)(?:~~)*)\[_([1-9]\d*|\*)\]}
                      {$1\%$2}g;
             $str =~ s{((?<!~)(?:~~)*)\[([A-Za-z#*]\w*),([^\]]+)\]} 
-                     {{"$1\%$2(" . _escape($3) . ')'}}g;
+                     {$("$1\%$2(" . _escape($3) . ')')}g;
 	    _default_gettext($str, < @_);
 	};
     }
@@ -241,16 +238,16 @@ sub _default_gettext {
 		[^)]*		#     and other ignorable params
 	    \)			#   closing function call
 	)			# closing either one of
-    }{{
+    }{$( do {
 	my $digit = $2 || shift;
 	$digit . (
-	    $1 ? (
-		($1 eq 'tense') ? (($3 eq 'present') ? 'ing' : 'ed') :
-		($1 eq 'quant') ? ' ' . (($digit +> 1) ? ($4 || "$3s") : $3) :
+	    $1 ?? (
+		($1 eq 'tense') ?? (($3 eq 'present') ?? 'ing' !! 'ed') !!
+		($1 eq 'quant') ?? ' ' . (($digit +> 1) ?? ($4 || "$3s") !! $3) !!
 		''
-	    ) : ''
+	    ) !! ''
 	);
-    }}gx;
+    })}gx;
     return $str;
 };
 
@@ -262,17 +259,16 @@ sub _escape {
 
 sub _unescape {
     join(',', map {
-        m/\A(\s*)%([1-9]\d*|\*)(\s*)\z/ ? "$1_$2$3" : $_
-    } split(m/,/, @_[0]));
+        m/\A(\s*)%([1-9]\d*|\*)(\s*)\z/ ?? "$1_$2$3" !! $_
+    }, split(m/,/, @_[0]));
 }
 
-sub auto_path {
-    my ($self, $calldir) = < @_;
+sub auto_path($self, $calldir) {
     $calldir =~ s#::#/#g;
-    my $path = %INC{$calldir . '.pm'} or return;
+    my $path = $^INCLUDED{?$calldir . '.pm'} or return;
 
     # Try absolute path name.
-    if ($^O eq 'MacOS') {
+    if ($^OS_NAME eq 'MacOS') {
 	(my $malldir = $calldir) =~ s!/!:!g;
 	$path =~ s#^(.*)$malldir\.pm\z#$1auto:$malldir:#s;
     } else {
@@ -281,9 +277,9 @@ sub auto_path {
 
     return $path if -d $path;
 
-    # If that failed, try relative path with normal @INC searching.
+    # If that failed, try relative path with normal $^INCLUDE_PATH searching.
     $path = "auto/$calldir/";
-    foreach my $inc ( @INC) {
+    foreach my $inc ( $^INCLUDE_PATH) {
 	return "$inc/$path" if -d "$inc/$path";
     }
 

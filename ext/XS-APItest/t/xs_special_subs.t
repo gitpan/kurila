@@ -4,25 +4,20 @@ use TestInit;
 use Config;
 
 BEGIN {
-    if (%Config{'extensions'} !~ m/\bXS\/APItest\b/) {
-        print "1..0 # Skip: XS::APItest was not built\n";
-        exit 0;
-    }
     # Hush the used only once warning.
     $XS::APItest::WARNINGS_ON_BOOTSTRAP = $MacPerl::Architecture;
     $XS::APItest::WARNINGS_ON_BOOTSTRAP = 1;
 }
 
-use strict;
 use warnings;
 our $uc;
 BEGIN { $uc = 1; }
-use Test::More tests => $uc ? 100 : 80;
+use Test::More tests => $uc ?? 100 !! 80;
 
 # Doing this longhand cut&paste makes it clear
 # BEGIN and INIT are FIFO, CHECK and END are LIFO
 BEGIN {
-    print "# First BEGIN\n";
+    diag "First BEGIN";
     is($XS::APItest::BEGIN_called, undef, "BEGIN not yet called");
     is($XS::APItest::BEGIN_called_PP, undef, "BEGIN not yet called");
     is($XS::APItest::UNITCHECK_called, undef, "UNITCHECK not yet called")
@@ -38,7 +33,7 @@ BEGIN {
 }
 
 CHECK {
-    print "# First CHECK\n";
+    diag "First CHECK";
     is($XS::APItest::BEGIN_called, 1, "BEGIN called");
     is($XS::APItest::BEGIN_called_PP, 1, "BEGIN called");
     is($XS::APItest::UNITCHECK_called, 1, "UNITCHECK called") if $uc;
@@ -52,7 +47,7 @@ CHECK {
 }
 
 INIT {
-    print "# First INIT\n";
+    diag "First INIT";
     is($XS::APItest::BEGIN_called, 1, "BEGIN called");
     is($XS::APItest::BEGIN_called_PP, 1, "BEGIN called");
     is($XS::APItest::UNITCHECK_called, 1, "UNITCHECK called") if $uc;
@@ -66,7 +61,7 @@ INIT {
 }
 
 END {
-    print "# First END\n";
+    diag "First END";
     is($XS::APItest::BEGIN_called, 1, "BEGIN called");
     is($XS::APItest::BEGIN_called_PP, 1, "BEGIN called");
     is($XS::APItest::UNITCHECK_called, 1, "UNITCHECK called") if $uc;
@@ -79,7 +74,7 @@ END {
     is($XS::APItest::END_called_PP, 1, "END called");
 }
 
-print "# First body\n";
+diag "First body";
 is($XS::APItest::BEGIN_called, 1, "BEGIN called");
 is($XS::APItest::BEGIN_called_PP, 1, "BEGIN called");
 is($XS::APItest::UNITCHECK_called, 1, "UNITCHECK called") if $uc;
@@ -93,7 +88,7 @@ is($XS::APItest::END_called_PP, undef, "END not yet called");
 
 use XS::APItest;
 
-print "# Second body\n";
+diag "Second body";
 is($XS::APItest::BEGIN_called, 1, "BEGIN called");
 is($XS::APItest::BEGIN_called_PP, 1, "BEGIN called");
 is($XS::APItest::UNITCHECK_called, 1, "UNITCHECK called") if $uc;
@@ -106,7 +101,7 @@ is($XS::APItest::END_called, undef, "END not yet called");
 is($XS::APItest::END_called_PP, undef, "END not yet called");
 
 BEGIN {
-    print "# Second BEGIN\n";
+    diag "Second BEGIN";
     is($XS::APItest::BEGIN_called, 1, "BEGIN called");
     is($XS::APItest::BEGIN_called_PP, 1, "BEGIN called");
     is($XS::APItest::UNITCHECK_called, 1, "UNITCHECK called") if $uc;
@@ -120,7 +115,7 @@ BEGIN {
 }
 
 CHECK {
-    print "# Second CHECK\n";
+    diag "Second CHECK";
     is($XS::APItest::BEGIN_called, 1, "BEGIN called");
     is($XS::APItest::BEGIN_called_PP, 1, "BEGIN called");
     is($XS::APItest::UNITCHECK_called, 1, "UNITCHECK yet called") if $uc;
@@ -134,7 +129,7 @@ CHECK {
 }
 
 INIT {
-    print "# Second INIT\n";
+    diag "Second INIT";
     is($XS::APItest::BEGIN_called, 1, "BEGIN called");
     is($XS::APItest::BEGIN_called_PP, 1, "BEGIN called");
     is($XS::APItest::UNITCHECK_called, 1, "UNITCHECK called") if $uc;
@@ -148,7 +143,7 @@ INIT {
 }
 
 END {
-    print "# Second END\n";
+    diag "Second END";
     is($XS::APItest::BEGIN_called, 1, "BEGIN called");
     is($XS::APItest::BEGIN_called_PP, 1, "BEGIN called");
     is($XS::APItest::UNITCHECK_called, 1, "UNITCHECK called") if $uc;

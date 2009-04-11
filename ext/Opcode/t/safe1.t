@@ -1,15 +1,8 @@
 #!./perl -w
-$|=1;
+$^OUTPUT_AUTOFLUSH=1;
 use Config;
-BEGIN {
-    if (%Config{'extensions'} !~ m/\bOpcode\b/ && %Config{'osname'} ne 'VMS') {
-        print "1..0\n";
-        exit 0;
-    }
 
-}
-
-print "1..0\n# TODO for changes pckage system";
+print $^STDOUT, "1..0\n# TODO for changes pckage system";
 exit;
 
 # Tests Todo:
@@ -17,7 +10,7 @@ exit;
 
 package test;	# test from somewhere other than main
 
-use vars < qw($bar);
+our ($bar);
 
 use Opcode v1.00 < qw(opdesc opset opset_to_ops opset_to_hex
 	opmask_add full_opset empty_opset opcodes opmask define_optag);
@@ -25,7 +18,7 @@ use Opcode v1.00 < qw(opdesc opset opset_to_ops opset_to_hex
 use Safe v1.00;
 
 my $last_test; # initalised at end
-print "1..$last_test\n";
+print $^STDOUT, "1..$last_test\n";
 
 my $t = 1;
 my $cpt;
@@ -41,30 +34,30 @@ foreach(1..3) {
 
 	$cpt->share( <qw($foo));
 
-	print ${*{$cpt->varglob('foo')}}       == 42 ? "ok $t\n" : "not ok $t\n"; $t++;
+	print $^STDOUT, ${*{$cpt->varglob('foo')}}       == 42 ?? "ok $t\n" !! "not ok $t\n"; $t++;
 
 	${*{$cpt->varglob('foo')}} = 9;
 
-	print $foo == 9	? "ok $t\n" : "not ok $t\n"; $t++;
+	print $^STDOUT, $foo == 9	?? "ok $t\n" !! "not ok $t\n"; $t++;
 
-	print $cpt->reval('$foo')       == 9	? "ok $t\n" : "not ok $t\n"; $t++;
+	print $^STDOUT, $cpt->reval('$foo')       == 9	?? "ok $t\n" !! "not ok $t\n"; $t++;
 	# check 'main' has been changed:
-	print $cpt->reval('$::foo')     == 9	? "ok $t\n" : "not ok $t\n"; $t++;
-	print $cpt->reval('$main::foo') == 9	? "ok $t\n" : "not ok $t\n"; $t++;
+	print $^STDOUT, $cpt->reval('$::foo')     == 9	?? "ok $t\n" !! "not ok $t\n"; $t++;
+	print $^STDOUT, $cpt->reval('$main::foo') == 9	?? "ok $t\n" !! "not ok $t\n"; $t++;
 	# check we can't see our test package:
-	print $cpt->reval('$test::foo')     	? "not ok $t\n" : "ok $t\n"; $t++;
-	print $cpt->reval('${*{Symbol::fetch_glob("test::foo")}}')		? "not ok $t\n" : "ok $t\n"; $t++;
+	print $^STDOUT, $cpt->reval('$test::foo')     	?? "not ok $t\n" !! "ok $t\n"; $t++;
+	print $^STDOUT, $cpt->reval('${*{Symbol::fetch_glob("test::foo")}}')		?? "not ok $t\n" !! "ok $t\n"; $t++;
 
 	$cpt->erase;	# erase the compartment, e.g., delete all variables
 
-	print $cpt->reval('$foo') ? "not ok $t\n" : "ok $t\n"; $t++;
+	print $^STDOUT, $cpt->reval('$foo') ?? "not ok $t\n" !! "ok $t\n"; $t++;
 
 	# Note that we *must* use $cpt->varglob here because if we used
 	# $Root::foo etc we would still see the original values!
 	# This seems to be because the compiler has created an extra ref.
 
-	print ${*{$cpt->varglob('foo')}} ? "not ok $t\n" : "ok $t\n"; $t++;
+	print $^STDOUT, ${*{$cpt->varglob('foo')}} ?? "not ok $t\n" !! "ok $t\n"; $t++;
 }
 
-print "ok $last_test\n";
+print $^STDOUT, "ok $last_test\n";
 BEGIN { $last_test = 28 }

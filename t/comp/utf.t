@@ -1,18 +1,18 @@
 #!./perl
 
+use Config;
+
 BEGIN {
     unless ('PerlIO::Layer'->find('perlio')) {
-	print "1..0 # Skip: not perlio\n";
+	print $^STDOUT, "1..0 # Skip: not perlio\n";
 	exit 0;
     }
-    if (%ENV{PERL_CORE_MINITEST}) {
-	print "1..0 # Skip: no dynamic loading on miniperl, no threads\n";
+    if (env::var('PERL_CORE_MINITEST')) {
+	print $^STDOUT, "1..0 # Skip: no dynamic loading on miniperl, no threads\n";
 	exit 0;
     }
-    our %Config;
-    require Config; Config->import;
-    if (%Config{'extensions'} !~ m/\bEncode\b/) {
-      print "1..0 # Skip: Encode was not built\n";
+    if (config_value('extensions') !~ m/\bEncode\b/) {
+      print $^STDOUT, "1..0 # Skip: Encode was not built\n";
       exit 0;
     }
 }

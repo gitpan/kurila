@@ -1,8 +1,7 @@
 package File::Spec::Win32;
 
-use strict;
 
-use vars < qw(@ISA $VERSION);
+our (@ISA, $VERSION);
 require File::Spec::Unix;
 
 $VERSION = '3.2701';
@@ -69,7 +68,7 @@ variables are tainted, they are not used.
 my $tmpdir;
 sub tmpdir {
     return $tmpdir if defined $tmpdir;
-    $tmpdir = @_[0]->_tmpdir( < map( %ENV{$_}, qw(TMPDIR TEMP TMP) ),
+    $tmpdir = @_[0]->_tmpdir( < map( { env::var($_) }, qw(TMPDIR TEMP TMP) ),
 			      'SYS:/temp',
 			      'C:\system\temp',
 			      'C:/temp',
@@ -87,9 +86,9 @@ Default: 1
 
 =cut
 
-sub case_tolerant () {
+sub case_tolerant(?$drive) {
   try { require Win32API::File; } or return 1;
-  my $drive = shift || "C:";
+  $drive ||= "C:";
   my $osFsType = "\0"x256;
   my $osVolName = "\0"x256;
   my $ouFsFlags = 0;
@@ -105,17 +104,15 @@ volume, 1 if it's absolute with no volume, 0 otherwise.
 
 =cut
 
-sub file_name_is_absolute {
-
-    my ($self,$file) = < @_;
+sub file_name_is_absolute($self,$file) {
 
     if ($file =~ m{^($VOL_RX)}o) {
       my $vol = $1;
-      return  $vol =~ m{^$UNC_RX}o ? 2
-	      : $file =~ m{^$DRIVE_RX(?:[\\/])}o ? 2
-	      : 0;
+      return  $vol =~ m{^$UNC_RX}o ?? 2
+	      !! $file =~ m{^$DRIVE_RX(?:[\\/])}o ?? 2
+	      !! 0;
     }
-    return $file =~  m{^[\\/]} ? 1 : 0;
+    return $file =~  m{^[\\/]} ?? 1 !! 0;
 }
 
 =item catfile
@@ -160,9 +157,9 @@ sub catdir {
 }
 
 sub path {
-    my @path = split(';', %ENV{PATH});
+    my @path = split(';', env::var('PATH'));
     s/"//g for  @path;
-    @path = grep length, @path;
+    @path = grep { length }, @path;
     unshift(@path, ".");
     return @path;
 }
@@ -181,7 +178,7 @@ On Win32 makes
 sub canonpath {
     # Legacy / compatibility support
     #
-    return @_[1] if !defined(@_[1]) or @_[1] eq '';
+    return @_[?1] if !defined(@_[?1]) or @_[1] eq '';
     return _canon_cat( @_[1] );
 }
 
@@ -204,9 +201,8 @@ The results can be passed to L</catpath> to get back a path equivalent to
 
 =cut
 
-sub splitpath {
-    my ($self,$path, $nofile) = < @_;
-    my ($volume,$directory,$file) = ('','','');
+sub splitpath($self,$path, ?$nofile) {
+    my @($volume,$directory,$file) = @('','','');
     if ( $nofile ) {
         $path =~ 
             m{^ ( $VOL_RX ? ) (.*) }sox;
@@ -250,8 +246,7 @@ Yields:
 
 =cut
 
-sub splitdir {
-    my ($self,$directories) = < @_ ;
+sub splitdir($self,$directories) { 
     #
     # split() likes to forget about trailing null fields, so here we
     # check to be sure that there will not be any before handling the
@@ -265,7 +260,7 @@ sub splitdir {
         # since there was a trailing separator, add a file name to the end, 
         # then do the split, then replace it with ''.
         #
-        my @directories = split( m|[\\/]|, "{$directories}dummy" ) ;
+        my @directories = split( m|[\\/]|, "$($directories)dummy" ) ;
         @directories[( (nelems @directories)-1) ]= '' ;
         return @directories ;
     }
@@ -280,8 +275,7 @@ the $volume become significant.
 
 =cut
 
-sub catpath {
-    my ($self,$volume,$directory,$file) = < @_;
+sub catpath($self,$volume,$directory,$file) {
 
     # If it's UNC, make sure the glue separator is there, reusing
     # whatever separator is first in the $volume
@@ -300,7 +294,7 @@ sub catpath {
          $file   =~ m@[^\\/]@
        ) {
         $volume =~ m@([\\/])@ ;
-        my $sep = $1 ? $1 : '\' ;
+        my $sep = $1 ?? $1 !! '\' ;
         $volume .= $sep ;
     }
 
@@ -313,8 +307,7 @@ sub _same {
   lc(@_[1]) eq lc(@_[2]);
 }
 
-sub rel2abs {
-    my ($self,$path,$base ) = < @_;
+sub rel2abs($self,$path,?$base) {
 
     my $is_abs = $self->file_name_is_absolute($path);
 
@@ -339,10 +332,10 @@ sub rel2abs {
       $base = $self->canonpath( $base ) ;
     }
 
-    my ( $path_directories, $path_file ) =
-      < ($self->splitpath( $path, 1 ))[[1..2]] ;
+    my @( $path_directories, $path_file ) =
+       ($self->splitpath( $path, 1 ))[[1..2]] ;
 
-    my ( $base_volume, $base_directories ) = <
+    my @( $base_volume, $base_directories, _ ) = 
       $self->splitpath( $base, 1 ) ;
 
     $path = $self->catpath( 
@@ -375,18 +368,18 @@ implementation of these methods, not the semantics.
 =cut
 
 
-sub _canon_cat(@)				# @path -> path
+sub _canon_cat				# @path -> path
 {
     my $first  = shift;
     my $volume = $first =~ s{ \A ([A-Za-z]:) ([\\/]?) }{}x	# drive letter
-    	       ? ucfirst( $1 ).( $2 ? "\\" : "" )
-	       : $first =~ s{ \A (?:\\\\|//) ([^\\/]+)
+    	       ?? ucfirst( $1 ).( $2 ?? "\\" !! "" )
+	       !! $first =~ s{ \A (?:\\\\|//) ([^\\/]+)
 				 (?: [\\/] ([^\\/]+) )?
 	       			 [\\/]? }{}xs			# UNC volume
-	       ? "\\\\$1".( defined $2 ? "\\$2" : "" )."\\"
-	       : $first =~ s{ \A [\\/] }{}x			# root dir
-	       ? "\\"
-	       : "";
+	       ?? "\\\\$1".( defined $2 ?? "\\$2" !! "" )."\\"
+	       !! $first =~ s{ \A [\\/] }{}x			# root dir
+	       ?? "\\"
+	       !! "";
     my $path   = join "\\", @( $first, < @_);
 
     $path =~ s#[\\/]+#\\#g;		# xx/yy --> xx\yy & xx\\yy --> xx\yy
@@ -436,7 +429,7 @@ sub _canon_cat(@)				# @path -> path
 	    if    $path eq ""
 	      and $volume =~ m#\A(\\\\.*)\\\z#s;
     }
-    return $path ne "" || $volume ? $volume.$path : ".";
+    return $path ne "" || $volume ?? $volume.$path !! ".";
 }
 
 1;

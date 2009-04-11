@@ -1,11 +1,12 @@
 #!./perl
 
-use strict;
+
 use warnings;
+use signals;
 
 require './test.pl';
 
-plan(skip_all => "Your system has no SIGALRM") if !exists %SIG{ALRM};
+plan(skip_all => "Your system has no SIGALRM") if ! signals::supported("ALRM");
 plan(tests => 8);
 
 =pod
@@ -18,7 +19,7 @@ into an infinite loop
 =cut
 
 # initial setup, everything sane
-{
+do {
     package K;
     use mro 'c3';
     our @ISA = qw/J I/;
@@ -45,45 +46,45 @@ into an infinite loop
     our @ISA = qw/A B C/;
     package C;
     use mro 'c3';
-    our @ISA = @( qw// );
+    our @ISA = qw//;
     package B;
     use mro 'c3';
-    our @ISA = @( qw// );
+    our @ISA = qw//;
     package A;
     use mro 'c3';
-    our @ISA = @( qw// );
-}
+    our @ISA = qw//;
+};
 
 # A series of 8 abberations that would cause infinite loops,
 #  each one undoing the work of the previous
 my @loopies = @(
     sub { @E::ISA = qw/F/ },
     sub { @E::ISA = qw/D/; @C::ISA = qw/F/ },
-    sub { @C::ISA = @( qw// ); @A::ISA = qw/K/ },
-    sub { @A::ISA = @( qw// ); @J::ISA = qw/F K/ },
+    sub { @C::ISA = qw//; @A::ISA = qw/K/ },
+    sub { @A::ISA = qw//; @J::ISA = qw/F K/ },
     sub { @J::ISA = qw/F/; @H::ISA = qw/K G/ },
     sub { @H::ISA = qw/G/; @B::ISA = qw/B/ },
-    sub { @B::ISA = @( qw// ); @K::ISA = qw/K J I/ },
+    sub { @B::ISA = qw//; @K::ISA = qw/K J I/ },
     sub { @K::ISA = qw/J I/; @D::ISA = qw/A H B C/ },
 );
 
 foreach my $loopy ( @loopies) {
     try {
-        local %SIG{ALRM} = sub { die "ALRMTimeout" };
+        local signals::handler("ALRM") = sub { die "ALRMTimeout" };
         alarm(3);
         $loopy->();
         mro::get_linear_isa('K', 'c3');
     };
 
-    if(my $err = $@) {
-        if($err->{description} =~ m/ALRMTimeout/) {
+    if(my $err = $^EVAL_ERROR) {
+        if($err->{?description} =~ m/ALRMTimeout/) {
             ok(0, "Loop terminated by SIGALRM");
         }
-        elsif($err->{description} =~ m/Recursive inheritance detected/) {
+        elsif($err->{?description} =~ m/Recursive inheritance detected/) {
             ok(1, "Graceful exception thrown");
         }
         else {
-            ok(0, "Unrecognized exception: $err");
+            ok(0, "Unrecognized exception: $($err->message)");
         }
     }
     else {

@@ -42,15 +42,15 @@ Perl_do_join(pTHX_ register SV *sv, SV *delim, register SV *av)
     if ( ! SvAVOK(av) ) {
 	Perl_croak(aTHX_ "%s expected an ARRAY but got %s", OP_DESC(PL_op), Ddesc(av));
     }
-    items = av_len(av) + 1;
+    items = av_len(svTav(av)) + 1;
 
-    mark = AvARRAY(av);
+    mark = AvARRAY(svTav(av));
 
     len = (items > 0 ? (delimlen * (items - 1) ) : 0);
     SvUPGRADE(sv, SVt_PV);
     if (SvLEN(sv) < len + items) {	/* current length is way too short */
 	while (items-- > 0) {
-	    if (*mark && !SvGMAGICAL(*mark) && SvOK(*mark)) {
+	    if (*mark && SvOK(*mark)) {
 		STRLEN tmplen;
 		SvPV_const(*mark, tmplen);
 		len += tmplen;
@@ -60,13 +60,10 @@ Perl_do_join(pTHX_ register SV *sv, SV *delim, register SV *av)
 	SvGROW(sv, len + 1);		/* so try to pre-extend */
 
 	mark = AvARRAY(av);
-	items = av_len(av) + 1;
+	items = av_len(svTav(av)) + 1;
     }
 
     sv_setpvn(sv, "", 0);
-
-    if (PL_tainting && SvMAGICAL(sv))
-	SvTAINTED_off(sv);
 
     if (items-- > 0) {
 	if (*mark)
@@ -99,8 +96,6 @@ Perl_do_sprintf(pTHX_ SV *sv, I32 len, SV **sarg)
 
     sv_vsetpvfn(sv, pat, patlen, NULL, sarg + 1, len - 1, &do_taint);
     SvSETMAGIC(sv);
-    if (do_taint)
-	SvTAINTED_on(sv);
 }
 
 /* currently converts input to bytes if possible, but doesn't sweat failure */
@@ -249,30 +244,26 @@ Perl_do_vecget(pTHX_ SV *sv, I32 offset, I32 size)
  * utf8-valid any more
  */
 void
-Perl_do_vecset(pTHX_ SV *sv)
+Perl_do_vecset(pTHX)
 {
-    dVAR;
-    register I32 offset, bitoffs = 0;
-    register I32 size;
+    dVAR; dSP;
+    register I32 bitoffs = 0;
     register unsigned char *s;
-    register UV lval;
     I32 mask;
     STRLEN targlen;
     STRLEN len;
-    SV * const targ = LvTARG(sv);
-
-    PERL_ARGS_ASSERT_DO_VECSET;
+    UV lval = POPu;
+    register const IV size   = POPi;
+    register IV offset = POPi;
+    register SV * const targ = POPs;
 
     if (!targ)
 	return;
     s = (unsigned char*)SvPV_force(targ, targlen);
 
     (void)SvPOK_only(targ);
-    lval = SvUV(sv);
-    offset = LvTARGOFF(sv);
     if (offset < 0)
 	Perl_croak(aTHX_ "Negative offset to vec in lvalue context");
-    size = LvTARGLEN(sv);
     if (size < 1 || (size & (size-1))) /* size < 1 or not a power of two */
 	Perl_croak(aTHX_ "Illegal number of bits in vec");
 
@@ -326,6 +317,7 @@ Perl_do_vecset(pTHX_ SV *sv)
 #endif
     }
     SvSETMAGIC(targ);
+    PUSHs(targ);
 }
 
 void
@@ -517,10 +509,10 @@ Perl_do_vop(pTHX_ I32 optype, SV *sv, SV *left, SV *right)
 
     PERL_ARGS_ASSERT_DO_VOP;
 
-    if (sv != left || (optype != OP_BIT_AND && !SvOK(sv) && !SvGMAGICAL(sv)))
+    if (sv != left || (optype != OP_BIT_AND && !SvOK(sv)))
 	sv_setpvn(sv, "", 0);	/* avoid undef warning on |= and ^= */
-    lsave = lc = SvPV_nomg_const(left, leftlen);
-    rsave = rc = SvPV_nomg_const(right, rightlen);
+    lsave = lc = SvPV_const(left, leftlen);
+    rsave = rc = SvPV_const(right, rightlen);
 
     /* This need to come after SvPV to ensure that string overloading has
        fired off.  */
@@ -614,7 +606,6 @@ Perl_do_vop(pTHX_ I32 optype, SV *sv, SV *left, SV *right)
 	    break;
 	}
     }
-    SvTAINT(sv);
 }
 
 OP *
@@ -656,7 +647,7 @@ Perl_do_kv(pTHX)
 	}
 	PUTBACK;
     }
-    XPUSHs(res);
+    XPUSHs(avTsv(res));
     RETURN;
 }
 
@@ -679,6 +670,7 @@ Perl_do_arg_check(pTHX_ SV** base)
     SV** arg = base;
     I32 numargs = 0;
 
+    PERL_ARGS_ASSERT_DO_ARG_CHECK;
 /*     if (opargs & OA_MARK) { */
 /* 	arg = PL_stack_base + TOPMARK; */
 /*     } else { */

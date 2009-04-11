@@ -1,9 +1,9 @@
 #!perl -w
 
 BEGIN {
-    if( %ENV{PERL_CORE} ) {
+    if( env::var('PERL_CORE') ) {
         chdir 't';
-        @INC = @('../lib', 'lib');
+        $^INCLUDE_PATH = @('../lib', 'lib');
     }
 }
 
@@ -13,8 +13,8 @@ use Dev::Null;
 
 my $str = "";
 open my $dummy_fh, '>>', \$str or die;
-*STDOUT = *$dummy_fh{IO};
+$^STDOUT = *$dummy_fh{IO};
 
-print "not ok 1\n";     # this should not print.
+print $^STDOUT, "not ok 1\n";     # this should not print.
 pass 'STDOUT can be mucked with';
 

@@ -89,6 +89,9 @@ package PLXML::unop;
 
 our @ISA = ('PLXML');
 
+package PLXML::rootop;
+
+our @ISA = ('PLXML');
 
 # New ops always go at the end, just before 'custom'
 
@@ -134,6 +137,12 @@ sub desc { 'null operation' }
 sub check { 'ck_null' }
 sub flags { '0' }
 sub args { '' }
+
+package PLXML::op_root;
+
+our @ISA = ('PLXML::rootop');
+
+sub key { 'root' }
 
 
 package PLXML::op_stub;
@@ -228,6 +237,11 @@ sub check { 'ck_null' }
 sub flags { 'd2' }
 sub args { 'S S' }
 
+package PLXML::op_magicsv;
+
+our @ISA = ('PLXML::baseop');
+
+sub key { 'magicsv' }
 
 package PLXML::op_padsv;
 
@@ -560,6 +574,9 @@ sub check { 'ck_sassign' }
 sub flags { 's0' }
 sub args { '' }
 
+package PLXML::op_logassign_assign;
+
+our @ISA = ('PLXML::baseop');
 
 package PLXML::op_aassign;
 
@@ -638,6 +655,17 @@ sub check { 'ck_lfun' }
 sub flags { 's%' }
 sub args { 'S?' }
 
+package PLXML::op_dotdotdot;
+
+our @ISA = ('PLXML::baseop');
+
+package PLXML::op_placeholder;
+
+our @ISA = ('PLXML::baseop');
+
+package PLXML::op_dynascope;
+
+our @ISA = ('PLXML::baseop_unop');
 
 package PLXML::op_study;
 
@@ -652,7 +680,7 @@ sub args { 'S?' }
 
 package PLXML::op_pos;
 
-our @ISA = ('PLXML::baseop_unop');
+our @ISA = ('PLXML::listop');
 
 sub key { 'pos' }
 sub desc { 'match position' }
@@ -897,6 +925,19 @@ sub check { 'ck_concat' }
 sub flags { 'fsT2' }
 sub args { 'S S' }
 
+package PLXML::op_hashconcat;
+
+our @ISA = ('PLXML::binop');
+
+sub key { 'hashconcat' }
+sub args { 'S S' }
+
+package PLXML::op_arrayconcat;
+
+our @ISA = ('PLXML::binop');
+
+sub key { 'arrayconcat' }
+sub args { 'S S' }
 
 package PLXML::op_stringify;
 
@@ -1641,6 +1682,14 @@ sub check { 'ck_fun' }
 sub flags { '%' }
 sub args { 'S' }
 
+package PLXML::op_hashexpand;
+
+our @ISA = ('PLXML::op_expand');
+
+package PLXML::op_arrayexpand;
+
+our @ISA = ('PLXML::op_expand');
+
 package PLXML::op_values;
 
 our @ISA = ('PLXML::baseop_unop');
@@ -1783,9 +1832,23 @@ sub check { 'ck_join' }
 sub flags { 'mst@' }
 sub args { 'S L' }
 
+package PLXML::op_hashjoin;
 
+our @ISA = ('PLXML::listop');
+
+sub key { 'hashjoin' }
+
+package PLXML::op_arrayjoin;
+
+our @ISA = ('PLXML::listop');
+
+sub key { 'arrayjoin' }
 
 # List operators.
+
+package PLXML::op_listfirst;
+
+our @ISA = ('PLXML::listop');
 
 package PLXML::op_list;
 
@@ -1819,6 +1882,14 @@ sub check { 'ck_fun' }
 sub flags { 'ms@' }
 sub args { 'L' }
 
+package PLXML::op_anonarray;
+
+our @ISA = ('PLXML::op_anonlist');
+
+package PLXML::op_enter_anonarray_assign;
+
+our @ISA = ('PLXML::baseop');
+
 package PLXML::op_anonhash;
 
 our @ISA = ('PLXML::listop');
@@ -1829,7 +1900,17 @@ sub check { 'ck_fun' }
 sub flags { 'ms@' }
 sub args { 'L' }
 
+package PLXML::op_enter_anonhash_assign;
 
+our @ISA = ('PLXML::baseop');
+
+package PLXML::op_enter_hashexpand_assign;
+
+our @ISA = ('PLXML::baseop');
+
+package PLXML::op_enter_arrayexpand_assign;
+
+our @ISA = ('PLXML::baseop');
 
 package PLXML::op_splice;
 

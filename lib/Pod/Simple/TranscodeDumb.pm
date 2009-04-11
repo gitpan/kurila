@@ -2,8 +2,8 @@
 ## This module is to be use()'d only by Pod::Simple::Transcode
 
 package Pod::Simple::TranscodeDumb;
-use strict;
-use vars < qw($VERSION %Supported);
+
+our ($VERSION, %Supported);
 $VERSION = '2.02';
 # This module basically pretends it knows how to transcode, except
 #  only for null-transcodings!  We use this when Encode isn't
@@ -34,11 +34,11 @@ sub encmodver {
 }
 
 sub make_transcoder {
-  my($e) = @_[1];
+  my $e = @_[1];
   die "WHAT ENCODING!?!?" unless $e;
   my $x;
   if ($e eq "latin1") {
-      return sub { return map { join '', map { utf8::chr($_) } @( unpack "C*", $_) } @_ };
+      return sub { return map { join '', map { utf8::chr($_) }, @( unpack "C*", $_) }, @_ };
   }
 
   return sub {;

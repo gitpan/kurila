@@ -2,15 +2,15 @@ use ExtUtils::MakeMaker;
 use Config;
 use File::Spec;
 
-my $e = %Config{'exe_ext'};
-my $o = %Config{'obj_ext'};
+my $e = config_value('exe_ext');
+my $o = config_value('obj_ext');
 my $exeout_flag = '-o ';
-my $core = grep { $_ eq 'PERL_CORE=1' } @ARGV;
-if ($^O eq 'MSWin32') {
-    if (%Config{'cc'} =~ m/^cl/i) {
+my $core = grep { $_ eq 'PERL_CORE=1' }, @ARGV;
+if ($^OS_NAME eq 'MSWin32') {
+    if (config_value('cc') =~ m/^cl/i) {
 	$exeout_flag = '-Fe';
     }
-    elsif (%Config{'cc'} =~ m/^bcc/i) {
+    elsif (config_value('cc') =~ m/^bcc/i) {
 	$exeout_flag = '-e';
     }
 }
@@ -26,8 +26,10 @@ WriteMakefile(
 
 package MY;
 
+use Config;
+
 sub post_constants {
-    "\nLIBS = %Config::Config{libs}\n"
+    "\nLIBS = $(config_value('libs'))\n"
 }
 
 sub headerpath {
@@ -35,19 +37,19 @@ sub headerpath {
 	return File::Spec->catdir( File::Spec->updir,
 				   File::Spec->updir);
     } else {
-	return File::Spec->catdir(%Config::Config{archlibexp}, "CORE");
+	return File::Spec->catdir(config_value("archlibexp"), "CORE");
     }
 }
 
 sub MY::postamble {
     my $headerpath = headerpath();
-    my @headers = map { File::Spec->catfile($headerpath, $_) } qw(op.h cop.h);
-    my $noecho = shift->{NOECHO};
+    my @headers = map { File::Spec->catfile($headerpath, $_) }, qw(op.h cop.h);
+    my $noecho = shift->{?NOECHO};
 
 "
 B\$(OBJ_EXT) : defsubs.h
 
-defsubs.h :: {join ' ',@headers} defsubs_h.PL
+defsubs.h :: $(join ' ',@headers) defsubs_h.PL
 	\$(PERL) -I\$(INST_ARCHLIB) -I\$(INST_LIB) -I\$(PERL_ARCHLIB) -I\$(PERL_LIB) defsubs_h.PL defsubs.h $headerpath
 "
 }
@@ -55,6 +57,6 @@ defsubs.h :: {join ' ',@headers} defsubs_h.PL
 sub MY::processPL {
     my $text = shift->SUPER::processPL(< @_);
     # Append our extra parameter
-    $text =~ s/^(\t.*defsubs_h\.PL.*)/{$1 . ' ' . headerpath()}/m;
+    $text =~ s/^(\t.*defsubs_h\.PL.*)/$1 $(headerpath())/m;
     $text;
 }

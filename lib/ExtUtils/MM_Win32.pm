@@ -1,6 +1,5 @@
 package ExtUtils::MM_Win32;
 
-use strict;
 
 
 =head1 NAME
@@ -29,10 +28,10 @@ require ExtUtils::MM_Unix;
 our @ISA = qw( ExtUtils::MM_Unix );
 our $VERSION = '6.44';
 
-%ENV{EMXSHELL} = 'sh'; # to run `commands`
+env::var('EMXSHELL' ) = 'sh'; # to run `commands`
 
-my $BORLAND = %Config{'cc'} =~ m/^bcc/i ? 1 : 0;
-my $GCC     = %Config{'cc'} =~ m/^gcc/i ? 1 : 0;
+my $BORLAND = %Config{?'cc'} =~ m/^bcc/i ?? 1 !! 0;
+my $GCC     = %Config{?'cc'} =~ m/^gcc/i ?? 1 !! 0;
 
 
 =head2 Overridden methods
@@ -43,22 +42,21 @@ my $GCC     = %Config{'cc'} =~ m/^gcc/i ? 1 : 0;
 
 =cut
 
-sub dlsyms {
-    my($self,< %attribs) = < @_;
+sub dlsyms($self,%< %attribs) {
 
-    my($funcs) = %attribs{DL_FUNCS} || $self->{DL_FUNCS} || \%();
-    my($vars)  = %attribs{DL_VARS} || $self->{DL_VARS} || \@();
-    my($funclist) = %attribs{FUNCLIST} || $self->{FUNCLIST} || \@();
-    my($imports)  = %attribs{IMPORTS} || $self->{IMPORTS} || \%();
+    my@($funcs) = %attribs{?DL_FUNCS} || $self->{?DL_FUNCS} || \%();
+    my@($vars)  = %attribs{?DL_VARS} || $self->{?DL_VARS} || \@();
+    my@($funclist) = %attribs{?FUNCLIST} || $self->{?FUNCLIST} || \@();
+    my@($imports)  = %attribs{?IMPORTS} || $self->{?IMPORTS} || \%();
     my(@m);
 
-    if (not $self->{SKIPHASH}->{'dynamic'}) {
+    if (not $self->{SKIPHASH}->{?'dynamic'}) {
 	push(@m,"
-$self->{BASEEXT}.def: Makefile.PL
+$self->{?BASEEXT}.def: Makefile.PL
 ",
      q!	$(PERLRUN) -MExtUtils::Mksymlists \\
-     -e "Mksymlists('NAME'=>\"!, $self->{NAME},
-     q!\", 'DLBASE' => '!,$self->{DLBASE},
+     -e "Mksymlists('NAME'=>\"!, $self->{?NAME},
+     q!\", 'DLBASE' => '!,$self->{?DLBASE},
      # The above two lines quoted differently to work around
      # a bug in the 4DOS/4NT command line interpreter.  The visible
      # result of the bug was files named q('extension_name',) *with the
@@ -78,8 +76,7 @@ Changes the path separator with .
 
 =cut
 
-sub replace_manpage_separator {
-    my($self,$man) = < @_;
+sub replace_manpage_separator($self,$man) {
     $man =~ s,/+,.,g;
     $man;
 }
@@ -96,11 +93,10 @@ used by default.
 
 =cut
 
-sub maybe_command {
-    my($self,$file) = < @_;
-    my @e = @( exists(%ENV{'PATHEXT'})
-          ? < split(m/;/, %ENV{PATHEXT})
-	  : < qw(.com .exe .bat .cmd) );
+sub maybe_command($self,$file) {
+    my @e = defined(env::var('PATHEXT'))
+          ?? split(m/;/, env::var('PATHEXT'))
+	  !! qw(.com .exe .bat .cmd);
     my $e = '';
     for ( @e) { $e .= "\Q$_\E|" }
     chop $e;
@@ -124,14 +120,14 @@ Using \ for Windows.
 =cut
 
 sub init_DIRFILESEP {
-    my($self) = shift;
+    my@($self) =@( shift);
 
     my $make = $self->make;
 
     # The ^ makes sure its not interpreted as an escape in nmake
-    $self->{DIRFILESEP} = $make eq 'nmake' ? '^\' :
-                          $make eq 'dmake' ? '\\'
-                                           : '\';
+    $self->{+DIRFILESEP} = $make eq 'nmake' ?? '^\' !!
+                          $make eq 'dmake' ?? '\\'
+                                           !! '\';
 }
 
 =item B<init_others>
@@ -148,47 +144,46 @@ Adjustments are made for Borland's quirks needing -L to come first.
 
 =cut
 
-sub init_others {
-    my ($self) = < @_;
+sub init_others($self) {
 
     # Used in favor of echo because echo won't strip quotes. :(
-    $self->{ECHO}     ||= $self->oneliner('print qq{@ARGV}', \@('-l'));
-    $self->{ECHO_N}   ||= $self->oneliner('print qq{@ARGV}');
+    $self->{+ECHO}     ||= $self->oneliner('print qq{@ARGV}', \@('-l'));
+    $self->{+ECHO_N}   ||= $self->oneliner('print qq{@ARGV}');
 
-    $self->{TOUCH}    ||= '$(ABSPERLRUN) -MExtUtils::Command -e touch';
-    $self->{CHMOD}    ||= '$(ABSPERLRUN) -MExtUtils::Command -e chmod'; 
-    $self->{CP}       ||= '$(ABSPERLRUN) -MExtUtils::Command -e cp';
-    $self->{RM_F}     ||= '$(ABSPERLRUN) -MExtUtils::Command -e rm_f';
-    $self->{RM_RF}    ||= '$(ABSPERLRUN) -MExtUtils::Command -e rm_rf';
-    $self->{MV}       ||= '$(ABSPERLRUN) -MExtUtils::Command -e mv';
-    $self->{NOOP}     ||= 'rem';
-    $self->{TEST_F}   ||= '$(ABSPERLRUN) -MExtUtils::Command -e test_f';
-    $self->{DEV_NULL} ||= '> NUL';
+    $self->{+TOUCH}    ||= '$(ABSPERLRUN) -MExtUtils::Command -e touch';
+    $self->{+CHMOD}    ||= '$(ABSPERLRUN) -MExtUtils::Command -e chmod'; 
+    $self->{+CP}       ||= '$(ABSPERLRUN) -MExtUtils::Command -e cp';
+    $self->{+RM_F}     ||= '$(ABSPERLRUN) -MExtUtils::Command -e rm_f';
+    $self->{+RM_RF}    ||= '$(ABSPERLRUN) -MExtUtils::Command -e rm_rf';
+    $self->{+MV}       ||= '$(ABSPERLRUN) -MExtUtils::Command -e mv';
+    $self->{+NOOP}     ||= 'rem';
+    $self->{+TEST_F}   ||= '$(ABSPERLRUN) -MExtUtils::Command -e test_f';
+    $self->{+DEV_NULL} ||= '> NUL';
 
-    $self->{FIXIN}    ||= $self->{PERL_CORE} ? 
-      "\$(PERLRUN) $self->{PERL_SRC}/win32/bin/pl2bat.pl" : 
+    $self->{+FIXIN}    ||= $self->{?PERL_CORE} ?? 
+      "\$(PERLRUN) $self->{?PERL_SRC}/win32/bin/pl2bat.pl" !! 
       'pl2bat.bat';
 
-    $self->{LD}     ||= %Config{ld} || 'link';
-    $self->{AR}     ||= %Config{ar} || 'lib';
+    $self->{+LD}     ||= %Config{?ld} || 'link';
+    $self->{+AR}     ||= %Config{?ar} || 'lib';
 
     $self->SUPER::init_others;
 
     # Setting SHELL from $Config{sh} can break dmake.  Its ok without it.
     delete $self->{SHELL};
 
-    $self->{LDLOADLIBS} ||= %Config{libs};
+    $self->{+LDLOADLIBS} ||= %Config{?libs};
     # -Lfoo must come first for Borland, so we put it in LDDLFLAGS
     if ($BORLAND) {
-        my $libs = $self->{LDLOADLIBS};
+        my $libs = $self->{?LDLOADLIBS};
         my $libpath = '';
         while ($libs =~ s/(?:^|\s)(("?)-L.+?\2)(?:\s|$)/ /) {
             $libpath .= ' ' if length $libpath;
             $libpath .= $1;
         }
-        $self->{LDLOADLIBS} = $libs;
-        $self->{LDDLFLAGS} ||= %Config{lddlflags};
-        $self->{LDDLFLAGS} .= " $libpath";
+        $self->{+LDLOADLIBS} = $libs;
+        $self->{+LDDLFLAGS} ||= %Config{?lddlflags};
+        $self->{+LDDLFLAGS} .= " $libpath";
     }
 
     return 1;
@@ -204,19 +199,19 @@ Add MM_Win32_VERSION.
 =cut
 
 sub init_platform {
-    my($self) = shift;
+    my@($self) =@( shift);
 
-    $self->{MM_Win32_VERSION} = $VERSION;
+    $self->{+MM_Win32_VERSION} = $VERSION;
 }
 
 sub platform_constants {
-    my($self) = shift;
+    my@($self) =@( shift);
     my $make_frag = '';
 
     foreach my $macro (qw(MM_Win32_VERSION))
     {
-        next unless defined $self->{$macro};
-        $make_frag .= "$macro = $self->{$macro}\n";
+        next unless defined $self->{?$macro};
+        $make_frag .= "$macro = $self->{?$macro}\n";
     }
 
     return $make_frag;
@@ -229,8 +224,7 @@ Add .USESHELL target for dmake.
 
 =cut
 
-sub special_targets {
-    my($self) = < @_;
+sub special_targets($self) {
 
     my $make_frag = $self->SUPER::special_targets;
 
@@ -251,8 +245,7 @@ to its own method.
 
 =cut
 
-sub static_lib {
-    my($self) = < @_;
+sub static_lib($self) {
     return '' unless $self->has_link_code;
 
     my(@m);
@@ -263,20 +256,20 @@ END
 
     # If this extension has its own library (eg SDBM_File)
     # then copy that to $(INST_STATIC) and add $(OBJECT) into it.
-    push @m, <<'MAKE_FRAG' if $self->{MYEXTLIB};
+    push @m, <<'MAKE_FRAG' if $self->{?MYEXTLIB};
 	$(CP) $(MYEXTLIB) $@
 MAKE_FRAG
 
     push @m,
-q{	$(AR) }.($BORLAND ? '$@ $(OBJECT:^"+")'
-			  : ($GCC ? '-ru $@ $(OBJECT)'
-			          : '-out:$@ $(OBJECT)')).q{
+q{	$(AR) }.($BORLAND ?? '$@ $(OBJECT:^"+")'
+			  !! ($GCC ?? '-ru $@ $(OBJECT)'
+			          !! '-out:$@ $(OBJECT)')).q{
 	$(CHMOD) $(PERM_RWX) $@
 	$(NOECHO) $(ECHO) "$(EXTRALIBS)" > $(INST_ARCHAUTODIR)\extralibs.ld
 };
 
     # Old mechanism - still available:
-    push @m, <<'MAKE_FRAG' if $self->{PERL_SRC} && $self->{EXTRALIBS};
+    push @m, <<'MAKE_FRAG' if $self->{?PERL_SRC} && $self->{?EXTRALIBS};
 	$(NOECHO) $(ECHO) "$(EXTRALIBS)" >> $(PERL_SRC)\ext.libs
 MAKE_FRAG
 
@@ -290,15 +283,14 @@ Complicated stuff for Win32 that I don't understand. :(
 
 =cut
 
-sub dynamic_lib {
-    my($self, < %attribs) = < @_;
+sub dynamic_lib($self, %< %attribs) {
     return '' unless $self->needs_linking(); #might be because of a subdir
 
     return '' unless $self->has_link_code;
 
-    my($otherldflags) = %attribs{OTHERLDFLAGS} || ($BORLAND ? 'c0d32.obj': '');
-    my($inst_dynamic_dep) = %attribs{INST_DYNAMIC_DEP} || "";
-    my($ldfrom) = '$(LDFROM)';
+    my@($otherldflags) = %attribs{?OTHERLDFLAGS} || ($BORLAND ?? 'c0d32.obj'!! '');
+    my@($inst_dynamic_dep) = %attribs{?INST_DYNAMIC_DEP} || "";
+    my@($ldfrom) = '$(LDFROM)';
     my(@m);
 
 # one thing for GCC/Mingw32:
@@ -306,7 +298,7 @@ sub dynamic_lib {
 #    a (hopefully unique) image-base from the dll's name
 # -- BKS, 10-19-1999
     if ($GCC) { 
-	my $dllname = $self->{BASEEXT} . "." . $self->{DLEXT};
+	my $dllname = $self->{?BASEEXT} . "." . $self->{?DLEXT};
 	$dllname =~ m/(....)(.{0,4})/;
 	my $baseaddr = unpack("n", $1 ^^^ $2);
 	$otherldflags .= sprintf("-Wl,--image-base,0x\%x0000 ", $baseaddr);
@@ -330,9 +322,9 @@ $(INST_DYNAMIC): $(OBJECT) $(MYEXTLIB) $(BOOTSTRAP) $(INST_ARCHAUTODIR)$(DFSEP).
       push(@m,
        q{	$(LD) $(LDDLFLAGS) $(OTHERLDFLAGS) }.$ldfrom.q{,$@,,}
        .($self->make eq 'dmake' 
-                ? q{$(PERL_ARCHIVE:s,/,\,) $(LDLOADLIBS:s,/,\,) }
+                ?? q{$(PERL_ARCHIVE:s,/,\,) $(LDLOADLIBS:s,/,\,) }
 		 .q{$(MYEXTLIB:s,/,\,),$(EXPORT_LIST:s,/,\,)}
-		: q{$(subst /,\,$(PERL_ARCHIVE)) $(subst /,\,$(LDLOADLIBS)) }
+		!! q{$(subst /,\,$(PERL_ARCHIVE)) $(subst /,\,$(LDLOADLIBS)) }
 		 .q{$(subst /,\,$(MYEXTLIB)),$(subst /,\,$(EXPORT_LIST))})
        .q{,$(RESFILES)});
     } else {	# VC
@@ -341,7 +333,7 @@ $(INST_DYNAMIC): $(OBJECT) $(MYEXTLIB) $(BOOTSTRAP) $(INST_ARCHAUTODIR)$(DFSEP).
       .q{$(MYEXTLIB) $(PERL_ARCHIVE) $(LDLOADLIBS) -def:$(EXPORT_LIST)});
 
       # VS2005 (aka VC 8) or higher, but not for 64-bit compiler from Platform SDK
-      if (%Config{ivsize} == 4 && %Config{cc} eq 'cl' and %Config{ccversion} =~ m/^(\d+)/ and $1 +>= 14) 
+      if (%Config{?ivsize} == 4 && %Config{?cc} eq 'cl' and %Config{?ccversion} =~ m/^(\d+)/ and $1 +>= 14) 
     {
         push(@m,
           q{
@@ -365,7 +357,7 @@ gcc.  Otherwise, take out all *.pdb files.
 sub extra_clean_files {
     my $self = shift;
 
-    return $GCC ?  @(qw(dll.base dll.exp)) :  @('*.pdb');
+    return $GCC ??  @(qw(dll.base dll.exp)) !!  @('*.pdb');
 }
 
 =item init_linker
@@ -375,9 +367,9 @@ sub extra_clean_files {
 sub init_linker {
     my $self = shift;
 
-    $self->{PERL_ARCHIVE}       = "\$(PERL_INC)\\%Config{libperl}";
-    $self->{PERL_ARCHIVE_AFTER} = '';
-    $self->{EXPORT_LIST}        = '$(BASEEXT).def';
+    $self->{+PERL_ARCHIVE}       = "\$(PERL_INC)\\%Config{?libperl}";
+    $self->{+PERL_ARCHIVE_AFTER} = '';
+    $self->{+EXPORT_LIST}        = '$(BASEEXT).def';
 }
 
 
@@ -387,8 +379,7 @@ Checks for the perl program under several common perl extensions.
 
 =cut
 
-sub perl_script {
-    my($self,$file) = < @_;
+sub perl_script($self,$file) {
     return $file if -r $file && -f _;
     return "$file.pl"  if -r "$file.pl" && -f _;
     return "$file.plx" if -r "$file.plx" && -f _;
@@ -416,8 +407,8 @@ banner.
 =cut
 
 sub pasthru {
-    my($self) = shift;
-    return "PASTHRU = " . ($self->make eq 'nmake' ? "-nologo" : "");
+    my@($self) =@( shift);
+    return "PASTHRU = " . ($self->make eq 'nmake' ?? "-nologo" !! "");
 }
 
 
@@ -428,8 +419,7 @@ for other Windows shells, I don't know.
 
 =cut
 
-sub oneliner {
-    my($self, $cmd, $switches) = < @_;
+sub oneliner($self, $cmd, $switches) {
     $switches = \@() unless defined $switches;
 
     # Strip leading and trailing newlines
@@ -445,8 +435,7 @@ sub oneliner {
 }
 
 
-sub quote_literal {
-    my($self, $text) = < @_;
+sub quote_literal($self, $text) {
 
     # I don't know if this is correct, but it seems to work on
     # Win98's command.com
@@ -465,8 +454,7 @@ sub quote_literal {
 }
 
 
-sub escape_newlines {
-    my($self, $text) = < @_;
+sub escape_newlines($self, $text) {
 
     # Escape newlines
     $text =~ s{\n}{\\\n}g;
@@ -489,14 +477,13 @@ NOTE: This only works with simple relative directories.  Throw it an absolute di
 
 =cut
 
-sub cd {
-    my($self, $dir, < @cmds) = < @_;
+sub cd($self, $dir, @< @cmds) {
 
     return $self->SUPER::cd($dir, < @cmds) unless $self->make eq 'nmake';
 
-    my $cmd = join "\n\t", map "$_", @cmds;
+    my $cmd = join "\n\t", map { "$_" }, @cmds;
 
-    my $updirs = $self->catdir(< map { $self->updir } $self->splitdir($dir));
+    my $updirs = $self->catdir(< map { $self->updir }, $self->splitdir($dir));
 
     # No leading tab and no trailing newline makes for easier embedding.
     my $make_frag = sprintf <<'MAKE_FRAG', $dir, $cmd, $updirs;
@@ -520,7 +507,7 @@ nmake 1.50 limits command length to 2048 characters.
 sub max_exec_len {
     my $self = shift;
 
-    return $self->{_MAX_EXEC_LEN} ||= 2 * 1024;
+    return ($self->{+_MAX_EXEC_LEN} ||= 2 * 1024);
 }
 
 
@@ -543,22 +530,21 @@ defined.
 
 =cut
 
-sub cflags {
-    my($self,$libperl)=< @_;
-    return $self->{CFLAGS} if $self->{CFLAGS};
+sub cflags($self,$libperl) {
+    return $self->{?CFLAGS} if $self->{?CFLAGS};
     return '' unless $self->needs_linking();
 
     my $base = $self->SUPER::cflags($libperl);
     foreach (split m/\n/, $base) {
-        m/^(\S*)\s*=\s*(\S*)$/ and $self->{$1} = $2;
+        m/^(\S*)\s*=\s*(\S*)$/ and $self->{+$1} = $2;
     };
-    $self->{CCFLAGS} .= " -DPERLDLL" if ($self->{LINKTYPE} eq 'static');
+    $self->{+CCFLAGS} .= " -DPERLDLL" if ($self->{?LINKTYPE} eq 'static');
 
-    return $self->{CFLAGS} = qq{
-CCFLAGS = $self->{CCFLAGS}
-OPTIMIZE = $self->{OPTIMIZE}
-PERLTYPE = $self->{PERLTYPE}
-};
+    return ($self->{+CFLAGS} = qq{
+CCFLAGS = $self->{?CCFLAGS}
+OPTIMIZE = $self->{?OPTIMIZE}
+PERLTYPE = $self->{?PERLTYPE}
+});
 
 }
 

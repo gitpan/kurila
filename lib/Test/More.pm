@@ -1,8 +1,7 @@
 package Test::More;
 
-use strict;
 
-use vars < qw($VERSION @ISA @EXPORT %EXPORT_TAGS $TODO);
+our ($VERSION, @ISA, @EXPORT, %EXPORT_TAGS, $TODO);
 $VERSION = '0.78';
 $VERSION = eval $VERSION;    # make the alpha version come out as a number
 
@@ -17,7 +16,7 @@ use Test::Builder::Module;
              $TODO
              plan
              can_ok  isa_ok
-             diag
+             diag info
              BAIL_OUT
             );
 
@@ -218,8 +217,7 @@ This is the same as Test::Simple's ok() routine.
 
 =cut
 
-sub ok ($;$) {
-    my($test, $name) = < @_;
+sub ok($test, ?$name) {
     my $tb = Test::More->builder;
 
     $tb->ok($test, $name);
@@ -285,16 +283,16 @@ function which is an alias of isnt().
 
 =cut
 
-sub is ($$;$) {
+sub is($lhs, $rhs, ?$msg) {
     my $tb = Test::More->builder;
 
-    $tb->is_eq(< @_);
+    $tb->is_eq($lhs, $rhs, $msg);
 }
 
-sub isnt ($$;$) {
+sub isnt($lhs, $rhs, ?$msg) {
     my $tb = Test::More->builder;
 
-    $tb->isnt_eq(< @_);
+    $tb->isnt_eq($lhs, $rhs, $msg);
 }
 
 
@@ -328,10 +326,10 @@ diagnostics on failure.
 
 =cut
 
-sub like ($$;$) {
+sub like($got, $expected, ?$name) {
     my $tb = Test::More->builder;
 
-    $tb->like(< @_);
+    $tb->like($got, $expected, $name);
 }
 
 
@@ -344,10 +342,10 @@ given pattern.
 
 =cut
 
-sub unlike ($$;$) {
+sub unlike($got, $expected, ?$name) {
     my $tb = Test::More->builder;
 
-    $tb->unlike(< @_);
+    $tb->unlike($got, $expected, $name);
 }
 
 
@@ -384,7 +382,7 @@ is()'s use of C<eq> will interfere:
 
 =cut
 
-sub cmp_ok($$$;$) {
+sub cmp_ok {
     my $tb = Test::More->builder;
 
     $tb->cmp_ok(< @_);
@@ -420,8 +418,7 @@ as one test.  If you desire otherwise, use:
 
 =cut
 
-sub can_ok ($@) {
-    my($proto, < @methods) = < @_;
+sub can_ok($proto, @< @methods) {
     my $class = ref $proto || $proto;
     my $tb = Test::More->builder;
 
@@ -443,12 +440,12 @@ sub can_ok ($@) {
     }
 
     my $name;
-    $name = (nelems @methods) == 1 ? "$class->can('@methods[0]')" 
-                          : "$class->can(...)";
+    $name = (nelems @methods) == 1 ?? "$class->can('@methods[0]')" 
+                          !! "$class->can(...)";
 
     my $ok = $tb->ok( !nelems @nok, $name );
 
-    $tb->diag(< map "    $class->can('$_') failed\n", @nok);
+    $tb->diag(< map { "    $class->can('$_') failed\n" }, @nok);
 
     return $ok;
 }
@@ -482,8 +479,7 @@ you'd like them to be more specific, you can supply an $object_name
 
 =cut
 
-sub isa_ok ($$;$) {
-    my($object, $class, $obj_name) = < @_;
+sub isa_ok($object, $class, ?$obj_name) {
     my $tb = Test::More->builder;
 
     my $diag;
@@ -497,10 +493,10 @@ sub isa_ok ($$;$) {
     }
     else {
         # We can't use UNIVERSAL::isa because we want to honor isa() overrides
-        local $@;
+        local $^EVAL_ERROR = undef;
         my $rslt = try { $object->isa($class) };
-        if( $@ ) {
-            if( $@->message =~ m/^Can't call method "isa" on unblessed reference/ ) {
+        if( $^EVAL_ERROR ) {
+            if( $^EVAL_ERROR->message =~ m/^Can't call method "isa" on unblessed reference/ ) {
                 # Its an unblessed reference
                 if( !UNIVERSAL::isa($object, $class) ) {
                     my $ref = ref $object;
@@ -510,7 +506,7 @@ sub isa_ok ($$;$) {
                 die <<WHOA;
 WHOA! I tried to call ->isa on your object and got some weird error.
 Here's the error.
-{$@->message}
+$($^EVAL_ERROR->message)
 WHOA
             }
         }
@@ -552,12 +548,12 @@ Use these very, very, very sparingly.
 
 =cut
 
-sub pass (;$) {
+sub pass {
     my $tb = Test::More->builder;
     $tb->ok(1, < @_);
 }
 
-sub fail (;$) {
+sub fail {
     my $tb = Test::More->builder;
     $tb->ok(0, < @_);
 }
@@ -613,12 +609,11 @@ because the notion of "compile-time" is relative.  Instead, you want:
 
 =cut
 
-sub use_ok ($;@) {
-    my($module, < @imports) = < @_;
+sub use_ok($module, @< @imports) {
     @imports = @( () ) unless (nelems @imports);
     my $tb = Test::More->builder;
 
-    my($pack,$filename,$line) = caller;
+    my@($pack,$filename,$line) =@( caller);
 
     my $code;
     if( (nelems @imports) == 1 and ref @imports[0] and @imports[0]->isa('version') ) {
@@ -626,7 +621,7 @@ sub use_ok ($;@) {
         # for it to work with non-Exporter based modules.
         $code = <<USE;
 package $pack;
-use $module {@imports[0]->stringify};
+use $module $(@imports[0]->stringify);
 1;
 USE
     }
@@ -638,13 +633,13 @@ use $module < \@\{\@args[0]\};
 USE
     }
 
-    my($eval_result, $eval_error) = < _eval($code, \@imports);
+    my@($eval_result, $eval_error) =  _eval($code, \@imports);
     my $ok = $tb->ok( $eval_result, "use $module;" );
     
     unless( $ok ) {
         $tb->diag(<<DIAGNOSTIC);
     Tried to use '$module'.
-    Error:  {$eval_error->message}
+    Error:  $($eval_error->message)
 DIAGNOSTIC
 
     }
@@ -654,14 +649,14 @@ DIAGNOSTIC
 
 
 sub _eval {
-    my($code) = shift;
+    my@($code) =@( shift);
     my @args = @_;
 
     # Work around oddities surrounding resetting of $@ by immediately
     # storing it.
-    local($@,$!);   # isolate eval
+    local($^EVAL_ERROR,$^OS_ERROR);   # isolate eval
     my $eval_result = eval $code;
-    my $eval_error  = $@;
+    my $eval_error  = $^EVAL_ERROR;
 
     return @($eval_result, $eval_error);
 }
@@ -670,8 +665,7 @@ sub _eval {
 
 =cut
 
-sub dies_like {
-    my ($coderef, $like, $name) = < @_;
+sub dies_like($coderef, $like, ?$name) {
 
     my $tb = Test::More->builder;
 
@@ -679,8 +673,8 @@ sub dies_like {
         $tb->diag("didn't die");
         return $tb->ok(0, $name);
     }
-    my $err = $@->message;
-    return $tb->like($err, $like, $name);
+    my $err = $^EVAL_ERROR->description;
+    return $tb->like($err, $like, $name) or diag($^EVAL_ERROR->stacktrace);
 }
 
 =item B<require_ok>
@@ -692,8 +686,7 @@ Like use_ok(), except it requires the $module or $file.
 
 =cut
 
-sub require_ok ($) {
-    my($module) = shift;
+sub require_ok ($module) {
     my $tb = Test::More->builder;
 
     my $pack = caller;
@@ -708,13 +701,13 @@ require $module;
 1;
 REQUIRE
 
-    my($eval_result, $eval_error) = < _eval($code);
+    my@($eval_result, $eval_error) =  _eval($code);
     my $ok = $tb->ok( $eval_result, "require $module;" );
 
     unless( $ok ) {
         $tb->diag(<<DIAGNOSTIC);
     Tried to require '$module'.
-    Error:  {$eval_error->message}
+    Error:  $($eval_error->message)
 DIAGNOSTIC
 
     }
@@ -768,7 +761,7 @@ along these lines.
 
 =cut
 
-use vars < qw(@Data_Stack %Refs_Seen);
+our (@Data_Stack, %Refs_Seen);
 my $DNE = bless \@(), 'Does::Not::Exist';
 
 sub _dne {
@@ -792,7 +785,7 @@ WARNING
 	return $tb->ok(0);
     }
 
-    my($got, $expected, $name) = < @_;
+    my @($got, $expected, ?$name) =  @_;
 
     my $ok;
 
@@ -809,13 +802,13 @@ WARNING
 }
 
 sub _format_stack {
-    my(@Stack) = @_;
+    my @Stack = @_;
 
     my $var = '$FOO';
     my $prev_ref = 0;
     foreach my $entry ( @Stack) {
-        my $type = $entry->{type} || '';
-        my $idx  = $entry->{'idx'};
+        my $type = $entry->{?type} || '';
+        my $idx  = $entry->{?'idx'};
         if( $type eq 'HASH' ) {
             $var .= "->" if $prev_ref;
             $var .= "\{$idx\}";
@@ -846,12 +839,12 @@ sub _format_stack {
 
     my @vals = @Stack[-1]->{vals}->[[@(0,1)]];
     my @vars = @( () );
-    (@vars[0] = $var) =~ s/\$FOO/     \$got/;
-    (@vars[1] = $var) =~ s/\$FOO/\$expected/;
+    (@vars[+0] = $var) =~ s/\$FOO/     \$got/;
+    (@vars[+1] = $var) =~ s/\$FOO/\$expected/;
 
     my $out = "Structures begin differing at:\n";
     foreach my $val ( @vals) {
-        $val = _dne($val)    ? "Does not exist" : dump::view($val);
+        $val = _dne($val)    ?? "Does not exist" !! dump::view($val);
     }
 
     $out .= "@vars[0] = @vals[0]\n";
@@ -921,6 +914,21 @@ sub diag {
     $tb->diag(< @_);
 }
 
+=item B<diag>
+
+  diag(@informational_message);
+
+Prints an informational message which is guaranteed not to interfere with
+test output.  Like C<print> @informational_message is simply concatenated
+together.
+
+=cut
+
+sub info {
+    my $tb = Test::More->builder;
+
+    $tb->info(< @_);
+}
 
 =back
 
@@ -985,8 +993,7 @@ use TODO.  Read on.
 =cut
 
 #'#
-sub skip {
-    my($why, $how_many) = < @_;
+sub skip($why, ?$how_many) {
     my $tb = Test::More->builder;
 
     unless( defined $how_many ) {
@@ -1005,7 +1012,7 @@ sub skip {
         $tb->skip($why);
     }
 
-    local $^W = 0;
+    local $^WARNING = 0;
     last SKIP;
 }
 
@@ -1071,8 +1078,7 @@ interpret them as passing.
 
 =cut
 
-sub todo_skip {
-    my($why, $how_many) = < @_;
+sub todo_skip($why, ?$how_many) {
     my $tb = Test::More->builder;
 
     unless( defined $how_many ) {
@@ -1086,7 +1092,7 @@ sub todo_skip {
         $tb->todo_skip($why);
     }
 
-    local $^W = 0;
+    local $^WARNING = 0;
     last TODO;
 }
 
@@ -1169,10 +1175,9 @@ sub eq_array {
     _deep_check(< @_);
 }
 
-sub _eq_array  {
-    my($a1, $a2) = < @_;
+sub _eq_array($a1, $a2)  {
 
-    if( grep !_type($_) eq 'ARRAY', @( $a1, $a2) ) {
+    if( grep { !_type($_) eq 'ARRAY' }, @( $a1, $a2) ) {
         warn "eq_array passed a non-array ref";
         return 0;
     }
@@ -1180,10 +1185,10 @@ sub _eq_array  {
     return 1 if $a1 \== $a2;
 
     my $ok = 1;
-    my $max = (nelems @$a1) +> nelems @$a2 ? (nelems @$a1) : nelems @$a2;
+    my $max = (nelems @$a1) +> nelems @$a2 ?? (nelems @$a1) !! nelems @$a2;
     for (0..$max-1) {
-        my $e1 = $_ +> (nelems @$a1)-1 ? $DNE : $a1->[$_];
-        my $e2 = $_ +> (nelems @$a2)-1 ? $DNE : $a2->[$_];
+        my $e1 = $_ +> (nelems @$a1)-1 ?? $DNE !! $a1->[$_];
+        my $e2 = $_ +> (nelems @$a2)-1 ?? $DNE !! $a2->[$_];
 
         push @Data_Stack, \%( type => 'ARRAY', idx => $_, vals => \@($e1, $e2) );
         $ok = _deep_check($e1,$e2);
@@ -1195,8 +1200,7 @@ sub _eq_array  {
     return $ok;
 }
 
-sub _deep_check {
-    my($e1, $e2) = < @_;
+sub _deep_check($e1, $e2) {
     my $tb = Test::More->builder;
 
     my $ok = 0;
@@ -1206,14 +1210,14 @@ sub _deep_check {
     # circular.
     local %Refs_Seen = %( < %Refs_Seen );
 
-    {
+    do {
         # Quiet uninitialized value warnings when comparing undefs.
-        local $^W = 0; 
+        local $^WARNING = 0; 
 
-        if( %Refs_Seen{ref::address($e1)} ) {
-            return %Refs_Seen{ref::address($e1)} eq ref::address($e2);
+        if( %Refs_Seen{?ref::address($e1)} ) {
+            return %Refs_Seen{?ref::address($e1)} eq ref::address($e2);
         }
-        %Refs_Seen{ref::address $e1} = ref::address $e2;
+        %Refs_Seen{+ref::address($e1)} = ref::address($e2);
 
         if (_dne($e1) or _dne($e2)) {
             $ok = _dne($e1) && _dne($e2);
@@ -1257,14 +1261,13 @@ sub _deep_check {
         else {
             _whoa(1, "Unknown type '$type' in _deep_check");
         }
-    }
+    };
 
     return $ok;
 }
 
 
-sub _whoa {
-    my($check, $desc) = < @_;
+sub _whoa($check, $desc) {
     if( $check ) {
         die <<WHOA;
 WHOA!  $desc
@@ -1288,10 +1291,9 @@ sub eq_hash {
     return _deep_check(< @_);
 }
 
-sub _eq_hash {
-    my($a1, $a2) = < @_;
+sub _eq_hash($a1, $a2) {
 
-    if( grep !_type($_) eq 'HASH', @( $a1, $a2) ) {
+    if( grep { !_type($_) eq 'HASH' }, @( $a1, $a2) ) {
         warn "eq_hash passed a non-hash ref";
         return 0;
     }
@@ -1299,10 +1301,10 @@ sub _eq_hash {
     return 1 if $a1 \== $a2;
 
     my $ok = 1;
-    my $bigger = (nelems keys %$a1) +> (nelems keys %$a2) ? $a1 : $a2;
+    my $bigger = (nelems keys %$a1) +> (nelems keys %$a2) ?? $a1 !! $a2;
     foreach my $k (keys %$bigger) {
-        my $e1 = exists $a1->{$k} ? $a1->{$k} : $DNE;
-        my $e2 = exists $a2->{$k} ? $a2->{$k} : $DNE;
+        my $e1 = exists $a1->{$k} ?? $a1->{?$k} !! $DNE;
+        my $e2 = exists $a2->{$k} ?? $a2->{?$k} !! $DNE;
 
         push @Data_Stack, \%( type => 'HASH', idx => $k, vals => \@($e1, $e2) );
         $ok = _deep_check($e1, $e2);
@@ -1340,27 +1342,12 @@ Test::Deep contains much better set comparison functions.
 
 =cut
 
-sub eq_set  {
-    my($a1, $a2) = < @_;
+sub eq_set($a1, $a2, ?$name)  {
     return 0 unless (nelems @$a1) == nelems @$a2;
 
-    # There's faster ways to do this, but this is easiest.
-    local $^W = 0;
-
-    # It really doesn't matter how we sort them, as long as both arrays are 
-    # sorted with the same algorithm.
-    #
-    # Ensure that references are not accidentally treated the same as a
-    # string containing the reference.
-    #
-    # Have to inline the sort routine due to a threading/sort bug.
-    # See [rt.cpan.org 6782]
-    #
-    # I don't know how references would be sorted so we just don't sort
-    # them.  This means eq_set doesn't really work with refs.
     return eq_array(
-           \@(< grep(ref, @$a1), < sort( grep(!ref, @$a1) )),
-           \@(< grep(ref, @$a2), < sort( grep(!ref, @$a2) )),
+           \ (sort { $a cmp $b }, map { dump::view($_) }, @$a1 ),
+           \ (sort { $a cmp $b }, map { dump::view($_) }, @$a2 ),
     );
 }
 

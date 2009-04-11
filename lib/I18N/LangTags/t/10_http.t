@@ -2,11 +2,12 @@
 # Time-stamp: "2004-06-17 23:06:22 PDT"
 
 use I18N::LangTags::Detect;
+use env;
 
-use Test;
+use Test::More;
 BEGIN { plan tests => 87 };
 
-my @in = grep m/\S/, split m/\n/, q{
+my @in = grep { m/\S/ }, split m/\n/, q{
 
 [ sv      ]  sv
 [ en      ]  en
@@ -64,17 +65,17 @@ foreach my $in ( @in) {
 
   if($in eq 'NIX') { $in = ''; @should = @( () ); }
 
-  local %ENV{'HTTP_ACCEPT_LANGUAGE'};
+  local env::var('HTTP_ACCEPT_LANGUAGE') = undef;
   
   foreach my $modus (@(
     sub {
-      print "# Testing with arg...\n";
-      %ENV{'HTTP_ACCEPT_LANGUAGE'} = 'PLORK';
+      print $^STDOUT, "# Testing with arg...\n";
+      env::var('HTTP_ACCEPT_LANGUAGE' ) = 'PLORK';
       return @(@_[0]);
     },
     sub {
-      print "# Testing wath HTTP_ACCEPT_LANGUAGE...\n";
-      %ENV{'HTTP_ACCEPT_LANGUAGE'} = @_[0];
+      print $^STDOUT, "# Testing wath HTTP_ACCEPT_LANGUAGE...\n";
+      env::var('HTTP_ACCEPT_LANGUAGE' ) = @_[0];
      return();
     },)
   ) {
@@ -88,17 +89,17 @@ foreach my $in ( @in) {
      (nelems @out) == nelems @should
        and lc( join "\e", @(<@out) ) eq lc( join "\e", @should )
     ) {
-      print "# Happily got [{join ' ',@(<@out)}] from [$in]\n";
+      print $^STDOUT, "# Happily got [$(join ' ',@(<@out))] from [$in]\n";
       ok 1;
     } else {
       ok 0;
-      print "#Got:         [{join ' ',@out}]\n",
-            "# but wanted: [{join ' ',@should}]\n",
+      print $^STDOUT, "#Got:         [$(join ' ',@out)]\n",
+            "# but wanted: [$(join ' ',@should)]\n",
             "# < \"$in\"\n#\n";
     }
   }
 }
 
-print "#\n#\n# Bye-bye!\n";
+print $^STDOUT, "#\n#\n# Bye-bye!\n";
 ok 1;
 

@@ -1,12 +1,11 @@
 BEGIN {
-    if(%ENV{PERL_CORE}) {
+    if(env::var('PERL_CORE')) {
         chdir 't';
-        @INC = @( '../lib' );
+        $^INCLUDE_PATH = @( '../lib' );
     }
 }
 
-use strict;
-use Test;
+use Test::More;
 BEGIN { plan tests => 8 };
 
 my $d;
@@ -33,12 +32,12 @@ my @from = @(
 
 # Might as well test all the classes...
 while((nelems @from)) {
-  my($x => $expected) = splice(@from, 0,2);
+  my@($x => $expected) = @: splice(@from, 0,2);
   my $more = '';
-  print "#Testing via class $x, version ", $x->VERSION(), "\n";
+  print $^STDOUT, "#Testing via class $x, version ", $x->VERSION(), "\n";
   my $p = $x->new;
   my($got, $exp);
-  ok scalar($got = $x->_out(
+  is scalar($got = $x->_out(
     # Mutor:
     sub {
      @_[0]->code_handler(sub { $more .= @_[1] . ":" . @_[0] . "\n"       } );
@@ -57,7 +56,7 @@ while((nelems @from)) {
     => scalar($exp = $expected);
   ;
   unless($got eq $exp) {
-    print '# Got vs exp:\n# ', < Pod::Simple::BlackBox::pretty($got),
+    print $^STDOUT, '# Got vs exp:\n# ', < Pod::Simple::BlackBox::pretty($got),
      "\n# ", <Pod::Simple::BlackBox::pretty($exp),"\n";
   }
   
@@ -71,13 +70,13 @@ while((nelems @from)) {
    "",)
   );
   unless($got eq $exp) {
-   print '# Got vs exp:\n# ', < Pod::Simple::BlackBox::pretty($got),
+   print $^STDOUT, '# Got vs exp:\n# ', < Pod::Simple::BlackBox::pretty($got),
     "\n# ", <Pod::Simple::BlackBox::pretty($exp),"\n";
   }
 }
 
 
-print "# Wrapping up... one for the road...\n";
+print $^STDOUT, "# Wrapping up... one for the road...\n";
 ok 1;
-print "# --- Done with ", __FILE__, " --- \n";
+print $^STDOUT, "# --- Done with ", __FILE__, " --- \n";
 

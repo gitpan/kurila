@@ -4,7 +4,7 @@
 #
 # BEGIN {
 #   chdir 't' if -d 't';
-#   @INC = '../lib';
+#   $^INCLUDE_PATH = '../lib';
 # }
 #
 # t/TEST will use -MTestInit.  You may "use TestInit" in the test
@@ -19,12 +19,12 @@ our $VERSION = 1.01;
 
 BEGIN {
     chdir 't' if -d 't';
-    @INC = @('../lib');
+    $^INCLUDE_PATH = @('../lib');
 }
 
-# Don't interfere with the taintedness of %ENV, this could perturbate tests
-%ENV{PERL_CORE} = 1 unless $^TAINT;
+env::var('PERL_CORE' ) = 1;
 
-$0 =~ s/\.dp$//; # for the test.deparse make target
+$^PROGRAM_NAME =~ s/\.dp$//; # for the test.deparse make target
+
 1;
 

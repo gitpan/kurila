@@ -1,8 +1,7 @@
 package CompTestUtils;
 
 package main ;
-
-use strict ;
+ 
 use warnings;
 use bytes;
 
@@ -21,10 +20,10 @@ sub title
 
 sub like_eval
 {
-    like $@->{description}, nelems @_ ;
+    like $^EVAL_ERROR->{?description}, nelems @_ ;
 }
 
-{
+do {
     package LexFile ;
 
     our ($index);
@@ -51,9 +50,9 @@ sub like_eval
         for ( @$self) { 1 while unlink $_ } ;
     }
 
-}
+};
 
-{
+do {
     package LexDir ;
 
     use File::Path;
@@ -69,7 +68,7 @@ sub like_eval
         my $self = shift ;
         foreach ( @$self) { rmtree $_ }
     }
-}
+};
 sub readFile
 {
     my $f = shift ;
@@ -85,11 +84,11 @@ sub readFile
     }
     else
     {
-        open (F, "<", "$f") 
-            or die "Cannot open $f: $!\n" ;
-        binmode F;
-        @strings = @( ~< *F ) ;	
-        close F ;
+        open (my $fh, "<", "$f") 
+            or die "Cannot open $f: $^OS_ERROR\n" ;
+        binmode $fh;
+        @strings = @( ~< *$fh ) ;	
+        close $fh ;
     }
 
     return join "", @strings ;
@@ -100,25 +99,24 @@ sub touch
     foreach ( @_) { writeFile($_, '') }
 }
 
-sub writeFile
-{
-    my($filename, < @strings) = < @_ ;
+sub writeFile($filename, @< @strings)
+{ 
     1 while unlink $filename ;
-    open (F, ">", "$filename") 
-        or croak "Cannot open $filename: $!\n" ;
-    binmode F;
+    open (my $fh, ">", "$filename") 
+        or croak "Cannot open $filename: $^OS_ERROR\n" ;
+    binmode $fh;
     foreach ( @strings) {
         no warnings ;
-        print F $_ ;
+        print $fh, $_ ;
     }
-    close F ;
+    close $fh ;
 }
 
 sub GZreadFile
 {
-    my ($filename) = shift ;
+    my @($filename) =@( shift) ;
 
-    my ($uncomp) = "" ;
+    my $uncomp = "" ;
     my $line = "" ;
     my $fil = gzopen($filename, "rb") 
         or croak "Cannopt open '$filename': $Compress::Zlib::gzerrno" ;
@@ -153,17 +151,17 @@ sub hexDump
     #while (read(STDIN, $data, 16)) {
     while (my $data = substr($d, 0, 16)) {
         substr($d, 0, 16, '') ;
-        printf "# \%8.8lx    ", $offset;
+        printf $^STDOUT, "# \%8.8lx    ", $offset;
         $offset += 16;
 
         my @array = @( unpack('C*', $data) );
         foreach ( @array) {
-            printf('%2.2x ', $_);
+            printf($^STDOUT, '%2.2x ', $_);
         }
-        print "   " x (16 - nelems @array)
+        print $^STDOUT, "   " x (16 - nelems @array)
             if (nelems @array) +< 16 ;
         $data =~ s/[\0-\37\177-\377]/./g;
-        print "  $data\n";
+        print $^STDOUT, "  $data\n";
     }
 
 }
@@ -178,7 +176,7 @@ some text
 EOM
 
     my $x;
-    ok $x = IO::Compress::Gzip->new( $name, < %opts) 
+    ok($x = IO::Compress::Gzip->new( $name, < %opts))
         or diag "GzipError is $IO::Compress::Gzip::GzipError" ;
     ok $x->write($string) ;
     ok $x->close ;
@@ -186,10 +184,10 @@ EOM
     #is GZreadFile($name), $string ;
 
     my $gunz;
-    ok $gunz = IO::Uncompress::Gunzip->new( $name, Strict => 0)
+    ok($gunz = IO::Uncompress::Gunzip->new( $name, Strict => 0))
         or diag "GunzipError is $IO::Uncompress::Gunzip::GunzipError" ;
     my $hdr;
-    ok $hdr = $gunz->getHeaderInfo();
+    ok($hdr = $gunz->getHeaderInfo());
     my $uncomp ;
     ok $gunz->read($uncomp) ;
     ok $uncomp eq $string;
@@ -198,9 +196,8 @@ EOM
     return $hdr ;
 }
 
-sub cmpFile
-{
-    my ($filename, $uue) = < @_ ;
+sub cmpFile($filename, $uue)
+{ 
     return readFile($filename) eq unpack("u", $uue) ;
 }
 
@@ -228,7 +225,7 @@ sub uncompressBuffer
                 );
 
     my $out ;
-    my $obj = %mapping{$compWith}->new( \$buffer, -Append => 1);
+    my $obj = %mapping{?$compWith}->new( \$buffer, -Append => 1);
     1 while $obj->read($out) +> 0 ;
     return $out ;
 
@@ -298,8 +295,8 @@ my %TopFuncMap = %(  'IO::Compress::Gzip'          => 'IO::Compress::Gzip::gzip'
                     'IO::Uncompress::DummyUncomp' => 'IO::Uncompress::DummyUncomp::dummyuncomp',
                  );
 
-   %TopFuncMap = %( < map { ($_              => %TopFuncMap{$_}, 
-                        %TopFuncMap{$_} => %TopFuncMap{$_}) } 
+   %TopFuncMap = %( < @+: map { @($_              => %TopFuncMap{?$_}, 
+                        %TopFuncMap{?$_} => %TopFuncMap{?$_}) }, 
                  keys %TopFuncMap ) ;
 
  #%TopFuncMap = map { ($_              => \&{ $TopFuncMap{$_} ) } 
@@ -324,34 +321,34 @@ my %inverse  = %( 'IO::Compress::Gzip'                    => 'IO::Uncompress::Gu
                  'IO::Compress::DummyComp'               => 'IO::Uncompress::DummyUncomp',
              );
 
-%inverse  = %( < map { ($_ => %inverse{$_}, %inverse{$_} => $_) } keys %inverse );
+%inverse  = %( < @+: map { @($_ => %inverse{?$_}, %inverse{?$_} => $_) }, keys %inverse );
 
 sub getInverse
 {
     my $class = shift ;
 
-    return %inverse{$class} ;
+    return %inverse{?$class} ;
 }
 
 sub getErrorRef
 {
     my $class = shift ;
 
-    return %ErrorMap{$class} ;
+    return %ErrorMap{?$class} ;
 }
 
 sub getTopFuncRef
 {
     my $class = shift ;
 
-    return \&{ %TopFuncMap{$class} } ;
+    return \&{ %TopFuncMap{?$class} } ;
 }
 
 sub getTopFuncName
 {
     my $class = shift ;
 
-    return %TopFuncMap{$class}  ;
+    return %TopFuncMap{?$class}  ;
 }
 
 sub compressBuffer
@@ -382,7 +379,7 @@ sub compressBuffer
                 );
 
     my $out ;
-    my $obj = %mapping{$compWith}->new( \$out);
+    my $obj = %mapping{?$compWith}->new( \$out);
     $obj->write($buffer) ;
     $obj->close();
     return $out ;
@@ -560,7 +557,7 @@ sub mkComplete
 sub mkErr
 {
     my $string = shift ;
-    my ($dummy, $file, $line) = caller ;
+    my @($dummy, $file, $line) =@( caller) ;
     -- $line ;
 
     $file = quotemeta($file);
@@ -572,22 +569,22 @@ sub mkEvalErr
 {
     my $string = shift ;
 
-    return "/$string\\s+at /" ;
+    return "/$string/" ;
 }
 
 sub dumpObj
 {
     my $obj = shift ;
 
-    my ($dummy, $file, $line) = caller ;
+    my @($dummy, $file, $line) =@( caller) ;
 
     if ((nelems @_))
     {
-        print "#\n# dumpOBJ from $file line $line {join ' ',@_}\n" ;
+        print $^STDOUT, "#\n# dumpOBJ from $file line $line $(join ' ',@_)\n" ;
     }
     else
     {
-        print "#\n# dumpOBJ from $file line $line \n" ;
+        print $^STDOUT, "#\n# dumpOBJ from $file line $line \n" ;
     }
 
     my $max = 0 ;;
@@ -598,12 +595,12 @@ sub dumpObj
 
     foreach my $k (sort keys %{ *$obj })
     {
-        my $v = $obj->{$k} ;
+        my $v = $obj->{?$k} ;
         $v = '-undef-' unless defined $v;
         my $pad = ' ' x ($max - length($k) + 2) ;
-        print "# $k$pad: [$v]\n";
+        print $^STDOUT, "# $k$pad: [$v]\n";
     }
-    print "#\n" ;
+    print $^STDOUT, "#\n" ;
 }
 
 
@@ -619,7 +616,7 @@ sub getMultiValues
 sub gotScalarUtilXS
 {
     eval ' use Scalar::Util "dualvar" ';
-    return $@ ? 0 : 1 ;
+    return $^EVAL_ERROR ?? 0 !! 1 ;
 }
 
 package CompTestUtils;

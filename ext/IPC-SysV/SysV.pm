@@ -6,8 +6,7 @@
 
 package IPC::SysV;
 
-use strict;
-use vars < qw(@ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $VERSION $XS_VERSION);
+our (@ISA, @EXPORT, @EXPORT_OK, %EXPORT_TAGS, $VERSION, $XS_VERSION);
 use Carp;
 use Config;
 
@@ -46,7 +45,7 @@ $VERSION = eval $VERSION;
 	ftok
 );
 
-BOOT_XS: {
+BOOT_XS: do {
     require DynaLoader;
 
     # DynaLoader calls dl_load_flags as a static method.
@@ -55,7 +54,7 @@ BOOT_XS: {
     do {
 	__PACKAGE__->can('bootstrap') || \&DynaLoader::bootstrap
     }->(__PACKAGE__, $XS_VERSION);
-}
+};
 
 1;
 

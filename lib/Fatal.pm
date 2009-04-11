@@ -1,6 +1,5 @@
 package Fatal;
 
-use strict;
 our($Debug, $VERSION);
 
 $VERSION = 1.06;
@@ -25,15 +24,14 @@ sub fill_protos {
     push(@out, $1 . "\{\@_[$n]\}"), next if $proto =~ s/^\s*\\([\@%\$\&])//;
     push(@out, "\@_[$n]"), next if $proto =~ s/^\s*([_*\$&])//;
     push(@out, " < \@_[[ $n..nelems(\@_)-1]]"), last if $proto =~ s/^\s*(;\s*)?\@//;
-    $seen_semi = 1, $n--, next if $proto =~ s/^\s*;//; # XXXX ????
+    ($seen_semi = 1), $n--, next if $proto =~ s/^\s*;//; # XXXX ????
     die "Unknown prototype letters: \"$proto\"";
   }
   push(@out1,\@($n+1,< @out));
   return @out1;
 }
 
-sub write_invocation {
-  my ($core, $call, $name, < @argvs) = < @_;
+sub write_invocation($core, $call, $name, @< @argvs) {
   if ((nelems @argvs) == 1) {		# No optional arguments
     my @argv = @{@argvs[0]};
     shift @argv;
@@ -44,46 +42,42 @@ sub write_invocation {
     while ((nelems @argvs)) {
       @argv = @{shift @argvs};
       $n = shift @argv;
-      push @out, "{$else}if (nelems(\@_) == $n) \{\n";
+      push @out, "$($else)if (nelems(\@_) == $n) \{\n";
       $else = "\t\} els";
       push @out, 
           "\t\treturn " . one_invocation($core, $call, $name, < @argv) . ";\n";
     }
     push @out, <<EOC;
 	\}
-	die "$name(\$(join ' ', map \{ dump::view(\$_) \} \@_): Do not expect to get \$(nelems(\@_)) arguments";
+	die "$name(\$(join ' ', map \{ dump::view(\$_) \}, \@_): Do not expect to get \$(nelems(\@_)) arguments";
 EOC
     return join '', @out;
   }
 }
 
-sub one_invocation {
-  my ($core, $call, $name, < @argv) = < @_;
-  return qq{$call({join ', ', @argv}) || die "Can't $name(\{join ', ', map \{ dump::view(\$_) \} \@_\})} . 
-    ($core ? ': $!' : ', \$! is \"$!\"') . '"';
+sub one_invocation($core, $call, $name, @< @argv) {
+  return qq{$call($(join ', ', @argv)) || die "Can't $name(\$(join ', ', map \{ dump::view(\$_) \}, \@_))} . 
+    ($core ?? ': $^OS_ERROR' !! ', \$^OS_ERROR is \"$^OS_ERROR\"') . '"';
 }
 
-sub _make_fatal {
-    my($sub, $pkg) = < @_;
+sub _make_fatal($sub, $pkg) {
     my($name, $code, $sref, $real_proto, $proto, $core, $call);
     my $ini = $sub;
 
-    $sub = "{$pkg}::$sub" unless $sub =~ m/::/;
+    $sub = "$($pkg)::$sub" unless $sub =~ m/::/;
     $name = $sub;
     $name =~ s/.*::// or $name =~ s/^&//;
-    print "# _make_fatal: sub=$sub pkg=$pkg name=$name\n" if $Debug;
+    $sub = Symbol::fetch_glob($sub);
+    print $^STDOUT, "# _make_fatal: sub=$sub pkg=$pkg name=$name\n" if $Debug;
     die "Bad subroutine name for Fatal: $name" unless $name =~ m/^\w+$/;
     if (defined(&$sub)) {	# user subroutine
 	$sref = \&$sub;
 	$proto = prototype $sref;
 	$call = '&$sref';
-    } elsif ($sub eq $ini && $sub !~ m/^CORE::GLOBAL::/) {
-	# Stray user subroutine
-	die "$sub is not a Perl subroutine" 
     } else {			# CORE subroutine
         $proto = try { prototype "CORE::$name" };
 	die "$name is neither a builtin, nor a Perl subroutine" 
-	  if $@;
+	  if $^EVAL_ERROR;
 	die "Cannot make the non-overridable builtin $name fatal"
 	  if not defined $proto;
 	$core = 1;
@@ -96,19 +90,19 @@ sub _make_fatal {
       $proto = '@';
     }
     $code = <<EOS;
-sub$real_proto \{
-	local(\$!) = (0);
+sub \{
+	local(\$^OS_ERROR) = (0);
 EOS
     my @protos = fill_protos($proto);
     $code .= write_invocation($core, $call, $name, < @protos);
     $code .= "\}\n";
-    print $code if $Debug;
-    {
+    print $^STDOUT, $code if $Debug;
+    do {
       $code = eval("package $pkg; $code");
-      die if $@;
+      die if $^EVAL_ERROR;
       no warnings;   # to avoid: Subroutine foo redefined ...
-      *{Symbol::fetch_glob($sub)} = $code;
-    }
+      *{$sub} = $code;
+    };
 }
 
 1;

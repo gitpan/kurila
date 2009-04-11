@@ -1,10 +1,9 @@
-use strict;
 use File::Spec;
 
 ### only run interactive tests when there's someone that can answer them
-use Test::More -t STDOUT
-                    ? 'no_plan' 
-                    : ( skip_all => "No interactive tests from harness" );
+use Test::More -t $^STDOUT
+                    ?? 'no_plan' 
+                    !! ( skip_all => "No interactive tests from harness" );
 
 my $Class   = 'IPC::Cmd';
 my $Child   = File::Spec->catfile( qw[src child.pl] );

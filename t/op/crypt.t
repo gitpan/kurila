@@ -5,7 +5,7 @@ BEGIN {
 
     require "./test.pl";
 
-    if( !%Config{d_crypt} ) {
+    if( ! config_value("d_crypt") ) {
         skip_all("crypt unimplemented");
     }
     else {
@@ -23,21 +23,21 @@ BEGIN {
 # bets, given alternative encryption/hashing schemes like MD5,
 # C2 (or higher) security schemes, and non-UNIX platforms.
 
-SKIP: {
-	skip ("VOS crypt ignores salt.", 1) if ($^O eq 'vos');
+SKIP: do {
+	skip ("VOS crypt ignores salt.", 1) if ($^OS_NAME eq 'vos');
 	ok(substr(crypt("ab", "cd"), 2) ne substr(crypt("ab", "ce"), 2), "salt makes a difference");
-}
+};
 
 use utf8;
 
 $a = "a\x[FF]\x{100}";
 
 try {$b = crypt($a, "cd")};
-is($@, '',   "treat all strings as byte-strings");
+is($^EVAL_ERROR, '',   "treat all strings as byte-strings");
 
 chop $a; # throw away the wide character
 
 try {$b = crypt($a, "cd")};
-is($@, '',                   "downgrade to eight bit characters");
+is($^EVAL_ERROR, '',                   "downgrade to eight bit characters");
 is($b, crypt("a\x[FF]", "cd"), "downgrade results agree");
 

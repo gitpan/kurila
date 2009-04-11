@@ -1,13 +1,13 @@
 #!perl
 
-use strict;
+
 use warnings;
 use Getopt::Long;
 use File::Basename;
 use File::Spec;
 
 BEGIN {
-    if ($^O eq 'VMS') {
+    if ($^OS_NAME eq 'VMS') {
         require VMS::Filespec;
         VMS::Filespec->import;
     }
@@ -15,27 +15,27 @@ BEGIN {
 
 Getopt::Long::Configure('no_ignore_case');
 
-our $LastUpdate = -M $0;
+our $LastUpdate = -M $^PROGRAM_NAME;
 
 sub handle_file {
     my $opts    = shift;
     my $file    = shift or die "Need file\n". usage();
     my $outfile = shift || '';
-    $file = vms_check_name($file) if $^O eq 'VMS';
+    $file = vms_check_name($file) if $^OS_NAME eq 'VMS';
     my $mode    = @(stat($file))[2] ^&^ 07777;
 
     open my $fh, "<", $file
-        or do { warn "Could not open input file $file: $!"; exit 0 };
-    my $str = do { local $/; ~< $fh };
+        or do { warn "Could not open input file $file: $^OS_ERROR"; exit 0 };
+    my $str = do { local $^INPUT_RECORD_SEPARATOR = undef; ~< $fh };
 
     ### unpack?
     my $outstr;
-    if( $opts->{u} ) {
+    if( $opts->{?u} ) {
         if( !$outfile ) {
             $outfile = $file;
             $outfile =~ s/\.packed\z//;
         }
-        my ($head, $body) = < split m/__UU__\n/, $str;
+        my @($head, $body) =  split m/__UU__\n/, $str;
         die "Can't unpack malformed data in '$file'\n"
             if !$head;
         $outstr = unpack 'u', $body;
@@ -43,7 +43,7 @@ sub handle_file {
     } else {
         $outfile ||= $file . '.packed';
 
-        my $me = basename($0);
+        my $me = basename($^PROGRAM_NAME);
 
         $outstr = <<"EOFBLURB" . pack 'u', $str;
 #########################################################################
@@ -58,48 +58,48 @@ To recreate it use the following command:
 
      $me -p $file $outfile
 
-Created at {join ' ',@{\@(scalar localtime)}
-}#########################################################################
+Created at $(scalar localtime)
+)#########################################################################
 __UU__
 EOFBLURB
     }
 
     ### output the file
-    if( $opts->{'s'} ) {
-        print STDOUT $outstr;
+    if( $opts->{?'s'} ) {
+        print $^STDOUT, $outstr;
     } else {
-        $outfile = VMS::Filespec::vmsify($outfile) if $^O eq 'VMS';
-        print "Writing $file into $outfile\n" if $opts->{'v'};
+        $outfile = VMS::Filespec::vmsify($outfile) if $^OS_NAME eq 'VMS';
+        print $^STDOUT, "Writing $file into $outfile\n" if $opts->{?'v'};
         open my $outfh, ">", $outfile
-            or do { warn "Could not open $outfile for writing: $!"; exit 0 };
+            or do { warn "Could not open $outfile for writing: $^OS_ERROR"; exit 0 };
         binmode $outfh;
         ### $outstr might be empty, if the file was empty
-        print $outfh $outstr if $outstr;
+        print $outfh, $outstr if $outstr;
         close $outfh;
 
         chmod $mode, $outfile;
     }
 
     ### delete source file?
-    if( $opts->{'D'} and $file ne $outfile ) {
+    if( $opts->{?'D'} and $file ne $outfile ) {
         1 while unlink $file;
     }
 }
 
 sub bulk_process {
     my $opts = shift;
-    my $Manifest = $opts->{'m'};
+    my $Manifest = $opts->{?'m'};
 
-    open my $fh, "<", $Manifest or die "Could not open '$Manifest':$!";
+    open my $fh, "<", $Manifest or die "Could not open '$Manifest':$^OS_ERROR";
 
-    print "Reading $Manifest\n"
-            if $opts->{'v'};
+    print $^STDOUT, "Reading $Manifest\n"
+            if $opts->{?'v'};
 
     my $count = 0;
     my $lines = 0;
     while( my $line = ~< $fh ) {
         chomp $line;
-        my ($file) = < split m/\s+/, $line;
+        my @($file, ...) =  split m/\s+/, $line;
 
         $lines++;
 
@@ -109,44 +109,44 @@ sub bulk_process {
 
         my $out = $file;
         $out =~ s/\.packed\z//;
-        $out = vms_check_name($out) if $^O eq 'VMS';
+        $out = vms_check_name($out) if $^OS_NAME eq 'VMS';
 
         ### unpack
-        if( !$opts->{'c'} ) {
-            ( $out, $file ) = ( $file, $out ) if $opts->{'p'};
+        if( !$opts->{?'c'} ) {
+            @( $out, $file ) = @( $file, $out ) if $opts->{?'p'};
             if (-e $out) {
                 my $changed = -M _;
                 if ($changed +< $LastUpdate and $changed +< -M $file) {
-                    print "Skipping '$file' as '$out' is up-to-date.\n"
-                        if $opts->{'v'};
+                    print $^STDOUT, "Skipping '$file' as '$out' is up-to-date.\n"
+                        if $opts->{?'v'};
                     next;
                 }
             }
             handle_file($opts, $file, $out);
-            print "Converted '$file' to '$out'\n"
-                if $opts->{'v'};
+            print $^STDOUT, "Converted '$file' to '$out'\n"
+                if $opts->{?'v'};
 
         ### clean up
         } else {
 
             ### file exists?
             unless( -e $out ) {
-                print "File '$file' was not unpacked into '$out'. Can not remove.\n";
+                print $^STDOUT, "File '$file' was not unpacked into '$out'. Can not remove.\n";
 
             ### remove it
             } else {
-                print "Removing '$out'\n";
+                print $^STDOUT, "Removing '$out'\n";
                 1 while unlink $out;
             }
         }
     }
-    print "Found $count files to process out of $lines in '$Manifest'\n"
-            if $opts->{'v'};
+    print $^STDOUT, "Found $count files to process out of $lines in '$Manifest'\n"
+            if $opts->{?'v'};
 }
 
 sub usage {
     return qq[
-Usage: $^X $0 [-d dir] [-v] [-c] [-D] -p|-u [orig [packed|-s] | -m [manifest]]
+Usage: $^EXECUTABLE_NAME $^PROGRAM_NAME [-d dir] [-v] [-c] [-D] -p|-u [orig [packed|-s] | -m [manifest]]
 
     Handle binary files in source tree. Can be used to pack or
     unpack files individiually or as specified by a manifest file.
@@ -181,7 +181,7 @@ sub vms_check_name {
     $file = VMS::Filespec::vmsify($file);
     return $file if -e $file;
 
-    my ($vol,$dirs,$base) = < File::Spec->splitpath($file);
+    my @($vol,$dirs,$base) =  File::Spec->splitpath($file);
     my $tmp = $base;
     1 while $tmp =~ s/([^\.]+)\.(.+\..+)/$1_$2/;
     my $try = File::Spec->catpath($vol, $dirs, $tmp);
@@ -199,17 +199,17 @@ my $opts = \%();
 GetOptions($opts,'u','p','c', 'D', 'm:s','s','d=s','v','h');
 
 die "Can't pack and unpack at the same time!\n", < usage()
-    if $opts->{'u'} && $opts->{'p'};
-die < usage() if $opts->{'h'};
+    if $opts->{?'u'} && $opts->{?'p'};
+die < usage() if $opts->{?'h'};
 
-if ( $opts->{'d'} ) {
-    chdir $opts->{'d'}
-        or die "Failed to chdir to '$opts->{'d'}':$!";
+if ( $opts->{?'d'} ) {
+    chdir $opts->{?'d'}
+        or die "Failed to chdir to '$opts->{?'d'}':$^OS_ERROR";
 }
-$opts->{'u'} = 1 if !$opts->{'p'};
-binmode STDOUT if $opts->{'s'};
+$opts->{+'u'} = 1 if !$opts->{?'p'};
+binmode $^STDOUT if $opts->{?'s'};
 if ( exists $opts->{'m'} or exists $opts->{'c'} ) {
-    $opts->{'m'} ||= "MANIFEST";
+    $opts->{+'m'} ||= "MANIFEST";
     bulk_process($opts);
     exit(0);
 } else {

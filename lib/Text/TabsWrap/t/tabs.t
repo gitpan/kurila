@@ -90,9 +90,8 @@ my $numtests = nelems(@tests) / 2;
 plan tests => $numtests;
 
 use Text::Tabs;
-use strict;
 
-my $rerun = %ENV{'PERL_DL_NONLAZY'} ? 0 : 1;
+my $rerun = env::var('PERL_DL_NONLAZY') ?? 0 !! 1;
 
 while (@tests) {
 	my $in = shift(@tests);

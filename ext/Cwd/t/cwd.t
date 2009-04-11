@@ -2,29 +2,28 @@
 
 use Cwd;
 
-use strict;
 use Config;
 use File::Spec;
 use File::Path;
 
 use lib File::Spec->catdir('t', 'lib');
 use Test::More;
-require VMS::Filespec if $^O eq 'VMS';
+require VMS::Filespec if $^OS_NAME eq 'VMS';
 
 my $tests = 30;
 # _perl_abs_path() currently only works when the directory separator
 # is '/', so don't test it when it won't work.
-my $EXTRA_ABSPATH_TESTS = (%Config{prefix} =~ m/\//) && $^O ne 'cygwin';
+my $EXTRA_ABSPATH_TESTS = (config_value('prefix') =~ m/\//) && $^OS_NAME ne 'cygwin';
 $tests += 4 if $EXTRA_ABSPATH_TESTS;
 plan tests => $tests;
 
-SKIP: {
-  skip "no need to check for blib/ in the core", 1 if %ENV{PERL_CORE};
-  like %INC{'Cwd.pm'}, qr{blib}i, "Cwd should be loaded from blib/ during testing";
-}
+SKIP: do {
+  skip "no need to check for blib/ in the core", 1 if env::var('PERL_CORE');
+  like $^INCLUDED{?'Cwd.pm'}, qr{blib}i, "Cwd should be loaded from blib/ during testing";
+};
 
-my $IsVMS = $^O eq 'VMS';
-my $IsMacOS = $^O eq 'MacOS';
+my $IsVMS = $^OS_NAME eq 'VMS';
+my $IsMacOS = $^OS_NAME eq 'MacOS';
 
 # check imports
 can_ok('main', < qw(cwd getcwd fastcwd fastgetcwd));
@@ -32,51 +31,55 @@ ok( !defined(&chdir),           'chdir() not exported by default' );
 ok( !defined(&abs_path),        '  nor abs_path()' );
 ok( !defined(&fast_abs_path),   '  nor fast_abs_path()');
 
-{
+do {
   my @fields = qw(PATH IFS CDPATH ENV BASH_ENV);
-  my $before = grep exists %ENV{$_}, @fields;
+  my $before = grep { defined env::var($_) }, @fields;
   cwd();
-  my $after = grep exists %ENV{$_}, @fields;
+  my $after = grep { defined env::var($_) }, @fields;
   is(nelems($before), nelems($after), "cwd() shouldn't create spurious entries in \%ENV");
-}
+};
 
-# XXX force Cwd to bootsrap its XSUBs since we have set @INC = "../lib"
+# XXX force Cwd to bootsrap its XSUBs since we have set $^INCLUDE_PATH = "../lib"
 # XXX and subsequent chdir()s can make them impossible to find
 try { fastcwd };
 
 # Must find an external pwd (or equivalent) command.
 
-my $pwd = $^O eq 'MSWin32' ? "cmd" : "pwd";
+my $pwd = $^OS_NAME eq 'MSWin32' ?? "cmd" !! "pwd";
 my $pwd_cmd =
-    ($^O eq "NetWare") ?
-        "cd" :
-    ($IsMacOS) ?
-        "pwd" :
-        (grep { -x && -f } map { "$_/$pwd%Config{exe_ext}" }
-	                   split m/%Config{path_sep}/, %ENV{PATH})[0];
+    ($^OS_NAME eq "NetWare") ??
+        "cd" !!
+    ($IsMacOS) ??
+        "pwd" !!
+        (grep { -x && -f }, map { "$_/$pwd$(config_value('exe_ext'))" },
+	                   split m/$(config_value('path_sep'))/, env::var('PATH'))[0];
 
 $pwd_cmd = 'SHOW DEFAULT' if $IsVMS;
-if ($^O eq 'MSWin32') {
+if ($^OS_NAME eq 'MSWin32') {
     $pwd_cmd =~ s,/,\\,g;
     $pwd_cmd = "$pwd_cmd /c cd";
 }
-$pwd_cmd =~ s=\\=/=g if ($^O eq 'dos');
+$pwd_cmd =~ s=\\=/=g if ($^OS_NAME eq 'dos');
 
-SKIP: {
+SKIP: do {
     skip "No native pwd command found to test against", 4 unless $pwd_cmd;
 
-    print "# native pwd = '$pwd_cmd'\n";
+    print $^STDOUT, "# native pwd = '$pwd_cmd'\n";
 
-    local %ENV{[qw(PATH IFS CDPATH ENV BASH_ENV)]} = ();
-    my ($pwd_cmd_untainted) = $pwd_cmd =~ m/^(.+)$/; # Untaint.
+    my %local_env_keys = %:< @+: map { @: $_, env::var($_) }, qw[PATH IFS CDPATH ENV BASH_ENV];
+    push dynascope->{onleave}, sub {
+        env::var($_) = %local_env_keys{$_} for keys %local_env_keys;
+    };
+    env::var($_) = undef for keys %local_env_keys;
+    my @($pwd_cmd_untainted) = @: $pwd_cmd =~ m/^(.+)$/; # Untaint.
     chomp(my $start = `$pwd_cmd_untainted`);
 
     # Win32's cd returns native C:\ style
-    $start =~ s,\\,/,g if ($^O eq 'MSWin32' || $^O eq "NetWare");
+    $start =~ s,\\,/,g if ($^OS_NAME eq 'MSWin32' || $^OS_NAME eq "NetWare");
     # DCL SHOW DEFAULT has leading spaces
     $start =~ s/^\s+// if $IsVMS;
-    SKIP: {
-        skip("'$pwd_cmd' failed, nothing to test against", 4) if $?;
+    SKIP: do {
+        skip("'$pwd_cmd' failed, nothing to test against", 4) if $^CHILD_ERROR;
         skip("/afs seen, paths unlikely to match", 4) if $start =~ m|/afs/|;
 
 	# Darwin's getcwd(3) (which Cwd.xs:bsd_realpath() uses which
@@ -92,7 +95,7 @@ SKIP: {
 	# Admittedly fixing this in the Cwd module would be better
 	# long-term solution but deleting $ENV{PWD} should not be
 	# done light-heartedly. --jhi
-	delete %ENV{PWD} if $^O eq 'darwin';
+	env::var('PWD') = undef if $^OS_NAME eq 'darwin';
 
 	my $cwd        = cwd;
 	my $getcwd     = getcwd;
@@ -103,8 +106,8 @@ SKIP: {
 	is($getcwd,     $start, 'getcwd()');
 	is($fastcwd,    $start, 'fastcwd()');
 	is($fastgetcwd, $start, 'fastgetcwd()');
-    }
-}
+    };
+};
 
 my @test_dirs = qw{_ptrslt_ _path_ _to_ _a_ _dir_};
 my $Test_Dir     = File::Spec->catdir(< @test_dirs);
@@ -114,47 +117,47 @@ Cwd::chdir $Test_Dir;
 
 foreach my $func (qw(cwd getcwd fastcwd fastgetcwd)) {
   my $result = eval "$func()";
-  is $@, '';
+  is $^EVAL_ERROR, '';
   dir_ends_with( $result, $Test_Dir, "$func()" );
 }
 
-{
+do {
   # Some versions of File::Path (e.g. that shipped with perl 5.8.5)
   # call getcwd() with an argument (perhaps by calling it as a
   # method?), so make sure that doesn't die.
   is getcwd(), getcwd('foo'), "Call getcwd() with an argument";
-}
+};
 
 # Cwd::chdir should also update $ENV{PWD}
-dir_ends_with( %ENV{PWD}, $Test_Dir, 'Cwd::chdir() updates $ENV{PWD}' );
+dir_ends_with( env::var('PWD'), $Test_Dir, 'Cwd::chdir() updates $ENV{PWD}' );
 my $updir = File::Spec->updir;
 
 for (1..nelems @test_dirs) {
   Cwd::chdir $updir;
-  print "#%ENV{PWD}\n";
+  print $^STDOUT, "#$(env::var('PWD'))\n";
 }
 
 rmtree(@test_dirs[0], 0, 0);
 
-{
-  my $check = ($IsVMS   ? qr|\b((?i)t)\]$| :
-	       $IsMacOS ? qr|\bt:$| :
+do {
+  my $check = ($IsVMS   ?? qr|\b((?i)t)\]$| !!
+	       $IsMacOS ?? qr|\bt:$| !!
 			  qr|\bt$| );
   
-  like(%ENV{PWD}, $check);
-}
+  like(env::var('PWD'), $check);
+};
 
-{
+do {
   # Make sure abs_path() doesn't trample $ENV{PWD}
-  my $start_pwd = %ENV{PWD};
+  my $start_pwd = env::var('PWD');
   mkpath(\@($Test_Dir), 0, 0777);
   Cwd::abs_path($Test_Dir);
-  is %ENV{PWD}, $start_pwd;
+  is env::var('PWD'), $start_pwd;
   rmtree(@test_dirs[0], 0, 0);
-}
+};
 
-SKIP: {
-    skip "no symlinks on this platform", 2+$EXTRA_ABSPATH_TESTS unless %Config{d_symlink};
+SKIP: do {
+    skip "no symlinks on this platform", 2+$EXTRA_ABSPATH_TESTS unless config_value('d_symlink');
 
     mkpath(\@($Test_Dir), 0, 0777);
     symlink $Test_Dir, "linktest";
@@ -163,7 +166,7 @@ SKIP: {
     my $fast_abs_path =  Cwd::fast_abs_path("linktest");
     my $want          =  quotemeta(
                              File::Spec->rel2abs(
-			         %ENV{PERL_CORE} ? $Test_Dir : < File::Spec->catdir('t', $Test_Dir)
+			         env::var('PERL_CORE') ?? $Test_Dir !! < File::Spec->catdir('t', $Test_Dir)
                                                 )
                                   );
 
@@ -173,11 +176,11 @@ SKIP: {
 
     rmtree(@test_dirs[0], 0, 0);
     1 while unlink "linktest";
-}
+};
 
-if (%ENV{PERL_CORE}) {
+if (env::var('PERL_CORE')) {
     chdir '../ext/Cwd/t';
-    unshift @INC, '../../../lib';
+    unshift $^INCLUDE_PATH, '../../../lib';
 }
 
 # Make sure we can run abs_path() on files, not just directories
@@ -195,23 +198,22 @@ path_ends_with(Cwd::_perl_abs_path($path), 'cwd.t', '_perl_abs_path() can be inv
 
 
   
-SKIP: {
+SKIP: do {
   my $file;
-  {
+  do {
     my $root = Cwd::abs_path(File::Spec->rootdir);	# Add drive letter?
-    local *FH;
-    opendir FH, $root or skip("Can't opendir($root): $!", 2+$EXTRA_ABSPATH_TESTS);
-    ($file) = < grep {-f $_ and not -l $_} map File::Spec->catfile($root, $_), @( readdir FH);
-    closedir FH;
-  }
+    opendir my $fh, $root or skip("Can't opendir($root): $^OS_ERROR", 2+$EXTRA_ABSPATH_TESTS);
+    @(?$file) = grep {-f $_ and not -l $_}, map { File::Spec->catfile($root, $_) }, @( readdir $fh);
+    closedir $fh;
+  };
   skip "No plain file in root directory to test with", 2+$EXTRA_ABSPATH_TESTS unless $file;
   
-  $file = VMS::Filespec::rmsexpand($file) if $^O eq 'VMS';
+  $file = VMS::Filespec::rmsexpand($file) if $^OS_NAME eq 'VMS';
   is Cwd::abs_path($file), $file, 'abs_path() works on files in the root directory';
   is Cwd::fast_abs_path($file), $file, 'fast_abs_path() works on files in the root directory';
   is Cwd::_perl_abs_path($file), $file, '_perl_abs_path() works on files in the root directory'
     if $EXTRA_ABSPATH_TESTS;
-}
+};
 
 
 #############################################
@@ -219,21 +221,21 @@ SKIP: {
 # directory or path comparison capability.
 
 sub bracketed_form_dir {
-  return join '', map "[$_]", grep length, File::Spec->splitdir(File::Spec->canonpath( shift() ));
+  return join '', map { "[$_]" }, grep { length }, File::Spec->splitdir(File::Spec->canonpath( shift() ));
 }
 
 sub dir_ends_with {
-  my ($dir, $expect) = (shift, shift);
+  my @($dir, $expect) = @(shift, shift);
   my $bracketed_expect = quotemeta bracketed_form_dir($expect);
-  like( bracketed_form_dir($dir), qr|$bracketed_expect$|i, ((nelems @_) ? shift : ()) );
+  like( bracketed_form_dir($dir), qr|$bracketed_expect$|i, ((nelems @_) ?? shift !! ()) );
 }
 
 sub bracketed_form_path {
-  return join '', map "[$_]", grep length, File::Spec->splitpath(File::Spec->canonpath( shift() ));
+  return join '', map { "[$_]" }, grep { length }, File::Spec->splitpath(File::Spec->canonpath( shift() ));
 }
 
 sub path_ends_with {
-  my ($dir, $expect) = (shift, shift);
+  my @($dir, $expect) = @(shift, shift);
   my $bracketed_expect = quotemeta bracketed_form_path($expect);
-  like( bracketed_form_path($dir), qr|$bracketed_expect$|i, ((nelems @_) ? shift : ()) );
+  like( bracketed_form_path($dir), qr|$bracketed_expect$|i, ((nelems @_) ?? shift !! ()) );
 }
